@@ -53,7 +53,10 @@ class MiddlewareAutoDiscover:
                 business_modules = []
                 for item in base_path.iterdir():
                     if item.is_dir() and not item.name.startswith('_') and item.name != '__pycache__':
-                        business_modules.append(item.name)
+                        # 检查是否有middleware目录
+                        middleware_dir = item / "middleware"
+                        if middleware_dir.exists() and middleware_dir.is_dir():
+                            business_modules.append(item.name)
                 
                 print(f"📦 发现业务模块: {business_modules}")
                 
