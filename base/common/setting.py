@@ -5,6 +5,35 @@ from pydantic_settings import BaseSettings
 from typing import Any, List, Optional, Literal
 from pathlib import Path
 
+
+def get_model_list() -> List[str]:
+
+	plugin_models = []
+	core_models = []
+
+	plugins_dir = Path(__file__).parent.parent / "plugins"
+	if plugins_dir.exists() and plugins_dir.is_dir():
+		for plugin in plugins_dir.iterdir():
+			models_path = plugin / "models"
+			if models_path.exists() and models_path.is_dir():
+				for model_file in models_path.glob("*.py"):
+					if model_file.name != "__init__.py":
+						relative_model = f"base.plugins.{plugin.name}.models.{model_file.stem}"
+						plugin_models.append(relative_model)
+
+	core_dir = Path(__file__).parent.parent / "core"
+	if core_dir.exists() and core_dir.is_dir():
+		for core_module in core_dir.iterdir():
+			models_path = core_module / "models"
+			if models_path.exists() and models_path.is_dir():
+				for model_file in models_path.glob("*.py"):
+					if model_file.name != "__init__.py":
+						relative_model = f"base.core.{core_module.name}.models.{model_file.stem}"
+						core_models.append(relative_model)
+
+	model_list = core_models + plugin_models + ['aerich.models']
+	return model_list
+
 class Settings(BaseSettings):
 	
 	app_name: str = config.config.get("app", "name", fallback="AIPanelAdmin")
@@ -17,8 +46,8 @@ class Settings(BaseSettings):
 	db_password: str = config.config.get("db", "password", fallback="123456")
 	db_port: int = config.config.getint("db", "port", fallback=5432)
 	# 项目根目录
-	base_path = Path(__file__).parent.parent.parent
-	LOG_DIR = config.config.get("log", "path", fallback=str(base_path / "logs"))
+	base_path: Path = Path(__file__).parent.parent.parent
+	LOG_DIR: str = config.config.get("log", "path", fallback=str(base_path / "logs"))
 	# ================================================= #
 	# ******************** 跨域配置 ******************** #
 	# ================================================= #
@@ -91,7 +120,7 @@ class Settings(BaseSettings):
 		},
 		"apps": {
             "models": {
-                "models": ["base.models.users","aerich.models"],
+                "models": get_model_list(),
                 "default_connection": "postgres",
             },
         },
