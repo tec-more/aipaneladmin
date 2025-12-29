@@ -59,7 +59,8 @@ class MiddlewareAutoDiscover:
                 
                 
                 
-                # 扫描每个业务模块的middleware目                for module_name in business_modules:
+                # 扫描每个业务模块的middleware目录
+                for module_name in business_modules:
                     middleware_package = f"{base_package}.{module_name}.middleware"
                     module_middleware = self._discover_module_middleware(middleware_package, module_name)
                     all_middleware.extend(module_middleware)
