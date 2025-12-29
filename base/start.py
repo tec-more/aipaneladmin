@@ -35,6 +35,6 @@ def init_app() -> FastAPI:
 	# 注册中间件、路由和异常处理
 	register_exceptions(app)
 	register_middlewares(app)
-	register_routers(app, prefix="/api")
+	register_routers(app)
 
 	return app
