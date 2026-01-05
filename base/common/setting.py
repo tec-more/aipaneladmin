@@ -6,21 +6,70 @@ from typing import Any, List, Optional, Literal
 from pathlib import Path
 
 
-def get_model_list() -> List[str]:
+def get_enabled_plugins() -> List[str]:
+	"""
+	从各插件的 manifest.json 读取已安装且激活的插件列表
+	用于在 ORM 配置阶段确定要加载哪些插件模型
+	"""
+	import json
+	plugins_dir = Path(__file__).parent.parent / "plugins"
+	exclude_dirs = {"__pycache__", ".git"}
 
+	enabled_plugins = []
+	if plugins_dir.exists() and plugins_dir.is_dir():
+		for plugin in plugins_dir.iterdir():
+			if plugin.is_dir() and not plugin.name.startswith("_") and plugin.name not in exclude_dirs:
+				manifest_file = plugin / "manifest.json"
+				if manifest_file.exists():
+					try:
+						with open(manifest_file, "r", encoding="utf-8") as f:
+							manifest = json.load(f)
+							if manifest.get("is_installed") and manifest.get("is_enabled"):
+								enabled_plugins.append(plugin.name)
+					except Exception:
+						pass
+
+	return enabled_plugins
+
+
+def get_plugin_models_from_manifest(plugin_name: str) -> List[str]:
+	"""
+	从插件的 manifest.json 读取模型列表
+	"""
+	import json
+	plugins_dir = Path(__file__).parent.parent / "plugins"
+	manifest_file = plugins_dir / plugin_name / "manifest.json"
+
+	models = []
+	if manifest_file.exists():
+		try:
+			with open(manifest_file, "r", encoding="utf-8") as f:
+				manifest = json.load(f)
+				# 从 manifest 中读取 models 字段
+				model_files = manifest.get("models", [])
+				for model_file in model_files:
+					# model_file 格式: "greeting" 或 "models/greeting"
+					if "/" in model_file:
+						model_path = model_file.replace("/", ".")
+					else:
+						model_path = f"models.{model_file}"
+					models.append(f"base.plugins.{plugin_name}.{model_path}")
+		except Exception:
+			pass
+
+	return models
+
+
+def get_model_list() -> List[str]:
+	"""
+	获取所有需要加载的模型列表
+	- 核心模块的模型总是加载
+	- 插件模型只有在已安装且激活时才加载（从 manifest.json 读取模型声明）
+	"""
 	plugin_models = []
 	core_models = []
 
-	plugins_dir = Path(__file__).parent.parent / "plugins"
-	if plugins_dir.exists() and plugins_dir.is_dir():
-		for plugin in plugins_dir.iterdir():
-			models_path = plugin / "models"
-			if models_path.exists() and models_path.is_dir():
-				for model_file in models_path.glob("*.py"):
-					if model_file.name != "__init__.py":
-						relative_model = f"base.plugins.{plugin.name}.models.{model_file.stem}"
-						plugin_models.append(relative_model)
-
+	# 加载核心模块的模型
 	core_dir = Path(__file__).parent.parent / "core"
 	if core_dir.exists() and core_dir.is_dir():
 		for core_module in core_dir.iterdir():
@@ -30,6 +79,12 @@ def get_model_list() -> List[str]:
 					if model_file.name != "__init__.py":
 						relative_model = f"base.core.{core_module.name}.models.{model_file.stem}"
 						core_models.append(relative_model)
+
+	# 只加载已安装且激活的插件模型
+	enabled_plugins = get_enabled_plugins()
+	for plugin_name in enabled_plugins:
+		models = get_plugin_models_from_manifest(plugin_name)
+		plugin_models.extend(models)
 
 	model_list = core_models + plugin_models + ['aerich.models']
 	return model_list

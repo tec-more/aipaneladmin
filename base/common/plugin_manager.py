@@ -1,0 +1,540 @@
+"""
+插件管理器 - 约定式插件系统
+插件信息从 manifest.json 读取，路由和模型只在激活状态下加载
+插件状态（is_installed, is_enabled）直接存储在各插件的 manifest.json 中
+
+约定式插件结构：
+- manifest.json     必需，插件元数据、路由声明和状态
+- __init__.py       必需，可以为空文件
+- api/              可选，API 路由（在 manifest.json 的 routes 中声明）
+- models/           可选，数据模型（在 manifest.json 的 models 中声明）
+- schemas/          可选，Pydantic Schema
+- services/         可选，业务逻辑
+
+manifest.json 示例：
+{
+    "name": "hello_world",
+    "display_name": "Hello World",
+    "version": "1.0.0",
+    "routes": ["api/v1/hello"],    // 路由模块路径
+    "models": ["greeting"],         // 模型模块名
+    "is_installed": false,
+    "is_enabled": false
+}
+
+__init__.py 可选导出（均为可选）：
+- router: APIRouter           插件路由（优先于 manifest routes）
+- on_enable(app) -> bool      启用时调用
+- on_disable() -> bool        禁用时调用
+- on_startup() -> None        应用启动时调用
+- on_shutdown() -> None       应用关闭时调用
+"""
+import json
+import shutil
+import zipfile
+import importlib
+import importlib.util
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from fastapi import FastAPI, APIRouter
+
+from base.common.log import log
+from base.common.setting import settings
+
+
+class PluginInstance:
+    """插件实例包装器"""
+
+    def __init__(self, name: str, module: Any, manifest: dict, router: Optional[APIRouter] = None):
+        self.name = name
+        self.module = module
+        self.display_name = manifest.get("display_name", name)
+        self.version = manifest.get("version", "0.0.0")
+        self.description = manifest.get("description", "")
+        self.author = manifest.get("author", "")
+        self.website = manifest.get("website", "")
+        self.dependencies = manifest.get("dependencies", [])
+        self.enabled = False
+        # 优先使用模块导出的 router，否则使用传入的 router
+        self.router: Optional[APIRouter] = getattr(module, 'router', None) or router
+
+    async def on_enable(self, app: FastAPI) -> bool:
+        """调用插件的 on_enable 钩子"""
+        if hasattr(self.module, 'on_enable'):
+            result = await self.module.on_enable(app)
+            if not result:
+                return False
+        self.enabled = True
+        return True
+
+    async def on_disable(self) -> bool:
+        """调用插件的 on_disable 钩子"""
+        if hasattr(self.module, 'on_disable'):
+            result = await self.module.on_disable()
+            if not result:
+                return False
+        self.enabled = False
+        return True
+
+    async def on_startup(self) -> None:
+        """调用插件的 on_startup 钩子"""
+        if hasattr(self.module, 'on_startup'):
+            await self.module.on_startup()
+
+    async def on_shutdown(self) -> None:
+        """调用插件的 on_shutdown 钩子"""
+        if hasattr(self.module, 'on_shutdown'):
+            await self.module.on_shutdown()
+
+    async def on_uninstall(self) -> bool:
+        """调用插件的 on_uninstall 钩子"""
+        if hasattr(self.module, 'on_uninstall'):
+            return await self.module.on_uninstall()
+        return True
+
+
+class PluginManager:
+    """插件管理器(单例)"""
+
+    _instance: Optional["PluginManager"] = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+
+        self._plugins: Dict[str, PluginInstance] = {}  # 已加载的插件实例
+        self._manifests: Dict[str, dict] = {}  # 插件 manifest 信息缓存
+        self._app: Optional[FastAPI] = None
+        self._plugins_dir = settings.base_path / "base" / "plugins"
+        self._initialized = True
+
+    @property
+    def plugins_dir(self) -> Path:
+        return self._plugins_dir
+
+    def set_app(self, app: FastAPI) -> None:
+        self._app = app
+
+    def get_plugin(self, name: str) -> Optional[PluginInstance]:
+        return self._plugins.get(name)
+
+    def get_all_plugins(self) -> Dict[str, PluginInstance]:
+        return self._plugins.copy()
+
+    # ==================== Manifest 管理 ====================
+
+    def get_manifest(self, name: str) -> Optional[dict]:
+        """获取插件 manifest 信息"""
+        if name in self._manifests:
+            return self._manifests[name]
+        return self._read_manifest(name)
+
+    def _read_manifest(self, name: str) -> Optional[dict]:
+        """从 manifest.json 读取插件信息"""
+        plugin_dir = self._plugins_dir / name
+        manifest_file = plugin_dir / "manifest.json"
+
+        if not manifest_file.exists():
+            return None
+
+        try:
+            with open(manifest_file, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+                self._manifests[name] = manifest
+                return manifest
+        except Exception as e:
+            log.error(f"读取插件 {name} 的 manifest.json 失败: {e}")
+            return None
+
+    def _write_manifest(self, name: str, manifest: dict) -> bool:
+        """写入 manifest.json"""
+        plugin_dir = self._plugins_dir / name
+        manifest_file = plugin_dir / "manifest.json"
+
+        try:
+            with open(manifest_file, "w", encoding="utf-8") as f:
+                json.dump(manifest, f, ensure_ascii=False, indent=4)
+            self._manifests[name] = manifest
+            return True
+        except Exception as e:
+            log.error(f"写入插件 {name} 的 manifest.json 失败: {e}")
+            return False
+
+    def update_plugin_status(self, name: str, is_installed: bool = None, is_enabled: bool = None) -> bool:
+        """更新插件状态（写入 manifest.json）"""
+        manifest = self.get_manifest(name)
+        if not manifest:
+            return False
+
+        if is_installed is not None:
+            manifest["is_installed"] = is_installed
+        if is_enabled is not None:
+            manifest["is_enabled"] = is_enabled
+
+        return self._write_manifest(name, manifest)
+
+    def get_enabled_plugins_from_manifests(self) -> List[str]:
+        """获取已安装且激活的插件列表"""
+        enabled = []
+        for name in self.discover_plugins():
+            manifest = self.get_manifest(name)
+            if manifest and manifest.get("is_installed") and manifest.get("is_enabled"):
+                enabled.append(name)
+        return enabled
+
+    def discover_plugins(self) -> List[str]:
+        """发现插件目录中的所有插件（通过 manifest.json）"""
+        discovered = []
+        exclude_dirs = {"__pycache__", ".git"}
+
+        if not self._plugins_dir.exists():
+            return discovered
+
+        for item in self._plugins_dir.iterdir():
+            if item.is_dir() and not item.name.startswith("_") and item.name not in exclude_dirs:
+                manifest_file = item / "manifest.json"
+                if manifest_file.exists():
+                    discovered.append(item.name)
+
+        return discovered
+
+    def discover_plugins_info(self) -> List[dict]:
+        """发现所有插件并返回 manifest 信息"""
+        discovered = self.discover_plugins()
+        result = []
+
+        for name in discovered:
+            manifest = self.get_manifest(name)
+            if manifest:
+                result.append({
+                    "name": manifest.get("name", name),
+                    "display_name": manifest.get("display_name", name),
+                    "version": manifest.get("version", "1.0.0"),
+                    "description": manifest.get("description", ""),
+                    "author": manifest.get("author", ""),
+                    "website": manifest.get("website", ""),
+                    "dependencies": manifest.get("dependencies", []),
+                    "is_installed": manifest.get("is_installed", False),
+                    "is_enabled": manifest.get("is_enabled", False),
+                })
+
+        return result
+
+    def load_plugin(self, name: str) -> Optional[PluginInstance]:
+        """加载指定插件模块"""
+        if name in self._plugins:
+            return self._plugins[name]
+
+        plugin_dir = self._plugins_dir / name
+        init_file = plugin_dir / "__init__.py"
+        manifest_file = plugin_dir / "manifest.json"
+
+        if not manifest_file.exists():
+            log.error(f"插件 manifest 不存在: {manifest_file}")
+            return None
+
+        if not init_file.exists():
+            log.error(f"插件入口文件不存在: {init_file}")
+            return None
+
+        try:
+            # 读取 manifest 获取路由配置
+            manifest = self.get_manifest(name)
+
+            # 动态加载插件模块
+            spec = importlib.util.spec_from_file_location(
+                f"base.plugins.{name}", init_file
+            )
+            if spec is None or spec.loader is None:
+                return None
+
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # 从 manifest routes 加载路由（如果模块没有导出 router）
+            router = None
+            if not hasattr(module, 'router') and manifest:
+                router = self._load_routes_from_manifest(name, manifest)
+
+            # 创建插件实例包装器
+            plugin_instance = PluginInstance(name, module, manifest, router)
+            self._plugins[name] = plugin_instance
+            log.info(f"插件加载成功: {name}")
+            return plugin_instance
+
+        except Exception as e:
+            log.error(f"加载插件 {name} 失败: {e}")
+            return None
+
+    def _load_routes_from_manifest(self, name: str, manifest: dict) -> Optional[APIRouter]:
+        """从 manifest 的 routes 字段加载路由"""
+        routes = manifest.get("routes", [])
+        if not routes:
+            return None
+
+        combined_router = APIRouter()
+        plugin_dir = self._plugins_dir / name
+
+        for route_path in routes:
+            # route_path 格式: "api/v1/hello"
+            route_module_path = route_path.replace("/", ".")
+            route_file = plugin_dir / f"{route_path}.py"
+
+            if not route_file.exists():
+                log.warning(f"插件 {name} 的路由文件不存在: {route_file}")
+                continue
+
+            try:
+                spec = importlib.util.spec_from_file_location(
+                    f"base.plugins.{name}.{route_module_path}",
+                    route_file
+                )
+                if spec and spec.loader:
+                    route_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(route_module)
+
+                    if hasattr(route_module, 'router'):
+                        combined_router.include_router(route_module.router)
+                        log.debug(f"已加载路由模块: {route_path}")
+            except Exception as e:
+                log.error(f"加载路由模块 {route_path} 失败: {e}")
+
+        return combined_router if combined_router.routes else None
+
+    async def enable_plugin(self, name: str) -> bool:
+        """启用插件"""
+        manifest = self.get_manifest(name)
+        if not manifest:
+            log.error(f"插件 {name} 的 manifest.json 不存在")
+            return False
+
+        # 加载插件
+        plugin = self._plugins.get(name)
+        if not plugin:
+            plugin = self.load_plugin(name)
+            if not plugin:
+                return False
+
+        if plugin.enabled:
+            return True
+
+        if not self._app:
+            log.error("FastAPI 应用未初始化")
+            return False
+
+        try:
+            # 检查依赖
+            dependencies = manifest.get("dependencies", [])
+            for dep in dependencies:
+                dep_plugin = self._plugins.get(dep)
+                if not dep_plugin or not dep_plugin.enabled:
+                    log.error(f"插件 {name} 依赖的插件 {dep} 未启用")
+                    return False
+
+            # 调用启用钩子
+            success = await plugin.on_enable(self._app)
+            if not success:
+                return False
+
+            # 注册路由
+            if plugin.router:
+                self._app.include_router(plugin.router)
+                log.info(f"已注册插件路由: {name}")
+
+            # 更新 manifest 状态
+            self.update_plugin_status(name, is_installed=True, is_enabled=True)
+
+            log.info(f"插件已启用: {manifest.get('display_name', name)}")
+            return True
+
+        except Exception as e:
+            log.error(f"启用插件 {name} 失败: {e}")
+            return False
+
+    async def disable_plugin(self, name: str) -> bool:
+        """禁用插件"""
+        plugin = self._plugins.get(name)
+        if not plugin or not plugin.enabled:
+            self.update_plugin_status(name, is_enabled=False)
+            return True
+
+        try:
+            # 检查依赖
+            for other_name, other_plugin in self._plugins.items():
+                if other_plugin.enabled:
+                    other_manifest = self.get_manifest(other_name)
+                    if other_manifest and name in other_manifest.get("dependencies", []):
+                        log.error(f"无法禁用插件 {name}，插件 {other_name} 依赖它")
+                        return False
+
+            success = await plugin.on_disable()
+            if not success:
+                return False
+
+            self.update_plugin_status(name, is_enabled=False)
+
+            manifest = self.get_manifest(name)
+            log.info(f"插件已禁用: {manifest.get('display_name', name) if manifest else name}")
+            return True
+
+        except Exception as e:
+            log.error(f"禁用插件 {name} 失败: {e}")
+            return False
+
+    async def install_plugin(self, plugin_path: str) -> Optional[str]:
+        """安装插件(从 zip 文件或目录)"""
+        try:
+            source_path = Path(plugin_path)
+
+            if source_path.suffix == ".zip":
+                return await self._install_from_zip(source_path)
+            elif source_path.is_dir():
+                return await self._install_from_dir(source_path)
+            else:
+                log.error(f"不支持的插件格式: {plugin_path}")
+                return None
+
+        except Exception as e:
+            log.error(f"安装插件失败: {e}")
+            return None
+
+    async def _install_from_zip(self, zip_path: Path) -> Optional[str]:
+        """从 zip 文件安装插件"""
+        if not zip_path.exists():
+            return None
+
+        temp_dir = self._plugins_dir / "_temp_install"
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        temp_dir.mkdir()
+
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(temp_dir)
+
+            items = list(temp_dir.iterdir())
+            plugin_dir = items[0] if len(items) == 1 and items[0].is_dir() else temp_dir
+
+            manifest_file = plugin_dir / "manifest.json"
+            if not manifest_file.exists():
+                log.error("无效的插件结构：缺少 manifest.json")
+                return None
+
+            if not (plugin_dir / "__init__.py").exists():
+                log.error("无效的插件结构：缺少 __init__.py")
+                return None
+
+            with open(manifest_file, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+                plugin_name = manifest.get("name", plugin_dir.name)
+
+            target_dir = self._plugins_dir / plugin_name
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+
+            shutil.move(str(plugin_dir), str(target_dir))
+            self.update_plugin_status(plugin_name, is_installed=True, is_enabled=False)
+
+            log.info(f"插件安装成功: {plugin_name}")
+            return plugin_name
+
+        finally:
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+
+    async def _install_from_dir(self, source_dir: Path) -> Optional[str]:
+        """从目录安装插件"""
+        manifest_file = source_dir / "manifest.json"
+        if not manifest_file.exists():
+            log.error("无效的插件结构：缺少 manifest.json")
+            return None
+
+        if not (source_dir / "__init__.py").exists():
+            log.error("无效的插件结构：缺少 __init__.py")
+            return None
+
+        with open(manifest_file, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+            plugin_name = manifest.get("name", source_dir.name)
+
+        target_dir = self._plugins_dir / plugin_name
+
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+
+        shutil.copytree(source_dir, target_dir)
+        self.update_plugin_status(plugin_name, is_installed=True, is_enabled=False)
+
+        log.info(f"插件安装成功: {plugin_name}")
+        return plugin_name
+
+    async def uninstall_plugin(self, name: str) -> bool:
+        """卸载插件"""
+        plugin = self._plugins.get(name)
+
+        try:
+            if plugin and plugin.enabled:
+                await self.disable_plugin(name)
+
+            if plugin:
+                await plugin.on_uninstall()
+
+            if name in self._plugins:
+                del self._plugins[name]
+
+            if name in self._manifests:
+                del self._manifests[name]
+
+            plugin_dir = self._plugins_dir / name
+            if plugin_dir.exists():
+                shutil.rmtree(plugin_dir)
+
+            log.info(f"插件已卸载: {name}")
+            return True
+
+        except Exception as e:
+            log.error(f"卸载插件 {name} 失败: {e}")
+            return False
+
+    async def load_enabled_plugins(self) -> None:
+        """加载并启用已激活的插件"""
+        enabled_plugins = self.get_enabled_plugins_from_manifests()
+
+        for plugin_name in enabled_plugins:
+            manifest = self.get_manifest(plugin_name)
+            if manifest:
+                await self.enable_plugin(plugin_name)
+            else:
+                log.warning(f"插件 {plugin_name} 的 manifest 不存在，跳过加载")
+
+        # 同步数据库状态（如果可用）
+        try:
+            from base.core.extension.models.plugin import Plugin as PluginModel
+            db_enabled_plugins = await PluginModel.filter(is_enabled=True, is_installed=True).all()
+            for plugin_record in db_enabled_plugins:
+                if plugin_record.name not in enabled_plugins:
+                    await self.enable_plugin(plugin_record.name)
+        except Exception as e:
+            log.debug(f"数据库插件状态同步跳过: {e}")
+
+    async def startup(self) -> None:
+        """应用启动时调用"""
+        for plugin in self._plugins.values():
+            if plugin.enabled:
+                await plugin.on_startup()
+
+    async def shutdown(self) -> None:
+        """应用关闭时调用"""
+        for plugin in self._plugins.values():
+            if plugin.enabled:
+                await plugin.on_shutdown()
+
+
+# 全局插件管理器实例
+plugin_manager = PluginManager()

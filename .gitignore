@@ -1,5 +1,6 @@
 # sphinx build directories
 _build/
+web/node_modules/
 
 # dotfiles
 .*
@@ -40,3 +41,29 @@ setup/win32/static/postgresql*.exe
 /vscode/
 .vscode/
 .venv/
+
+# logs
+logs/
+*.log
+
+# database
+*.db
+*.sqlite
+*.sqlite3
+
+# pytest cache
+.pytest_cache/
+htmlcov/
+.coverage
+
+# migrations
+migrations/models/
+
+# environment variables
+.env
+.env.local
+
+# IDE
+.idea/
+*.swp
+*.swo
