@@ -127,3 +127,31 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
         )
 
     return user_id
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    从JWT令牌中获取当前用户对象
+
+    Args:
+        credentials: HTTP Authorization 凭证
+
+    Returns:
+        User: 用户对象
+
+    Raises:
+        HTTPException: 如果令牌无效或用户不存在
+    """
+    from base.core.users.models.users import User
+
+    user_id = await get_current_user_id(credentials)
+    user = await User.filter(id=user_id).first()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user

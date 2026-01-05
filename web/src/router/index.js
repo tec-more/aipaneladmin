@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useMenuStore } from '@/stores/menu'
 
 const routes = [
   {
@@ -70,7 +71,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   document.title = `${to.meta.title || ''} - AI Panel Admin`
 
   // 直接从 localStorage 读取 token 判断登录状态
@@ -88,6 +89,15 @@ router.beforeEach((to, from, next) => {
   } else if (!isLoggedIn) {
     next({ path: '/login', query: { redirect: to.fullPath } })
   } else {
+    // 已登录，加载用户菜单
+    const menuStore = useMenuStore()
+    if (!menuStore.isLoaded && !menuStore.loading) {
+      try {
+        await menuStore.fetchUserMenus()
+      } catch (error) {
+        console.error('加载菜单失败:', error)
+      }
+    }
     next()
   }
 })

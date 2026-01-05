@@ -90,7 +90,7 @@ def get_model_list() -> List[str]:
 	return model_list
 
 class Settings(BaseSettings):
-	
+
 	app_name: str = config.config.get("app", "name", fallback="AIPanelAdmin")
 	app_description: str = config.config.get("app", "description", fallback="AIPanelAdmin API Documentation")
 	app_version: str = config.config.get("app", "version", fallback="0.1.0")
@@ -100,6 +100,12 @@ class Settings(BaseSettings):
 	db_user: str = config.config.get("db", "user", fallback="admin")
 	db_password: str = config.config.get("db", "password", fallback="123456")
 	db_port: int = config.config.getint("db", "port", fallback=5432)
+	# Redis配置
+	REDIS_ENABLED: bool = config.config.getboolean("redis", "enabled", fallback=False)
+	REDIS_HOST: str = config.config.get("redis", "host", fallback="127.0.0.1")
+	REDIS_PORT: int = config.config.getint("redis", "port", fallback=6379)
+	REDIS_PASSWORD: str = config.config.get("redis", "password", fallback="")
+	REDIS_DB: int = config.config.getint("redis", "db", fallback=0)
 	# 项目根目录
 	base_path: Path = Path(__file__).parent.parent.parent
 	LOG_DIR: str = config.config.get("log", "path", fallback=str(base_path / "logs"))

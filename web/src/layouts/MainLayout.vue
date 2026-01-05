@@ -16,41 +16,48 @@
         active-text-color="#409eff"
         router
       >
-        <el-menu-item index="/dashboard">
-          <el-icon><Odometer /></el-icon>
-          <template #title>仪表盘</template>
-        </el-menu-item>
-
-        <el-sub-menu index="system">
-          <template #title>
-            <el-icon><Setting /></el-icon>
-            <span>系统管理</span>
-          </template>
-          <el-menu-item index="/users">
-            <el-icon><User /></el-icon>
-            <template #title>用户管理</template>
+        <!-- 动态菜单渲染 -->
+        <template v-for="menu in menuStore.menuTree" :key="menu.id">
+          <!-- 有子菜单的情况 -->
+          <el-sub-menu v-if="menu.children && menu.children.length > 0" :index="menu.path || `menu-${menu.id}`">
+            <template #title>
+              <el-icon>
+                <component :is="getIconComponent(menu.icon)" />
+              </el-icon>
+              <span>{{ menu.name }}</span>
+            </template>
+            <!-- 递归渲染子菜单 -->
+            <template v-for="child in menu.children" :key="child.id">
+              <el-sub-menu v-if="child.children && child.children.length > 0" :index="child.path || `menu-${child.id}`">
+                <template #title>
+                  <el-icon>
+                    <component :is="getIconComponent(child.icon)" />
+                  </el-icon>
+                  <span>{{ child.name }}</span>
+                </template>
+                <el-menu-item v-for="subChild in child.children" :key="subChild.id" :index="subChild.path">
+                  <el-icon>
+                    <component :is="getIconComponent(subChild.icon)" />
+                  </el-icon>
+                  <template #title>{{ subChild.name }}</template>
+                </el-menu-item>
+              </el-sub-menu>
+              <el-menu-item v-else :index="child.path">
+                <el-icon>
+                  <component :is="getIconComponent(child.icon)" />
+                </el-icon>
+                <template #title>{{ child.name }}</template>
+              </el-menu-item>
+            </template>
+          </el-sub-menu>
+          <!-- 没有子菜单的情况 -->
+          <el-menu-item v-else :index="menu.path">
+            <el-icon>
+              <component :is="getIconComponent(menu.icon)" />
+            </el-icon>
+            <template #title>{{ menu.name }}</template>
           </el-menu-item>
-          <el-menu-item index="/departments">
-            <el-icon><OfficeBuilding /></el-icon>
-            <template #title>部门管理</template>
-          </el-menu-item>
-          <el-menu-item index="/roles">
-            <el-icon><UserFilled /></el-icon>
-            <template #title>角色管理</template>
-          </el-menu-item>
-          <el-menu-item index="/permissions">
-            <el-icon><Key /></el-icon>
-            <template #title>权限管理</template>
-          </el-menu-item>
-          <el-menu-item index="/menus">
-            <el-icon><Menu /></el-icon>
-            <template #title>菜单管理</template>
-          </el-menu-item>
-          <el-menu-item index="/plugins">
-            <el-icon><Connection /></el-icon>
-            <template #title>插件管理</template>
-          </el-menu-item>
-        </el-sub-menu>
+        </template>
       </el-menu>
     </el-aside>
 
@@ -121,16 +128,78 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, markRaw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UserFilled } from '@element-plus/icons-vue'
+import {
+  UserFilled, Odometer, Setting, User, OfficeBuilding, Key, Menu,
+  Connection, Document, Folder, Files, Grid, List, Search, Edit,
+  Delete, Plus, Minus, Check, Close, Warning, InfoFilled, QuestionFilled,
+  Star, Message, Bell, Calendar, Clock, Location, Phone, Picture,
+  VideoCamera, Upload, Download, Link, Share, Lock, Unlock, Tools,
+  Monitor, DataLine, PieChart, TrendCharts, Histogram
+} from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { useMenuStore } from '@/stores/menu'
 import { changePassword } from '@/api/auth'
+
+// 图标组件映射
+const iconComponents = {
+  Odometer: markRaw(Odometer),
+  Setting: markRaw(Setting),
+  User: markRaw(User),
+  OfficeBuilding: markRaw(OfficeBuilding),
+  UserFilled: markRaw(UserFilled),
+  Key: markRaw(Key),
+  Menu: markRaw(Menu),
+  Connection: markRaw(Connection),
+  Document: markRaw(Document),
+  Folder: markRaw(Folder),
+  Files: markRaw(Files),
+  Grid: markRaw(Grid),
+  List: markRaw(List),
+  Search: markRaw(Search),
+  Edit: markRaw(Edit),
+  Delete: markRaw(Delete),
+  Plus: markRaw(Plus),
+  Minus: markRaw(Minus),
+  Check: markRaw(Check),
+  Close: markRaw(Close),
+  Warning: markRaw(Warning),
+  InfoFilled: markRaw(InfoFilled),
+  QuestionFilled: markRaw(QuestionFilled),
+  Star: markRaw(Star),
+  Message: markRaw(Message),
+  Bell: markRaw(Bell),
+  Calendar: markRaw(Calendar),
+  Clock: markRaw(Clock),
+  Location: markRaw(Location),
+  Phone: markRaw(Phone),
+  Picture: markRaw(Picture),
+  VideoCamera: markRaw(VideoCamera),
+  Upload: markRaw(Upload),
+  Download: markRaw(Download),
+  Link: markRaw(Link),
+  Share: markRaw(Share),
+  Lock: markRaw(Lock),
+  Unlock: markRaw(Unlock),
+  Tools: markRaw(Tools),
+  Monitor: markRaw(Monitor),
+  DataLine: markRaw(DataLine),
+  PieChart: markRaw(PieChart),
+  TrendCharts: markRaw(TrendCharts),
+  Histogram: markRaw(Histogram)
+}
+
+// 根据图标名称获取组件
+const getIconComponent = (iconName) => {
+  return iconComponents[iconName] || iconComponents.Document
+}
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const menuStore = useMenuStore()
 
 const isCollapse = ref(false)
 const passwordVisible = ref(false)
@@ -176,6 +245,7 @@ const handleCommand = async (command) => {
         type: 'warning'
       })
       await userStore.logout()
+      menuStore.resetMenus()
       router.push('/login')
     } catch {
       // 取消操作
@@ -197,6 +267,13 @@ const submitPassword = async () => {
   ElMessage.success('密码修改成功')
   passwordVisible.value = false
 }
+
+// 组件挂载时加载菜单
+onMounted(async () => {
+  if (!menuStore.isLoaded) {
+    await menuStore.fetchUserMenus()
+  }
+})
 </script>
 
 <style lang="scss" scoped>
