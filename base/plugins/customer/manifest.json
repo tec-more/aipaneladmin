@@ -1,0 +1,18 @@
+{
+    "name": "customer",
+    "display_name": "客户模块",
+    "version": "1.0.0",
+    "description": "客户模块，提供网站注册客户的管理功能",
+    "author": "hepan",
+    "is_installed": true,
+    "is_enabled": true,
+    "routes": [
+        "api/v1/customer"
+    ],
+    "models": [
+        "customer"
+    ],
+    "schemas": [
+        "customer_schema"
+    ]
+}
