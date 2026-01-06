@@ -28,29 +28,7 @@
             "sort": 4,
             "is_hidden": false,
             "menu_type": "menu",
-            "permission_code": "order:list",
-            "children": [
-                {
-                    "name": "订单列表",
-                    "path": "/orders/list",
-                    "icon": "List",
-                    "component": "order/OrderList",
-                    "sort": 1,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "order:list"
-                },
-                {
-                    "name": "订单详情",
-                    "path": "/orders/detail",
-                    "icon": "Detail",
-                    "component": "order/OrderDetail",
-                    "sort": 2,
-                    "is_hidden": true,
-                    "menu_type": "menu",
-                    "permission_code": "order:detail"
-                }
-            ]
+            "permission_code": "order:list"
         }
     ]
 }

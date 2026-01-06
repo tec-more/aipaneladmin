@@ -24,29 +24,7 @@
             "sort": 2,
             "is_hidden": false,
             "menu_type": "menu",
-            "permission_code": "customer:list",
-            "children": [
-                {
-                    "name": "客户列表",
-                    "path": "/customers/list",
-                    "icon": "List",
-                    "component": "customer/CustomerList",
-                    "sort": 1,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "customer:list"
-                },
-                {
-                    "name": "客户详情",
-                    "path": "/customers/detail",
-                    "icon": "Detail",
-                    "component": "customer/CustomerDetail",
-                    "sort": 2,
-                    "is_hidden": true,
-                    "menu_type": "menu",
-                    "permission_code": "customer:detail"
-                }
-            ]
+            "permission_code": "customer:list"
         }
     ]
 }

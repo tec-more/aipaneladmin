@@ -26,11 +26,11 @@ request.interceptors.response.use(
   (response) => {
     const res = response.data
     // 后端成功响应码为 0 或 success 为 true
-    if (res.code === 0 || res.success === true) {
+    if (res.code === 0 || res.code === 200 || res.success === true) {
       return res
     } else {
-      ElMessage.error(res.msg || '请求失败')
-      return Promise.reject(new Error(res.msg || '请求失败'))
+      ElMessage.error(res.msg || '请求失败1')
+      return Promise.reject(new Error(res.msg || '请求失败2'))
     }
   },
   (error) => {
@@ -45,7 +45,7 @@ request.interceptors.response.use(
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
       } else {
-        ElMessage.error(data?.msg || error.message || '请求失败')
+        ElMessage.error(data?.msg || error.message || '请求失败3')
       }
     } else {
       ElMessage.error('网络错误，请检查网络连接')

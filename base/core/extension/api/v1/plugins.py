@@ -102,6 +102,8 @@ async def sync_plugins(
             author=info.get("author"),
             website=info.get("website"),
             dependencies=info.get("dependencies", []),
+            is_installed=info.get("is_installed", False),
+            is_enabled=info.get("is_enabled", False),
         )
         synced.append(await db_plugin.to_dict())
 

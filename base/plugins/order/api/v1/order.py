@@ -4,6 +4,7 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, Query
 
+from base.common.response import SuccessResponse
 from base.plugins.order.schemas.order_schema import (
     OrderCreate, OrderResponse, OrderListResponse, OrderUpdate, OrderCreateResponse
 )
@@ -12,13 +13,13 @@ from base.plugins.order.services.order_service import OrderService
 
 # 创建路由实例
 router = APIRouter(
-    prefix="/orders",
+    prefix="/api/v1/orders",
     tags=["订单管理"],
     responses={404: {"description": "Not found"}},
 )
 
 
-@router.post("/", response_model=OrderCreateResponse, summary="创建订单")
+@router.post("/create", response_model=OrderCreateResponse, summary="创建订单")
 async def create_order(order_create: OrderCreate):
     """创建新订单
     
@@ -33,10 +34,12 @@ async def create_order(order_create: OrderCreate):
             product_id=order_create.product_id,
             quantity=order_create.quantity
         )
-        return OrderCreateResponse(
-            order_id=order.id,
-            order_no=order.order_no,
-            message="订单创建成功"
+        return SuccessResponse(
+            data={
+                "order_id": order.id,
+                "order_no": order.order_no
+            },
+            msg="订单创建成功"
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -50,7 +53,7 @@ async def get_order(order_id: int):
     order = await OrderService.get_order_by_id(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    return order
+    return SuccessResponse(data=order, msg="获取订单详情成功")
 
 
 @router.get("/by-order-no/{order_no}", response_model=OrderResponse, summary="根据订单号获取订单详情")
@@ -59,7 +62,7 @@ async def get_order_by_no(order_no: str):
     order = await OrderService.get_order_by_no(order_no)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    return order
+    return SuccessResponse(data=order, msg="获取订单详情成功")
 
 
 @router.get("/customer/{customer_id}", response_model=OrderListResponse, summary="获取客户订单列表")
@@ -73,7 +76,7 @@ async def get_customer_orders(
     # 计算总数
     from base.plugins.order.models.order import Order
     total = await Order.filter(customer_id=customer_id).count()
-    return OrderListResponse(total=total, items=orders)
+    return SuccessResponse(data={"total": total, "items": orders}, msg="获取客户订单列表成功")
 
 
 @router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
@@ -86,7 +89,7 @@ async def get_all_orders(
     # 计算总数
     from base.plugins.order.models.order import Order
     total = await Order.all().count()
-    return OrderListResponse(total=total, items=orders)
+    return SuccessResponse(data={"total": total, "items": orders}, msg="获取所有订单列表成功")
 
 
 @router.put("/{order_id}", response_model=OrderResponse, summary="更新订单信息")
@@ -123,4 +126,4 @@ async def update_order(order_id: int, order_update: OrderUpdate):
     
     # 重新获取更新后的订单
     updated_order = await OrderService.get_order_by_id(order_id)
-    return updated_order
+    return SuccessResponse(data=updated_order, msg="更新订单信息成功")

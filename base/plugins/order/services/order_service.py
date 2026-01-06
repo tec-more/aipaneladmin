@@ -149,7 +149,7 @@ class OrderService:
     async def get_all_orders(page: int = 1, page_size: int = 20) -> List[Order]:
         """获取所有订单列表"""
         offset = (page - 1) * page_size
-        return await Order.order_by("-created_at").offset(offset).limit(page_size)
+        return await Order.all().order_by("-created_at").offset(offset).limit(page_size)
 
     @staticmethod
     async def update_order_status(order_id: int, status: int) -> bool:

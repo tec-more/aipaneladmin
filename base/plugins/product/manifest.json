@@ -24,29 +24,7 @@
             "sort": 3,
             "is_hidden": false,
             "menu_type": "menu",
-            "permission_code": "product:list",
-            "children": [
-                {
-                    "name": "产品列表",
-                    "path": "/products/list",
-                    "icon": "List",
-                    "component": "product/ProductList",
-                    "sort": 1,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "product:list"
-                },
-                {
-                    "name": "产品详情",
-                    "path": "/products/detail",
-                    "icon": "Detail",
-                    "component": "product/ProductDetail",
-                    "sort": 2,
-                    "is_hidden": true,
-                    "menu_type": "menu",
-                    "permission_code": "product:detail"
-                }
-            ]
+            "permission_code": "product:list"
         }
     ]
 }

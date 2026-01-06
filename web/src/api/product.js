@@ -2,7 +2,7 @@ import request from '@/utils/request'
 
 // 获取产品列表
 export const getProductList = (params) => {
-  return request.get('/api/v1/product/list', { params })
+  return request.get('/v1/product/list', { params })
 }
 
 // 获取产品详情
@@ -12,7 +12,7 @@ export const getProductDetail = (id) => {
 
 // 创建产品
 export const createProduct = (data) => {
-  return request.post('/api/v1/product', data)
+  return request.post('/v1/product', data)
 }
 
 // 更新产品
@@ -27,7 +27,7 @@ export const deleteProduct = (id) => {
 
 // 批量删除产品
 export const batchDeleteProduct = (ids) => {
-  return request.delete('/api/v1/product/batch', { data: { ids } })
+  return request.delete('/v1/product/batch', { data: { ids } })
 }
 
 // 更新产品库存
