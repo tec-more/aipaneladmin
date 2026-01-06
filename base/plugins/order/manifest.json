@@ -1,0 +1,22 @@
+{
+    "name": "order",
+    "display_name": "订单模块",
+    "version": "1.0.0",
+    "description": "订单模块，用于记录虚拟产品的销售数据",
+    "author": "hepan",
+    "routes": [
+        "api/v1/order"
+    ],
+    "models": [
+        "order"
+    ],
+    "schemas": [
+        "order_schema"
+    ],
+    "dependencies": [
+        "customer",
+        "product"
+    ],
+    "is_installed": true,
+    "is_enabled": true
+}

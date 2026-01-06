@@ -1,0 +1,18 @@
+{
+    "name": "product",
+    "display_name": "产品模块",
+    "version": "1.0.0",
+    "description": "产品模块，提供产品的管理功能",
+    "author": "hepan",
+    "is_installed": true,
+    "is_enabled": true,
+    "routes": [
+        "api/v1/product"
+    ],
+    "models": [
+        "product"
+    ],
+    "schemas": [
+        "product_schema"
+    ]
+}

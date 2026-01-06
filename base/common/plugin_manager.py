@@ -511,25 +511,77 @@ class PluginManager:
             return False
 
     async def load_enabled_plugins(self) -> None:
-        """加载并启用已激活的插件"""
+        """加载并启用已激活的插件（处理依赖关系）"""
+        # 获取所有已启用的插件
         enabled_plugins = self.get_enabled_plugins_from_manifests()
-
-        for plugin_name in enabled_plugins:
-            manifest = self.get_manifest(plugin_name)
-            if manifest:
-                await self.enable_plugin(plugin_name)
-            else:
-                log.warning(f"插件 {plugin_name} 的 manifest 不存在，跳过加载")
-
+        
         # 同步数据库状态（如果可用）
         try:
             from base.core.extension.models.plugin import Plugin as PluginModel
             db_enabled_plugins = await PluginModel.filter(is_enabled=True, is_installed=True).all()
             for plugin_record in db_enabled_plugins:
                 if plugin_record.name not in enabled_plugins:
-                    await self.enable_plugin(plugin_record.name)
+                    enabled_plugins.append(plugin_record.name)
         except Exception as e:
             log.debug(f"数据库插件状态同步跳过: {e}")
+        
+        # 构建插件依赖图
+        plugin_deps = {}
+        all_manifests = {}
+        for plugin_name in enabled_plugins:
+            manifest = self.get_manifest(plugin_name)
+            if manifest:
+                all_manifests[plugin_name] = manifest
+                dependencies = manifest.get("dependencies", [])
+                # 过滤出存在且已启用的依赖
+                filtered_deps = []
+                for dep in dependencies:
+                    dep_manifest = self.get_manifest(dep)
+                    if dep_manifest and (dep_manifest.get("is_installed") and dep_manifest.get("is_enabled")):
+                        filtered_deps.append(dep)
+                plugin_deps[plugin_name] = filtered_deps
+        
+        # 拓扑排序
+        visited = set()
+        temp_visited = set()
+        order = []
+        cycle_found = False
+        
+        def dfs(plugin):
+            nonlocal cycle_found
+            if cycle_found:
+                return
+            
+            if plugin in temp_visited:
+                log.error(f"插件依赖循环: {plugin}")
+                cycle_found = True
+                return
+            
+            if plugin in visited:
+                return
+            
+            temp_visited.add(plugin)
+            
+            for dep in plugin_deps.get(plugin, []):
+                dfs(dep)
+            
+            temp_visited.remove(plugin)
+            visited.add(plugin)
+            order.append(plugin)
+        
+        # 对所有插件执行 DFS
+        for plugin_name in plugin_deps.keys():
+            if plugin_name not in visited:
+                dfs(plugin_name)
+        
+        if cycle_found:
+            log.error("插件依赖存在循环，加载失败")
+            return
+        
+        # 按拓扑排序顺序启用插件
+        log.debug(f"插件拓扑排序结果: {order}")
+        for plugin_name in order:
+            await self.enable_plugin(plugin_name)
 
     async def startup(self) -> None:
         """应用启动时调用"""

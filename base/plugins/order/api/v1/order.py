@@ -1,0 +1,126 @@
+"""
+订单API路由
+"""
+from typing import List
+from fastapi import APIRouter, HTTPException, Query
+
+from base.plugins.order.schemas.order_schema import (
+    OrderCreate, OrderResponse, OrderListResponse, OrderUpdate, OrderCreateResponse
+)
+from base.plugins.order.services.order_service import OrderService
+
+
+# 创建路由实例
+router = APIRouter(
+    prefix="/orders",
+    tags=["订单管理"],
+    responses={404: {"description": "Not found"}},
+)
+
+
+@router.post("/", response_model=OrderCreateResponse, summary="创建订单")
+async def create_order(order_create: OrderCreate):
+    """创建新订单
+    
+    - **customer_id**: 客户ID
+    - **product_id**: 产品ID
+    - **quantity**: 购买数量（默认为1）
+    - **remark**: 订单备注（可选）
+    """
+    try:
+        order = await OrderService.create_order(
+            customer_id=order_create.customer_id,
+            product_id=order_create.product_id,
+            quantity=order_create.quantity
+        )
+        return OrderCreateResponse(
+            order_id=order.id,
+            order_no=order.order_no,
+            message="订单创建成功"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="创建订单失败")
+
+
+@router.get("/{order_id}", response_model=OrderResponse, summary="获取订单详情")
+async def get_order(order_id: int):
+    """根据订单ID获取订单详情"""
+    order = await OrderService.get_order_by_id(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    return order
+
+
+@router.get("/by-order-no/{order_no}", response_model=OrderResponse, summary="根据订单号获取订单详情")
+async def get_order_by_no(order_no: str):
+    """根据订单编号获取订单详情"""
+    order = await OrderService.get_order_by_no(order_no)
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    return order
+
+
+@router.get("/customer/{customer_id}", response_model=OrderListResponse, summary="获取客户订单列表")
+async def get_customer_orders(
+    customer_id: int,
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量")
+):
+    """获取指定客户的订单列表"""
+    orders = await OrderService.get_orders_by_customer(customer_id, page, page_size)
+    # 计算总数
+    from base.plugins.order.models.order import Order
+    total = await Order.filter(customer_id=customer_id).count()
+    return OrderListResponse(total=total, items=orders)
+
+
+@router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
+async def get_all_orders(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量")
+):
+    """获取所有订单列表（分页）"""
+    orders = await OrderService.get_all_orders(page, page_size)
+    # 计算总数
+    from base.plugins.order.models.order import Order
+    total = await Order.all().count()
+    return OrderListResponse(total=total, items=orders)
+
+
+@router.put("/{order_id}", response_model=OrderResponse, summary="更新订单信息")
+async def update_order(order_id: int, order_update: OrderUpdate):
+    """更新订单信息
+    
+    - **payment_status**: 支付状态（可选）
+    - **order_status**: 订单状态（可选）
+    - **remark**: 订单备注（可选）
+    """
+    # 检查订单是否存在
+    order = await OrderService.get_order_by_id(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    
+    # 更新订单状态
+    update_data = order_update.model_dump(exclude_unset=True)
+    
+    if "payment_status" in update_data:
+        success = await OrderService.update_payment_status(
+            order_id=order_id,
+            status=update_data["payment_status"]
+        )
+        if not success:
+            raise HTTPException(status_code=500, detail="更新支付状态失败")
+    
+    if "order_status" in update_data:
+        success = await OrderService.update_order_status(
+            order_id=order_id,
+            status=update_data["order_status"]
+        )
+        if not success:
+            raise HTTPException(status_code=500, detail="更新订单状态失败")
+    
+    # 重新获取更新后的订单
+    updated_order = await OrderService.get_order_by_id(order_id)
+    return updated_order

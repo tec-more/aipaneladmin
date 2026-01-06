@@ -63,6 +63,7 @@ class Customer(BaseModel, TimestampMixin):
     # 账户信息
     points = fields.IntField(default=0, description="积分")
     balance = fields.DecimalField(max_digits=10, decimal_places=2, default=0.00, description="余额")
+    membership_expiry_date = fields.DatetimeField(null=True, description="会员到期日期", index=True)
     
     # 登录信息
     last_login = fields.DatetimeField(null=True, description="最后登录时间", index=True)
@@ -87,6 +88,7 @@ class Customer(BaseModel, TimestampMixin):
             "is_verified": self.is_verified,
             "points": self.points,
             "balance": float(self.balance) if hasattr(self.balance, "__float__") else self.balance,
+            "membership_expiry_date": self.membership_expiry_date.strftime("%Y-%m-%d %H:%M:%S") if self.membership_expiry_date else None,
             "last_login": self.last_login.strftime("%Y-%m-%d %H:%M:%S") if self.last_login else None,
             "login_count": self.login_count,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
