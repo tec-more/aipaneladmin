@@ -315,6 +315,72 @@ class PluginManager:
 
         return combined_router if combined_router.routes else None
 
+    async def _process_plugin_menus(self, name: str, manifest: dict) -> bool:
+        """处理插件的菜单配置"""
+        try:
+            from base.core.users.services.menu_service import MenuService
+            from base.core.users.schemas.rbac import MenuCreate, MenuUpdate
+            
+            # 获取菜单配置
+            menus_config = manifest.get("menus", [])
+            if not menus_config:
+                return True
+            
+            # 递归处理菜单（创建或更新）
+            async def process_menu_recursive(menu_config, parent_id=None):
+                # 查找菜单
+                existing_menu = await MenuService.get_menu_by_name_and_path(
+                    menu_config["name"],
+                    menu_config["path"]
+                )
+                
+                if existing_menu:
+                    # 更新菜单
+                    update_data = MenuUpdate(
+                        name=menu_config["name"],
+                        path=menu_config["path"],
+                        icon=menu_config.get("icon"),
+                        component=menu_config.get("component"),
+                        parent_id=parent_id,
+                        sort=menu_config.get("sort", 0),
+                        is_hidden=menu_config.get("is_hidden", False),
+                        menu_type=menu_config.get("menu_type", "menu"),
+                        permission_code=menu_config.get("permission_code"),
+                        is_active=True
+                    )
+                    menu = await MenuService.update_menu(existing_menu.id, update_data)
+                    log.debug(f"更新菜单: {menu_config['name']} ({menu_config['path']})")
+                else:
+                    # 创建菜单
+                    create_data = MenuCreate(
+                        name=menu_config["name"],
+                        path=menu_config["path"],
+                        icon=menu_config.get("icon"),
+                        component=menu_config.get("component"),
+                        parent_id=parent_id,
+                        sort=menu_config.get("sort", 0),
+                        is_hidden=menu_config.get("is_hidden", False),
+                        menu_type=menu_config.get("menu_type", "menu"),
+                        permission_code=menu_config.get("permission_code")
+                    )
+                    menu = await MenuService.create_menu(create_data)
+                    log.debug(f"创建菜单: {menu_config['name']} ({menu_config['path']})")
+                
+                # 处理子菜单
+                for child_config in menu_config.get("children", []):
+                    await process_menu_recursive(child_config, menu.id)
+            
+            # 处理所有顶级菜单
+            for menu_config in menus_config:
+                await process_menu_recursive(menu_config)
+            
+            log.info(f"插件 {name} 的菜单配置已处理完成")
+            return True
+            
+        except Exception as e:
+            log.error(f"处理插件 {name} 的菜单配置失败: {e}")
+            return False
+
     async def enable_plugin(self, name: str) -> bool:
         """启用插件"""
         manifest = self.get_manifest(name)
@@ -350,6 +416,9 @@ class PluginManager:
             if not success:
                 return False
 
+            # 处理菜单配置
+            await self._process_plugin_menus(name, manifest)
+
             # 注册路由
             if plugin.router:
                 self._app.include_router(plugin.router)
@@ -363,6 +432,44 @@ class PluginManager:
 
         except Exception as e:
             log.error(f"启用插件 {name} 失败: {e}")
+            return False
+
+    async def _cleanup_plugin_menus(self, name: str, manifest: dict) -> bool:
+        """清理插件的菜单配置"""
+        try:
+            from base.core.users.services.menu_service import MenuService
+            
+            # 获取菜单配置
+            menus_config = manifest.get("menus", [])
+            if not menus_config:
+                return True
+            
+            # 递归删除菜单
+            async def delete_menu_recursive(menu_config):
+                # 查找菜单
+                from base.core.users.models.rbac import Menu
+                menu = await Menu.filter(
+                    name=menu_config["name"],
+                    path=menu_config["path"]
+                ).first()
+                
+                if menu:
+                    # 先删除子菜单
+                    for child_config in menu_config.get("children", []):
+                        await delete_menu_recursive(child_config)
+                    
+                    # 删除当前菜单
+                    await MenuService.delete_menu(menu.id)
+            
+            # 处理所有顶级菜单
+            for menu_config in menus_config:
+                await delete_menu_recursive(menu_config)
+            
+            log.info(f"插件 {name} 的菜单配置已清理完成")
+            return True
+            
+        except Exception as e:
+            log.error(f"清理插件 {name} 的菜单配置失败: {e}")
             return False
 
     async def disable_plugin(self, name: str) -> bool:
@@ -385,9 +492,13 @@ class PluginManager:
             if not success:
                 return False
 
+            # 清理菜单配置
+            manifest = self.get_manifest(name)
+            if manifest:
+                await self._cleanup_plugin_menus(name, manifest)
+
             self.update_plugin_status(name, is_enabled=False)
 
-            manifest = self.get_manifest(name)
             log.info(f"插件已禁用: {manifest.get('display_name', name) if manifest else name}")
             return True
 

@@ -77,6 +77,35 @@ class MenuService:
         return deleted_count > 0
 
     @staticmethod
+    async def get_menu_by_name_and_path(name: str, path: str) -> Optional[Menu]:
+        """根据名称和路径查找菜单"""
+        return await Menu.filter(name=name, path=path).first()
+
+    @staticmethod
+    async def batch_create_menus(menu_data_list: List[MenuCreate]) -> List[Menu]:
+        """批量创建菜单"""
+        created_menus = []
+        for menu_data in menu_data_list:
+            menu = await MenuService.create_menu(menu_data)
+            created_menus.append(menu)
+        return created_menus
+
+    @staticmethod
+    async def batch_update_menus(menu_updates: List[dict]) -> List[Optional[Menu]]:
+        """批量更新菜单
+        menu_updates 格式: [{'name': str, 'path': str, 'data': MenuUpdate}, ...]
+        """
+        updated_menus = []
+        for update in menu_updates:
+            menu = await MenuService.get_menu_by_name_and_path(update['name'], update['path'])
+            if menu:
+                updated_menu = await MenuService.update_menu(menu.id, update['data'])
+                updated_menus.append(updated_menu)
+            else:
+                updated_menus.append(None)
+        return updated_menus
+
+    @staticmethod
     async def get_all_menus() -> List[Menu]:
         """获取所有菜单"""
         return await Menu.filter(is_active=True).order_by('sort', 'id')
