@@ -8,7 +8,7 @@
 - __init__.py       必需，可以为空文件
 - api/              可选，API 路由（在 manifest.json 的 routes 中声明）
 - models/           可选，数据模型（在 manifest.json 的 models 中声明）
-- schemas/          可选，Pydantic Schema
+- schemas/          可选，Pydantic Schema（在 manifest.json 的 schemas 中声明，用于文档）
 - services/         可选，业务逻辑
 
 manifest.json 示例：
@@ -18,9 +18,15 @@ manifest.json 示例：
     "version": "1.0.0",
     "routes": ["api/v1/hello"],    // 路由模块路径
     "models": ["greeting"],         // 模型模块名
+    "schemas": ["greeting"],        // Schema模块名（仅用于文档，不自动加载）
     "is_installed": false,
     "is_enabled": false
 }
+
+注意：
+- routes 和 models 会自动加载到应用中
+- schemas 不会自动加载，需要在代码中按需 import 使用
+  例如: from base.plugins.hello_world.schemas.greeting import GreetingSchema
 
 __init__.py 可选导出（均为可选）：
 - router: APIRouter           插件路由（优先于 manifest routes）
@@ -261,6 +267,8 @@ class PluginManager:
             router = None
             if not hasattr(module, 'router') and manifest:
                 router = self._load_routes_from_manifest(name, manifest)
+
+            # 注意: schemas 不需要自动加载，由开发者在使用时按需 import
 
             # 创建插件实例包装器
             plugin_instance = PluginInstance(name, module, manifest, router)
