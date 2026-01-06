@@ -1,16 +1,22 @@
 """
 Redis缓存工具类
 """
-import redis.asyncio as redis
 from typing import Optional, Any, List
 import json
 from .setting import settings
+
+# 可选导入Redis，避免没有安装时导入失败
+try:
+    import redis.asyncio as redis
+except ImportError:
+    redis = None
+    print("Redis模块未安装，将禁用Redis缓存功能")
 
 
 class RedisCache:
     """Redis缓存单例类"""
     _instance: Optional["RedisCache"] = None
-    _client: Optional[redis.Redis] = None
+    _client: Optional[Any] = None
     _enabled: bool = False
 
     def __new__(cls):
@@ -33,21 +39,23 @@ class RedisCache:
         return cls._instance is not None and cls._instance._client is not None
 
     async def connect(self):
-        """连接Redis"""
-        if not settings.REDIS_ENABLED:
-            print("Redis已禁用，使用数据库直接查询")
+        """
+        连接Redis
+        """
+        if not settings.REDIS_ENABLED or redis is None:
+            print("Redis已禁用或模块未安装，使用数据库直接查询")
             return
 
         password = settings.REDIS_PASSWORD if settings.REDIS_PASSWORD else None
-        self._client = redis.Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            password=password,
-            db=settings.REDIS_DB,
-            decode_responses=True
-        )
-        # 测试连接
         try:
+            self._client = redis.Redis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                password=password,
+                db=settings.REDIS_DB,
+                decode_responses=True
+            )
+            # 测试连接
             await self._client.ping()
             self._enabled = True
             print("Redis连接成功")

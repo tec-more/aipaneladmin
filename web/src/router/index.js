@@ -54,6 +54,24 @@ const routes = [
         name: 'Plugins',
         component: () => import('@/views/plugin/Index.vue'),
         meta: { title: '插件管理', icon: 'Connection' }
+      },
+      {
+        path: 'customers',
+        name: 'Customers',
+        component: () => import('@/views/customer/Index.vue'),
+        meta: { title: '客户管理', icon: 'User' }
+      },
+      {
+        path: 'products',
+        name: 'Products',
+        component: () => import('@/views/product/Index.vue'),
+        meta: { title: '产品管理', icon: 'Box' }
+      },
+      {
+        path: 'orders',
+        name: 'Orders',
+        component: () => import('@/views/order/Index.vue'),
+        meta: { title: '订单管理', icon: 'Document' }
       }
     ]
   },
