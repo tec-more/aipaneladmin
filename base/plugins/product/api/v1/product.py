@@ -150,10 +150,15 @@ except ImportError:
         async def get_product_categories():
             pass
 
-router = APIRouter(prefix="/api/v1/product", tags=["产品管理"])
+# 创建路由实例
+router = APIRouter(
+    prefix="/api",
+    tags=["产品管理"]
+)
 
 
-@router.post("/", summary="创建产品", status_code=status.HTTP_201_CREATED)
+# 为每个路由添加单数和复数两种路径
+@router.post("/v1/product", summary="创建产品", status_code=status.HTTP_201_CREATED)
 async def create_product(
         product_data: ProductCreate,
         current_user_id: int = Depends(get_current_user_id)
@@ -182,7 +187,7 @@ async def create_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.get("/list", summary="获取产品列表(分页)")
+@router.get("/v1/product/list", summary="获取产品列表(分页)")
 async def get_product_list(
         page: int = Query(1, ge=1, description="页码"),
         page_size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -243,7 +248,7 @@ async def get_product_list(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.get("/{product_id}", summary="获取产品详情")
+@router.get("/v1/product/{product_id}", summary="获取产品详情")
 async def get_product_detail(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -275,7 +280,7 @@ async def get_product_detail(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.put("/{product_id}", summary="更新产品信息")
+@router.put("/v1/product/{product_id}", summary="更新产品信息")
 async def update_product(
         product_id: int,
         product_data: ProductUpdate,
@@ -307,7 +312,7 @@ async def update_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.delete("/{product_id}", summary="删除产品")
+@router.delete("/v1/product/{product_id}", summary="删除产品")
 async def delete_product(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -331,7 +336,7 @@ async def delete_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/{product_id}/toggle-status", summary="切换产品上架状态")
+@router.patch("/v1/product/{product_id}/toggle-status", summary="切换产品上架状态")
 async def toggle_product_status(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -362,7 +367,7 @@ async def toggle_product_status(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/{product_id}/stock", summary="更新产品库存")
+@router.patch("/v1/product/{product_id}/stock", summary="更新产品库存")
 async def update_product_stock(
         product_id: int,
         stock_data: ProductStockUpdate,
@@ -396,7 +401,7 @@ async def update_product_stock(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/{product_id}/sales", summary="更新产品销售数量")
+@router.patch("/v1/product/{product_id}/sales", summary="更新产品销售数量")
 async def update_product_sales(
         product_id: int,
         sales_data: ProductSalesUpdate,
@@ -428,7 +433,7 @@ async def update_product_sales(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/{product_id}/view", summary="增加产品浏览次数")
+@router.patch("/v1/product/{product_id}/view", summary="增加产品浏览次数")
 async def increment_product_view(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -458,7 +463,7 @@ async def increment_product_view(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.get("/categories/list", summary="获取所有产品分类")
+@router.get("/v1/product/categories/list", summary="获取所有产品分类")
 async def get_product_categories(
         current_user_id: int = Depends(get_current_user_id)
 ):
@@ -476,3 +481,6 @@ async def get_product_categories(
         return SuccessResponse(data={"categories": categories}, msg="获取分类成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+

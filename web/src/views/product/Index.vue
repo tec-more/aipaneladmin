@@ -65,8 +65,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="{ row }">
+            <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
             <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
             <el-button type="success" link :icon="Box" @click="handleUpdateStock(row)">库存</el-button>
             <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">
@@ -151,8 +152,9 @@
 
 <script setup>
 import { ref, reactive, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Edit, Delete, Box } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Edit, Delete, Box, View } from '@element-plus/icons-vue'
 import {
   getProductList,
   createProduct,
@@ -170,6 +172,7 @@ const stockDialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
 const stockFormRef = ref(null)
+const router = useRouter()
 
 const tableData = ref([])
 const currentProduct = ref(null)
@@ -251,6 +254,10 @@ const handleReset = () => {
   searchForm.product_type = null
   searchForm.is_active = null
   handleSearch()
+}
+
+const handleDetail = (row) => {
+  router.push(`/products/${row.id}`)
 }
 
 const handleAdd = () => {

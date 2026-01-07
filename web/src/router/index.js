@@ -56,22 +56,40 @@ const routes = [
         meta: { title: '插件管理', icon: 'Connection' }
       },
       {
-        path: 'customers',
-        name: 'Customers',
+        path: 'customer',
+        name: 'Customer',
         component: () => import('@/views/customer/Index.vue'),
         meta: { title: '客户管理', icon: 'User' }
       },
       {
-        path: 'products',
-        name: 'Products',
+        path: 'customer/:id',
+        name: 'CustomerDetail',
+        component: () => import('@/views/customer/Detail.vue'),
+        meta: { title: '客户详情' }
+      },
+      {
+        path: 'product',
+        name: 'Product',
         component: () => import('@/views/product/Index.vue'),
         meta: { title: '产品管理', icon: 'Box' }
       },
       {
-        path: 'orders',
-        name: 'Orders',
+        path: 'product/:id',
+        name: 'ProductDetail',
+        component: () => import('@/views/product/Detail.vue'),
+        meta: { title: '产品详情' }
+      },
+      {
+        path: 'order',
+        name: 'Order',
         component: () => import('@/views/order/Index.vue'),
         meta: { title: '订单管理', icon: 'Document' }
+      },
+      {
+        path: 'order/:id',
+        name: 'OrderDetail',
+        component: () => import('@/views/order/Detail.vue'),
+        meta: { title: '订单详情' }
       }
     ]
   },

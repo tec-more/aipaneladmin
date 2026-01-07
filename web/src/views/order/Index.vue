@@ -62,8 +62,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="{ row }">
+            <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
             <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
             <el-button v-if="row.status === 'pending'" type="success" link :icon="Check" @click="handleComplete(row)">完成</el-button>
             <el-button v-if="row.status === 'pending'" type="warning" link :icon="Close" @click="handleCancel(row)">取消</el-button>
@@ -140,8 +141,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Edit, Delete, Check, Close } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, View, Edit, Delete, Check, Close } from '@element-plus/icons-vue'
 import {
   getOrderList,
   createOrder,
@@ -157,6 +159,7 @@ import {
   getProductList
 } from '@/api/product'
 
+const router = useRouter()
 const loading = ref(false)
 const submitLoading = ref(false)
 const dialogVisible = ref(false)
@@ -341,6 +344,10 @@ const handleCancel = async (row) => {
   } catch (e) {
     // 取消或错误
   }
+}
+
+const handleDetail = (row) => {
+  router.push(`/orders/${row.id}`)
 }
 
 const handleDelete = async (row) => {

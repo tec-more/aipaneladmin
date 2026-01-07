@@ -57,8 +57,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="{ row }">
+            <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
             <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
             <el-button type="success" link :icon="Money" @click="handleUpdatePoints(row)">充值</el-button>
             <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">
@@ -138,8 +139,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Edit, Delete, Money } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Edit, Delete, Money, View } from '@element-plus/icons-vue'
 import {
   getCustomerList,
   createCustomer,
@@ -157,6 +159,7 @@ const pointsDialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
 const pointsFormRef = ref(null)
+const router = useRouter()
 
 const tableData = ref([])
 const currentCustomer = ref(null)
@@ -244,6 +247,10 @@ const handleAdd = () => {
     membership_expiry_date: null
   }
   dialogVisible.value = true
+}
+
+const handleDetail = (row) => {
+  router.push(`/customers/${row.id}`)
 }
 
 const handleEdit = (row) => {

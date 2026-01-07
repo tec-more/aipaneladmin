@@ -7,7 +7,7 @@ export const getProductList = (params) => {
 
 // 获取产品详情
 export const getProductDetail = (id) => {
-  return request.get(`/api/v1/product/${id}`)
+  return request.get(`/v1/product/${id}`)
 }
 
 // 创建产品
@@ -17,12 +17,12 @@ export const createProduct = (data) => {
 
 // 更新产品
 export const updateProduct = (id, data) => {
-  return request.put(`/api/v1/product/${id}`, data)
+  return request.put(`/v1/product/${id}`, data)
 }
 
 // 删除产品
 export const deleteProduct = (id) => {
-  return request.delete(`/api/v1/product/${id}`)
+  return request.delete(`/v1/product/${id}`)
 }
 
 // 批量删除产品
@@ -32,10 +32,10 @@ export const batchDeleteProduct = (ids) => {
 
 // 更新产品库存
 export const updateProductStock = (id, data) => {
-  return request.patch(`/api/v1/product/${id}/stock`, data)
+  return request.patch(`/v1/product/${id}/stock`, data)
 }
 
 // 上下架产品
 export const toggleProductStatus = (id) => {
-  return request.patch(`/api/v1/product/${id}/status`)
+  return request.patch(`/v1/product/${id}/toggle-status`)
 }

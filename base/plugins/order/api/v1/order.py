@@ -13,7 +13,7 @@ from base.plugins.order.services.order_service import OrderService
 
 # 创建路由实例
 router = APIRouter(
-    prefix="/api/v1/orders",
+    prefix="/api/v1/order",
     tags=["订单管理"],
     responses={404: {"description": "Not found"}},
 )

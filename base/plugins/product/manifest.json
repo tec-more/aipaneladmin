@@ -18,7 +18,7 @@
     "menus": [
         {
             "name": "产品管理",
-            "path": "/products",
+            "path": "/product",
             "icon": "Box",
             "component": "product/Index",
             "sort": 3,

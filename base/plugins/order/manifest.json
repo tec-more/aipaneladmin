@@ -22,7 +22,7 @@
     "menus": [
         {
             "name": "订单管理",
-            "path": "/orders",
+            "path": "/order",
             "icon": "ShoppingCart",
             "component": "order/Index",
             "sort": 4,

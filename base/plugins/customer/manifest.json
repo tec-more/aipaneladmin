@@ -18,7 +18,7 @@
     "menus": [
         {
             "name": "客户管理",
-            "path": "/customers",
+            "path": "/customer",
             "icon": "User",
             "component": "customer/Index",
             "sort": 2,

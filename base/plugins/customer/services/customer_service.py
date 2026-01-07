@@ -437,3 +437,48 @@ class CustomerService:
         if exclude_id:
             query = query.exclude(id=exclude_id)
         return await query.exists()
+
+    @staticmethod
+    async def update_customer_points(customer_id: int, points: int) -> Optional[Customer]:
+        """
+        更新客户积分
+
+        Args:
+            customer_id: 客户ID
+            points: 积分值
+
+        Returns:
+            Optional[Customer]: 更新后的客户对象
+        """
+        customer = await Customer.filter(id=customer_id).first()
+        if not customer:
+            return None
+
+        # 更新积分
+        customer.points = points
+        await customer.save()
+
+        return customer
+
+    @staticmethod
+    async def update_customer_membership(customer_id: int, membership_expire: Optional[datetime] = None) -> Optional[Customer]:
+        """
+        更新客户会员到期日期
+
+        Args:
+            customer_id: 客户ID
+            membership_expire: 会员到期日期
+
+        Returns:
+            Optional[Customer]: 更新后的客户对象
+        """
+        customer = await Customer.filter(id=customer_id).first()
+        if not customer:
+            return None
+
+        # 更新会员到期日期
+        if membership_expire:
+            customer.membership_expire = membership_expire
+            await customer.save()
+
+        return customer
