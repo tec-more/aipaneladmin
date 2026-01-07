@@ -196,11 +196,11 @@ const fetchProductDetail = async () => {
 }
 
 const handleBack = () => {
-  router.push('/products')
+  router.push('/product')
 }
 
 const handleEdit = () => {
-  router.push(`/products/edit/${productId.value}`)
+  router.push(`/product/edit/${productId.value}`)
 }
 
 const handleToggleStatus = async () => {
@@ -220,7 +220,7 @@ const handleDelete = async () => {
     })
     await deleteProduct(productId.value)
     ElMessage.success('删除成功')
-    router.push('/products')
+    router.push('/product')
   } catch (e) {
     // 取消或错误
   }

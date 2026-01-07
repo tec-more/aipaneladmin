@@ -347,7 +347,7 @@ const handleCancel = async (row) => {
 }
 
 const handleDetail = (row) => {
-  router.push(`/orders/${row.id}`)
+  router.push(`/order/${row.id}`)
 }
 
 const handleDelete = async (row) => {

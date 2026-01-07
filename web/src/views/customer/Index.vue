@@ -250,7 +250,7 @@ const handleAdd = () => {
 }
 
 const handleDetail = (row) => {
-  router.push(`/customers/${row.id}`)
+  router.push(`/customer/${row.id}`)
 }
 
 const handleEdit = (row) => {
