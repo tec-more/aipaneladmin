@@ -53,7 +53,14 @@ async def get_order(order_id: int):
     order = await OrderService.get_order_by_id(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    return SuccessResponse(data=order, msg="获取订单详情成功")
+    # 转换为字典确保datetime字段被正确格式化
+    if hasattr(order, 'to_dict'):
+        order_dict = await order.to_dict()
+    elif hasattr(order, 'dict'):
+        order_dict = order.dict()
+    else:
+        order_dict = dict(order)
+    return SuccessResponse(data=order_dict, msg="获取订单详情成功")
 
 
 @router.get("/by-order-no/{order_no}", response_model=OrderResponse, summary="根据订单号获取订单详情")
@@ -62,7 +69,14 @@ async def get_order_by_no(order_no: str):
     order = await OrderService.get_order_by_no(order_no)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    return SuccessResponse(data=order, msg="获取订单详情成功")
+    # 转换为字典确保datetime字段被正确格式化
+    if hasattr(order, 'to_dict'):
+        order_dict = await order.to_dict()
+    elif hasattr(order, 'dict'):
+        order_dict = order.dict()
+    else:
+        order_dict = dict(order)
+    return SuccessResponse(data=order_dict, msg="获取订单详情成功")
 
 
 @router.get("/customer/{customer_id}", response_model=OrderListResponse, summary="获取客户订单列表")
@@ -76,7 +90,19 @@ async def get_customer_orders(
     # 计算总数
     from base.plugins.order.models.order import Order
     total = await Order.filter(customer_id=customer_id).count()
-    return SuccessResponse(data={"total": total, "items": orders}, msg="获取客户订单列表成功")
+    
+    # 转换为字典列表确保datetime字段被正确格式化
+    order_list = []
+    for order in orders:
+        if hasattr(order, 'to_dict'):
+            order_dict = await order.to_dict()
+        elif hasattr(order, 'dict'):
+            order_dict = order.dict()
+        else:
+            order_dict = dict(order)
+        order_list.append(order_dict)
+    
+    return SuccessResponse(data={"total": total, "items": order_list}, msg="获取客户订单列表成功")
 
 
 @router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
@@ -89,7 +115,19 @@ async def get_all_orders(
     # 计算总数
     from base.plugins.order.models.order import Order
     total = await Order.all().count()
-    return SuccessResponse(data={"total": total, "items": orders}, msg="获取所有订单列表成功")
+    
+    # 转换为字典列表确保datetime字段被正确格式化
+    order_list = []
+    for order in orders:
+        if hasattr(order, 'to_dict'):
+            order_dict = await order.to_dict()
+        elif hasattr(order, 'dict'):
+            order_dict = order.dict()
+        else:
+            order_dict = dict(order)
+        order_list.append(order_dict)
+    
+    return SuccessResponse(data={"total": total, "items": order_list}, msg="获取所有订单列表成功")
 
 
 @router.put("/{order_id}", response_model=OrderResponse, summary="更新订单信息")
@@ -126,4 +164,11 @@ async def update_order(order_id: int, order_update: OrderUpdate):
     
     # 重新获取更新后的订单
     updated_order = await OrderService.get_order_by_id(order_id)
-    return SuccessResponse(data=updated_order, msg="更新订单信息成功")
+    # 转换为字典确保datetime字段被正确格式化
+    if hasattr(updated_order, 'to_dict'):
+        order_dict = await updated_order.to_dict()
+    elif hasattr(updated_order, 'dict'):
+        order_dict = updated_order.dict()
+    else:
+        order_dict = dict(updated_order)
+    return SuccessResponse(data=order_dict, msg="更新订单信息成功")

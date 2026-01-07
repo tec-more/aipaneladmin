@@ -174,7 +174,13 @@ async def get_current_customer_info(current_customer_id: int = Depends(get_curre
         customer = await CustomerService.get_customer_info(current_customer_id)
         if not customer:
             return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        customer_dict = customer.dict() if hasattr(customer, 'dict') else dict(customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(customer, 'to_dict'):
+            customer_dict = await customer.to_dict()
+        elif hasattr(customer, 'dict'):
+            customer_dict = customer.dict()
+        else:
+            customer_dict = dict(customer)
         return SuccessResponse(data=customer_dict)
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
@@ -199,7 +205,13 @@ async def update_current_customer_info(
         updated_customer = await CustomerService.update_customer_info(current_customer_id, customer_data)
         if not updated_customer:
             return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        customer_dict = updated_customer.dict() if hasattr(updated_customer, 'dict') else dict(updated_customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(updated_customer, 'to_dict'):
+            customer_dict = await updated_customer.to_dict()
+        elif hasattr(updated_customer, 'dict'):
+            customer_dict = updated_customer.dict()
+        else:
+            customer_dict = dict(updated_customer)
         return SuccessResponse(data=customer_dict, msg="更新成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
@@ -284,7 +296,13 @@ async def get_customer_detail(
         customer = await CustomerService.get_customer_info(customer_id)
         if not customer:
             return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        customer_dict = customer.dict() if hasattr(customer, 'dict') else dict(customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(customer, 'to_dict'):
+            customer_dict = await customer.to_dict()
+        elif hasattr(customer, 'dict'):
+            customer_dict = customer.dict()
+        else:
+            customer_dict = dict(customer)
         return SuccessResponse(data=customer_dict)
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
@@ -311,7 +329,13 @@ async def update_customer(
         updated_customer = await CustomerService.update_customer_info(customer_id, customer_data)
         if not updated_customer:
             return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        customer_dict = updated_customer.dict() if hasattr(updated_customer, 'dict') else dict(updated_customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(updated_customer, 'to_dict'):
+            customer_dict = await updated_customer.to_dict()
+        elif hasattr(updated_customer, 'dict'):
+            customer_dict = updated_customer.dict()
+        else:
+            customer_dict = dict(updated_customer)
         return SuccessResponse(data=customer_dict, msg="更新成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
@@ -336,7 +360,13 @@ async def create_customer(
         customer = await CustomerService.register_customer(customer_data)
         if not customer:
             return ErrorResponse(msg="创建失败", status_code=status.HTTP_400_BAD_REQUEST)
-        customer_dict = customer.dict() if hasattr(customer, 'dict') else dict(customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(customer, 'to_dict'):
+            customer_dict = await customer.to_dict()
+        elif hasattr(customer, 'dict'):
+            customer_dict = customer.dict()
+        else:
+            customer_dict = dict(customer)
         return SuccessResponse(data=customer_dict, msg="创建成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
@@ -392,10 +422,7 @@ async def batch_delete_customer(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/v1/customers/{customer_id}/toggle-status", summary="切换客户状态")
 @router.patch("/v1/customer/{customer_id}/toggle-status", summary="切换客户状态")
-@router.patch("/v1/customers/{customer_id}/status", summary="切换客户状态")
-@router.patch("/v1/customer/{customer_id}/status", summary="切换客户状态")
 async def toggle_customer_status(
         customer_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -414,14 +441,19 @@ async def toggle_customer_status(
         updated_customer = await CustomerService.toggle_customer_status(customer_id)
         if not updated_customer:
             return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        customer_dict = updated_customer.dict() if hasattr(updated_customer, 'dict') else dict(updated_customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(updated_customer, 'to_dict'):
+            customer_dict = await updated_customer.to_dict()
+        elif hasattr(updated_customer, 'dict'):
+            customer_dict = updated_customer.dict()
+        else:
+            customer_dict = dict(updated_customer)
         status_text = "激活" if updated_customer.is_active else "禁用" if hasattr(updated_customer, 'is_active') else "未知"
         return SuccessResponse(data=customer_dict, msg=f"用户已{status_text}")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/v1/customers/{customer_id}/points", summary="更新客户积分")
 @router.patch("/v1/customer/{customer_id}/points", summary="更新客户积分")
 async def update_customer_points(
         customer_id: int,
@@ -444,13 +476,18 @@ async def update_customer_points(
         customer = await CustomerService.update_customer_points(customer_id, points)
         if not customer:
             return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        customer_dict = customer.dict() if hasattr(customer, 'dict') else dict(customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(customer, 'to_dict'):
+            customer_dict = await customer.to_dict()
+        elif hasattr(customer, 'dict'):
+            customer_dict = customer.dict()
+        else:
+            customer_dict = dict(customer)
         return SuccessResponse(data=customer_dict, msg="积分更新成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/v1/customers/{customer_id}/membership", summary="更新客户会员到期日期")
 @router.patch("/v1/customer/{customer_id}/membership", summary="更新客户会员到期日期")
 async def update_customer_membership(
         customer_id: int,
@@ -473,7 +510,13 @@ async def update_customer_membership(
         customer = await CustomerService.update_customer_membership(customer_id, membership_expire)
         if not customer:
             return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        customer_dict = customer.dict() if hasattr(customer, 'dict') else dict(customer)
+        # 使用to_dict方法确保datetime字段被正确转换
+        if hasattr(customer, 'to_dict'):
+            customer_dict = await customer.to_dict()
+        elif hasattr(customer, 'dict'):
+            customer_dict = customer.dict()
+        else:
+            customer_dict = dict(customer)
         return SuccessResponse(data=customer_dict, msg="会员到期日期更新成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)

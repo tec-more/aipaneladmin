@@ -1,4 +1,5 @@
 import os
+import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from tortoise import Tortoise
@@ -8,6 +9,7 @@ from base.common.database import init_data
 from base.common.middleware import register_middlewares
 from base.common.exceptions import register_exceptions
 from base.common.router import register_routers
+from base.common.json_encoder import DateTimeEncoder
 from base.plugins import plugin_manager
 
 @asynccontextmanager
@@ -39,7 +41,8 @@ def init_app() -> FastAPI:
         version=settings.app_version,
         openapi_url="/openapi.json",
         factory=True,
-        lifespan=lifespan
+        lifespan=lifespan,
+        json_dumps=lambda data, **kwargs: json.dumps(data, **kwargs, cls=DateTimeEncoder, ensure_ascii=False)
     )
 
     # 注册中间件、路由和异常处理
