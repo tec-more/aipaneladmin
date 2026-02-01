@@ -59,7 +59,7 @@ def auto_discover_routers(
         return
 
     package_path = base_module.__path__[0]
-    print(f"🔍 扫描包路径: {package_path}")
+    print(f"[SCAN] Scanning package path: {package_path}")
 
     routers_found = 0
 
@@ -96,9 +96,9 @@ def auto_discover_routers(
         except ImportError as e:
             print(f"⚠️ 导入模块失败 {full_name}: {e}")
         except Exception as e:
-            print(f"❌ 处理模块 {full_name} 时出错: {e}")
+            print(f"[ERROR] Error processing module {full_name}: {e}")
 
-    print(f"🎯 路由自动发现完成，共注册 {routers_found} 个路由")
+    print(f"[DONE] Router auto-discovery completed, {routers_found} routers registered")
 
 def _discover_in_subpackage(app: FastAPI, package_name: str, router_var: str, routers_found: int, skip_modules: List[str]):
     """递归发现子包中的路由"""

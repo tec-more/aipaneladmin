@@ -156,6 +156,7 @@ class Settings(BaseSettings):
 					"user": db_user,  # Database username
 					"password": db_password,  # Database password
 					"database": db_name,  # Database name
+					"ssl": False,  # Disable SSL
 				},
 			},
 			# MSSQL/Oracle configuration

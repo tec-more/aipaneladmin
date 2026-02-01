@@ -1,0 +1,133 @@
+{
+    "name": "aif2f",
+    "version": "1.0.0",
+    "description": "AI传译系统集成插件 - 用户管理、会员系统、支付功能",
+    "author": "AIPanelAdmin",
+    "is_installed": true,
+    "is_enabled": true,
+    "dependencies": [],
+    "routes": [
+        "api/v1"
+    ],
+    "models": [
+        "membership",
+        "user_membership",
+        "recharge_order",
+        "payment_transaction",
+        "usage_log"
+    ],
+    "menus": [
+        {
+            "name": "AIF2F管理",
+            "path": "/aif2f",
+            "icon": "Translation",
+            "component": "",
+            "redirect": "/aif2f/dashboard",
+            "sort": 100,
+            "children": [
+                {
+                    "name": "数据看板",
+                    "path": "/aif2f/dashboard",
+                    "icon": "Dashboard",
+                    "component": "aif2f/dashboard/index",
+                    "sort": 1
+                },
+                {
+                    "name": "会员管理",
+                    "path": "/aif2f/membership",
+                    "icon": "User",
+                    "component": "aif2f/membership/index",
+                    "sort": 2
+                },
+                {
+                    "name": "充值订单",
+                    "path": "/aif2f/orders",
+                    "icon": "ShoppingCart",
+                    "component": "aif2f/orders/index",
+                    "sort": 3
+                },
+                {
+                    "name": "支付记录",
+                    "path": "/aif2f/payments",
+                    "icon": "Money",
+                    "component": "aif2f/payments/index",
+                    "sort": 4
+                },
+                {
+                    "name": "使用记录",
+                    "path": "/aif2f/usage",
+                    "icon": "Document",
+                    "component": "aif2f/usage/index",
+                    "sort": 5
+                },
+                {
+                    "name": "会员等级配置",
+                    "path": "/aif2f/levels",
+                    "icon": "Setting",
+                    "component": "aif2f/levels/index",
+                    "sort": 6
+                }
+            ]
+        }
+    ],
+    "permissions": [
+        {
+            "name": "AIF2F用户查看",
+            "code": "aif2f:user:view",
+            "module": "aif2f",
+            "description": "查看AIF2F用户信息"
+        },
+        {
+            "name": "AIF2F用户编辑",
+            "code": "aif2f:user:edit",
+            "module": "aif2f",
+            "description": "编辑AIF2F用户信息"
+        },
+        {
+            "name": "AIF2F会员查看",
+            "code": "aif2f:membership:view",
+            "module": "aif2f",
+            "description": "查看AIF2F会员信息"
+        },
+        {
+            "name": "AIF2F会员编辑",
+            "code": "aif2f:membership:edit",
+            "module": "aif2f",
+            "description": "编辑AIF2F会员信息"
+        },
+        {
+            "name": "AIF2F订单查看",
+            "code": "aif2f:order:view",
+            "module": "aif2f",
+            "description": "查看AIF2F订单"
+        },
+        {
+            "name": "AIF2F订单退款",
+            "code": "aif2f:order:refund",
+            "module": "aif2f",
+            "description": "AIF2F订单退款"
+        },
+        {
+            "name": "AIF2F统计查看",
+            "code": "aif2f:statistics:view",
+            "module": "aif2f",
+            "description": "查看AIF2F统计数据"
+        }
+    ],
+    "hooks": {
+        "on_enable": "on_enable",
+        "on_disable": "on_disable",
+        "on_startup": "on_startup",
+        "on_shutdown": "on_shutdown"
+    },
+    "config": {
+        "membership": {
+            "default_free_hours": 0,
+            "max_fibonacci_level": 20
+        },
+        "payment": {
+            "order_expire_minutes": 15,
+            "auto_check_interval": 300
+        }
+    }
+}

@@ -46,8 +46,8 @@ class MiddlewareAutoDiscover:
                 base_module = importlib.import_module(base_package)
                 base_path = Path(base_module.__path__[0])
                 
-                print(f"🔍 开始扫描基础包: {base_package}")
-                print(f"📁 基础路径: {base_path}")
+                print(f"[SCAN] Starting scan base package: {base_package}")
+                print(f"[PATH] Base path: {base_path}")
                 
                 # 获取所有业务模块（users, dept等）
                 business_modules = []
@@ -58,7 +58,7 @@ class MiddlewareAutoDiscover:
                         if middleware_dir.exists() and middleware_dir.is_dir():
                             business_modules.append(item.name)
                 
-                print(f"📦 发现业务模块: {business_modules}")
+                print(f"[MODULES] Found business modules: {business_modules}")
                 
                 
                 
@@ -75,7 +75,7 @@ class MiddlewareAutoDiscover:
             return all_middleware
             
         except ImportError as e:
-            print(f"❌ 无法导入基础包 {base_package}: {e}")
+            print(f"[ERROR] Failed to import base package {base_package}: {e}")
             return []
     
     def _discover_module_middleware(self, middleware_package: str, module_name: str) -> List[Dict]:
@@ -86,7 +86,7 @@ class MiddlewareAutoDiscover:
             middleware_module = importlib.import_module(middleware_package)
             middleware_path = Path(middleware_module.__file__).parent
             
-            print(f"  📂 扫描模块: {module_name} -> {middleware_path}")
+            print(f"  [SCAN] Scanning module: {module_name} -> {middleware_path}")
             
             # 扫描middleware目录下的所有Python文件
             for file_path in middleware_path.iterdir():
@@ -104,7 +104,7 @@ class MiddlewareAutoDiscover:
                         
                         if middleware_info:
                             module_middleware.append(middleware_info)
-                            print(f"    ✅ 发现中间件: {module_name}.{middleware_file_name}")
+                            print(f"    [OK] Found middleware: {module_name}.{middleware_file_name}")
                             
                     except ImportError as e:
                         print(f"    ⚠️ 导入失败: {full_module_path} -> {e}")
@@ -173,18 +173,18 @@ class MiddlewareAutoDiscover:
                     # 注册类中间件
                     self.app.add_middleware(mw_info['middleware_obj'])
                     registered_count += 1
-                    print(f"    🟦 注册类中间件: {mw_info['module_name']}.{mw_info['file_name']}")
+                    print(f"    [CLASS] Registering class middleware: {mw_info['module_name']}.{mw_info['file_name']}")
                     
                 elif mw_info['type'] == 'function':
                     # 注册函数中间件
                     self._register_function_middleware(mw_info)
                     registered_count += 1
-                    print(f"    🟩 注册函数中间件: {mw_info['module_name']}.{mw_info['file_name']}")
+                    print(f"    [FUNC] Registering function middleware: {mw_info['module_name']}.{mw_info['file_name']}")
                     
             except Exception as e:
-                print(f"    ❌ 注册失败 {mw_info['module_name']}.{mw_info['file_name']}: {e}")
+                print(f"    [FAIL] Registration failed {mw_info['module_name']}.{mw_info['file_name']}: {e}")
         
-        print(f"✅ 中间件注册完成: 成功 {registered_count} 个, 总数 {len(middleware_list)} 个")
+        print(f"[DONE] Middleware registration completed: {registered_count} successful, {len(middleware_list)} total")
     
     def _register_function_middleware(self, mw_info: Dict):
         """注册函数中间件"""
