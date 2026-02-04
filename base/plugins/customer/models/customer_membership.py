@@ -1,5 +1,5 @@
 """
-用户会员关系模型
+客户会员关系模型
 """
 
 from datetime import datetime
@@ -7,18 +7,18 @@ from tortoise import fields
 from base.common.model import BaseModel, TimestampMixin
 
 
-class UserMembership(BaseModel):
-    """用户会员信息表"""
+class CustomerMembership(BaseModel, TimestampMixin):
+    """客户会员信息表"""
 
-    user = fields.ForeignKeyField(
-        "models.User",
-        related_name="aif2f_memberships",
-        on_delete="CASCADE"
+    customer = fields.ForeignKeyField(
+        "models.Customer",
+        related_name="memberships",
+        on_delete=fields.CASCADE
     )
     membership_level = fields.ForeignKeyField(
         "models.MembershipLevel",
-        related_name="users",
-        on_delete="RESTRICT",
+        related_name="customers",
+        on_delete=fields.RESTRICT,
         null=True
     )
     start_time = fields.DatetimeField(description="开始时间")
@@ -41,8 +41,8 @@ class UserMembership(BaseModel):
     auto_renew = fields.BooleanField(default=False, description="是否自动续费")
 
     class Meta:
-        table = "aif2f_user_membership"
-        unique_together = (("user", "is_active"),)
+        table = "customer_membership"
+        unique_together = (("customer", "is_active"),)
 
     @property
     def is_expired(self) -> bool:
@@ -55,4 +55,4 @@ class UserMembership(BaseModel):
         return self.is_active and not self.is_expired and self.remaining_hours > 0
 
     def __str__(self):
-        return f"User {self.user_id} - Level {self.level} - {self.remaining_hours}h remaining"
+        return f"Customer {self.customer_id} - Level {self.level} - {self.remaining_hours}h remaining"

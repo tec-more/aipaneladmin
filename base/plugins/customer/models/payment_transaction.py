@@ -15,13 +15,13 @@ class TransactionStatus(str, Enum):
     REFUNDED = "refunded"    # 已退款
 
 
-class PaymentTransaction(BaseModel):
+class PaymentTransaction(BaseModel, TimestampMixin):
     """支付交易记录表"""
 
     order = fields.ForeignKeyField(
-        "models.RechargeOrder",
+        "models.CustomerOrder",
         related_name="transactions",
-        on_delete="CASCADE"
+        on_delete=fields.CASCADE
     )
     transaction_id = fields.CharField(max_length=128, unique=True, description="交易ID")
     transaction_type = fields.CharField(max_length=20, description="交易类型(wechat/alipay)")
@@ -36,7 +36,7 @@ class PaymentTransaction(BaseModel):
     processed_at = fields.DatetimeField(auto_now_add=True, description="处理时间")
 
     class Meta:
-        table = "aif2f_payment_transaction"
+        table = "customer_payment_transaction"
         ordering = ["-processed_at"]
 
     def __str__(self):

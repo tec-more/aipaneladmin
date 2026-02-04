@@ -16,13 +16,8 @@ async def init_db():
         pass
 
     await command.init()
-    try:
-        await command.migrate()
-    except AttributeError:
-        logging.warning("unable to retrieve model history from database, model history will be created from scratch")
-        shutil.rmtree("migrations")
-        await command.init_db(safe=True)
-
+    # Skip migrate during server startup to avoid interactive prompts
+    # Run migrations manually with: aerich migrate
     await command.upgrade(run_in_transaction=True)
     
 async def init_data():

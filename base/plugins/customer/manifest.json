@@ -2,29 +2,132 @@
     "name": "customer",
     "display_name": "客户模块",
     "version": "1.0.0",
-    "description": "客户模块，提供网站注册客户的管理功能",
+    "description": "客户模块，提供客户管理、会员系统、订单管理等功能",
     "author": "hepan",
     "is_installed": true,
     "is_enabled": true,
+    "route_prefix": "/api/v1/customer",
     "routes": [
-        "api/v1/customer"
+        "api/v1"
     ],
     "models": [
-        "customer"
+        "customer",
+        "membership",
+        "customer_membership",
+        "order",
+        "payment_transaction",
+        "usage_log"
     ],
     "schemas": [
-        "customer_schema"
+        "customer_schema",
+        "membership",
+        "order"
     ],
     "menus": [
         {
             "name": "客户管理",
             "path": "/customer",
             "icon": "User",
-            "component": "customer/Index",
+            "component": "",
+            "redirect": "/customer/list",
             "sort": 2,
-            "is_hidden": false,
-            "menu_type": "menu",
-            "permission_code": "customer:list"
+            "children": [
+                {
+                    "name": "客户列表",
+                    "path": "/customer/list",
+                    "icon": "User",
+                    "component": "customer/list/index",
+                    "sort": 1
+                },
+                {
+                    "name": "会员等级配置",
+                    "path": "/customer/membership-levels",
+                    "icon": "Setting",
+                    "component": "customer/membership-levels/index",
+                    "sort": 2
+                },
+                {
+                    "name": "订单管理",
+                    "path": "/customer/orders",
+                    "icon": "ShoppingCart",
+                    "component": "customer/orders/index",
+                    "sort": 3
+                },
+                {
+                    "name": "支付记录",
+                    "path": "/customer/payments",
+                    "icon": "Money",
+                    "component": "customer/payments/index",
+                    "sort": 4
+                },
+                {
+                    "name": "使用记录",
+                    "path": "/customer/usage",
+                    "icon": "Document",
+                    "component": "customer/usage/index",
+                    "sort": 5
+                }
+            ]
         }
-    ]
+    ],
+    "permissions": [
+        {
+            "name": "客户查看",
+            "code": "customer:view",
+            "module": "customer",
+            "description": "查看客户信息"
+        },
+        {
+            "name": "客户编辑",
+            "code": "customer:edit",
+            "module": "customer",
+            "description": "编辑客户信息"
+        },
+        {
+            "name": "客户删除",
+            "code": "customer:delete",
+            "module": "customer",
+            "description": "删除客户"
+        },
+        {
+            "name": "会员等级管理",
+            "code": "customer:membership_level",
+            "module": "customer",
+            "description": "管理会员等级配置"
+        },
+        {
+            "name": "订单查看",
+            "code": "customer:order:view",
+            "module": "customer",
+            "description": "查看客户订单"
+        },
+        {
+            "name": "订单退款",
+            "code": "customer:order:refund",
+            "module": "customer",
+            "description": "订单退款"
+        },
+        {
+            "name": "使用记录查看",
+            "code": "customer:usage:view",
+            "module": "customer",
+            "description": "查看客户使用记录"
+        }
+    ],
+    "hooks": {
+        "on_enable": "on_enable",
+        "on_disable": "on_disable",
+        "on_startup": "on_startup",
+        "on_shutdown": "on_shutdown"
+    },
+    "config": {
+        "membership": {
+            "default_free_hours": 0,
+            "max_fibonacci_level": 20
+        },
+        "payment": {
+            "order_expire_minutes": 15,
+            "auto_check_interval": 300
+        }
+    }
 }

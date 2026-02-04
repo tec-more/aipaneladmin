@@ -1,5 +1,5 @@
 """
-充值订单模型
+订单模型
 """
 
 from enum import Enum
@@ -33,19 +33,19 @@ def generate_order_no() -> str:
     return f"ORD{timestamp}{random_str}"
 
 
-class RechargeOrder(BaseModel):
-    """充值订单表"""
+class CustomerOrder(BaseModel, TimestampMixin):
+    """客户充值订单表"""
 
     order_no = fields.CharField(max_length=64, unique=True, description="订单号")
-    user = fields.ForeignKeyField(
-        "models.User",
+    customer = fields.ForeignKeyField(
+        "models.Customer",
         related_name="recharge_orders",
-        on_delete="CASCADE"
+        on_delete=fields.CASCADE
     )
     membership_level = fields.ForeignKeyField(
         "models.MembershipLevel",
         related_name="orders",
-        on_delete="RESTRICT"
+        on_delete=fields.RESTRICT
     )
     amount = fields.DecimalField(max_digits=10, decimal_places=2, description="支付金额")
     hours = fields.IntField(description="购买小时数")
@@ -70,36 +70,8 @@ class RechargeOrder(BaseModel):
     remark = fields.TextField(null=True, description="备注")
 
     class Meta:
-        table = "aif2f_recharge_order"
+        table = "customer_order"
         ordering = ["-created_at"]
-
-    @classmethod
-    def create_order(cls, user_id: int, membership_level_id: int,
-                     payment_method: str, client_ip: str = None):
-        """创建订单"""
-        from .membership import MembershipLevel
-
-        # 获取会员等级信息
-        level = MembershipLevel.get(id=membership_level_id)
-
-        # 计算总小时数
-        total_hours = level.duration_hours + level.bonus_hours
-
-        # 订单过期时间(15分钟)
-        expire_time = datetime.now() + timedelta(minutes=15)
-
-        return cls(
-            order_no=generate_order_no(),
-            user_id=user_id,
-            membership_level_id=membership_level_id,
-            amount=level.price,
-            hours=level.duration_hours,
-            bonus_hours=level.bonus_hours,
-            total_hours=total_hours,
-            payment_method=payment_method,
-            expire_time=expire_time,
-            client_ip=client_ip
-        )
 
     @property
     def is_expired(self) -> bool:

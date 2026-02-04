@@ -4,8 +4,9 @@
     "version": "1.0.0",
     "description": "订单模块，用于记录虚拟产品的销售数据",
     "author": "hepan",
+    "route_prefix": "/api/v1/order",
     "routes": [
-        "api/v1/order"
+        "api/v1"
     ],
     "models": [
         "order"

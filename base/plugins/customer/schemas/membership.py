@@ -45,12 +45,12 @@ class MembershipLevelOut(BaseModel):
     updated_at: datetime
 
 
-class UserMembershipOut(BaseModel):
-    """用户会员信息输出"""
+class CustomerMembershipOut(BaseModel):
+    """客户会员信息输出"""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: int
+    customer_id: int
     membership_level_id: Optional[int]
     start_time: datetime
     expire_time: datetime

@@ -12,14 +12,14 @@ from base.plugins.order.services.order_service import OrderService
 
 
 # 创建路由实例
-router = APIRouter(
+order_router = APIRouter(
     prefix="/api/v1/order",
     tags=["订单管理"],
     responses={404: {"description": "Not found"}},
 )
 
 
-@router.post("/create", response_model=OrderCreateResponse, summary="创建订单")
+@order_router.post("/create", response_model=OrderCreateResponse, summary="创建订单")
 async def create_order(order_create: OrderCreate):
     """创建新订单
     
@@ -47,7 +47,7 @@ async def create_order(order_create: OrderCreate):
         raise HTTPException(status_code=500, detail="创建订单失败")
 
 
-@router.get("/{order_id}", response_model=OrderResponse, summary="获取订单详情")
+@order_router.get("/{order_id}", response_model=OrderResponse, summary="获取订单详情")
 async def get_order(order_id: int):
     """根据订单ID获取订单详情"""
     order = await OrderService.get_order_by_id(order_id)
@@ -63,7 +63,7 @@ async def get_order(order_id: int):
     return SuccessResponse(data=order_dict, msg="获取订单详情成功")
 
 
-@router.get("/by-order-no/{order_no}", response_model=OrderResponse, summary="根据订单号获取订单详情")
+@order_router.get("/by-order-no/{order_no}", response_model=OrderResponse, summary="根据订单号获取订单详情")
 async def get_order_by_no(order_no: str):
     """根据订单编号获取订单详情"""
     order = await OrderService.get_order_by_no(order_no)
@@ -79,7 +79,7 @@ async def get_order_by_no(order_no: str):
     return SuccessResponse(data=order_dict, msg="获取订单详情成功")
 
 
-@router.get("/customer/{customer_id}", response_model=OrderListResponse, summary="获取客户订单列表")
+@order_router.get("/customer/{customer_id}", response_model=OrderListResponse, summary="获取客户订单列表")
 async def get_customer_orders(
     customer_id: int,
     page: int = Query(1, ge=1, description="页码"),
@@ -105,7 +105,7 @@ async def get_customer_orders(
     return SuccessResponse(data={"total": total, "items": order_list}, msg="获取客户订单列表成功")
 
 
-@router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
+@order_router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
 async def get_all_orders(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量")
@@ -130,7 +130,7 @@ async def get_all_orders(
     return SuccessResponse(data={"total": total, "items": order_list}, msg="获取所有订单列表成功")
 
 
-@router.put("/{order_id}", response_model=OrderResponse, summary="更新订单信息")
+@order_router.put("/{order_id}", response_model=OrderResponse, summary="更新订单信息")
 async def update_order(order_id: int, order_update: OrderUpdate):
     """更新订单信息
     

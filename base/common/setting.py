@@ -203,5 +203,16 @@ class Settings(BaseSettings):
 	GZIP_MIN_SIZE: int = 1000       # 最小压缩大小(字节)
 	GZIP_COMPRESS_LEVEL: int = 9    # 压缩级别(1-9)
 
+	# ================================================= #
+	# ******************* 邮件服务配置 ******************* #
+	# ================================================= #
+	EMAIL_ENABLED: bool = config.config.getboolean("email", "enabled", fallback=True)
+	SMTP_HOST: str = config.config.get("email", "smtp_host", fallback="smtp.qq.com")
+	SMTP_PORT: int = config.config.getint("email", "smtp_port", fallback=587)
+	SMTP_USE_TLS: bool = config.config.getboolean("email", "smtp_use_tls", fallback=True)
+	SENDER_EMAIL: str = config.config.get("email", "sender_email", fallback="")
+	SENDER_PASSWORD: str = config.config.get("email", "sender_password", fallback="")
+	SENDER_NAME: str = config.config.get("email", "sender_name", fallback="AIPanelAdmin")
+
 
 settings = Settings()

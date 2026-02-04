@@ -131,7 +131,7 @@ class UploadFileResponse(FileResponse):
     ):
         """
         初始化文件响应类
-        
+
         参数:
         - file_path (str): 文件路径。
         - filename (str): 文件名。
@@ -139,7 +139,7 @@ class UploadFileResponse(FileResponse):
         - headers (Mapping[str, str] | None): 响应头。
         - background (BackgroundTask | None): 后台任务。
         - status_code (int): HTTP 状态码。
-        
+
         返回:
         - None
         """
@@ -154,3 +154,49 @@ class UploadFileResponse(FileResponse):
             method=None,
             content_disposition_type="attachment"
         )
+
+
+def success_response(
+    data: Any = None,
+    msg: str = RET.OK.msg,
+    code: int = RET.OK.code,
+    status_code: int = status.HTTP_200_OK,
+    success: bool = True
+) -> SuccessResponse:
+    """
+    成功响应快捷函数
+
+    参数:
+    - data (Any): 响应数据。
+    - msg (str): 响应消息。
+    - code (int): 业务状态码。
+    - status_code (int): HTTP 状态码。
+    - success (bool): 操作是否成功。
+
+    返回:
+    - SuccessResponse: 成功响应对象
+    """
+    return SuccessResponse(data=data, msg=msg, code=code, status_code=status_code, success=success)
+
+
+def fail_response(
+    data: Any = None,
+    msg: str = RET.ERROR.msg,
+    code: int = RET.ERROR.code,
+    status_code: int = status.HTTP_400_BAD_REQUEST,
+    success: bool = False
+) -> ErrorResponse:
+    """
+    失败响应快捷函数
+
+    参数:
+    - data (Any): 响应数据。
+    - msg (str): 响应消息。
+    - code (int): 业务状态码。
+    - status_code (int): HTTP 状态码。
+    - success (bool): 操作是否成功。
+
+    返回:
+    - ErrorResponse: 错误响应对象
+    """
+    return ErrorResponse(data=data, msg=msg, code=code, status_code=status_code, success=success)

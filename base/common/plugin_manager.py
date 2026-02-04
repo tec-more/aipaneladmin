@@ -6,7 +6,7 @@
 约定式插件结构：
 - manifest.json     必需，插件元数据、路由声明和状态
 - __init__.py       必需，可以为空文件
-- api/              可选，API 路由（在 manifest.json 的 routes 中声明）
+- api/              可选，API 路由（在 manifest.json 的 routes 中声明目录）
 - models/           可选，数据模型（在 manifest.json 的 models 中声明）
 - schemas/          可选，Pydantic Schema（在 manifest.json 的 schemas 中声明，用于文档）
 - services/         可选，业务逻辑
@@ -16,12 +16,22 @@ manifest.json 示例：
     "name": "hello_world",
     "display_name": "Hello World",
     "version": "1.0.0",
-    "routes": ["api/v1/hello"],    // 路由模块路径
-    "models": ["greeting"],         // 模型模块名
-    "schemas": ["greeting"],        // Schema模块名（仅用于文档，不自动加载）
+    "route_prefix": "/api/v1/customer",    // 可选，所有路由的统一前缀
+    "routes": ["api/v1"],                  // 路由目录路径（递归加载该目录下的所有路由文件）
+    "models": ["greeting"],                // 模型模块名
+    "schemas": ["greeting"],               // Schema模块名（仅用于文档，不自动加载）
     "is_installed": false,
     "is_enabled": false
 }
+
+路由加载规则：
+- routes 指定路由目录（如 "api/v1"）
+- route_prefix（可选）指定所有路由的统一前缀（如 "/api/v1/customer"）
+- 插件管理器会递归遍历该目录下的所有 .py 文件（排除 __init__.py）
+- 每个路由文件使用 {文件名}_router 的命名方式导出路由
+- 例如: auth.py 导出 auth_router, customer.py 导出 customer_router
+- 最终路径 = route_prefix + 路由文件中的路径
+  例如: "/api/v1/customer" + "/auth" + "/send-code" = "/api/v1/customer/auth/send-code"
 
 注意：
 - routes 和 models 会自动加载到应用中
@@ -281,39 +291,71 @@ class PluginManager:
             return None
 
     def _load_routes_from_manifest(self, name: str, manifest: dict) -> Optional[APIRouter]:
-        """从 manifest 的 routes 字段加载路由"""
-        routes = manifest.get("routes", [])
-        if not routes:
-            return None
+        """从 manifest.json 的 routes 字段加载路由
 
-        combined_router = APIRouter()
+        读取 manifest.json 中的 routes 配置（如 "api/v1"），
+        递归遍历该目录下的所有文件，每个文件使用 {文件名}_router 的命名方式加载路由
+
+        可选配置：
+        - route_prefix: 所有路由的统一前缀（如 "/api/v1/customer"）
+        """
         plugin_dir = self._plugins_dir / name
 
-        for route_path in routes:
-            # route_path 格式: "api/v1/hello"
-            route_module_path = route_path.replace("/", ".")
-            route_file = plugin_dir / f"{route_path}.py"
+        # 从 manifest 获取 routes 配置
+        routes_config = manifest.get("routes", [])
+        if not routes_config:
+            return None
 
-            if not route_file.exists():
-                log.warning(f"插件 {name} 的路由文件不存在: {route_file}")
+        # 获取 route_prefix（可选）
+        route_prefix = manifest.get("route_prefix", "")
+        combined_router = APIRouter(prefix=route_prefix) if route_prefix else APIRouter()
+        loaded_count = 0
+
+        # 遍历 routes 配置中的每个路径
+        for route_path in routes_config:
+            route_dir = plugin_dir / route_path
+
+            # 检查目录是否存在
+            if not route_dir.exists() or not route_dir.is_dir():
+                log.warning(f"插件 {name} 的路由目录不存在: {route_dir}")
                 continue
 
-            try:
-                spec = importlib.util.spec_from_file_location(
-                    f"base.plugins.{name}.{route_module_path}",
-                    route_file
-                )
-                if spec and spec.loader:
-                    route_module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(route_module)
+            # 递归遍历该目录下的所有 .py 文件（排除 __init__.py）
+            for route_file in route_dir.rglob("*.py"):
+                if route_file.name == "__init__.py":
+                    continue
 
-                    if hasattr(route_module, 'router'):
-                        combined_router.include_router(route_module.router)
-                        log.debug(f"已加载路由模块: {route_path}")
-            except Exception as e:
-                log.error(f"加载路由模块 {route_path} 失败: {e}")
+                try:
+                    # 计算相对路径和模块路径
+                    relative_path = route_file.relative_to(plugin_dir)
+                    module_path = f"base.plugins.{name}.{relative_path.as_posix().replace('/', '.')[:-3]}"  # 去掉.py
 
-        return combined_router if combined_router.routes else None
+                    # 根据 {文件名}_router 的规则构建路由属性名
+                    router_attr = f"{route_file.stem}_router"
+
+                    # 动态加载模块
+                    spec = importlib.util.spec_from_file_location(module_path, route_file)
+                    if spec and spec.loader:
+                        route_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(route_module)
+
+                        # 检查是否存在对应的路由属性
+                        if hasattr(route_module, router_attr):
+                            router_obj = getattr(route_module, router_attr)
+                            combined_router.include_router(router_obj)
+                            loaded_count += 1
+                            log.debug(f"已加载路由文件: {relative_path} -> {router_attr}")
+                        else:
+                            log.warning(f"路由文件 {relative_path} 中未找到 {router_attr} 属性")
+                except Exception as e:
+                    log.error(f"加载路由文件 {route_file} 失败: {e}")
+
+        # 返回 combined_router 如果成功加载了至少一个路由模块
+        if loaded_count > 0:
+            prefix_info = f" (prefix: {route_prefix})" if route_prefix else ""
+            log.info(f"插件 {name} 共加载了 {loaded_count} 个路由文件{prefix_info}")
+            return combined_router
+        return None
 
     async def _process_plugin_menus(self, name: str, manifest: dict) -> bool:
         """处理插件的菜单配置"""

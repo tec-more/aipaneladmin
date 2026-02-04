@@ -50,12 +50,12 @@ def auto_discover_routers(
     try:
         base_module = importlib.import_module(base_package)
     except ImportError as e:
-        print(f"❌ 无法导入基础包 {base_package}: {e}")
+        print(f"[ERROR] Failed to import base package {base_package}: {e}")
         return
 
     # 获取包的路径
     if not hasattr(base_module, "__path__"):
-        print(f"❌ {base_package} 不是一个有效的包")
+        print(f"[ERROR] {base_package} is not a valid package")
         return
 
     package_path = base_module.__path__[0]
@@ -74,7 +74,7 @@ def auto_discover_routers(
         # 如果需要检查插件状态（base.plugins 下的模块）
         if check_plugin_status and ispkg:
             if not _is_plugin_enabled(name):
-                print(f"⏭️ 跳过未激活插件: {name}")
+                print(f"[SKIP] Inactive plugin: {name}")
                 continue
 
         try:
@@ -87,14 +87,14 @@ def auto_discover_routers(
                 # 注册路由到主应用
                 app.include_router(router_instance)
                 routers_found += 1
-                print(f"✅ 已注册路由: {full_name} -> {router_instance.prefix or '/'}")
+                print(f"[OK] Registered router: {full_name} -> {router_instance.prefix or '/'}")
 
             # 如果是包，递归扫描（支持子目录）
             if ispkg:
                 num = _discover_in_subpackage(app, full_name, router_variable_name, routers_found, skip_modules)
                 routers_found += num if num else 0
         except ImportError as e:
-            print(f"⚠️ 导入模块失败 {full_name}: {e}")
+            print(f"[WARNING] Failed to import module {full_name}: {e}")
         except Exception as e:
             print(f"[ERROR] Error processing module {full_name}: {e}")
 
@@ -121,15 +121,15 @@ def _discover_in_subpackage(app: FastAPI, package_name: str, router_var: str, ro
                 if isinstance(router_instance, APIRouter):
                     app.include_router(router_instance)
                     routers_found += 1
-                    print(f"✅ 已注册子包路由: {full_name}")
+                    print(f"[OK] Registered sub-package router: {full_name}")
                 
                 # 继续递归
                 if ispkg:
-                    num = _discover_in_subpackage(app, full_name, router_var,routers_found, skip_modules)
+                    num = _discover_in_subpackage(app, full_name, router_var, 0, skip_modules)
                     routers_found += num if num else 0
                     
             except ImportError as e:
-                print(f"⚠️ 导入子模块失败 {full_name}: {e}")
+                print(f"[WARNING] Failed to import sub-module {full_name}: {e}")
         return routers_found   
     except ImportError:
         return
@@ -137,5 +137,5 @@ def _discover_in_subpackage(app: FastAPI, package_name: str, router_var: str, ro
 def register_routers(app: FastAPI):
     # 自动注册 core 目录下的所有路由
     auto_discover_routers(app, base_package="base.core")
-    # 自动注册 plugins 目录下已激活插件的路由
-    auto_discover_routers(app, base_package="base.plugins", check_plugin_status=True)
+    # 插件路由由 plugin_manager 在 startup 时注册，不需要在这里注册
+    # 这样避免了重复注册导致的 Duplicate Operation ID 警告

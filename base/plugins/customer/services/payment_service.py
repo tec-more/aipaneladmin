@@ -3,17 +3,20 @@
 """
 
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import json
-from base.common.setting import settings
-from base.plugins.aif2f.models import (
-    RechargeOrder,
+from decimal import Decimal
+
+from base.plugins.customer.models import (
+    CustomerOrder,
     PaymentTransaction,
     OrderStatus,
     TransactionStatus,
-    PaymentMethod
+    PaymentMethod,
+    generate_order_no
 )
+from base.plugins.customer.models.membership import MembershipLevel
 
 
 class PaymentService:
@@ -25,25 +28,40 @@ class PaymentService:
 
     async def create_order(
         self,
-        user_id: int,
+        customer_id: int,
         membership_level_id: int,
         payment_method: str,
         client_ip: str = None
-    ) -> RechargeOrder:
+    ) -> CustomerOrder:
         """创建支付订单"""
-        # 使用模型的方法创建订单
-        order = await RechargeOrder.create_order(
-            user_id=user_id,
+        # 获取会员等级信息
+        level = await MembershipLevel.get_or_none(id=membership_level_id)
+        if not level:
+            raise ValueError("会员等级不存在")
+
+        # 计算总小时数
+        total_hours = level.duration_hours + level.bonus_hours
+
+        # 订单过期时间(15分钟)
+        expire_time = datetime.now() + timedelta(minutes=15)
+
+        order = await CustomerOrder.create(
+            order_no=generate_order_no(),
+            customer_id=customer_id,
             membership_level_id=membership_level_id,
+            amount=level.price,
+            hours=level.duration_hours,
+            bonus_hours=level.bonus_hours,
+            total_hours=total_hours,
             payment_method=payment_method,
+            expire_time=expire_time,
             client_ip=client_ip
         )
-        await order.save()
         return order
 
-    async def get_order(self, order_no: str) -> Optional[RechargeOrder]:
+    async def get_order(self, order_no: str) -> Optional[CustomerOrder]:
         """获取订单"""
-        return await RechargeOrder.get_or_none(order_no=order_no).prefetch_related(
+        return await CustomerOrder.get_or_none(order_no=order_no).prefetch_related(
             "membership_level"
         )
 
@@ -59,7 +77,7 @@ class PaymentService:
 
     async def check_order_expired(self) -> None:
         """检查并更新过期订单（定时任务调用）"""
-        expired_orders = await RechargeOrder.filter(
+        expired_orders = await CustomerOrder.filter(
             payment_status=OrderStatus.PENDING
         ).filter(expire_time__lt=datetime.now())
 
@@ -94,7 +112,7 @@ class PaymentService:
             order_id=order.id,
             transaction_id=transaction_id,
             transaction_type=transaction_type,
-            amount=amount,
+            amount=Decimal(str(amount)),
             status=TransactionStatus.SUCCESS,
             notify_data=notify_data
         )
@@ -105,10 +123,10 @@ class PaymentService:
         order.pay_time = datetime.now()
         await order.save()
 
-        # 创建或更新用户会员
-        from base.plugins.aif2f.services.membership_service import MembershipService
-        await MembershipService.create_user_membership(
-            user_id=order.user_id,
+        # 创建或更新客户会员
+        from base.plugins.customer.services.membership_service import MembershipService
+        await MembershipService.create_customer_membership(
+            customer_id=order.customer_id,
             membership_level_id=order.membership_level_id,
             hours=order.total_hours
         )
@@ -129,7 +147,7 @@ class WechatPayService(PaymentService):
 
     async def create_payment(
         self,
-        order: RechargeOrder,
+        order: CustomerOrder,
         client_ip: str
     ) -> Dict[str, Any]:
         """
@@ -200,7 +218,7 @@ class AlipayService(PaymentService):
 
     async def create_payment(
         self,
-        order: RechargeOrder,
+        order: CustomerOrder,
         client_ip: str
     ) -> Dict[str, Any]:
         """

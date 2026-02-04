@@ -113,13 +113,13 @@ except ImportError:
         async def delete_customer(customer_id):
             pass
 
-router = APIRouter(
-    prefix="/api",
+customer_router = APIRouter(
+    prefix="",
     tags=["客户管理"]
 )
 
 
-@router.post("/v1/customer/register", summary="客户注册")
+@customer_router.post("/register", summary="客户注册")
 async def register_customer(customer_data: CustomerCreate):
     """
     客户注册接口
@@ -144,7 +144,7 @@ async def register_customer(customer_data: CustomerCreate):
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.post("/v1/customer/login", summary="客户登录")
+@customer_router.post("/login", summary="客户登录")
 async def login_customer(login_data: CustomerLogin):
     """
     客户登录接口
@@ -162,7 +162,7 @@ async def login_customer(login_data: CustomerLogin):
         return ErrorResponse(msg=str(e), status_code=status.HTTP_401_UNAUTHORIZED)
 
 
-@router.get("/v1/customer/me", summary="获取当前客户信息")
+@customer_router.get("/me", summary="获取当前客户信息")
 async def get_current_customer_info(current_customer_id: int = Depends(get_current_user_id)):
     """
     获取当前登录客户的详细信息
@@ -186,7 +186,7 @@ async def get_current_customer_info(current_customer_id: int = Depends(get_curre
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.put("/v1/customer/me", summary="更新当前客户信息")
+@customer_router.put("/me", summary="更新当前客户信息")
 async def update_current_customer_info(
         customer_data: CustomerUpdate,
         current_customer_id: int = Depends(get_current_user_id)
@@ -217,7 +217,7 @@ async def update_current_customer_info(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.get("/v1/customer/list", summary="获取客户列表(分页)")
+@customer_router.get("/list", summary="获取客户列表(分页)")
 async def get_customer_list(
         page: int = Query(1, ge=1, description="页码"),
         page_size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -277,7 +277,7 @@ async def get_customer_list(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.get("/v1/customer/{customer_id}", summary="获取客户详情")
+@customer_router.get("/{customer_id}", summary="获取客户详情")
 async def get_customer_detail(
         customer_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -308,7 +308,7 @@ async def get_customer_detail(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.put("/v1/customer/{customer_id}", summary="更新客户信息")
+@customer_router.put("/{customer_id}", summary="更新客户信息")
 async def update_customer(
         customer_id: int,
         customer_data: CustomerUpdate,
@@ -341,7 +341,7 @@ async def update_customer(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.post("/v1/customer", summary="创建客户")
+@customer_router.post("/", summary="创建客户")
 async def create_customer(
         customer_data: CustomerCreate,
         current_user_id: int = Depends(get_current_user_id)
@@ -372,7 +372,7 @@ async def create_customer(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.delete("/v1/customer/{customer_id}", summary="删除客户")
+@customer_router.delete("/{customer_id}", summary="删除客户")
 async def delete_customer(
         customer_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -396,7 +396,7 @@ async def delete_customer(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.delete("/v1/customer/batch", summary="批量删除客户")
+@customer_router.delete("/batch", summary="批量删除客户")
 async def batch_delete_customer(
         request: dict,
         current_user_id: int = Depends(get_current_user_id)
@@ -422,7 +422,7 @@ async def batch_delete_customer(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/v1/customer/{customer_id}/toggle-status", summary="切换客户状态")
+@customer_router.patch("/{customer_id}/toggle-status", summary="切换客户状态")
 async def toggle_customer_status(
         customer_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -454,7 +454,7 @@ async def toggle_customer_status(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/v1/customer/{customer_id}/points", summary="更新客户积分")
+@customer_router.patch("/{customer_id}/points", summary="更新客户积分")
 async def update_customer_points(
         customer_id: int,
         request: dict,
@@ -488,7 +488,7 @@ async def update_customer_points(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@router.patch("/v1/customer/{customer_id}/membership", summary="更新客户会员到期日期")
+@customer_router.patch("/{customer_id}/membership", summary="更新客户会员到期日期")
 async def update_customer_membership(
         customer_id: int,
         request: dict,

@@ -1,5 +1,5 @@
 """
-支付相关 Schema
+订单相关 Schema
 """
 
 from datetime import datetime
@@ -22,7 +22,7 @@ class OrderOut(BaseModel):
 
     id: int
     order_no: str
-    user_id: int
+    customer_id: int
     membership_level_id: int
     amount: Decimal
     hours: int
@@ -56,3 +56,18 @@ class AlipayNotifyIn(BaseModel):
     """支付宝回调"""
     # 具体字段根据支付宝文档定义
     pass
+
+
+class UsageLogOut(BaseModel):
+    """使用记录输出"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    customer_id: int
+    session_id: str
+    duration_seconds: int
+    service_type: str
+    details: Dict[str, Any]
+    characters_count: int
+    api_cost: Decimal
+    created_at: datetime

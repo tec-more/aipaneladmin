@@ -114,18 +114,24 @@ class UserService:
         return deleted_count > 0
 
     @staticmethod
-    async def authenticate(username: str, password: str) -> Optional[User]:
+    async def authenticate(username_or_email: str, password: str) -> Optional[User]:
         """
-        用户认证
+        用户认证（支持用户名或邮箱）
 
         Args:
-            username: 用户名
+            username_or_email: 用户名或邮箱
             password: 密码
 
         Returns:
             Optional[User]: 认证成功返回用户对象,失败返回None
         """
-        user = await UserService.get_by_username(username)
+        # 先尝试通过用户名查找
+        user = await UserService.get_by_username(username_or_email)
+
+        # 如果用户名不存在，尝试通过邮箱查找
+        if not user:
+            user = await UserService.get_by_email(username_or_email)
+
         if not user:
             return None
 

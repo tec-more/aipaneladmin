@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from decimal import Decimal
 
-from base.plugins.aif2f.models import (
+from base.plugins.customer.models import (
     MembershipLevel,
-    UserMembership,
+    CustomerMembership,
     LevelType
 )
 
@@ -142,35 +142,59 @@ class MembershipService:
     @staticmethod
     async def get_level_by_id(level_id: int) -> Optional[MembershipLevel]:
         """根据ID获取会员等级"""
-        return await MembershipLevel.get_or_none(id=level_id, is_active=True)
+        return await MembershipLevel.get_or_none(id=level_id)
 
     @staticmethod
-    async def get_user_membership(user_id: int) -> Optional[UserMembership]:
-        """获取用户会员信息"""
-        return await UserMembership.get_or_none(
-            user_id=user_id,
+    async def create_level(level_data: dict) -> MembershipLevel:
+        """创建会员等级"""
+        return await MembershipLevel.create(**level_data)
+
+    @staticmethod
+    async def update_level(level_id: int, level_data: dict) -> Optional[MembershipLevel]:
+        """更新会员等级"""
+        level = await MembershipLevel.get_or_none(id=level_id)
+        if not level:
+            return None
+        await level.update_from_dict(level_data)
+        await level.save()
+        return level
+
+    @staticmethod
+    async def delete_level(level_id: int) -> bool:
+        """删除会员等级"""
+        level = await MembershipLevel.get_or_none(id=level_id)
+        if not level:
+            return False
+        await level.delete()
+        return True
+
+    @staticmethod
+    async def get_customer_membership(customer_id: int) -> Optional[CustomerMembership]:
+        """获取客户会员信息"""
+        return await CustomerMembership.get_or_none(
+            customer_id=customer_id,
             is_active=True
         ).prefetch_related("membership_level")
 
     @staticmethod
-    async def create_user_membership(
-        user_id: int,
+    async def create_customer_membership(
+        customer_id: int,
         membership_level_id: int,
         hours: int
-    ) -> UserMembership:
-        """创建用户会员"""
+    ) -> CustomerMembership:
+        """创建客户会员"""
         level = await MembershipService.get_level_by_id(membership_level_id)
         if not level:
             raise ValueError("会员等级不存在")
 
         now = datetime.now()
 
-        # 检查用户是否已有会员
-        existing = await MembershipService.get_user_membership(user_id)
+        # 检查客户是否已有会员
+        existing = await MembershipService.get_customer_membership(customer_id)
         if existing:
             # 如果有，则累加时间
             total_hours = existing.total_hours + hours
-            remaining_hours = existing.remaining_hours + hours
+            remaining_hours = float(existing.remaining_hours) + hours
 
             # 如果未过期，延长有效期；否则重新计算
             if not existing.is_expired:
@@ -195,8 +219,8 @@ class MembershipService:
                 hours=level.duration_hours
             )
 
-            user_membership = await UserMembership.create(
-                user_id=user_id,
+            customer_membership = await CustomerMembership.create(
+                customer_id=customer_id,
                 membership_level_id=membership_level_id,
                 start_time=now,
                 expire_time=expire_time,
@@ -206,12 +230,12 @@ class MembershipService:
                 is_active=True
             )
 
-            return user_membership
+            return customer_membership
 
     @staticmethod
-    async def update_membership_usage(user_id: int, used_hours: float) -> bool:
+    async def update_membership_usage(customer_id: int, used_hours: float) -> bool:
         """更新会员使用时长"""
-        membership = await MembershipService.get_user_membership(user_id)
+        membership = await MembershipService.get_customer_membership(customer_id)
         if not membership or not membership.is_vip:
             return False
 
@@ -230,9 +254,9 @@ class MembershipService:
         return True
 
     @staticmethod
-    async def check_membership_status(user_id: int) -> dict:
+    async def check_membership_status(customer_id: int) -> dict:
         """检查会员状态"""
-        membership = await MembershipService.get_user_membership(user_id)
+        membership = await MembershipService.get_customer_membership(customer_id)
 
         if not membership:
             return {

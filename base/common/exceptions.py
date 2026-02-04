@@ -36,7 +36,18 @@ async def HttpExcHandle(_: Request, exc: HTTPException) -> JSONResponse:
 
 
 async def RequestValidationHandle(_: Request, exc: RequestValidationError) -> JSONResponse:
-    content = dict(code=422, msg=f"RequestValidationError, {exc}")
+    # 提取详细的验证错误信息
+    errors = []
+    for error in exc.errors():
+        field = " -> ".join(str(loc) for loc in error["loc"])
+        errors.append(f"{field}: {error['msg']}")
+
+    error_detail = "; ".join(errors)
+    content = dict(
+        code=422,
+        msg=f"请求参数验证失败: {error_detail}",
+        data={"errors": exc.errors()}
+    )
     return JSONResponse(content=content, status_code=422)
 
 

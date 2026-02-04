@@ -18,7 +18,7 @@ class LevelType(str, Enum):
     FIBONACCI = "fibonacci"      # Fibonacci动态等级
 
 
-class MembershipLevel(BaseModel):
+class MembershipLevel(BaseModel, TimestampMixin):
     """会员等级配置表"""
 
     level_type = fields.CharEnumField(
@@ -44,7 +44,7 @@ class MembershipLevel(BaseModel):
     is_active = fields.BooleanField(default=True, description="是否启用")
 
     class Meta:
-        table = "aif2f_membership_level"
+        table = "customer_membership_level"
         ordering = ["sort_order", "level"]
 
     def __str__(self):

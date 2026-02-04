@@ -43,8 +43,8 @@ class UserUpdatePassword(BaseModel):
 
 
 class UserLogin(BaseModel):
-    """用户登录模型"""
-    username: str = Field(..., description="用户名")
+    """用户登录模型（支持用户名或邮箱登录）"""
+    username: str = Field(..., description="用户名或邮箱")
     password: str = Field(..., description="密码")
 
 
@@ -82,6 +82,25 @@ class UserListQuery(BaseModel):
     email: Optional[str] = Field(None, description="邮箱(模糊搜索)")
     is_active: Optional[bool] = Field(None, description="是否激活")
     dept_id: Optional[int] = Field(None, description="部门ID")
+
+
+class SendCodeSchema(BaseModel):
+    """发送验证码请求"""
+    email: EmailStr = Field(..., description="邮箱地址")
+    type: str = Field(..., description="类型: register-注册, login-登录, reset_password-重置密码")
+
+
+class VerifyCodeSchema(BaseModel):
+    """验证码验证请求"""
+    email: EmailStr = Field(..., description="邮箱地址")
+    code: str = Field(..., min_length=6, max_length=6, description="验证码")
+    type: str = Field(..., description="类型: register-注册, login-登录")
+
+
+class EmailLoginSchema(BaseModel):
+    """邮箱登录请求"""
+    email: EmailStr = Field(..., description="邮箱地址")
+    code: str = Field(..., min_length=6, max_length=6, description="验证码")
 
 
 class UserListResponse(BaseModel):

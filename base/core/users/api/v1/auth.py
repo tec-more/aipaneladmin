@@ -10,8 +10,12 @@ from base.core.users.schemas.users import (
     TokenResponse,
     UserResponse,
     UserUpdatePassword,
+    SendCodeSchema,
+    VerifyCodeSchema,
+    EmailLoginSchema,
 )
 from base.core.users.services.user_service import UserService
+from base.core.users.services.email_service import EmailService
 from base.common.security import (
     create_access_token,
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -22,10 +26,11 @@ from base.common.response import SuccessResponse, ErrorResponse
 router = APIRouter(prefix="/api/v1/auth", tags=["认证管理"])
 
 
-@router.post("/register", summary="用户注册", response_model=UserResponse)
+@router.post("/register", summary="管理员注册用户（仅限内部调用）", response_model=UserResponse)
 async def register(user_data: UserCreate):
     """
-    用户注册
+    管理员注册新用户
+    注意：此接口仅用于后台管理员创建，普通用户注册请使用客户接口 /api/v1/customer/auth/register
 
     Args:
         user_data: 用户注册数据
@@ -41,12 +46,12 @@ async def register(user_data: UserCreate):
     if await UserService.check_email_exists(user_data.email):
         return ErrorResponse(msg="邮箱已被注册", status_code=status.HTTP_400_BAD_REQUEST)
 
-    # 创建用户
+    # 创建用户（管理员）
     user = await UserService.create_user(user_data)
 
     # 转换为响应模型
     user_dict = await user.to_dict()
-    return SuccessResponse(data=user_dict, msg="注册成功")
+    return SuccessResponse(data=user_dict, msg="管理员创建成功")
 
 
 @router.post("/login", summary="用户登录")
@@ -143,6 +148,42 @@ async def change_password(
         return SuccessResponse(msg=message)
     else:
         return ErrorResponse(msg=message, status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@router.post("/send-code", summary="发送管理员验证码（已弃用）")
+async def send_code(code_data: SendCodeSchema):
+    """
+    发送验证码到管理员邮箱
+    注意：此接口已弃用，管理员请使用用户名密码登录。普通用户请使用 /api/v1/customer/auth/send-code
+
+    Args:
+        code_data: 邮箱和验证码类型
+
+    Returns:
+        发送结果
+    """
+    return ErrorResponse(
+        msg="此接口已弃用。普通用户请使用 /api/v1/customer/auth/send-code，管理员请使用用户名密码登录",
+        status_code=status.HTTP_410_GONE
+    )
+
+
+@router.post("/email-login", summary="管理员邮箱验证码登录（已弃用）")
+async def email_login(login_data: EmailLoginSchema):
+    """
+    使用邮箱和验证码登录（管理员）
+    注意：此接口已弃用。普通用户请使用 /api/v1/customer/auth/login-code，管理员请使用用户名密码登录
+
+    Args:
+        login_data: 邮箱和验证码
+
+    Returns:
+        Token和用户信息
+    """
+    return ErrorResponse(
+        msg="此接口已弃用。普通用户请使用 /api/v1/customer/auth/login-code，管理员请使用用户名密码登录",
+        status_code=status.HTTP_410_GONE
+    )
 
 
 @router.post("/logout", summary="用户登出")
