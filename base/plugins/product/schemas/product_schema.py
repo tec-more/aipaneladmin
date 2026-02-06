@@ -3,7 +3,7 @@
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 from decimal import Decimal
 
 
@@ -11,7 +11,8 @@ class ProductBase(BaseModel):
     """产品基础模型"""
     name: str = Field(..., min_length=1, max_length=255, description="产品名称")
     description: Optional[str] = Field(None, description="产品描述")
-    price: Decimal = Field(..., ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="产品价格")
+    original_price: Decimal = Field(..., ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
+    sale_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="优惠价")
     stock: int = Field(default=0, ge=0, description="库存数量")
     category: Optional[str] = Field(None, max_length=50, description="产品分类")
     tags: Optional[List[str]] = Field(None, description="产品标签")
@@ -19,6 +20,19 @@ class ProductBase(BaseModel):
     is_active: bool = Field(default=True, description="是否上架")
     is_hot: bool = Field(default=False, description="是否热门")
     is_new: bool = Field(default=False, description="是否新品")
+    recharge_hours: Optional[int] = Field(None, ge=0, description="充值时长（小时）")
+    bonus_hours: int = Field(default=0, ge=0, description="赠送时长（小时）")
+    discount_description: Optional[str] = Field(None, max_length=255, description="优惠描述")
+
+    @field_validator('sale_price')
+    @classmethod
+    def validate_sale_price(cls, v: Optional[Decimal], info) -> Optional[Decimal]:
+        """验证优惠价必须小于原价"""
+        if v is not None and 'original_price' in info.data:
+            original_price = info.data['original_price']
+            if v >= original_price:
+                raise ValueError('优惠价必须小于原价')
+        return v
 
 
 class ProductCreate(ProductBase):
@@ -30,7 +44,8 @@ class ProductUpdate(BaseModel):
     """更新产品模型"""
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="产品名称")
     description: Optional[str] = Field(None, description="产品描述")
-    price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="产品价格")
+    original_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
+    sale_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="优惠价")
     stock: Optional[int] = Field(None, ge=0, description="库存数量")
     category: Optional[str] = Field(None, max_length=50, description="产品分类")
     tags: Optional[List[str]] = Field(None, description="产品标签")
@@ -38,6 +53,9 @@ class ProductUpdate(BaseModel):
     is_active: Optional[bool] = Field(None, description="是否上架")
     is_hot: Optional[bool] = Field(None, description="是否热门")
     is_new: Optional[bool] = Field(None, description="是否新品")
+    recharge_hours: Optional[int] = Field(None, ge=0, description="充值时长（小时）")
+    bonus_hours: Optional[int] = Field(None, ge=0, description="赠送时长（小时）")
+    discount_description: Optional[str] = Field(None, max_length=255, description="优惠描述")
 
 
 class ProductResponse(BaseModel):
@@ -45,7 +63,8 @@ class ProductResponse(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
-    price: Decimal
+    original_price: Decimal
+    sale_price: Optional[Decimal] = None
     stock: int
     category: Optional[str] = None
     tags: Optional[List[str]] = None
@@ -55,8 +74,40 @@ class ProductResponse(BaseModel):
     is_new: bool
     view_count: int
     sales_count: int
+    recharge_hours: Optional[int] = None
+    bonus_hours: int
+    discount_description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    # 计算字段
+    @computed_field
+    @property
+    def current_price(self) -> Decimal:
+        """当前价格（有优惠价返回优惠价，否则返回原价）"""
+        return self.sale_price if self.sale_price is not None else self.original_price
+
+    @computed_field
+    @property
+    def has_discount(self) -> bool:
+        """是否有优惠"""
+        return self.sale_price is not None and self.sale_price < self.original_price
+
+    @computed_field
+    @property
+    def discount_percentage(self) -> int:
+        """折扣百分比"""
+        if not self.has_discount:
+            return 0
+        return int((self.original_price - self.sale_price) / self.original_price * 100)
+
+    @computed_field
+    @property
+    def total_hours(self) -> int:
+        """总时长（充值时长 + 赠送时长）"""
+        recharge = self.recharge_hours or 0
+        bonus = self.bonus_hours or 0
+        return recharge + bonus
 
     class Config:
         from_attributes = True

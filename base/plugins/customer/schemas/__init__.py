@@ -16,7 +16,8 @@ from .membership import (
     FibonacciLevelOut,
     CalculateFibonacciLevelIn,
 )
-from .order import (
+# 从 order 模块导入订单相关schemas
+from base.plugins.order.schemas import (
     CreateOrderIn,
     OrderOut,
     PaymentWebhookIn,
