@@ -1,7 +1,7 @@
 """
 客户模块API
 """
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, Path
 from typing import Optional
 
 # 导入响应类
@@ -220,7 +220,7 @@ async def update_current_customer_info(
 @customer_router.get("/list", summary="获取客户列表(分页)")
 async def get_customer_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
         username: Optional[str] = Query(None, description="用户名(模糊搜索)"),
         email: Optional[str] = Query(None, description="邮箱(模糊搜索)"),
         phone: Optional[str] = Query(None, description="手机号(模糊搜索)"),
@@ -277,9 +277,225 @@ async def get_customer_list(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
+# ============ 固定路径路由（必须放在参数化路由之前） ============
+
+# 会员等级、使用记录、支付记录等固定路径路由
+# 这些路由必须在参数化路由（/{customer_id}）之前定义，否则会被错误匹配
+
+@customer_router.get("/membership-levels", summary="获取会员等级列表(别名路由)")
+async def get_membership_levels_alias(
+        active_only: bool = Query(True, description="只显示启用的等级")
+):
+    """获取会员等级列表 (兼容前端调用)"""
+    try:
+        from base.plugins.customer.services.membership_service import MembershipService
+        levels = await MembershipService.get_all_levels(active_only=active_only)
+        return SuccessResponse(data=levels)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@customer_router.get("/usage", summary="获取使用记录列表(别名路由)")
+async def get_usage_logs_alias(
+        page: int = Query(1, ge=1, description="页码"),
+        page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+        customer_id: Optional[int] = Query(None, description="客户ID"),
+        service_type: Optional[str] = Query(None, description="服务类型"),
+        current_user_id: int = Depends(get_current_user_id)
+):
+    """获取使用记录列表 (兼容前端调用)"""
+    try:
+        from base.plugins.customer.models.usage_log import UsageLog
+        from base.plugins.customer.models.customer import Customer
+
+        query = UsageLog.all()
+        if customer_id:
+            query = query.filter(customer_id=customer_id)
+        else:
+            customer = await Customer.get_or_none(system_user_id=current_user_id)
+            if not customer:
+                return ErrorResponse(msg="客户不存在", status_code=status.HTTP_404_NOT_FOUND)
+            query = query.filter(customer_id=customer.id)
+
+        if service_type:
+            query = query.filter(service_type=service_type)
+
+        total = await query.count()
+        logs = await query.offset((page - 1) * page_size).limit(page_size).order_by("-created_at")
+
+        log_list = []
+        for log in logs:
+            if hasattr(log, 'to_dict'):
+                log_dict = await log.to_dict()
+            elif hasattr(log, 'dict'):
+                log_dict = log.dict()
+            else:
+                log_dict = dict(log)
+            log_list.append(log_dict)
+
+        response_data = {"total": total, "page": page, "page_size": page_size, "items": log_list}
+        return SuccessResponse(data=response_data)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@customer_router.get("/usage-logs", summary="获取所有使用记录列表(管理员)")
+async def get_all_usage_logs(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+    customer_id: Optional[int] = Query(None, description="客户ID"),
+    service_type: Optional[str] = Query(None, description="服务类型"),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """获取所有使用记录列表 (管理员功能)"""
+    return await get_usage_logs_alias(
+        page=page, page_size=page_size, customer_id=customer_id,
+        service_type=service_type, current_user_id=current_user_id
+    )
+
+
+@customer_router.post("/membership-levels", summary="创建会员等级(别名路由)")
+async def create_membership_level_alias(
+    request_data: dict,
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """创建会员等级 - 别名路由"""
+    try:
+        from base.plugins.customer.services.membership_service import MembershipService
+        level = await MembershipService.create_level(request_data)
+        if hasattr(level, 'to_dict'):
+            level_dict = await level.to_dict()
+        elif hasattr(level, 'dict'):
+            level_dict = level.dict()
+        else:
+            level_dict = dict(level)
+        return SuccessResponse(data=level_dict, msg="会员等级创建成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@customer_router.put("/membership-levels/{level_id}", summary="更新会员等级(别名路由)")
+async def update_membership_level_alias(
+    level_id: int,
+    request_data: dict,
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """更新会员等级 - 别名路由"""
+    try:
+        from base.plugins.customer.services.membership_service import MembershipService
+        level = await MembershipService.update_level(level_id, request_data)
+        if not level:
+            return ErrorResponse(msg="会员等级不存在", status_code=status.HTTP_404_NOT_FOUND)
+        if hasattr(level, 'to_dict'):
+            level_dict = await level.to_dict()
+        elif hasattr(level, 'dict'):
+            level_dict = level.dict()
+        else:
+            level_dict = dict(level)
+        return SuccessResponse(data=level_dict, msg="会员等级更新成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@customer_router.delete("/membership-levels/{level_id}", summary="删除会员等级(别名路由)")
+async def delete_membership_level_alias(
+    level_id: int,
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """删除会员等级 - 别名路由"""
+    try:
+        from base.plugins.customer.services.membership_service import MembershipService
+        success = await MembershipService.delete_level(level_id)
+        if not success:
+            return ErrorResponse(msg="会员等级不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(msg="会员等级删除成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@customer_router.patch("/membership-levels/{level_id}", summary="切换会员等级状态(别名路由)")
+async def toggle_membership_level_status_alias(
+    level_id: int,
+    request_data: dict = None,
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """切换会员等级状态 - 别名路由"""
+    try:
+        from base.plugins.customer.services.membership_service import MembershipService
+        if request_data is None:
+            request_data = {}
+        is_active = request_data.get("is_active", True)
+        level = await MembershipService.update_level(level_id, {"is_active": is_active})
+        if not level:
+            return ErrorResponse(msg="会员等级不存在", status_code=status.HTTP_404_NOT_FOUND)
+        if hasattr(level, 'to_dict'):
+            level_dict = await level.to_dict()
+        elif hasattr(level, 'dict'):
+            level_dict = level.dict()
+        else:
+            level_dict = dict(level)
+        status_text = "启用" if is_active else "禁用"
+        return SuccessResponse(data=level_dict, msg=f"会员等级已{status_text}")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@customer_router.get("/payment-transactions", summary="获取支付交易记录列表(别名路由)")
+async def get_payment_transactions_alias(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+    trade_no: Optional[str] = Query(None, description="交易号(模糊搜索)"),
+    payment_method: Optional[str] = Query(None, description="支付方式(wechat/alipay)"),
+    status: Optional[str] = Query(None, description="交易状态"),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """获取支付交易记录列表 (兼容前端调用)"""
+    try:
+        from base.plugins.customer.models.payment_transaction import PaymentTransaction
+        from base.plugins.order.models import CustomerOrder
+
+        query = PaymentTransaction.all()
+        if trade_no:
+            orders = await CustomerOrder.filter(order_no__icontains=trade_no).values_list('id', flat=True)
+            if orders:
+                query = query.filter(order_id__in=orders)
+            else:
+                query = query.filter(order_id=-1)
+        if payment_method:
+            query = query.filter(transaction_type=payment_method)
+        if status:
+            query = query.filter(status=status)
+
+        total = await query.count()
+        transactions = await query.offset((page - 1) * page_size).limit(page_size).order_by("-processed_at")
+
+        transaction_list = []
+        for transaction in transactions:
+            if hasattr(transaction, 'to_dict'):
+                trans_dict = await transaction.to_dict()
+            elif hasattr(transaction, 'dict'):
+                trans_dict = transaction.dict()
+            else:
+                trans_dict = dict(transaction)
+            if hasattr(transaction, 'order_id') and transaction.order_id:
+                order = await CustomerOrder.get_or_none(id=transaction.order_id)
+                if order:
+                    trans_dict['order_no'] = order.order_no
+                    if hasattr(order, 'customer_id'):
+                        trans_dict['customer_id'] = order.customer_id
+            transaction_list.append(trans_dict)
+
+        response_data = {"total": total, "page": page, "page_size": page_size, "items": transaction_list}
+        return SuccessResponse(data=response_data)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+# ============ 参数化路由（必须放在最后） ============
+
 @customer_router.get("/{customer_id}", summary="获取客户详情")
 async def get_customer_detail(
-        customer_id: int,
+        customer_id: int = Path(..., gt=0, description="客户ID"),
         current_user_id: int = Depends(get_current_user_id)
 ):
     """
@@ -310,8 +526,8 @@ async def get_customer_detail(
 
 @customer_router.put("/{customer_id}", summary="更新客户信息")
 async def update_customer(
-        customer_id: int,
-        customer_data: CustomerUpdate,
+        customer_id: int = Path(..., gt=0, description="客户ID"),
+        customer_data: CustomerUpdate = None,
         current_user_id: int = Depends(get_current_user_id)
 ):
     """
@@ -374,7 +590,7 @@ async def create_customer(
 
 @customer_router.delete("/{customer_id}", summary="删除客户")
 async def delete_customer(
-        customer_id: int,
+        customer_id: int = Path(..., gt=0, description="客户ID"),
         current_user_id: int = Depends(get_current_user_id)
 ):
     """
@@ -424,7 +640,7 @@ async def batch_delete_customer(
 
 @customer_router.patch("/{customer_id}/toggle-status", summary="切换客户状态")
 async def toggle_customer_status(
-        customer_id: int,
+        customer_id: int = Path(..., gt=0, description="客户ID"),
         current_user_id: int = Depends(get_current_user_id)
 ):
     """
@@ -454,10 +670,19 @@ async def toggle_customer_status(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
+@customer_router.patch("/{customer_id}/status", summary="切换客户状态(别名路由)")
+async def toggle_customer_status_alias(
+        customer_id: int = Path(..., gt=0, description="客户ID"),
+        current_user_id: int = Depends(get_current_user_id)
+):
+    """切换客户激活状态 - 别名路由，兼容前端调用"""
+    return await toggle_customer_status(customer_id, current_user_id)
+
+
 @customer_router.patch("/{customer_id}/points", summary="更新客户积分")
 async def update_customer_points(
-        customer_id: int,
-        request: dict,
+        customer_id: int = Path(..., gt=0, description="客户ID"),
+        request: dict = None,
         current_user_id: int = Depends(get_current_user_id)
 ):
     """
@@ -490,18 +715,18 @@ async def update_customer_points(
 
 @customer_router.patch("/{customer_id}/membership", summary="更新客户会员到期日期")
 async def update_customer_membership(
-        customer_id: int,
-        request: dict,
+        customer_id: int = Path(..., gt=0, description="客户ID"),
+        request: dict = None,
         current_user_id: int = Depends(get_current_user_id)
 ):
     """
     更新客户会员到期日期(管理员功能)
-    
+
     Args:
         customer_id: 客户ID
         request: 包含membership_expire字段的请求体
         current_user_id: 当前用户ID
-        
+
     Returns:
         更新后的客户信息
     """

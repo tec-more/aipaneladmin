@@ -152,13 +152,13 @@ except ImportError:
 
 # 创建路由实例
 product_router = APIRouter(
-    prefix="/api",
+    prefix="",
     tags=["产品管理"]
 )
 
 
 # 为每个路由添加单数和复数两种路径
-@product_router.post("/v1/product", summary="创建产品", status_code=status.HTTP_201_CREATED)
+@product_router.post("/", summary="创建产品", status_code=status.HTTP_201_CREATED)
 async def create_product(
         product_data: ProductCreate,
         current_user_id: int = Depends(get_current_user_id)
@@ -187,10 +187,10 @@ async def create_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.get("/v1/product/list", summary="获取产品列表(分页)")
+@product_router.get("/list", summary="获取产品列表(分页)")
 async def get_product_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
         name: Optional[str] = Query(None, description="产品名称(模糊搜索)"),
         category: Optional[str] = Query(None, description="产品分类"),
         is_active: Optional[bool] = Query(None, description="是否上架"),
@@ -248,7 +248,7 @@ async def get_product_list(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.get("/v1/product/{product_id}", summary="获取产品详情")
+@product_router.get("/{product_id}", summary="获取产品详情")
 async def get_product_detail(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -280,7 +280,7 @@ async def get_product_detail(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.put("/v1/product/{product_id}", summary="更新产品信息")
+@product_router.put("/{product_id}", summary="更新产品信息")
 async def update_product(
         product_id: int,
         product_data: ProductUpdate,
@@ -312,7 +312,7 @@ async def update_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.delete("/v1/product/{product_id}", summary="删除产品")
+@product_router.delete("/{product_id}", summary="删除产品")
 async def delete_product(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -336,7 +336,38 @@ async def delete_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/v1/product/{product_id}/toggle-status", summary="切换产品上架状态")
+@product_router.delete("/batch", summary="批量删除产品")
+async def batch_delete_product(
+        request_data: dict,
+        current_user_id: int = Depends(get_current_user_id)
+):
+    """
+    批量删除产品
+
+    Args:
+        request_data: 包含ids数组的请求体
+        current_user_id: 当前用户ID
+
+    Returns:
+        删除结果
+    """
+    try:
+        ids = request_data.get("ids", [])
+        if not ids:
+            return ErrorResponse(msg="请选择要删除的产品", status_code=status.HTTP_400_BAD_REQUEST)
+
+        success_count = 0
+        for product_id in ids:
+            success = await ProductService.delete_product(product_id)
+            if success:
+                success_count += 1
+
+        return SuccessResponse(msg=f"成功删除{success_count}/{len(ids)}个产品")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.patch("/{product_id}/toggle-status", summary="切换产品上架状态")
 async def toggle_product_status(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -367,7 +398,7 @@ async def toggle_product_status(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/v1/product/{product_id}/stock", summary="更新产品库存")
+@product_router.patch("/{product_id}/stock", summary="更新产品库存")
 async def update_product_stock(
         product_id: int,
         stock_data: ProductStockUpdate,
@@ -401,7 +432,7 @@ async def update_product_stock(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/v1/product/{product_id}/sales", summary="更新产品销售数量")
+@product_router.patch("/{product_id}/sales", summary="更新产品销售数量")
 async def update_product_sales(
         product_id: int,
         sales_data: ProductSalesUpdate,
@@ -433,7 +464,7 @@ async def update_product_sales(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/v1/product/{product_id}/view", summary="增加产品浏览次数")
+@product_router.patch("/{product_id}/view", summary="增加产品浏览次数")
 async def increment_product_view(
         product_id: int,
         current_user_id: int = Depends(get_current_user_id)
@@ -463,7 +494,7 @@ async def increment_product_view(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.get("/v1/product/categories/list", summary="获取所有产品分类")
+@product_router.get("/categories/list", summary="获取所有产品分类")
 async def get_product_categories(
         current_user_id: int = Depends(get_current_user_id)
 ):

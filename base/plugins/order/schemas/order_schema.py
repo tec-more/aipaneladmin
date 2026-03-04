@@ -10,6 +10,7 @@ from decimal import Decimal
 
 class CreateOrderIn(BaseModel):
     """创建订单输入"""
+    customer_id: int = Field(..., description="客户ID")
     membership_level_id: int = Field(..., description="会员等级ID")
     payment_method: str = Field(..., description="支付方式(wechat/alipay)")
     client_ip: Optional[str] = None
@@ -140,9 +141,8 @@ class OrderCreateRequest(OrderBase):
 
 
 class OrderUpdateRequest(BaseModel):
-    """更新订单请求模型（保留以兼容旧代码）"""
-    payment_status: Optional[int] = Field(None, description="支付状态: 0-待支付, 1-已支付, 2-支付失败, 3-已退款")
-    order_status: Optional[int] = Field(None, description="订单状态: 0-待支付, 1-已支付, 2-已完成, 3-已取消")
+    """更新订单请求模型"""
+    payment_status: Optional[str] = Field(None, description="支付状态(pending/processing/paid/completed/cancelled/failed/refunded/expired)")
     remark: Optional[str] = Field(None, description="订单备注")
 
 

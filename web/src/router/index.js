@@ -68,6 +68,36 @@ const routes = [
         meta: { title: '客户详情' }
       },
       {
+        path: 'customer/list',
+        name: 'CustomerList',
+        component: () => import('@/views/customer/Index.vue'),
+        meta: { title: '客户列表' }
+      },
+      {
+        path: 'customer/membership-levels',
+        name: 'MembershipLevels',
+        component: () => import('@/views/customer/membership-levels/index.vue'),
+        meta: { title: '会员等级配置' }
+      },
+      {
+        path: 'customer/orders',
+        name: 'CustomerOrders',
+        component: () => import('@/views/customer/orders/index.vue'),
+        meta: { title: '订单管理' }
+      },
+      {
+        path: 'customer/payments',
+        name: 'CustomerPayments',
+        component: () => import('@/views/customer/payments/index.vue'),
+        meta: { title: '支付记录' }
+      },
+      {
+        path: 'customer/usage',
+        name: 'CustomerUsage',
+        component: () => import('@/views/customer/usage/index.vue'),
+        meta: { title: '使用记录' }
+      },
+      {
         path: 'product',
         name: 'Product',
         component: () => import('@/views/product/Index.vue'),

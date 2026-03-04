@@ -7,7 +7,8 @@ from typing import List
 from base.common.response import success_response, fail_response
 from base.plugins.customer.schemas import (
     MembershipLevelOut,
-    FibonacciLevelOut
+    FibonacciLevelOut,
+    MembershipLevelIn
 )
 from base.plugins.customer.services.membership_service import MembershipService
 from base.core.users.models.users import User
@@ -109,3 +110,119 @@ async def get_my_membership_level(
         "membership": membership,
         "fibonacci_level": fibonacci_info
     })
+
+
+@membership_router.post("/levels", summary="创建会员等级")
+async def create_membership_level(
+    level_data: MembershipLevelIn,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    创建会员等级
+
+    管理员功能
+    """
+    try:
+        # 将 Pydantic 模型转换为字典
+        level_dict = level_data.model_dump()
+
+        level = await MembershipService.create_level(level_dict)
+
+        # 转换为字典确保datetime字段被正确格式化
+        if hasattr(level, 'to_dict'):
+            level_dict = await level.to_dict()
+        elif hasattr(level, 'dict'):
+            level_dict = level.dict()
+        else:
+            level_dict = dict(level)
+
+        return success_response(data=level_dict, msg="会员等级创建成功")
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@membership_router.put("/levels/{level_id}", summary="更新会员等级")
+async def update_membership_level(
+    level_id: int,
+    level_data: MembershipLevelIn,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    更新会员等级
+
+    管理员功能
+    """
+    try:
+        # 将 Pydantic 模型转换为字典
+        update_dict = level_data.model_dump(exclude_unset=True)
+
+        level = await MembershipService.update_level(level_id, update_dict)
+
+        if not level:
+            return fail_response(msg="会员等级不存在")
+
+        # 转换为字典确保datetime字段被正确格式化
+        if hasattr(level, 'to_dict'):
+            level_dict = await level.to_dict()
+        elif hasattr(level, 'dict'):
+            level_dict = level.dict()
+        else:
+            level_dict = dict(level)
+
+        return success_response(data=level_dict, msg="会员等级更新成功")
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@membership_router.delete("/levels/{level_id}", summary="删除会员等级")
+async def delete_membership_level(
+    level_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    删除会员等级
+
+    管理员功能
+    """
+    try:
+        success = await MembershipService.delete_level(level_id)
+        if not success:
+            return fail_response(msg="会员等级不存在")
+        return success_response(msg="会员等级删除成功")
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@membership_router.patch("/levels/{level_id}", summary="切换会员等级状态")
+async def toggle_membership_level_status(
+    level_id: int,
+    status_data: dict = None,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    切换会员等级启用状态
+
+    管理员功能
+    """
+    try:
+        if status_data is None:
+            status_data = {}
+
+        is_active = status_data.get("is_active", True)
+        level = await MembershipService.update_level(level_id, {"is_active": is_active})
+
+        if not level:
+            return fail_response(msg="会员等级不存在")
+
+        # 转换为字典确保datetime字段被正确格式化
+        if hasattr(level, 'to_dict'):
+            level_dict = await level.to_dict()
+        elif hasattr(level, 'dict'):
+            level_dict = level.dict()
+        else:
+            level_dict = dict(level)
+
+        status_text = "启用" if is_active else "禁用"
+        return success_response(data=level_dict, msg=f"会员等级已{status_text}")
+    except Exception as e:
+        return fail_response(msg=str(e))
