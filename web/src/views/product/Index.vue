@@ -6,16 +6,16 @@
         <el-form-item label="产品名称">
           <el-input v-model="searchForm.name" placeholder="请输入产品名称" clearable />
         </el-form-item>
-        <el-form-item label="产品类型">
-          <el-select v-model="searchForm.product_type" placeholder="请选择" clearable style="width: 120px">
-            <el-option label="点卷" :value="'points'" />
-            <el-option label="会员" :value="'membership'" />
+        <el-form-item label="产品分类">
+          <el-select v-model="searchForm.category" placeholder="请选择" clearable style="width: 120px">
+            <el-option label="充值套餐" value="充值套餐" />
+            <el-option label="会员套餐" value="会员套餐" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.is_active" placeholder="请选择" clearable style="width: 120px">
-            <el-option label="启用" :value="true" />
-            <el-option label="禁用" :value="false" />
+            <el-option label="上架" :value="true" />
+            <el-option label="下架" :value="false" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -36,29 +36,59 @@
 
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
+        <el-table-column prop="sort" label="排序" width="80" align="center" />
         <el-table-column prop="name" label="产品名称" min-width="120" />
-        <el-table-column label="产品类型" width="100" align="center">
+        <el-table-column prop="description" label="产品描述" min-width="150" show-overflow-tooltip />
+        <el-table-column label="价格" width="120" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.product_type === 'points'" type="success">
-              点卷
-            </el-tag>
-            <el-tag v-else-if="row.product_type === 'membership'" type="warning">
-              会员
-            </el-tag>
-            <el-tag v-else type="info">
-              其他
-            </el-tag>
+            <div class="price-info">
+              <div class="current-price">¥{{ row.price?.toFixed(2) || '0.00' }}</div>
+              <div v-if="row.original_price && row.original_price > row.price" class="original-price">
+                原价: ¥{{ row.original_price?.toFixed(2) }}
+              </div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="price" label="价格" width="100" align="center">
+        <el-table-column label="折扣" width="80" align="center">
           <template #default="{ row }">
-            ¥{{ row.price.toFixed(2) }}
+            <el-tag v-if="row.discount_percentage > 0" type="danger">
+              {{ row.discount_percentage }}% off
+            </el-tag>
+            <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="value" label="产品价值" width="100" align="center" />
+        <el-table-column label="时长信息" width="150" align="center">
+          <template #default="{ row }">
+            <div class="hours-info">
+              <div>充值: {{ row.recharge_hours || 0 }}小时</div>
+              <div v-if="row.bonus_hours > 0" class="bonus-hours">
+                +赠送: {{ row.bonus_hours }}小时
+              </div>
+              <div class="total-hours">
+                总计: {{ row.total_hours || 0 }}小时
+              </div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="stock" label="库存" width="100" align="center" />
-        <el-table-column prop="sales_count" label="销售数量" width="100" align="center" />
-        <el-table-column prop="description" label="产品描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="sales_count" label="销量" width="100" align="center" />
+        <el-table-column prop="view_count" label="浏览" width="80" align="center" />
+        <el-table-column label="标签" width="200" align="center">
+          <template #default="{ row }">
+            <div class="tags-wrapper">
+              <el-tag v-if="row.is_hot" type="danger" size="small">热门</el-tag>
+              <el-tag v-if="row.is_new" type="success" size="small">新品</el-tag>
+              <el-tag
+                v-for="(tag, index) in row.tags"
+                :key="index"
+                size="small"
+                style="margin-left: 4px"
+              >
+                {{ tag }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-switch v-model="row.is_active" @change="handleToggleStatus(row)" />
@@ -95,34 +125,94 @@
     <el-dialog
       v-model="dialogVisible"
       :title="isEdit ? '编辑产品' : '新增产品'"
-      width="600px"
+      width="700px"
       @close="resetForm"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="产品名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入产品名称" />
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="产品名称" prop="name">
+              <el-input v-model="form.name" placeholder="请输入产品名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="排序" prop="sort">
+              <el-input-number v-model="form.sort" :min="0" :step="1" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="产品描述" prop="description">
+          <el-input v-model="form.description" type="textarea" placeholder="请输入产品描述" rows="2" />
         </el-form-item>
-        <el-form-item label="产品类型" prop="product_type">
-          <el-radio-group v-model="form.product_type">
-            <el-radio label="points">点卷</el-radio>
-            <el-radio label="membership">会员</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="价格" prop="price">
-          <el-input-number v-model="form.price" :min="0.01" :step="0.01" :precision="2" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="产品价值" prop="value">
-          <el-input-number v-model="form.value" :min="1" :step="1" style="width: 100%" />
-          <div class="form-tip">
-            <span v-if="form.product_type === 'points'">点卷数量</span>
-            <span v-else-if="form.product_type === 'membership'">会员天数</span>
-          </div>
-        </el-form-item>
-        <el-form-item label="库存" prop="stock">
-          <el-input-number v-model="form.stock" :min="0" :step="10" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="产品描述">
-          <el-input v-model="form.description" type="textarea" placeholder="请输入产品描述" rows="3" />
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="产品分类" prop="category">
+              <el-select v-model="form.category" placeholder="请选择分类" style="width: 100%">
+                <el-option label="充值套餐" value="充值套餐" />
+                <el-option label="会员套餐" value="会员套餐" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="库存" prop="stock">
+              <el-input-number v-model="form.stock" :min="0" :step="10" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="销售价格" prop="price">
+              <el-input-number v-model="form.price" :min="0.01" :step="0.01" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="原价" prop="original_price">
+              <el-input-number v-model="form.original_price" :min="0" :step="0.01" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="优惠描述" prop="discount_description">
+              <el-input v-model="form.discount_description" placeholder="如:限时8折" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="充值时长" prop="recharge_hours">
+              <el-input-number v-model="form.recharge_hours" :min="0" :step="1" style="width: 100%" />
+              <span style="margin-left: 8px; color: #999; font-size: 12px">小时</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="赠送时长" prop="bonus_hours">
+              <el-input-number v-model="form.bonus_hours" :min="0" :step="1" style="width: 100%" />
+              <span style="margin-left: 8px; color: #999; font-size: 12px">小时</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="产品标签" prop="tags">
+              <el-select v-model="form.tags" multiple placeholder="选择标签" style="width: 100%">
+                <el-option label="升级 LV.1" value="升级 LV.1" />
+                <el-option label="升级 LV.4" value="升级 LV.4" />
+                <el-option label="升级 LV.7" value="升级 LV.7" />
+                <el-option label="升级 LV.9" value="升级 LV.9" />
+                <el-option label="升级 LV.11" value="升级 LV.11" />
+                <el-option label="限时9折" value="限时9折" />
+                <el-option label="限时8折" value="限时8折" />
+                <el-option label="限时75折" value="限时75折" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="产品特性">
+          <el-checkbox v-model="form.is_active">上架</el-checkbox>
+          <el-checkbox v-model="form.is_hot">热门</el-checkbox>
+          <el-checkbox v-model="form.is_new">新品</el-checkbox>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -151,7 +241,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete, Box, View } from '@element-plus/icons-vue'
@@ -179,7 +269,7 @@ const currentProduct = ref(null)
 
 const searchForm = reactive({
   name: '',
-  product_type: null,
+  category: null,
   is_active: null
 })
 
@@ -191,11 +281,19 @@ const pagination = reactive({
 
 const form = ref({
   name: '',
-  product_type: 'points',
+  description: '',
   price: 0,
-  value: 100,
-  stock: 1000,
-  description: ''
+  original_price: null,
+  stock: 9999,
+  sort: 0,
+  category: '充值套餐',
+  recharge_hours: 0,
+  bonus_hours: 0,
+  tags: [],
+  is_active: true,
+  is_hot: false,
+  is_new: false,
+  discount_description: null
 })
 
 const stockForm = reactive({
@@ -207,16 +305,12 @@ const rules = {
     { required: true, message: '请输入产品名称', trigger: 'blur' },
     { min: 2, max: 50, message: '产品名称长度在2-50个字符', trigger: 'blur' }
   ],
-  product_type: [
-    { required: true, message: '请选择产品类型', trigger: 'change' }
-  ],
   price: [
     { required: true, message: '请输入价格', trigger: 'blur' },
     { type: 'number', min: 0.01, message: '价格不能少于0.01', trigger: 'blur' }
   ],
-  value: [
-    { required: true, message: '请输入产品价值', trigger: 'blur' },
-    { type: 'number', min: 1, message: '产品价值不能少于1', trigger: 'blur' }
+  category: [
+    { required: true, message: '请选择产品分类', trigger: 'change' }
   ]
 }
 
@@ -251,7 +345,7 @@ const handleSearch = () => {
 
 const handleReset = () => {
   searchForm.name = ''
-  searchForm.product_type = null
+  searchForm.category = null
   searchForm.is_active = null
   handleSearch()
 }
@@ -264,11 +358,19 @@ const handleAdd = () => {
   isEdit.value = false
   form.value = {
     name: '',
-    product_type: 'points',
+    description: '',
     price: 0,
-    value: 100,
-    stock: 1000,
-    description: ''
+    original_price: null,
+    stock: 9999,
+    sort: 0,
+    category: '充值套餐',
+    recharge_hours: 0,
+    bonus_hours: 0,
+    tags: [],
+    is_active: true,
+    is_hot: false,
+    is_new: false,
+    discount_description: null
   }
   dialogVisible.value = true
 }
@@ -278,11 +380,19 @@ const handleEdit = (row) => {
   form.value = {
     id: row.id,
     name: row.name,
-    product_type: row.product_type,
+    description: row.description || '',
     price: row.price,
-    value: row.value,
+    original_price: row.original_price,
     stock: row.stock,
-    description: row.description || ''
+    sort: row.sort || 0,
+    category: row.category,
+    recharge_hours: row.recharge_hours,
+    bonus_hours: row.bonus_hours,
+    tags: row.tags || [],
+    is_active: row.is_active,
+    is_hot: row.is_hot,
+    is_new: row.is_new,
+    discount_description: row.discount_description
   }
   dialogVisible.value = true
 }
@@ -295,11 +405,19 @@ const handleSubmit = async () => {
     if (isEdit.value) {
       await updateProduct(form.value.id, {
         name: form.value.name,
-        product_type: form.value.product_type,
+        description: form.value.description,
         price: form.value.price,
-        value: form.value.value,
+        original_price: form.value.original_price,
         stock: form.value.stock,
-        description: form.value.description
+        sort: form.value.sort,
+        category: form.value.category,
+        recharge_hours: form.value.recharge_hours,
+        bonus_hours: form.value.bonus_hours,
+        tags: form.value.tags,
+        is_active: form.value.is_active,
+        is_hot: form.value.is_hot,
+        is_new: form.value.is_new,
+        discount_description: form.value.discount_description
       })
       ElMessage.success('更新成功')
     } else {
@@ -331,7 +449,7 @@ const handleDelete = async (row) => {
 const handleToggleStatus = async (row) => {
   try {
     await toggleProductStatus(row.id)
-    ElMessage.success(row.is_active ? '已启用' : '已禁用')
+    ElMessage.success(row.is_active ? '已上架' : '已下架')
   } catch (e) {
     row.is_active = !row.is_active
   }
@@ -401,10 +519,36 @@ onMounted(() => {
     justify-content: flex-end;
   }
 
-  .form-tip {
-    margin-top: 8px;
+  .price-info {
+    .current-price {
+      font-weight: bold;
+      color: #f56c6c;
+    }
+    .original-price {
+      font-size: 12px;
+      color: #999;
+      text-decoration: line-through;
+    }
+  }
+
+  .hours-info {
     font-size: 12px;
-    color: #999;
+    .bonus-hours {
+      color: #67c23a;
+      font-weight: bold;
+    }
+    .total-hours {
+      font-weight: bold;
+      color: #409eff;
+      margin-top: 4px;
+    }
+  }
+
+  .tags-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
   }
 
   .stock-dialog-content {

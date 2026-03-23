@@ -55,9 +55,11 @@ class Product(BaseModel, TimestampMixin):
     """产品模型"""
     name = fields.CharField(max_length=255, unique=True, description="产品名称", index=True)
     description = fields.TextField(null=True, description="产品描述")
-    original_price = fields.DecimalField(max_digits=10, decimal_places=2, description="原价")
+    price = fields.DecimalField(max_digits=10, decimal_places=2, description="价格")
+    original_price = fields.DecimalField(max_digits=10, decimal_places=2, null=True, description="原价")
     sale_price = fields.DecimalField(max_digits=10, decimal_places=2, null=True, description="优惠价")
     stock = fields.IntField(default=0, description="库存数量")
+    sort = fields.IntField(default=0, description="排序", index=True)
     category = fields.CharField(max_length=50, null=True, description="产品分类", index=True)
     tags = fields.JSONField(null=True, description="产品标签")
     images = fields.JSONField(null=True, description="产品图片")
@@ -76,13 +78,13 @@ class Product(BaseModel, TimestampMixin):
 
     @property
     def current_price(self):
-        """获取当前价格（有优惠价返回优惠价，否则返回原价）"""
-        return float(self.sale_price) if self.sale_price else float(self.original_price)
+        """获取当前价格（返回price字段）"""
+        return float(self.price)
 
     @property
     def has_discount(self) -> bool:
         """判断是否有优惠"""
-        return self.sale_price is not None and float(self.sale_price) < float(self.original_price)
+        return self.original_price is not None and float(self.price) < float(self.original_price)
 
     @property
     def discount_percentage(self) -> int:
@@ -90,8 +92,8 @@ class Product(BaseModel, TimestampMixin):
         if not self.has_discount:
             return 0
         original = float(self.original_price)
-        sale = float(self.sale_price)
-        return int((original - sale) / original * 100)
+        current = float(self.price)
+        return int((original - current) / original * 100)
 
     @property
     def total_hours(self) -> int:
@@ -106,12 +108,14 @@ class Product(BaseModel, TimestampMixin):
             "id": self.id,
             "name": self.name,
             "description": self.description,
-            "original_price": float(self.original_price) if hasattr(self.original_price, "__float__") else self.original_price,
+            "price": float(self.price) if hasattr(self.price, "__float__") else self.price,
+            "original_price": float(self.original_price) if self.original_price and hasattr(self.original_price, "__float__") else self.original_price,
             "sale_price": float(self.sale_price) if self.sale_price and hasattr(self.sale_price, "__float__") else self.sale_price,
             "current_price": self.current_price,
             "has_discount": self.has_discount,
             "discount_percentage": self.discount_percentage,
             "stock": self.stock,
+            "sort": self.sort,
             "category": self.category,
             "tags": self.tags,
             "images": self.images,

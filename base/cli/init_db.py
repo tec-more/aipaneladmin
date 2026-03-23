@@ -106,6 +106,11 @@ async def create_default_permissions():
         # 日志管理
         {"name": "查看日志", "code": "log:list", "module": "日志管理", "description": "查看操作日志"},
         {"name": "删除日志", "code": "log:delete", "module": "日志管理", "description": "删除操作日志"},
+        # 产品管理
+        {"name": "查看产品列表", "code": "product:list", "module": "产品管理", "description": "查看产品列表"},
+        {"name": "创建产品", "code": "product:create", "module": "产品管理", "description": "创建新产品"},
+        {"name": "更新产品", "code": "product:update", "module": "产品管理", "description": "更新产品信息"},
+        {"name": "删除产品", "code": "product:delete", "module": "产品管理", "description": "删除产品"},
     ]
 
     created_permissions = []
@@ -183,6 +188,114 @@ async def create_default_permission_groups():
     return created_groups
 
 
+async def create_default_products():
+    """创建默认产品"""
+    from base.plugins.product.models.product import Product
+
+    products_data = [
+        {
+            "name": "体验包",
+            "description": "1小时",
+            "price": 1,
+            "original_price": None,
+            "sale_price": None,
+            "stock": 9999,
+            "sort": 1,
+            "category": "充值套餐",
+            "tags": ["升级 LV.1"],
+            "is_active": True,
+            "is_hot": False,
+            "is_new": True,
+            "recharge_hours": 1,
+            "bonus_hours": 0,
+            "discount_description": None,
+        },
+        {
+            "name": "基础包",
+            "description": "10小时",
+            "price": 9,
+            "original_price": 10,
+            "sale_price": None,
+            "stock": 9999,
+            "sort": 2,
+            "category": "充值套餐",
+            "tags": ["限时9折", "升级 LV.4"],
+            "is_active": True,
+            "is_hot": False,
+            "is_new": False,
+            "recharge_hours": 10,
+            "bonus_hours": 0,
+            "discount_description": "限时9折",
+        },
+        {
+            "name": "标准包",
+            "description": "50小时",
+            "price": 45,
+            "original_price": 50,
+            "sale_price": None,
+            "stock": 9999,
+            "sort": 3,
+            "category": "充值套餐",
+            "tags": ["限时9折", "升级 LV.7"],
+            "is_active": True,
+            "is_hot": False,
+            "is_new": False,
+            "recharge_hours": 50,
+            "bonus_hours": 0,
+            "discount_description": "限时9折",
+        },
+        {
+            "name": "超值包",
+            "description": "100小时 +20小时赠送",
+            "price": 80,
+            "original_price": 100,
+            "sale_price": None,
+            "stock": 9999,
+            "sort": 4,
+            "category": "充值套餐",
+            "tags": ["限时8折+赠送20小时", "升级 LV.9"],
+            "is_active": True,
+            "is_hot": True,
+            "is_new": False,
+            "recharge_hours": 100,
+            "bonus_hours": 20,
+            "discount_description": "限时8折+赠送20小时",
+        },
+        {
+            "name": "豪华包",
+            "description": "200小时 +50小时赠送",
+            "price": 150,
+            "original_price": 200,
+            "sale_price": None,
+            "stock": 9999,
+            "sort": 5,
+            "category": "充值套餐",
+            "tags": ["限时75折+赠送50小时", "升级 LV.11"],
+            "is_active": True,
+            "is_hot": True,
+            "is_new": False,
+            "recharge_hours": 200,
+            "bonus_hours": 50,
+            "discount_description": "限时75折+赠送50小时",
+        },
+    ]
+
+    created_products = []
+    for product_info in products_data:
+        # 检查是否已存在
+        existing_product = await Product.filter(name=product_info["name"]).first()
+        if existing_product:
+            print(f"[OK] 产品已存在: {existing_product.name}")
+            created_products.append(existing_product)
+            continue
+
+        product = await Product.create(**product_info)
+        created_products.append(product)
+        print(f"[OK] 创建产品: {product.name} - {product.current_price}元 ({product.total_hours}小时)")
+
+    return created_products
+
+
 async def create_default_departments():
     """创建默认部门"""
     departments_data = [
@@ -254,6 +367,64 @@ async def create_default_menus(force: bool = False):
         is_active=True,
     )
     print(f"[OK] 创建菜单: {system_menu.name}")
+
+    # 业务管理目录（一级菜单）
+    business_menu = await Menu.create(
+        name="业务管理",
+        path="/business",
+        icon="ShoppingCart",
+        component=None,
+        parent_id=None,
+        sort=2,
+        menu_type="directory",
+        permission=None,
+        is_visible=True,
+        is_active=True,
+    )
+    print(f"[OK] 创建菜单: {business_menu.name}")
+
+    # 业务管理子菜单
+    business_sub_menus = [
+        {
+            "name": "客户管理",
+            "path": "/customer/list",
+            "icon": "User",
+            "component": "customer/Index",
+            "sort": 1,
+            "permission": None,
+        },
+        {
+            "name": "产品管理",
+            "path": "/product",
+            "icon": "Box",
+            "component": "product/Index",
+            "sort": 2,
+            "permission": "product:list",
+        },
+        {
+            "name": "订单管理",
+            "path": "/order",
+            "icon": "Document",
+            "component": "order/Index",
+            "sort": 3,
+            "permission": None,
+        },
+    ]
+
+    for menu_info in business_sub_menus:
+        menu = await Menu.create(
+            name=menu_info["name"],
+            path=menu_info["path"],
+            icon=menu_info["icon"],
+            component=menu_info["component"],
+            parent_id=business_menu.id,
+            sort=menu_info["sort"],
+            menu_type="menu",
+            permission=menu_info["permission"],
+            is_visible=True,
+            is_active=True,
+        )
+        print(f"[OK] 创建菜单: {menu.name}")
 
     # 系统管理子菜单
     sub_menus = [
@@ -378,6 +549,9 @@ async def main():
 
         # 创建默认部门
         departments = await create_default_departments()
+
+        # 创建默认产品
+        await create_default_products()
 
         # 创建默认菜单
         await create_default_menus()

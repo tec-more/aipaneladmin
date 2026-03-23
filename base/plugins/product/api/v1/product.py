@@ -195,8 +195,7 @@ async def get_product_list(
         category: Optional[str] = Query(None, description="产品分类"),
         is_active: Optional[bool] = Query(None, description="是否上架"),
         is_hot: Optional[bool] = Query(None, description="是否热门"),
-        is_new: Optional[bool] = Query(None, description="是否新品"),
-        current_user_id: int = Depends(get_current_user_id)
+        is_new: Optional[bool] = Query(None, description="是否新品")
 ):
     """
     获取产品列表(分页)
@@ -250,8 +249,7 @@ async def get_product_list(
 
 @product_router.get("/{product_id}", summary="获取产品详情")
 async def get_product_detail(
-        product_id: int,
-        current_user_id: int = Depends(get_current_user_id)
+        product_id: int
 ):
     """
     获取产品详情
@@ -495,14 +493,9 @@ async def increment_product_view(
 
 
 @product_router.get("/categories/list", summary="获取所有产品分类")
-async def get_product_categories(
-        current_user_id: int = Depends(get_current_user_id)
-):
+async def get_product_categories():
     """
     获取所有产品分类
-
-    Args:
-        current_user_id: 当前用户ID
 
     Returns:
         产品分类列表
