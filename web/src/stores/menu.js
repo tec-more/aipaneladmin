@@ -46,7 +46,10 @@ const iconMap = {
   'DataLine': 'DataLine',
   'PieChart': 'PieChart',
   'TrendCharts': 'TrendCharts',
-  'Histogram': 'Histogram'
+  'Histogram': 'Histogram',
+  'ShoppingCart': 'ShoppingCart',
+  'Money': 'Money',
+  'Box': 'Box'
 }
 
 // 视图组件映射 - 根据后端返回的 component 路径映射到实际组件

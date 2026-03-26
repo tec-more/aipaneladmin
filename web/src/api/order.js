@@ -12,7 +12,7 @@ export const getOrderDetail = (id) => {
 
 // 创建订单
 export const createOrder = (data) => {
-  return request.post('/v1/orders/', data)
+  return request.post('/v1/orders/create', data)
 }
 
 // 更新订单

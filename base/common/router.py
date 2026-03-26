@@ -80,8 +80,18 @@ def auto_discover_routers(
         try:
             module = importlib.import_module(full_name)
 
-            # 查找路由实例
-            router_instance = getattr(module, router_variable_name, None)
+            # 查找路由实例 - 支持多种命名方式
+            # 1. 首先查找 {文件名}_router (插件规范)
+            router_instance = None
+
+            # 如果是普通模块文件（非包），尝试 {文件名}_router
+            if not ispkg:
+                file_router_name = f"{name}_router"
+                router_instance = getattr(module, file_router_name, None)
+
+            # 2. 如果没找到，查找 router_variable_name (通常是 "router")
+            if router_instance is None:
+                router_instance = getattr(module, router_variable_name, None)
 
             if isinstance(router_instance, APIRouter):
                 # 注册路由到主应用
@@ -104,38 +114,49 @@ def _discover_in_subpackage(app: FastAPI, package_name: str, router_var: str, ro
     """递归发现子包中的路由"""
     try:
         sub_module = importlib.import_module(package_name)
-        
+
         if not hasattr(sub_module, "__path__"):
             return
-            
+
         for finder, name, ispkg in pkgutil.iter_modules(sub_module.__path__):
             full_name = f"{package_name}.{name}"
-            
+
             if any(skip in name for skip in skip_modules):
                 continue
-                
+
             try:
                 module = importlib.import_module(full_name)
-                router_instance = getattr(module, router_var, None)
-                
+
+                # 支持多种路由命名方式
+                # 1. 对于普通 .py 文件（非包），尝试 {文件名}_router
+                router_instance = None
+                if not ispkg:
+                    file_router_name = f"{name}_router"
+                    router_instance = getattr(module, file_router_name, None)
+
+                # 2. 如果没找到，查找 router_var (通常是 "router")
+                if router_instance is None:
+                    router_instance = getattr(module, router_var, None)
+
                 if isinstance(router_instance, APIRouter):
                     app.include_router(router_instance)
                     routers_found += 1
                     print(f"[OK] Registered sub-package router: {full_name}")
-                
-                # 继续递归
+
+                # 继续递归（如果是包）
                 if ispkg:
                     num = _discover_in_subpackage(app, full_name, router_var, 0, skip_modules)
                     routers_found += num if num else 0
-                    
+
             except ImportError as e:
                 print(f"[WARNING] Failed to import sub-module {full_name}: {e}")
-        return routers_found   
+        return routers_found
     except ImportError:
         return
 
 def register_routers(app: FastAPI):
     # 自动注册 core 目录下的所有路由
     auto_discover_routers(app, base_package="base.core")
+
     # 插件路由由 plugin_manager 在 startup 时注册，不需要在这里注册
     # 这样避免了重复注册导致的 Duplicate Operation ID 警告

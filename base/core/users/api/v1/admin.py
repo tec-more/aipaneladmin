@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, Depends, Path
 from fastapi.responses import JSONResponse
 
-router = APIRouter(prefix="/api/v1/users/admin", tags=["用户管理"])
+router = APIRouter(prefix="/v1/users/admin", tags=["用户管理"])
 
 @router.get("/test", summary="获取用户信息", response_class=JSONResponse)
 async def get_user_info():

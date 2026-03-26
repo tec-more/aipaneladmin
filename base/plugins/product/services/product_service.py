@@ -86,9 +86,10 @@ except ImportError:
             pass
 
     class ProductCreate:
-        def __init__(self, name, price, **kwargs):
+        def __init__(self, name, price, original_price=None, **kwargs):
             self.name = name
             self.price = price
+            self.original_price = original_price
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
@@ -153,6 +154,7 @@ class ProductService:
             name=product_data.name,
             description=product_data.description,
             price=product_data.price,
+            original_price=product_data.original_price,
             stock=product_data.stock or 0,
             category=product_data.category,
             tags=product_data.tags,
@@ -160,6 +162,10 @@ class ProductService:
             is_active=product_data.is_active,
             is_hot=product_data.is_hot,
             is_new=product_data.is_new,
+            recharge_hours=product_data.recharge_hours,
+            bonus_hours=product_data.bonus_hours,
+            discount_description=product_data.discount_description,
+            sort=product_data.sort,
         )
 
         return product

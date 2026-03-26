@@ -6,8 +6,9 @@
     "author": "hepan",
     "is_installed": false,
     "is_enabled": false,
+    "route_prefix": "/v1/wechat_pay",
     "routes": [
-        "api/v1/wechat_pay"
+        "api/v1"
     ],
     "models": [],
     "schemas": [

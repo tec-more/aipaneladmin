@@ -8,7 +8,7 @@ from base.core.users.models.users import User
 from base.core.users.models.rbac import Role, Permission, Menu
 from base.core.dept.models.department import Department
 
-router = APIRouter(prefix="/api/v1/dashboard", tags=["仪表盘"])
+router = APIRouter(prefix="/v1/dashboard", tags=["仪表盘"])
 
 
 @router.get("/stats", summary="获取仪表盘统计数据")

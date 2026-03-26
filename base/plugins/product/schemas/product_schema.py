@@ -11,8 +11,8 @@ class ProductBase(BaseModel):
     """产品基础模型"""
     name: str = Field(..., min_length=1, max_length=255, description="产品名称")
     description: Optional[str] = Field(None, description="产品描述")
-    original_price: Decimal = Field(..., ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
-    sale_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="优惠价")
+    price: Decimal = Field(..., ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="销售价格")
+    original_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
     stock: int = Field(default=0, ge=0, description="库存数量")
     category: Optional[str] = Field(None, max_length=50, description="产品分类")
     tags: Optional[List[str]] = Field(None, description="产品标签")
@@ -24,14 +24,14 @@ class ProductBase(BaseModel):
     bonus_hours: int = Field(default=0, ge=0, description="赠送时长（小时）")
     discount_description: Optional[str] = Field(None, max_length=255, description="优惠描述")
 
-    @field_validator('sale_price')
+    @field_validator('original_price')
     @classmethod
-    def validate_sale_price(cls, v: Optional[Decimal], info) -> Optional[Decimal]:
-        """验证优惠价必须小于原价"""
-        if v is not None and 'original_price' in info.data:
-            original_price = info.data['original_price']
-            if v >= original_price:
-                raise ValueError('优惠价必须小于原价')
+    def validate_original_price(cls, v: Optional[Decimal], info) -> Optional[Decimal]:
+        """验证原价必须大于销售价格"""
+        if v is not None and 'price' in info.data:
+            price = info.data['price']
+            if v <= price:
+                raise ValueError('原价必须大于销售价格')
         return v
 
 
@@ -44,9 +44,10 @@ class ProductUpdate(BaseModel):
     """更新产品模型"""
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="产品名称")
     description: Optional[str] = Field(None, description="产品描述")
+    price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="销售价格")
     original_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
-    sale_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="优惠价")
     stock: Optional[int] = Field(None, ge=0, description="库存数量")
+    sort: Optional[int] = Field(None, ge=0, description="排序")
     category: Optional[str] = Field(None, max_length=50, description="产品分类")
     tags: Optional[List[str]] = Field(None, description="产品标签")
     images: Optional[List[str]] = Field(None, description="产品图片")
@@ -63,9 +64,10 @@ class ProductResponse(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
-    original_price: Decimal
-    sale_price: Optional[Decimal] = None
+    price: Decimal
+    original_price: Optional[Decimal] = None
     stock: int
+    sort: int
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     images: Optional[List[str]] = None
@@ -84,14 +86,14 @@ class ProductResponse(BaseModel):
     @computed_field
     @property
     def current_price(self) -> Decimal:
-        """当前价格（有优惠价返回优惠价，否则返回原价）"""
-        return self.sale_price if self.sale_price is not None else self.original_price
+        """当前价格（返回销售价格）"""
+        return self.price
 
     @computed_field
     @property
     def has_discount(self) -> bool:
-        """是否有优惠"""
-        return self.sale_price is not None and self.sale_price < self.original_price
+        """是否有优惠（有原价且原价大于销售价格）"""
+        return self.original_price is not None and self.original_price > self.price
 
     @computed_field
     @property
@@ -99,7 +101,7 @@ class ProductResponse(BaseModel):
         """折扣百分比"""
         if not self.has_discount:
             return 0
-        return int((self.original_price - self.sale_price) / self.original_price * 100)
+        return int((self.original_price - self.price) / self.original_price * 100)
 
     @computed_field
     @property

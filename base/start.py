@@ -25,21 +25,6 @@ async def lifespan(app: FastAPI):
         await plugin_manager.startup()
         print("插件系统初始化完成")
 
-        import sys
-        print("[DEBUG] Plugin startup complete, triggering schema generation...", file=sys.stderr, flush=True)
-
-        # 触发一次 schema 生成以验证
-        schema = app.openapi()
-
-        print(f"[DEBUG] Initial schema generated, total paths: {len(schema.get('paths', {}))}", file=sys.stderr, flush=True)
-
-        # Debug: 打印所有包含 customer/auth 的路径
-        paths = schema.get('paths', {})
-        customer_auth_paths = [p for p in paths.keys() if 'customer/auth' in p]
-        print(f"[DEBUG] Found {len(customer_auth_paths)} customer/auth paths in initial schema", file=sys.stderr, flush=True)
-        if customer_auth_paths:
-            print(f"[DEBUG] Customer auth paths: {customer_auth_paths[:5]}...", file=sys.stderr, flush=True)
-
         yield
 
         # 关闭插件系统
@@ -76,6 +61,8 @@ def init_app() -> FastAPI:
     # 注册中间件、路由和异常处理
     register_exceptions(app)
     register_middlewares(app)
+
+    # 使用自动路由注册机制
     register_routers(app)
 
     return app

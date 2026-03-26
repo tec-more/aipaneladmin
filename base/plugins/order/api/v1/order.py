@@ -12,7 +12,7 @@ from base.plugins.order.services.order_service import OrderService
 
 
 # 创建路由实例
-router = APIRouter(
+order_router = APIRouter(
     prefix="",
     tags=["订单管理"],
     responses={404: {"description": "Not found"}},
@@ -21,7 +21,7 @@ router = APIRouter(
 
 # ============ 具体路由（固定路径）必须放在参数化路由之前 ============
 
-@router.post("/create", response_model=OrderCreateResponse, summary="创建充值订单")
+@order_router.post("/create", response_model=OrderCreateResponse, summary="创建充值订单")
 async def create_order(order_create: CreateOrderIn):
     """创建充值订单
 
@@ -51,7 +51,7 @@ async def create_order(order_create: CreateOrderIn):
         raise HTTPException(status_code=500, detail="创建订单失败")
 
 
-@router.get("/by-order-no/{order_no}", response_model=OrderOut, summary="根据订单号获取订单详情")
+@order_router.get("/by-order-no/{order_no}", response_model=OrderOut, summary="根据订单号获取订单详情")
 async def get_order_by_no(order_no: str):
     """根据订单编号获取订单详情"""
     order = await OrderService.get_order_by_no(order_no)
@@ -67,7 +67,7 @@ async def get_order_by_no(order_no: str):
     return SuccessResponse(data=order_dict, msg="获取订单详情成功")
 
 
-@router.get("/customer/{customer_id}", response_model=OrderListResponse, summary="获取客户订单列表")
+@order_router.get("/customer/{customer_id}", response_model=OrderListResponse, summary="获取客户订单列表")
 async def get_customer_orders(
         customer_id: int,
         page: int = Query(1, ge=1, description="页码"),
@@ -93,7 +93,7 @@ async def get_customer_orders(
     return SuccessResponse(data={"total": total, "items": order_list}, msg="获取客户订单列表成功")
 
 
-@router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
+@order_router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
 async def get_all_orders(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=1000, description="每页数量"),
@@ -123,7 +123,7 @@ async def get_all_orders(
     return SuccessResponse(data={"total": total, "items": order_list}, msg="获取所有订单列表成功")
 
 
-@router.get("/list", response_model=OrderListResponse, summary="获取所有订单列表(别名路由)")
+@order_router.get("/list", response_model=OrderListResponse, summary="获取所有订单列表(别名路由)")
 async def get_all_orders_alias(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=1000, description="每页数量"),
@@ -135,7 +135,7 @@ async def get_all_orders_alias(
     return await get_all_orders(page=page, page_size=page_size, order_no=order_no, customer_name=customer_name, product_name=product_name)
 
 
-@router.delete("/batch", summary="批量删除订单")
+@order_router.delete("/batch", summary="批量删除订单")
 async def batch_delete_order(request_data: dict):
     """批量删除订单"""
     try:
@@ -161,7 +161,7 @@ async def batch_delete_order(request_data: dict):
 
 # ============ 参数化路由（必须放在最后） ============
 
-@router.get("/{order_id}", response_model=OrderOut, summary="获取订单详情")
+@order_router.get("/{order_id}", response_model=OrderOut, summary="获取订单详情")
 async def get_order(order_id: int):
     """根据订单ID获取订单详情"""
     order = await OrderService.get_order_by_id(order_id)
@@ -177,7 +177,7 @@ async def get_order(order_id: int):
     return SuccessResponse(data=order_dict, msg="获取订单详情成功")
 
 
-@router.put("/{order_id}", response_model=OrderOut, summary="更新订单信息")
+@order_router.put("/{order_id}", response_model=OrderOut, summary="更新订单信息")
 async def update_order(order_id: int, order_update: OrderUpdateRequest):
     """更新订单信息
 
@@ -216,7 +216,7 @@ async def update_order(order_id: int, order_update: OrderUpdateRequest):
     return SuccessResponse(data=order_dict, msg="更新订单信息成功")
 
 
-@router.delete("/{order_id}", summary="删除订单")
+@order_router.delete("/{order_id}", summary="删除订单")
 async def delete_order(order_id: int):
     """删除订单"""
     try:
@@ -233,7 +233,7 @@ async def delete_order(order_id: int):
         raise HTTPException(status_code=500, detail="删除订单失败")
 
 
-@router.patch("/{order_id}/status", summary="更新订单状态")
+@order_router.patch("/{order_id}/status", summary="更新订单状态")
 async def update_order_status_only(order_id: int, status_data: dict):
     """更新订单状态（别名路由）"""
     try:
@@ -261,7 +261,7 @@ async def update_order_status_only(order_id: int, status_data: dict):
         raise HTTPException(status_code=500, detail="更新订单状态失败")
 
 
-@router.patch("/{order_id}/payment-status", summary="更新支付状态")
+@order_router.patch("/{order_id}/payment-status", summary="更新支付状态")
 async def update_payment_status_only(order_id: int, payment_data: dict):
     """更新支付状态（别名路由）"""
     try:

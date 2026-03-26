@@ -48,7 +48,10 @@
         <el-table-column label="订单状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.status === 'pending'" type="warning">
-              待处理
+              待支付
+            </el-tag>
+            <el-tag v-else-if="row.status === 'paid'" type="success">
+              已支付
             </el-tag>
             <el-tag v-else-if="row.status === 'completed'" type="success">
               已完成
@@ -56,8 +59,11 @@
             <el-tag v-else-if="row.status === 'cancelled'" type="danger">
               已取消
             </el-tag>
+            <el-tag v-else-if="row.status === 'expired'" type="info">
+              已过期
+            </el-tag>
             <el-tag v-else type="info">
-              其他
+              {{ row.status }}
             </el-tag>
           </template>
         </el-table-column>

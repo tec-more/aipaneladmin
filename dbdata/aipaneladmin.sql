@@ -2387,8 +2387,6 @@ INSERT INTO public.department VALUES (6, '2026-01-05 17:36:34.251571+08', '2026-
 
 INSERT INTO public.menu VALUES (52, '2026-03-16 12:46:02.561222+08', '2026-03-16 12:46:02.561222+08', '仪表盘', '/dashboard', 'Odometer', 'dashboard/Index', NULL, 0, true, 'menu', true, NULL, true);
 INSERT INTO public.menu VALUES (53, '2026-03-16 12:46:02.57095+08', '2026-03-16 12:46:02.57095+08', '系统管理', '/system', 'Setting', NULL, NULL, 1, true, 'directory', true, NULL, true);
-INSERT INTO public.menu VALUES (54, '2026-03-16 12:46:02.571385+08', '2026-03-16 12:46:02.571385+08', '业务管理', '/business', 'ShoppingCart', NULL, NULL, 2, true, 'directory', true, NULL, true);
-INSERT INTO public.menu VALUES (55, '2026-03-16 12:46:02.572408+08', '2026-03-16 12:46:02.572408+08', '客户管理', '/customer/list', 'User', 'customer/Index', 54, 1, true, 'menu', true, NULL, true);
 INSERT INTO public.menu VALUES (58, '2026-03-16 12:46:02.573994+08', '2026-03-16 12:46:02.573994+08', '用户管理', '/users', 'User', 'user/Index', 53, 1, true, 'menu', true, 'user:list', true);
 INSERT INTO public.menu VALUES (59, '2026-03-16 12:46:02.575575+08', '2026-03-16 12:46:02.575575+08', '部门管理', '/departments', 'OfficeBuilding', 'department/Index', 53, 2, true, 'menu', true, 'dept:list', true);
 INSERT INTO public.menu VALUES (60, '2026-03-16 12:46:02.575575+08', '2026-03-16 12:46:02.575575+08', '角色管理', '/roles', 'UserFilled', 'role/Index', 53, 3, true, 'menu', true, 'role:list', true);

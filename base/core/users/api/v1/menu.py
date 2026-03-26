@@ -9,7 +9,7 @@ from base.core.users.services.user_service import UserService
 from base.common.security import get_current_user_id
 from base.common.response import SuccessResponse, ErrorResponse
 
-router = APIRouter(prefix="/api/v1/menus", tags=["菜单管理"])
+router = APIRouter(prefix="/v1/menus", tags=["菜单管理"])
 
 
 @router.get("/tree", summary="获取菜单树")

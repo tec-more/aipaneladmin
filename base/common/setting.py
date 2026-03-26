@@ -115,12 +115,15 @@ class Settings(BaseSettings):
 	CORS_ORIGIN_ENABLE: bool = True    # 是否启用跨域
 	# ALLOW_ORIGINS: List[str] = ["*"]   # 允许的域名列表
 	ALLOW_ORIGINS: List[str] = [
+		'http://0.0.0.0:9998',
 		'http://0.0.0.0:9999',
 		'http://0.0.0.0:8000',
 		'http://localhost:3000',
 		'http://127.0.0.1:3000',
 		'http://localhost:9999',
 		'http://127.0.0.1:9999',
+		'http://127.0.0.1:9998',
+		'http://localhost:9998',
 	]   # 允许的域名列表
 	ALLOW_METHODS: List[str] = ["*"]   # 允许的HTTP方法
 	ALLOW_HEADERS: List[str] = ["*"]   # 允许的请求头

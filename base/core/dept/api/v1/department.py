@@ -15,7 +15,7 @@ from base.core.users.services.user_service import UserService
 from base.common.security import get_current_user_id
 from base.common.response import SuccessResponse, ErrorResponse
 
-router = APIRouter(prefix="/api/v1/departments", tags=["部门管理"])
+router = APIRouter(prefix="/v1/departments", tags=["部门管理"])
 
 
 @router.get("/list", summary="获取部门列表(分页)")

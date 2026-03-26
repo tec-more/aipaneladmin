@@ -23,7 +23,7 @@ from base.common.security import (
 )
 from base.common.response import SuccessResponse, ErrorResponse
 
-router = APIRouter(prefix="/api/v1/auth", tags=["认证管理"])
+router = APIRouter(prefix="/v1/auth", tags=["认证管理"])
 
 
 @router.post("/register", summary="管理员注册用户（仅限内部调用）", response_model=UserResponse)

@@ -131,5 +131,36 @@ class CustomerOrder(BaseModel, TimestampMixin):
         """获取总小时数"""
         return self.hours + self.bonus_hours
 
+    async def to_dict(self):
+        """转换为字典，包含关联对象的名称"""
+        # 预加载关联数据
+        await self.fetch_related('customer', 'membership_level')
+
+        data = {
+            "id": self.id,
+            "order_no": self.order_no,
+            "customer_id": self.customer_id,
+            "customer_name": self.customer.name if self.customer else None,
+            "membership_level_id": self.membership_level_id,
+            "product_name": self.membership_level.name if self.membership_level else None,
+            "price": float(self.amount),
+            "amount": float(self.amount),
+            "hours": self.hours,
+            "bonus_hours": self.bonus_hours,
+            "total_hours": self.total_hours,
+            "payment_method": self.payment_method.value if isinstance(self.payment_method, Enum) else self.payment_method,
+            "payment_status": self.payment_status.value if isinstance(self.payment_status, Enum) else self.payment_status,
+            "status": self.payment_status.value if isinstance(self.payment_status, Enum) else self.payment_status,
+            "trade_no": self.trade_no,
+            "pay_time": self.pay_time.strftime("%Y-%m-%d %H:%M:%S") if self.pay_time else None,
+            "expire_time": self.expire_time.strftime("%Y-%m-%d %H:%M:%S") if self.expire_time else None,
+            "client_ip": self.client_ip,
+            "device_info": self.device_info,
+            "remark": self.remark,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+        return data
+
     def __str__(self):
         return f"Order {self.order_no} - {self.payment_status}"

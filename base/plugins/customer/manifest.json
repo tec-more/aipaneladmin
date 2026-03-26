@@ -6,7 +6,7 @@
     "author": "hepan",
     "is_installed": true,
     "is_enabled": true,
-    "route_prefix": "/api/v1/customer",
+    "route_prefix": "/v1/customer",
     "routes": [
         "api/v1"
     ],

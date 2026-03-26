@@ -36,7 +36,7 @@ from base.common.permissions import (
 )
 from base.common.response import SuccessResponse, ErrorResponse
 
-router = APIRouter(prefix="/api/v1/rbac", tags=["角色权限管理"])
+router = APIRouter(prefix="/v1/rbac", tags=["角色权限管理"])
 
 
 # ==================== 角色管理 ==================== #

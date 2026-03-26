@@ -16,7 +16,7 @@ from base.common.response import SuccessResponse, ErrorResponse
 from base.core.users.services.user_service import UserService
 from base.plugins import plugin_manager
 
-router = APIRouter(prefix="/api/v1/plugins", tags=["插件管理"])
+router = APIRouter(prefix="/v1/plugins", tags=["插件管理"])
 
 
 async def check_admin(current_user_id: int) -> bool:
