@@ -188,13 +188,21 @@ async def get_customer_orders(
     orders = await OrderService.get_orders_by_customer(customer_id, page, page_size)
 
     # 计算总数
-    from base.plugins.order.models.order import CustomerOrder
+    from base.plugins.order.models.order import CustomerOrder, OrderItem
     total = await CustomerOrder.filter(customer_id=customer_id).count()
 
     # 转换为字典列表
     order_list = []
     for order in orders:
-        # 列表接口不返回明细详情，只返回摘要
+        # 获取订单明细（用于生成产品摘要）
+        items = await OrderItem.filter(order_id=order.id)
+
+        # 构建产品摘要
+        product_summary = []
+        for item in items:
+            product_summary.append(f"{item.product_name} x{item.quantity}")
+
+        # 列表接口返回基本订单信息 + 产品摘要
         order_data = {
             "id": order.id,
             "order_no": order.order_no,
@@ -207,6 +215,11 @@ async def get_customer_orders(
             "pay_time": order.pay_time.strftime("%Y-%m-%d %H:%M:%S") if order.pay_time else None,
             "expire_time": order.expire_time.strftime("%Y-%m-%d %H:%M:%S") if order.expire_time else None,
             "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else None,
+            # 产品信息（新增）
+            "product_summary": product_summary,  # 产品摘要：["SVIP会员 x1", "积分充值 x2"]
+            "item_count": len(items),  # 商品种类数量
+            "first_product_name": items[0].product_name if items else None,  # 第一个产品名称
+            "first_product_image": items[0].product_image if items else None,  # 第一个产品图片
         }
         order_list.append(order_data)
 
@@ -227,12 +240,21 @@ async def get_all_orders(
     orders = await OrderService.get_all_orders(page, page_size)
 
     # 计算总数
-    from base.plugins.order.models.order import CustomerOrder
+    from base.plugins.order.models.order import CustomerOrder, OrderItem
     total = await CustomerOrder.all().count()
 
     # 转换为字典列表
     order_list = []
     for order in orders:
+        # 获取订单明细（用于生成产品摘要）
+        items = await OrderItem.filter(order_id=order.id)
+
+        # 构建产品摘要
+        product_summary = []
+        for item in items:
+            product_summary.append(f"{item.product_name} x{item.quantity}")
+
+        # 列表接口返回基本订单信息 + 产品摘要
         order_data = {
             "id": order.id,
             "order_no": order.order_no,
@@ -245,6 +267,11 @@ async def get_all_orders(
             "pay_time": order.pay_time.strftime("%Y-%m-%d %H:%M:%S") if order.pay_time else None,
             "expire_time": order.expire_time.strftime("%Y-%m-%d %H:%M:%S") if order.expire_time else None,
             "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else None,
+            # 产品信息（新增）
+            "product_summary": product_summary,  # 产品摘要：["SVIP会员 x1", "积分充值 x2"]
+            "item_count": len(items),  # 商品种类数量
+            "first_product_name": items[0].product_name if items else None,  # 第一个产品名称
+            "first_product_image": items[0].product_image if items else None,  # 第一个产品图片
         }
         order_list.append(order_data)
 

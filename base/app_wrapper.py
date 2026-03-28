@@ -17,13 +17,21 @@ class ASGIAppWithPrefix:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
-            # ========== 在这里打印 URL ==========
             original_path = scope.get("path", "")
             method = scope.get("method", "")
             client = scope.get("client", ["", ""])[0] if scope.get("client") else ""
 
-            # 打印访问日志（使用 print 到 stdout）
+            # 打印访问日志
             print(f'INFO:     {client} - "{method} {original_path} HTTP/1.1"', flush=True)
+
+            # 静态资源路径也直接透传
+            if (original_path.startswith("/docs") or
+                original_path.startswith("/openapi") or
+                original_path.startswith("/redoc") or
+                original_path.startswith("/static")):
+                # 直接传给 FastAPI，不处理
+                await self.app(scope, receive, send)
+                return
 
             # 如果路径以 prefix 开头，移除它
             if original_path.startswith(self.prefix):
@@ -32,6 +40,24 @@ class ASGIAppWithPrefix:
                 scope = dict(scope)  # 创建副本
                 scope["path"] = new_path
                 scope["root_path"] = self.prefix
+
+            # 如果路径不以 prefix 开头，添加 404 响应（API 路由必须带 /api）
+            elif not original_path.startswith("/static") and not original_path.startswith("/docs"):
+                # API 路由必须使用 /api 前缀
+                from starlette.responses import JSONResponse
+
+                response = JSONResponse(
+                    content={
+                        "error": "API routes must use /api prefix",
+                        "message": f"Please use /api{original_path} instead of {original_path}",
+                        "docs_url": "/docs",
+                        "api_prefix": "/api"
+                    },
+                    status_code=404
+                )
+
+                await response(scope, receive, send)
+                return
 
         # 调用实际应用
         await self.app(scope, receive, send)

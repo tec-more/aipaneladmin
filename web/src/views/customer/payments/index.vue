@@ -9,14 +9,16 @@
 
       <!-- 搜索表单 -->
       <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="交易号">
-          <el-input v-model="searchForm.trade_no" placeholder="请输入交易号" clearable />
+        <el-form-item label="订单号">
+          <el-input v-model="searchForm.trade_no" placeholder="请输入订单号（支持模糊搜索）" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item label="支付方式">
-          <el-select v-model="searchForm.payment_method" placeholder="请选择支付方式" clearable>
+          <el-select v-model="searchForm.payment_method" placeholder="请选择支付方式" clearable style="width: 150px">
             <el-option label="全部" :value="null" />
-            <el-option label="微信支付" value="wechat" />
+            <el-option label="微信支付" value="wxpay" />
             <el-option label="支付宝" value="alipay" />
+            <el-option label="七相-微信" value="qixiang_wxpay" />
+            <el-option label="七相-支付宝" value="qixiang_alipay" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -33,29 +35,43 @@
 
       <!-- 数据表格 -->
       <el-table :data="tableData" style="width: 100%" v-loading="loading" border>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="order_no" label="订单号" width="200" />
-        <el-table-column prop="trade_no" label="第三方交易号" width="200" />
-        <el-table-column prop="amount" label="金额" width="100">
+        <el-table-column prop="id" label="ID" width="80" align="center" />
+        <el-table-column prop="order_no" label="商户订单号" min-width="180">
           <template #default="{ row }">
-            ¥{{ row.amount }}
+            <span v-if="row.order_no" class="order-no">{{ row.order_no }}</span>
+            <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="payment_method" label="支付方式" width="100">
+        <el-table-column prop="qixiang_trade_no" label="七相订单号" min-width="180">
           <template #default="{ row }">
-            {{ getPaymentMethodLabel(row.payment_method) }}
+            <span v-if="row.qixiang_trade_no" class="trade-no">{{ row.qixiang_trade_no }}</span>
+            <span v-else-if="row.transaction_id" class="trade-no">{{ row.transaction_id }}</span>
+            <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="amount" label="金额" width="100" align="center">
+          <template #default="{ row }">
+            <span class="amount">¥{{ Number(row.amount || 0).toFixed(2) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="支付方式" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.payment_method_display" :type="row.payment_method_tag || 'info'">
+              {{ row.payment_method_display }}
+            </el-tag>
+            <span v-else class="text-muted">{{ getPaymentMethodLabel(row.transaction_type) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
+        <el-table-column prop="processed_at" label="处理时间" width="180">
           <template #default="{ row }">
-            {{ formatDateTime(row.created_at) }}
+            {{ formatDateTime(row.processed_at) }}
           </template>
         </el-table-column>
       </el-table>
@@ -129,9 +145,12 @@ const handleReset = () => {
 const getPaymentMethodLabel = (method) => {
   const labels = {
     wechat: '微信支付',
-    alipay: '支付宝'
+    wxpay: '微信支付',
+    alipay: '支付宝',
+    qixiang_wxpay: '七相-微信',
+    qixiang_alipay: '七相-支付宝'
   }
-  return labels[method] || method
+  return labels[method] || method || '-'
 }
 
 const getStatusLabel = (status) => {
@@ -177,5 +196,21 @@ onMounted(() => {
 
 .search-form {
   margin-bottom: 20px;
+}
+
+/* 样式优化 */
+.order-no, .trade-no {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #606266;
+}
+
+.amount {
+  font-weight: 600;
+  color: #f56c6c;
+}
+
+.text-muted {
+  color: #909399;
 }
 </style>

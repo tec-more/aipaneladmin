@@ -197,7 +197,8 @@ async def query_order(order_no: str):
         raise HTTPException(status_code=500, detail="查询订单失败")
 
 
-@qixiang_pay_router.post("/notify", summary="七相支付异步回调")
+@qixiang_pay_router.get("/notify", summary="七相支付异步回调（GET）")
+@qixiang_pay_router.post("/notify", summary="七相支付异步回调（POST）")
 async def payment_notify(request: Request):
     """
     七相支付异步回调通知
@@ -208,13 +209,17 @@ async def payment_notify(request: Request):
     - 必须返回纯文本"success"表示接收成功
     - 七相支付会多次重试直到收到success
     - 需要验证签名确保通知真实性
+    - 支持 GET 和 POST 两种请求方式
     """
     try:
-        # 获取回调数据（form-data格式）
-        notify_data = dict(await request.form())
+        # 获取回调数据（支持 GET 查询参数和 POST form-data）
+        if request.method == "GET":
+            notify_data = dict(request.query_params)
+        else:
+            notify_data = dict(await request.form())
 
         logger.info("=" * 60)
-        logger.info("[七相支付] 收到异步回调通知")
+        logger.info(f"[七相支付] 收到异步回调通知 ({request.method})")
         logger.info("=" * 60)
         logger.info(f"请求头: {dict(request.headers)}")
         logger.info(f"回调数据（原始）: {notify_data}")

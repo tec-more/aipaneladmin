@@ -152,6 +152,30 @@ class CustomerOrder(BaseModel, TimestampMixin):
         items = await self.items.all()
         items_list = [await item.to_dict() for item in items]
 
+        # 构建产品摘要信息
+        product_summary = []
+        for item in items_list:
+            product_summary.append(f"{item['product_name']} x{item['quantity']}")
+
+        # 查询实际的产品信息（如果有 product_id）
+        product_details = []
+        for item in items_list:
+            product_detail = {
+                "product_name": item['product_name'],
+                "product_type": item['product_type'],
+                "quantity": item['quantity'],
+                "unit_price": item['unit_price'],
+                "total_price": item['total_price']
+            }
+            # 如果有 product_id，尝试获取产品详细信息
+            if item.get('product_id'):
+                from base.plugins.product.models.product import Product
+                product = await Product.get_or_none(id=item['product_id'])
+                if product:
+                    product_detail['product_description'] = product.description
+                    product_detail['product_image'] = product.image_url
+            product_details.append(product_detail)
+
         data = {
             "id": self.id,
             "order_no": self.order_no,
@@ -172,6 +196,12 @@ class CustomerOrder(BaseModel, TimestampMixin):
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
             "items": items_list,  # 订单明细列表
+            # 新增：产品摘要和详细信息
+            "product_summary": product_summary,  # 产品摘要：["SVIP会员 x1", "积分充值 x2"]
+            "product_details": product_details,  # 产品详细信息列表
+            "item_count": len(items_list),  # 商品数量
+            "first_product_name": items_list[0]['product_name'] if items_list else None,  # 第一个产品名称
+            "first_product_image": items_list[0].get('product_image') if items_list else None,  # 第一个产品图片
         }
         return data
 

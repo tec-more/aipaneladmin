@@ -32,3 +32,19 @@ class UsageLog(BaseModel, TimestampMixin):
 
     def __str__(self):
         return f"Usage {self.session_id} - {self.duration_seconds}s"
+
+    async def to_dict(self):
+        """转换为字典（处理 Decimal 类型）"""
+        data = {
+            "id": self.id,
+            "customer_id": self.customer_id,
+            "session_id": self.session_id,
+            "duration_seconds": self.duration_seconds,
+            "service_type": self.service_type,
+            "details": self.details,
+            "characters_count": self.characters_count,
+            "api_cost": float(self.api_cost) if self.api_cost else 0,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+        return data

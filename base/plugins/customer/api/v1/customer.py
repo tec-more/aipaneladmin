@@ -305,23 +305,38 @@ async def get_usage_logs_alias(
 ):
     """获取使用记录列表 (兼容前端调用)"""
     try:
+        print(f"[UsageLogs] 开始导入模型...")
         from base.plugins.customer.models.usage_log import UsageLog
         from base.plugins.customer.models.customer import Customer
 
+        print(f"[UsageLogs] 模型导入成功")
+
         query = UsageLog.all()
+        print(f"[UsageLogs] 构建基础查询")
+
         if customer_id:
+            print(f"[UsageLogs] 按客户ID过滤: {customer_id}")
             query = query.filter(customer_id=customer_id)
         else:
+            # 没有指定 customer_id，查询当前用户对应的客户
+            print(f"[UsageLogs] 查询当前客户: system_user_id={current_user_id}")
             customer = await Customer.get_or_none(system_user_id=current_user_id)
-            if not customer:
-                return ErrorResponse(msg="客户不存在", status_code=status.HTTP_404_NOT_FOUND)
-            query = query.filter(customer_id=customer.id)
+            if customer:
+                print(f"[UsageLogs] 找到客户: {customer.id}，只返回该客户的记录")
+                query = query.filter(customer_id=customer.id)
+            else:
+                # 当前用户不是客户，可能是管理员，返回所有记录
+                print(f"[UsageLogs] 当前用户不是客户，返回所有使用记录")
 
-        if service_type:
+        if service_type and service_type.strip():
+            print(f"[UsageLogs] 按服务类型过滤: {service_type}")
             query = query.filter(service_type=service_type)
 
         total = await query.count()
+        print(f"[UsageLogs] 总记录数: {total}")
+
         logs = await query.offset((page - 1) * page_size).limit(page_size).order_by("-created_at")
+        print(f"[UsageLogs] 查询到 {len(logs)} 条记录")
 
         log_list = []
         for log in logs:
@@ -331,12 +346,106 @@ async def get_usage_logs_alias(
                 log_dict = log.dict()
             else:
                 log_dict = dict(log)
+
+            # 转换 Decimal
+            if 'api_cost' in log_dict and log_dict['api_cost'] is not None:
+                log_dict['api_cost'] = float(log_dict['api_cost'])
+
             log_list.append(log_dict)
 
         response_data = {"total": total, "page": page, "page_size": page_size, "items": log_list}
+        print(f"[UsageLogs] 返回数据: {len(log_list)} 条记录\n")
         return SuccessResponse(data=response_data)
     except Exception as e:
+        print(f"[ERROR] UsageLogs 异常: {e}")
+        import traceback
+        traceback.print_exc()
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@customer_router.post("/usage-logs/test", summary="创建测试使用记录（仅用于测试）")
+async def create_test_usage_log(
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """创建测试使用记录（用于演示）"""
+    try:
+        from base.plugins.customer.models.usage_log import UsageLog
+        from base.plugins.customer.models.customer import Customer
+        import uuid
+
+        print("\n[UsageLogs] 创建测试使用记录")
+
+        # 获取第一个客户
+        customer = await Customer.first()
+        if not customer:
+            return ErrorResponse(msg="没有客户数据，请先创建客户", status_code=status.HTTP_400_BAD_REQUEST)
+
+        print(f"[UsageLogs] 使用客户: {customer.id}")
+
+        # 创建测试记录
+        test_logs = [
+            {
+                "customer_id": customer.id,
+                "session_id": str(uuid.uuid4())[:32],
+                "duration_seconds": 120,
+                "service_type": "text_generation",
+                "characters_count": 1500,
+                "api_cost": 0.0150,
+                "details": {
+                    "model": "claude-3-opus",
+                    "prompt_tokens": 100,
+                    "completion_tokens": 400,
+                    "total_tokens": 500
+                }
+            },
+            {
+                "customer_id": customer.id,
+                "session_id": str(uuid.uuid4())[:32],
+                "duration_seconds": 60,
+                "service_type": "image_generation",
+                "characters_count": 0,
+                "api_cost": 0.0250,
+                "details": {
+                    "model": "dall-e-3",
+                    "image_size": "1024x1024",
+                    "prompt": "A beautiful sunset"
+                }
+            },
+            {
+                "customer_id": customer.id,
+                "session_id": str(uuid.uuid4())[:32],
+                "duration_seconds": 30,
+                "service_type": "tts",
+                "characters_count": 500,
+                "api_cost": 0.0060,
+                "details": {
+                    "model": "tts-1",
+                    "voice": "alloy",
+                    "text_length": 500
+                }
+            }
+        ]
+
+        created_count = 0
+        for log_data in test_logs:
+            try:
+                await UsageLog.create(**log_data)
+                created_count += 1
+                print(f"[UsageLogs] 创建记录成功: {log_data['service_type']}")
+            except Exception as e:
+                print(f"[UsageLogs] 创建记录失败: {e}")
+
+        print(f"[UsageLogs] 成功创建 {created_count} 条测试记录\n")
+
+        return SuccessResponse(
+            data={"created": created_count, "total": len(test_logs)},
+            msg=f"成功创建 {created_count} 条测试使用记录"
+        )
+    except Exception as e:
+        print(f"[ERROR] 创建测试记录失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @customer_router.get("/usage-logs", summary="获取所有使用记录列表(管理员)")
@@ -348,10 +457,24 @@ async def get_all_usage_logs(
     current_user_id: int = Depends(get_current_user_id)
 ):
     """获取所有使用记录列表 (管理员功能)"""
-    return await get_usage_logs_alias(
-        page=page, page_size=page_size, customer_id=customer_id,
-        service_type=service_type, current_user_id=current_user_id
-    )
+    print("\n[UsageLogs] 获取使用记录列表")
+    print(f"[UsageLogs] page={page}, page_size={page_size}")
+    print(f"[UsageLogs] customer_id={customer_id}")
+    print(f"[UsageLogs] service_type={service_type}")
+    print(f"[UsageLogs] current_user_id={current_user_id}")
+
+    try:
+        result = await get_usage_logs_alias(
+            page=page, page_size=page_size, customer_id=customer_id,
+            service_type=service_type, current_user_id=current_user_id
+        )
+        print(f"[UsageLogs] 查询成功\n")
+        return result
+    except Exception as e:
+        print(f"[ERROR] UsageLogs 查询失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @customer_router.post("/membership-levels", summary="创建会员等级(别名路由)")
@@ -446,28 +569,46 @@ async def get_payment_transactions_alias(
     page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
     trade_no: Optional[str] = Query(None, description="交易号(模糊搜索)"),
     payment_method: Optional[str] = Query(None, description="支付方式(wechat/alipay)"),
-    status: Optional[str] = Query(None, description="交易状态"),
+    payment_status: Optional[str] = Query(None, description="交易状态"),
     current_user_id: int = Depends(get_current_user_id)
 ):
     """获取支付交易记录列表 (兼容前端调用)"""
     try:
+        print("\n[PaymentTransactions] 开始查询支付交易记录")
+        print(f"[PaymentTransactions] page={page}, page_size={page_size}")
+        print(f"[PaymentTransactions] trade_no={repr(trade_no)}")
+        print(f"[PaymentTransactions] payment_method={repr(payment_method)}")
+        print(f"[PaymentTransactions] payment_status={repr(payment_status)}")
+
         from base.plugins.customer.models.payment_transaction import PaymentTransaction
         from base.plugins.order.models import CustomerOrder
 
         query = PaymentTransaction.all()
-        if trade_no:
+        print(f"[PaymentTransactions] 初始查询构建完成")
+
+        # 处理空字符串
+        if trade_no and trade_no.strip():
+            print(f"[PaymentTransactions] 按交易号模糊搜索: {trade_no}")
             orders = await CustomerOrder.filter(order_no__icontains=trade_no).values_list('id', flat=True)
+            print(f"[PaymentTransactions] 找到 {len(orders)} 个订单")
             if orders:
                 query = query.filter(order_id__in=orders)
             else:
                 query = query.filter(order_id=-1)
-        if payment_method:
+
+        if payment_method and payment_method.strip():
+            print(f"[PaymentTransactions] 按支付方式过滤: {payment_method}")
             query = query.filter(transaction_type=payment_method)
-        if status:
-            query = query.filter(status=status)
+
+        if payment_status and payment_status.strip():
+            print(f"[PaymentTransactions] 按状态过滤: {payment_status}")
+            query = query.filter(status=payment_status)
 
         total = await query.count()
+        print(f"[PaymentTransactions] 总记录数: {total}")
+
         transactions = await query.offset((page - 1) * page_size).limit(page_size).order_by("-processed_at")
+        print(f"[PaymentTransactions] 查询到 {len(transactions)} 条记录")
 
         transaction_list = []
         for transaction in transactions:
@@ -477,6 +618,46 @@ async def get_payment_transactions_alias(
                 trans_dict = transaction.dict()
             else:
                 trans_dict = dict(transaction)
+
+            # 转换 Decimal 为 float（JSON 序列化）
+            if 'amount' in trans_dict and trans_dict['amount'] is not None:
+                trans_dict['amount'] = float(trans_dict['amount'])
+
+            # 添加七相订单号（更清晰的字段名）
+            if 'transaction_id' in trans_dict:
+                trans_dict['qixiang_trade_no'] = trans_dict['transaction_id']
+
+            # 转换支付方式为中文显示
+            payment_type_map = {
+                'wxpay': '微信支付',
+                'wechat': '微信支付',
+                'alipay': '支付宝',
+                'qixiang_wxpay': '七相-微信',
+                'qixiang_alipay': '七相-支付宝',
+            }
+            trans_type = trans_dict.get('transaction_type', '')
+            trans_dict['payment_method_display'] = payment_type_map.get(trans_type, trans_type)
+
+            # 添加支付方式标签和颜色（用于前端显示）
+            if trans_type in ['wxpay', 'wechat', 'qixiang_wxpay']:
+                trans_dict['payment_method_tag'] = 'success'
+                trans_dict['payment_method_icon'] = 'wechat'
+            elif trans_type in ['alipay', 'qixiang_alipay']:
+                trans_dict['payment_method_tag'] = 'primary'
+                trans_dict['payment_method_icon'] = 'alipay'
+            else:
+                trans_dict['payment_method_tag'] = 'info'
+                trans_dict['payment_method_icon'] = 'default'
+
+            # notify_data 中的 Decimal 也要转换
+            if 'notify_data' in trans_dict and trans_dict['notify_data']:
+                try:
+                    # 递归转换 notify_data 中的 Decimal
+                    notify_data_str = str(trans_dict['notify_data'])
+                    trans_dict['notify_data'] = notify_data_str
+                except:
+                    pass
+
             if hasattr(transaction, 'order_id') and transaction.order_id:
                 order = await CustomerOrder.get_or_none(id=transaction.order_id)
                 if order:
@@ -486,8 +667,12 @@ async def get_payment_transactions_alias(
             transaction_list.append(trans_dict)
 
         response_data = {"total": total, "page": page, "page_size": page_size, "items": transaction_list}
+        print(f"[PaymentTransactions] 查询成功，返回 {len(transaction_list)} 条记录\n")
         return SuccessResponse(data=response_data)
     except Exception as e:
+        print(f"\n[ERROR] PaymentTransactions 查询失败: {e}")
+        import traceback
+        traceback.print_exc()
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 

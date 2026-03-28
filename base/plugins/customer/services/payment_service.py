@@ -3,19 +3,19 @@
 """
 
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 import hashlib
 import json
 from decimal import Decimal
 
 from base.plugins.customer.models import (
-    CustomerOrder,
     PaymentTransaction,
     OrderStatus,
     TransactionStatus,
-    PaymentMethod,
-    generate_order_no
+    PaymentMethod
 )
+# 使用新的订单模型
+from base.plugins.order.models.order import CustomerOrder
 from base.plugins.customer.models.membership import MembershipLevel
 
 
@@ -33,36 +33,29 @@ class PaymentService:
         payment_method: str,
         client_ip: str = None
     ) -> CustomerOrder:
-        """创建支付订单"""
+        """创建支付订单（适配新架构，使用 OrderService）"""
         # 获取会员等级信息
         level = await MembershipLevel.get_or_none(id=membership_level_id)
         if not level:
             raise ValueError("会员等级不存在")
 
-        # 计算总小时数
-        total_hours = level.duration_hours + level.bonus_hours
+        # 使用新的 OrderService 创建订单
+        from base.plugins.order.services.order_service import OrderService
 
-        # 订单过期时间(15分钟)
-        expire_time = datetime.now() + timedelta(minutes=15)
-
-        order = await CustomerOrder.create(
-            order_no=generate_order_no(),
+        order = await OrderService.create_membership_order(
             customer_id=customer_id,
             membership_level_id=membership_level_id,
-            amount=level.price,
-            hours=level.duration_hours,
-            bonus_hours=level.bonus_hours,
-            total_hours=total_hours,
             payment_method=payment_method,
-            expire_time=expire_time,
             client_ip=client_ip
         )
+
         return order
 
     async def get_order(self, order_no: str) -> Optional[CustomerOrder]:
         """获取订单"""
+        # 新架构：预加载 customer 和 items 关系
         return await CustomerOrder.get_or_none(order_no=order_no).prefetch_related(
-            "membership_level"
+            "customer", "items"
         )
 
     async def cancel_order(self, order_no: str) -> bool:
@@ -93,18 +86,21 @@ class PaymentService:
         amount: float,
         notify_data: Dict[str, Any]
     ) -> bool:
-        """处理支付回调"""
-        # 获取订单
+        """处理支付回调（适配新订单架构）"""
+        # 获取订单（包含明细）
         order = await self.get_order(order_no)
         if not order:
+            print(f"[PaymentCallback] 订单不存在: {order_no}")
             return False
 
         # 检查订单状态
         if order.payment_status == OrderStatus.PAID:
+            print(f"[PaymentCallback] 订单已支付，跳过: {order_no}")
             return True  # 已处理，避免重复
 
-        # 验证金额
-        if float(order.amount) != amount:
+        # 验证金额（使用新字段 final_amount）
+        if float(order.final_amount) != amount:
+            print(f"[PaymentCallback] 金额不匹配! 期望: {order.final_amount}, 实际: {amount}")
             return False
 
         # 创建交易记录
@@ -116,20 +112,45 @@ class PaymentService:
             status=TransactionStatus.SUCCESS,
             notify_data=notify_data
         )
+        print(f"[PaymentCallback] 创建交易记录成功: {transaction.id}")
 
         # 更新订单状态
         order.payment_status = OrderStatus.PAID
         order.trade_no = transaction_id
         order.pay_time = datetime.now()
         await order.save()
+        print(f"[PaymentCallback] 订单状态更新成功: {order_no} -> PAID")
 
-        # 创建或更新客户会员
-        from base.plugins.customer.services.membership_service import MembershipService
-        await MembershipService.create_customer_membership(
-            customer_id=order.customer_id,
-            membership_level_id=order.membership_level_id,
-            hours=order.total_hours
-        )
+        # 处理会员权益（从订单明细中获取）
+        try:
+            from base.plugins.order.models.order import OrderItem
+
+            # 获取订单明细
+            items = await OrderItem.filter(order_id=order.id)
+            print(f"[PaymentCallback] 订单 {order_no} 有 {len(items)} 个明细")
+
+            for item in items:
+                # 只处理会员类型的商品
+                if item.product_type == "membership" and item.extra_info:
+                    extra = item.extra_info
+                    membership_level_id = extra.get("membership_level_id")
+                    total_hours = extra.get("total_hours")
+
+                    if membership_level_id and total_hours:
+                        print(f"[PaymentCallback] 创建会员: level={membership_level_id}, hours={total_hours}")
+
+                        from base.plugins.customer.services.membership_service import MembershipService
+                        await MembershipService.create_customer_membership(
+                            customer_id=order.customer_id,
+                            membership_level_id=membership_level_id,
+                            hours=total_hours
+                        )
+                        print(f"[PaymentCallback] 会员创建成功")
+        except Exception as e:
+            print(f"[PaymentCallback] 处理会员权益失败: {e}")
+            import traceback
+            traceback.print_exc()
+            # 会员创建失败不影响支付成功状态
 
         return True
 

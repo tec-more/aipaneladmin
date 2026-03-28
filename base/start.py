@@ -40,9 +40,16 @@ def init_app() -> FastAPI:
         description=settings.app_description,
         version=settings.app_version,
         openapi_url="/openapi.json",
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan,
         json_dumps=lambda data, **kwargs: json.dumps(data, **kwargs, cls=DateTimeEncoder, ensure_ascii=False)
     )
+
+    # 设置服务器 URL（用于文档页面的 "Try it out" 功能）
+    app.state.servers = [
+        {"url": "http://127.0.0.1:9998/api", "description": "本地开发服务器"},
+    ]
 
     # 立即保存并替换 openapi 方法（在路由注册之前）
     _original_openapi = app.openapi
@@ -51,6 +58,11 @@ def init_app() -> FastAPI:
         import sys
         # 总是重新生成 schema（包含所有已注册的路由）
         openapi_schema = _original_openapi()
+
+        # 设置服务器 URL
+        if hasattr(app.state, 'servers'):
+            openapi_schema["servers"] = app.state.servers
+
         paths = openapi_schema.get('paths', {})
         customer_auth_count = len([p for p in paths.keys() if 'customer/auth' in p])
         print(f"[custom_openapi] Generated schema with {customer_auth_count} customer/auth paths, total {len(paths)} paths", file=sys.stderr, flush=True)
