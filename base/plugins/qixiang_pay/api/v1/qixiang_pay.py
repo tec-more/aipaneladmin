@@ -1,9 +1,11 @@
 """
 七相支付API路由
 """
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import PlainTextResponse
+from pydantic import ValidationError
 import logging
+import json
 
 from base.common.response import SuccessResponse
 from base.plugins.qixiang_pay.schemas.qixiang_schema import CreateOrderIn, CreateOrderOut, QueryOrderOut
@@ -23,8 +25,45 @@ qixiang_pay_router = APIRouter(
 router = qixiang_pay_router
 
 
+@qixiang_pay_router.post("/create-debug", summary="创建七相支付订单（调试模式）")
+async def create_order_debug(request: Request):
+    """
+    调试模式：直接接收原始请求，不验证参数
+    用于查看前端发送的原始数据
+    """
+    try:
+        # 获取原始请求体
+        body = await request.body()
+        body_str = body.decode('utf-8')
+
+        logger.info("=" * 60)
+        logger.info("[七相支付 DEBUG] 原始请求信息:")
+        logger.info("=" * 60)
+        logger.info(f"请求头: {dict(request.headers)}")
+        logger.info(f"请求体（原始）: {body_str}")
+
+        # 尝试解析JSON
+        try:
+            body_json = json.loads(body_str)
+            logger.info(f"请求体（JSON）: {json.dumps(body_json, indent=2, ensure_ascii=False)}")
+        except:
+            logger.warning("无法解析为JSON")
+
+        logger.info("=" * 60)
+
+        return SuccessResponse(data={
+            "headers": dict(request.headers),
+            "body_raw": body_str,
+            "body_json": json.loads(body_str) if body_str else None
+        }, msg="获取调试信息成功")
+
+    except Exception as e:
+        logger.error(f"[DEBUG] 错误: {e}", exc_info=True)
+        return SuccessResponse(data={"error": str(e)}, msg="调试信息获取失败")
+
+
 @qixiang_pay_router.post("/create", response_model=CreateOrderOut, summary="创建七相支付订单")
-async def create_order(order_data: CreateOrderIn):
+async def create_order(request: Request):
     """
     创建七相支付订单
 
@@ -43,18 +82,73 @@ async def create_order(order_data: CreateOrderIn):
     - **qrcode**: 二维码链接（如有）
     """
     try:
+        # 先获取原始请求体用于调试
+        body = await request.body()
+        body_str = body.decode('utf-8')
+
+        logger.info("=" * 60)
+        logger.info("[七相支付] 收到创建订单请求")
+        logger.info("=" * 60)
+        logger.info(f"原始请求体: {body_str}")
+
+        # 尝试解析JSON
+        try:
+            body_json = json.loads(body_str)
+            logger.info(f"解析后的JSON:")
+            for key, value in body_json.items():
+                logger.info(f"  {key}: {value} (类型: {type(value).__name__})")
+        except Exception as e:
+            logger.error(f"JSON解析失败: {e}")
+
+        # Pydantic 验证
+        try:
+            order_data = CreateOrderIn(**json.loads(body_str))
+            logger.info(f"[SUCCESS] Pydantic 验证通过")
+            logger.info(f"  order_no: {order_data.order_no}")
+            logger.info(f"  pay_type: {order_data.pay_type}")
+            logger.info(f"  amount: {order_data.amount}")
+            logger.info(f"  subject: {order_data.subject}")
+            logger.info(f"  client_ip: {order_data.client_ip}")
+            logger.info(f"  param: {order_data.param}")
+        except ValidationError as e:
+            logger.error(f"[ERROR] Pydantic 验证失败!")
+            logger.error(f"验证错误详情: {e.errors()}")
+            error_details = []
+            for error in e.errors():
+                error_details.append({
+                    "field": "->".join(str(loc) for loc in error["loc"]),
+                    "message": error["msg"],
+                    "type": error["type"]
+                })
+                logger.error(f"  字段: {'->'.join(str(loc) for loc in error['loc'])}")
+                logger.error(f"  错误: {error['msg']}")
+                logger.error(f"  类型: {error['type']}")
+            logger.info("=" * 60)
+
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "msg": "参数验证失败",
+                    "errors": error_details
+                }
+            )
+
+        logger.info("=" * 60)
+
         service = QixiangPayService()
         result = await service.create_order(order_data.model_dump())
 
-        logger.info(f"创建七相支付订单成功: {order_data.order_no}")
+        logger.info(f"[SUCCESS] 创建七相支付订单成功: {order_data.order_no}")
 
         return SuccessResponse(data=result, msg="创建订单成功")
 
+    except HTTPException:
+        raise
     except ValueError as e:
-        logger.error(f"创建七相支付订单失败（参数错误）: {str(e)}")
+        logger.error(f"[ERROR] 创建七相支付订单失败（参数错误）: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"创建七相支付订单异常: {str(e)}", exc_info=True)
+        logger.error(f"[ERROR] 创建七相支付订单异常: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="创建订单失败")
 
 

@@ -19,8 +19,7 @@
     ],
     "schemas": [
         "customer_schema",
-        "membership",
-        "order"
+        "membership"
     ],
     "menus": [
         {
@@ -46,25 +45,18 @@
                     "sort": 2
                 },
                 {
-                    "name": "订单管理",
-                    "path": "/customer/orders",
-                    "icon": "ShoppingCart",
-                    "component": "customer/orders/index",
-                    "sort": 3
-                },
-                {
                     "name": "支付记录",
                     "path": "/customer/payments",
                     "icon": "Money",
                     "component": "customer/payments/index",
-                    "sort": 4
+                    "sort": 3
                 },
                 {
                     "name": "使用记录",
                     "path": "/customer/usage",
                     "icon": "Document",
                     "component": "customer/usage/index",
-                    "sort": 5
+                    "sort": 4
                 }
             ]
         }
@@ -93,18 +85,6 @@
             "code": "customer:membership_level",
             "module": "customer",
             "description": "管理会员等级配置"
-        },
-        {
-            "name": "订单查看",
-            "code": "customer:order:view",
-            "module": "customer",
-            "description": "查看客户订单"
-        },
-        {
-            "name": "订单退款",
-            "code": "customer:order:refund",
-            "module": "customer",
-            "description": "订单退款"
         },
         {
             "name": "使用记录查看",

@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "七相聚合支付接口集成（支持微信支付、支付宝）",
     "author": "hepan",
-    "route_prefix": "/v1/pay/qixiang",
+    "route_prefix": "/v1/qixiang",
     "routes": [
         "api/v1"
     ],

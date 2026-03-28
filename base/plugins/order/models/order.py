@@ -1,9 +1,10 @@
 """
-订单模型
+订单模型 - 订单主表 + 订单明细表设计
 """
 
 from enum import Enum
 from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
 from tortoise import fields
 from base.common.model import BaseModel, TimestampMixin
 import random
@@ -67,23 +68,26 @@ def generate_order_no() -> str:
 
 
 class CustomerOrder(BaseModel, TimestampMixin):
-    """客户充值订单表"""
+    """
+    订单主表
+    存储订单的基本信息和支付状态
+    """
 
+    # ========== 基础信息 ==========
     order_no = fields.CharField(max_length=64, unique=True, description="订单号")
     customer = fields.ForeignKeyField(
         "models.Customer",
-        related_name="recharge_orders",
-        on_delete=fields.CASCADE
-    )
-    membership_level = fields.ForeignKeyField(
-        "models.MembershipLevel",
         related_name="orders",
-        on_delete=fields.RESTRICT
+        on_delete=fields.CASCADE,
+        description="客户"
     )
-    amount = fields.DecimalField(max_digits=10, decimal_places=2, description="支付金额")
-    hours = fields.IntField(description="购买小时数")
-    bonus_hours = fields.IntField(default=0, description="赠送小时数")
-    total_hours = fields.IntField(description="总小时数(购买+赠送)")
+
+    # ========== 金额信息 ==========
+    total_amount = fields.DecimalField(max_digits=10, decimal_places=2, description="订单总金额")
+    discount_amount = fields.DecimalField(max_digits=10, decimal_places=2, default=0, description="优惠金额")
+    final_amount = fields.DecimalField(max_digits=10, decimal_places=2, description="实际支付金额")
+
+    # ========== 支付信息 ==========
     payment_method = fields.CharEnumField(
         PaymentMethod,
         max_length=20,
@@ -97,13 +101,26 @@ class CustomerOrder(BaseModel, TimestampMixin):
     )
     trade_no = fields.CharField(max_length=128, null=True, description="第三方交易号")
     pay_time = fields.DatetimeField(null=True, description="支付时间")
+
+    # ========== 时间信息 ==========
     expire_time = fields.DatetimeField(description="订单过期时间")
+
+    # ========== 旧字段（保留用于向后兼容，设为可选） ==========
+    # 这些字段是旧的 customer_order 表的遗留字段
+    # 新架构中，会员信息存储在 order_items.extra_info 中
+    membership_level_id = fields.BigIntField(null=True, description="会员等级ID（旧字段，已弃用）")
+    hours = fields.IntField(null=True, description="购买小时数（旧字段，已弃用）")
+    bonus_hours = fields.IntField(null=True, description="赠送小时数（旧字段，已弃用）")
+    total_hours = fields.IntField(null=True, description="总小时数（旧字段，已弃用）")
+    amount = fields.DecimalField(max_digits=10, decimal_places=2, null=True, description="原金额字段（旧字段，已弃用）")
+
+    # ========== 其他信息 ==========
     client_ip = fields.CharField(max_length=50, null=True, description="客户端IP")
     device_info = fields.JSONField(null=True, description="设备信息")
     remark = fields.TextField(null=True, description="备注")
 
     class Meta:
-        table = "customer_order"
+        table = "orders"
         ordering = ["-created_at"]
 
     @property
@@ -126,28 +143,23 @@ class CustomerOrder(BaseModel, TimestampMixin):
         """获取状态中文标签"""
         return OrderStatus.get_status_label(self.payment_status.value)
 
-    @property
-    def total_hours(self) -> int:
-        """获取总小时数"""
-        return self.hours + self.bonus_hours
-
-    async def to_dict(self):
-        """转换为字典，包含关联对象的名称"""
+    async def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
         # 预加载关联数据
-        await self.fetch_related('customer', 'membership_level')
+        await self.fetch_related('customer')
+
+        # 获取订单明细
+        items = await self.items.all()
+        items_list = [await item.to_dict() for item in items]
 
         data = {
             "id": self.id,
             "order_no": self.order_no,
             "customer_id": self.customer_id,
-            "customer_name": self.customer.name if self.customer else None,
-            "membership_level_id": self.membership_level_id,
-            "product_name": self.membership_level.name if self.membership_level else None,
-            "price": float(self.amount),
-            "amount": float(self.amount),
-            "hours": self.hours,
-            "bonus_hours": self.bonus_hours,
-            "total_hours": self.total_hours,
+            "customer_name": str(self.customer) if self.customer else None,
+            "total_amount": float(self.total_amount),
+            "discount_amount": float(self.discount_amount),
+            "final_amount": float(self.final_amount),
             "payment_method": self.payment_method.value if isinstance(self.payment_method, Enum) else self.payment_method,
             "payment_status": self.payment_status.value if isinstance(self.payment_status, Enum) else self.payment_status,
             "status": self.payment_status.value if isinstance(self.payment_status, Enum) else self.payment_status,
@@ -159,8 +171,84 @@ class CustomerOrder(BaseModel, TimestampMixin):
             "remark": self.remark,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+            "items": items_list,  # 订单明细列表
         }
         return data
 
     def __str__(self):
         return f"Order {self.order_no} - {self.payment_status}"
+
+
+class OrderItem(BaseModel, TimestampMixin):
+    """
+    订单明细表
+    存储订单中的每个商品信息
+    """
+
+    # ========== 关联信息 ==========
+    order = fields.ForeignKeyField(
+        "models.CustomerOrder",
+        related_name="items",
+        on_delete=fields.CASCADE,
+        description="订单"
+    )
+    product = fields.ForeignKeyField(
+        "models.Product",
+        related_name="order_items",
+        on_delete=fields.SET_NULL,
+        null=True,
+        description="产品"
+    )
+
+    # ========== 产品信息（冗余字段，避免关联查询） ==========
+    product_name = fields.CharField(max_length=255, description="产品名称")
+    product_type = fields.CharField(max_length=50, description="产品类型：membership/points/item")
+    product_image = fields.CharField(max_length=500, null=True, description="产品图片")
+
+    # ========== 购买信息 ==========
+    quantity = fields.IntField(default=1, description="购买数量")
+    unit_price = fields.DecimalField(max_digits=10, decimal_places=2, description="单价")
+    total_price = fields.DecimalField(max_digits=10, decimal_places=2, description="小计金额")
+
+    # ========== 扩展信息（JSON格式，存储特定业务数据） ==========
+    extra_info = fields.JSONField(null=True, description="扩展信息")
+    """
+    扩展信息示例：
+    {
+        "membership_level_id": 1,          # 会员等级ID
+        "membership_level_name": "SVIP",   # 会员等级名称
+        "hours": 100,                      # 购买小时数
+        "bonus_hours": 20,                 # 赠送小时数
+        "total_hours": 120,                # 总小时数
+        "recharge_type": "monthly"         # 充值类型：monthly/yearly
+    }
+    """
+
+    class Meta:
+        table = "order_items"
+        ordering = ["-created_at"]
+
+    async def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        data = {
+            "id": self.id,
+            "order_id": self.order_id,
+            "product_id": self.product_id,
+            "product_name": self.product_name,
+            "product_type": self.product_type,
+            "product_image": self.product_image,
+            "quantity": self.quantity,
+            "unit_price": float(self.unit_price),
+            "total_price": float(self.total_price),
+            "extra_info": self.extra_info,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+        return data
+
+    def __str__(self):
+        return f"OrderItem {self.product_name} x {self.quantity}"
+
+# ========== 向后兼容 ==========
+# 注意：customer_order 表已重命名为 orders
+# 如果需要访问旧表，请使用 orders 表

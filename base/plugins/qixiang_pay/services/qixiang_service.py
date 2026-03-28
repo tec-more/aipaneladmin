@@ -117,7 +117,7 @@ class QixiangPayService:
         try:
             # 验证配置
             if not all([self.pid, self.key]):
-                raise ValueError("七相支付配置不完整，请检查config.ini")
+                raise ValueError("七相支付配置不完整，请检查config.conf")
 
             # 构建请求参数
             params = {
@@ -191,7 +191,7 @@ class QixiangPayService:
         try:
             # 验证配置
             if not all([self.pid, self.key]):
-                raise ValueError("七相支付配置不完整，请检查config.ini")
+                raise ValueError("七相支付配置不完整，请检查config.conf")
 
             # 构建查询URL
             url = f"{self.query_url}?act=order&pid={self.pid}&key={self.key}&out_trade_no={order_no}"
