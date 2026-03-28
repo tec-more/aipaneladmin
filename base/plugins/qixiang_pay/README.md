@@ -37,7 +37,7 @@ api_url = https://api.payqixiang.cn/mapi.php
 query_url = https://api.payqixiang.cn/api.php
 
 # 异步通知地址（需要外网可访问）
-notify_url = http://yourdomain.com/v1/pay/qixiang/notify
+notify_url = http://yourdomain.com/v1/qixiang/notify
 
 # 跳转通知地址
 return_url = http://yourdomain.com/payment/result
@@ -51,7 +51,7 @@ return_url = http://yourdomain.com/payment/result
 
 ### 1. 创建支付订单
 
-**接口**: `POST /v1/pay/qixiang/create`
+**接口**: `POST /v1/qixiang/create`
 
 **请求参数**:
 ```json
@@ -86,7 +86,7 @@ return_url = http://yourdomain.com/payment/result
 
 ### 2. 查询订单状态
 
-**接口**: `GET /v1/pay/qixiang/query/{order_no}`
+**接口**: `GET /v1/qixiang/query/{order_no}`
 
 **响应示例**:
 ```json
@@ -111,7 +111,7 @@ return_url = http://yourdomain.com/payment/result
 
 ### 3. 支付异步回调
 
-**接口**: `POST /v1/pay/qixiang/notify`
+**接口**: `POST /v1/qixiang/notify`
 
 由七相支付服务器主动调用，无需前端调用。
 
@@ -126,7 +126,7 @@ async def create_qixiang_order():
     """创建七相支付订单"""
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "http://localhost:8000/v1/pay/qixiang/create",
+            "http://localhost:8000/v1/qixiang/create",
             json={
                 "order_no": "20240327001",
                 "pay_type": "alipay",
@@ -141,7 +141,7 @@ async def query_qixiang_order(order_no: str):
     """查询七相支付订单"""
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"http://localhost:8000/v1/pay/qixiang/query/{order_no}"
+            f"http://localhost:8000/v1/qixiang/query/{order_no}"
         )
         result = response.json()
         return result
@@ -151,7 +151,7 @@ async def query_qixiang_order(order_no: str):
 
 ```bash
 # 创建订单
-curl -X POST "http://localhost:8000/v1/pay/qixiang/create" \
+curl -X POST "http://localhost:8000/v1/qixiang/create" \
   -H "Content-Type: application/json" \
   -d '{
     "order_no": "20240327001",
@@ -161,7 +161,7 @@ curl -X POST "http://localhost:8000/v1/pay/qixiang/create" \
   }'
 
 # 查询订单
-curl -X GET "http://localhost:8000/v1/pay/qixiang/query/20240327001"
+curl -X GET "http://localhost:8000/v1/qixiang/query/20240327001"
 ```
 
 ## 前端集成
@@ -170,7 +170,7 @@ curl -X GET "http://localhost:8000/v1/pay/qixiang/query/20240327001"
 
 ```javascript
 // 1. 创建订单获取支付链接
-const response = await fetch('/v1/pay/qixiang/create', {
+const response = await fetch('/v1/qixiang/create', {
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify({
@@ -192,7 +192,7 @@ document.getElementById('qrcode').innerHTML = qr.createImgTag();
 
 // 3. 轮询查询支付状态
 const pollTimer = setInterval(async () => {
-  const res = await fetch(`/v1/pay/qixiang/query/20240327001`);
+  const res = await fetch(`/v1/qixiang/query/20240327001`);
   const data = await res.json();
 
   if (data.data.status === 'success') {
@@ -207,7 +207,7 @@ const pollTimer = setInterval(async () => {
 
 ```javascript
 // 1. 创建订单获取支付链接
-const response = await fetch('/v1/pay/qixiang/create', {
+const response = await fetch('/v1/qixiang/create', {
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify({

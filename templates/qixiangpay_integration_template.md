@@ -172,7 +172,7 @@ sign = md5("money=1.00&name=VIP会员&out_trade_no=20160806151343349&...YOUR_KEY
 ### 需要实现的接口
 
 #### 1. 创建支付订单
-- **路径**: `POST /v1/pay/qixiang/create`
+- **路径**: `POST /v1/qixiang/create`
 - **功能**: 调用七相统一下单接口，创建支付订单
 - **输入**:
   - order_no: 商户订单号（必填）
@@ -185,7 +185,7 @@ sign = md5("money=1.00&name=VIP会员&out_trade_no=20160806151343349&...YOUR_KEY
   - trade_no: 七相订单号
 
 #### 2. 查询支付状态
-- **路径**: `GET /v1/pay/qixiang/query/{order_no}`
+- **路径**: `GET /v1/qixiang/query/{order_no}`
 - **功能**: 查询订单支付状态（用于前端轮询）
 - **输入**: order_no
 - **输出**:
@@ -194,7 +194,7 @@ sign = md5("money=1.00&name=VIP会员&out_trade_no=20160806151343349&...YOUR_KEY
   - amount: 金额
 
 #### 3. 支付异步回调
-- **路径**: `POST /v1/pay/qixiang/notify`
+- **路径**: `POST /v1/qixiang/notify`
 - **功能**: 接收七相支付异步通知，验证签名，更新订单状态
 - **输入**: 七相支付回调的所有参数
 - **输出**: 字符串"success"
@@ -234,7 +234,7 @@ base/plugins/qixiang_pay/
   "display_name": "七相支付",
   "version": "1.0.0",
   "description": "七相聚合支付接口集成（支持微信支付、支付宝）",
-  "route_prefix": "/v1/pay/qixiang",
+  "route_prefix": "/v1/qixiang",
   "routes": ["api/v1"],
   "dependencies": ["customer", "order"],
   "is_installed": true,
@@ -258,7 +258,7 @@ pid = 1003
 key = YOUR_KEY_HERE
 api_url = https://api.payqixiang.cn/mapi.php
 query_url = https://api.payqixiang.cn/api.php
-notify_url = http://yourdomain.com/v1/pay/qixiang/notify
+notify_url = http://yourdomain.com/v1/qixiang/notify
 return_url = http://yourdomain.com/payment/result
 ```
 
@@ -319,7 +319,7 @@ base/plugins/customer/services/payment_service.py
 from fastapi import APIRouter, HTTPException
 from base.common.response import SuccessResponse
 
-router = APIRouter(prefix="/v1/pay/qixiang", tags=["七相支付"])
+router = APIRouter(prefix="/v1/qixiang", tags=["七相支付"])
 
 @router.post("/create")
 async def create_order(order_data: CreateOrderIn):
@@ -483,7 +483,7 @@ from base.common.response import SuccessResponse
 from base.plugins.qixiang_pay.schemas.qixiang_schema import CreateOrderIn
 from base.plugins.qixiang_pay.services.qixiang_service import QixiangPayService
 
-router = APIRouter(prefix="/v1/pay/qixiang", tags=["七相支付"])
+router = APIRouter(prefix="/v1/qixiang", tags=["七相支付"])
 
 @router.post("/create")
 async def create_order(order_data: CreateOrderIn):
@@ -655,7 +655,7 @@ async def payment_notify(request: Request):
 ## API调用示例
 ### 创建订单
 ```bash
-curl -X POST "http://localhost:8000/v1/pay/qixiang/create" \
+curl -X POST "http://localhost:8000/v1/qixiang/create" \
   -H "Content-Type: application/json" \
   -d '{
     "order_no": "20240327001",
@@ -667,7 +667,7 @@ curl -X POST "http://localhost:8000/v1/pay/qixiang/create" \
 
 ### 查询订单
 ```bash
-curl -X GET "http://localhost:8000/v1/pay/qixiang/query/20240327001"
+curl -X GET "http://localhost:8000/v1/qixiang/query/20240327001"
 ```
 
 ## 测试数据

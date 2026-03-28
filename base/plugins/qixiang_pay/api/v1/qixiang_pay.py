@@ -167,18 +167,33 @@ async def query_order(order_no: str):
     - **amount**: 订单金额
     """
     try:
+        logger.info("=" * 60)
+        logger.info("[七相支付] 查询订单状态")
+        logger.info("=" * 60)
+        logger.info(f"订单号: {order_no}")
+
         service = QixiangPayService()
         result = await service.query_order(order_no)
 
-        logger.info(f"查询七相支付订单成功: {order_no}, 状态: {result.get('status')}")
+        logger.info(f"查询结果:")
+        logger.info(f"  订单号: {result.get('order_no')}")
+        logger.info(f"  七相订单号: {result.get('trade_no')}")
+        logger.info(f"  支付状态: {result.get('status')}")
+        logger.info(f"  支付类型: {result.get('pay_type')}")
+        logger.info(f"  订单金额: {result.get('amount')}")
+        logger.info(f"  原始状态码: {result.get('trade_status')}")
+        logger.info(f"[SUCCESS] 查询七相支付订单成功: {order_no}, 状态: {result.get('status')}")
+        logger.info("=" * 60)
 
         return SuccessResponse(data=result, msg="查询成功")
 
     except ValueError as e:
-        logger.error(f"查询七相支付订单失败（参数错误）: {str(e)}")
+        logger.error(f"[ERROR] 查询七相支付订单失败（参数错误）: {str(e)}")
+        logger.info("=" * 60)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"查询七相支付订单异常: {str(e)}", exc_info=True)
+        logger.error(f"[ERROR] 查询七相支付订单异常: {str(e)}", exc_info=True)
+        logger.info("=" * 60)
         raise HTTPException(status_code=500, detail="查询订单失败")
 
 
@@ -198,40 +213,122 @@ async def payment_notify(request: Request):
         # 获取回调数据（form-data格式）
         notify_data = dict(await request.form())
 
-        logger.info(f"收到七相支付回调通知: {notify_data.get('out_trade_no')}")
+        logger.info("=" * 60)
+        logger.info("[七相支付] 收到异步回调通知")
+        logger.info("=" * 60)
+        logger.info(f"请求头: {dict(request.headers)}")
+        logger.info(f"回调数据（原始）: {notify_data}")
+
+        # 打印所有回调参数
+        if notify_data:
+            logger.info(f"回调参数详情:")
+            for key, value in notify_data.items():
+                logger.info(f"  {key}: {value}")
+        else:
+            logger.warning("没有回调数据")
+
+        # 检查关键字段
+        out_trade_no = notify_data.get('out_trade_no')
+        trade_no = notify_data.get('trade_no')
+        trade_status = notify_data.get('trade_status')
+        money = notify_data.get('money')
+        sign = notify_data.get('sign')
+
+        logger.info(f"关键字段:")
+        logger.info(f"  商户订单号: {out_trade_no}")
+        logger.info(f"  七相订单号: {trade_no}")
+        logger.info(f"  支付状态: {trade_status}")
+        logger.info(f"  支付金额: {money}")
+        logger.info(f"  签名: {sign}")
 
         # 处理回调
+        logger.info(f"开始处理回调...")
         service = QixiangPayService()
         success = await service.process_notify(notify_data)
 
         if success:
-            logger.info(f"七相支付回调处理成功: {notify_data.get('out_trade_no')}")
+            logger.info(f"[SUCCESS] 七相支付回调处理成功: {out_trade_no}")
+            logger.info("=" * 60)
             # 必须返回纯文本"success"
             return PlainTextResponse(content="success")
         else:
-            logger.error(f"七相支付回调处理失败: {notify_data.get('out_trade_no')}")
+            logger.error(f"[ERROR] 七相支付回调处理失败: {out_trade_no}")
+            logger.info("=" * 60)
             return PlainTextResponse(content="fail", status_code=400)
 
     except ValueError as e:
-        logger.error(f"七相支付回调验证失败: {str(e)}")
+        logger.error(f"[ERROR] 七相支付回调验证失败: {str(e)}")
+        logger.error(f"[ERROR] 订单号: {notify_data.get('out_trade_no') if notify_data else 'unknown'}")
+        logger.info("=" * 60)
         return PlainTextResponse(content="fail", status_code=400)
 
     except Exception as e:
-        logger.error(f"处理七相支付回调异常: {str(e)}", exc_info=True)
+        logger.error(f"[ERROR] 处理七相支付回调异常: {str(e)}", exc_info=True)
+        logger.info("=" * 60)
         return PlainTextResponse(content="fail", status_code=500)
 
 
 @qixiang_pay_router.get("/return", summary="七相支付跳转通知")
-async def payment_return():
+async def payment_return(request: Request):
     """
     七相支付页面跳转通知
 
     用户支付完成后跳转回来的页面
     支付结果以异步通知为准，跳转通知仅供参考
     """
-    # 这里可以返回一个前端页面，展示支付结果
-    # 实际支付状态应该通过查询接口确认
-    return SuccessResponse(data={
-        "message": "支付完成，正在跳转...",
-        "notice": "实际支付状态请通过查询接口确认"
-    }, msg="支付跳转")
+    try:
+        # 获取所有查询参数
+        query_params = dict(request.query_params)
+
+        logger.info("=" * 60)
+        logger.info("[七相支付] 收到支付跳转通知")
+        logger.info("=" * 60)
+        logger.info(f"完整URL: {str(request.url)}")
+        logger.info(f"查询参数: {query_params}")
+
+        # 打印所有参数
+        if query_params:
+            logger.info(f"参数详情:")
+            for key, value in query_params.items():
+                logger.info(f"  {key}: {value}")
+        else:
+            logger.warning(f"没有查询参数")
+
+        # 验证签名（如果有）
+        if query_params.get('sign'):
+            service = QixiangPayService()
+            try:
+                params_to_verify = query_params.copy()
+                if not params_to_verify.get('name'):
+                    params_to_verify.pop('name', None)
+
+                is_valid = service.verify_sign(
+                    params_to_verify,
+                    service.key,
+                    query_params.get('sign', '')
+                )
+                logger.info(f"签名验证结果: {is_valid}")
+            except Exception as e:
+                logger.error(f"签名验证异常: {e}")
+        else:
+            logger.warning("没有sign参数，跳过签名验证")
+
+        logger.info("=" * 60)
+
+        # 返回详细的调试信息
+        return SuccessResponse(data={
+            "message": "支付完成，正在跳转...",
+            "notice": "实际支付状态请通过查询接口确认",
+            "debug": {
+                "url": str(request.url),
+                "query_params": query_params,
+                "has_sign": bool(query_params.get('sign'))
+            }
+        }, msg="支付跳转")
+
+    except Exception as e:
+        logger.error(f"[七相支付] 处理跳转通知异常: {e}", exc_info=True)
+        return SuccessResponse(data={
+            "error": str(e),
+            "message": "处理跳转通知时发生错误"
+        }, msg="处理跳转通知失败")
