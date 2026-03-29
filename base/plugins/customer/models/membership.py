@@ -39,6 +39,7 @@ class MembershipLevel(BaseModel, TimestampMixin):
         description="原价"
     )
     bonus_hours = fields.IntField(default=0, description="赠送小时数")
+    discount_percentage = fields.IntField(default=0, description="折扣百分比(0-100)")
     features = fields.JSONField(default=list, description="特权列表")
     sort_order = fields.IntField(default=0, description="排序")
     is_active = fields.BooleanField(default=True, description="是否启用")

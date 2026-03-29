@@ -19,6 +19,7 @@ class MembershipLevelIn(BaseModel):
     price: Decimal
     original_price: Optional[Decimal] = None
     bonus_hours: int = 0
+    discount_percentage: int = 0
     features: List[str] = []
     sort_order: int = 0
     is_active: bool = True
@@ -38,6 +39,7 @@ class MembershipLevelOut(BaseModel):
     price: Decimal
     original_price: Optional[Decimal]
     bonus_hours: int
+    discount_percentage: int
     features: List[str]
     sort_order: int
     is_active: bool
