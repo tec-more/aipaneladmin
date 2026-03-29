@@ -121,7 +121,7 @@ class PaymentService:
         await order.save()
         print(f"[PaymentCallback] 订单状态更新成功: {order_no} -> PAID")
 
-        # 处理会员权益（从订单明细中获取）
+        # 处理订单完成后的业务逻辑
         try:
             from base.plugins.order.models.order import OrderItem
 
@@ -129,28 +129,182 @@ class PaymentService:
             items = await OrderItem.filter(order_id=order.id)
             print(f"[PaymentCallback] 订单 {order_no} 有 {len(items)} 个明细")
 
-            for item in items:
-                # 只处理会员类型的商品
-                if item.product_type == "membership" and item.extra_info:
-                    extra = item.extra_info
-                    membership_level_id = extra.get("membership_level_id")
-                    total_hours = extra.get("total_hours")
+            for idx, item in enumerate(items):
+                print(f"\n[PaymentCallback] === 处理明细[{idx+1}] ===")
+                print(f"[PaymentCallback] product_id: {item.product_id}")
+                print(f"[PaymentCallback] product_type: {item.product_type}")
+                print(f"[PaymentCallback] product_name: {item.product_name}")
+                print(f"[PaymentCallback] extra_info: {item.extra_info}")
+                print(f"[PaymentCallback] extra_info type: {type(item.extra_info)}")
 
-                    if membership_level_id and total_hours:
-                        print(f"[PaymentCallback] 创建会员: level={membership_level_id}, hours={total_hours}")
+                # 1. 更新产品库存和销售数量
+                if item.product_id:
+                    from base.plugins.product.models.product import Product
+                    product = await Product.get_or_none(id=item.product_id)
+                    if product:
+                        # 减少库存
+                        new_stock = product.stock - item.quantity
+                        if new_stock < 0:
+                            print(f"[PaymentCallback] 警告: 产品 {product.name} 库存不足! 当前库存: {product.stock}, 购买数量: {item.quantity}")
+                        else:
+                            product.stock = new_stock
 
-                        from base.plugins.customer.services.membership_service import MembershipService
-                        await MembershipService.create_customer_membership(
-                            customer_id=order.customer_id,
-                            membership_level_id=membership_level_id,
-                            hours=total_hours
-                        )
-                        print(f"[PaymentCallback] 会员创建成功")
+                        # 增加销售数量
+                        product.sales_count = (product.sales_count or 0) + item.quantity
+                        await product.save()
+                        print(f"[PaymentCallback] 产品库存更新成功: {product.name}, 库存: {product.stock}, 销量: {product.sales_count}")
+                    else:
+                        print(f"[PaymentCallback] 警告: 产品ID {item.product_id} 不存在")
+
+                # 2. 处理会员类型的商品（更新用户时长）
+                # 支持 "membership" 和 "hours" 两种充值类商品
+                if item.product_type in ["membership", "hours"]:
+                    print(f"[PaymentCallback] 检测到充值类商品: {item.product_type}")
+
+                    if item.extra_info:
+                        extra = item.extra_info
+                        print(f"[PaymentCallback] extra_info内容: {extra}")
+
+                        # 支持字典和JSON字符串
+                        if isinstance(extra, str):
+                            import json
+                            try:
+                                extra = json.loads(extra)
+                                print(f"[PaymentCallback] 解析JSON字符串: {extra}")
+                            except:
+                                print(f"[PaymentCallback] ERROR: extra_info不是有效的JSON字符串")
+                                continue
+
+                        membership_level_id = extra.get("membership_level_id")
+                        total_hours = extra.get("total_hours")
+
+                        print(f"[PaymentCallback] 提取参数: membership_level_id={membership_level_id}, total_hours={total_hours}")
+
+                        if membership_level_id and total_hours:
+                            print(f"\n{'='*70}")
+                            print(f"[PaymentCallback] 🔔 开始处理会员充值")
+                            print(f"[PaymentCallback] 客户ID: {order.customer_id}")
+                            print(f"[PaymentCallback] 充值时长: {total_hours} 小时")
+                            print(f"[PaymentCallback] 会员等级ID: {membership_level_id}")
+                            print(f"{'='*70}\n")
+
+                            from base.plugins.customer.services.membership_service import MembershipService
+                            from base.plugins.customer.models.customer_membership import CustomerMembership
+
+                            # 充值前查询当前会员信息
+                            old_membership = await MembershipService.get_customer_membership(order.customer_id)
+                            if old_membership:
+                                print(f"[PaymentCallback] 📊 充值前状态:")
+                                print(f"[PaymentCallback]   会员ID: {old_membership.id}")
+                                print(f"[PaymentCallback]   充值总时长: {old_membership.total_hours} 小时")
+                                print(f"[PaymentCallback]   已用时长: {float(old_membership.used_hours):.2f} 小时")
+                                print(f"[PaymentCallback]   剩余时长: {float(old_membership.remaining_hours):.2f} 小时")
+                                print(f"[PaymentCallback]   Fibonacci等级: Lv{old_membership.level}")
+                                print(f"[PaymentCallback]   激活状态: {'是' if old_membership.is_active else '否'}")
+                            else:
+                                print(f"[PaymentCallback] 📊 充值前状态: 无会员记录（新用户）")
+
+                            print(f"\n[PaymentCallback] ⏳ 开始创建/更新会员...\n")
+
+                            # 执行充值操作
+                            membership = await MembershipService.create_customer_membership(
+                                customer_id=order.customer_id,
+                                membership_level_id=membership_level_id,
+                                hours=total_hours
+                            )
+
+                            if membership:
+                                print(f"\n{'='*70}")
+                                print(f"[PaymentCallback] ✅ 会员创建/更新成功!")
+                                print(f"{'='*70}")
+                                print(f"[PaymentCallback] 📊 充值后状态:")
+                                print(f"[PaymentCallback]   会员ID: {membership.id}")
+                                print(f"[PaymentCallback]   充值总时长: {membership.total_hours} 小时")
+                                print(f"[PaymentCallback]   已用时长: {float(membership.used_hours):.2f} 小时")
+                                print(f"[PaymentCallback]   剩余时长: {float(membership.remaining_hours):.2f} 小时")
+                                print(f"[PaymentCallback]   Fibonacci等级: Lv{membership.level}")
+                                print(f"[PaymentCallback]   激活状态: {'是' if membership.is_active else '否'}")
+                                print(f"[PaymentCallback]   VIP状态: {'是' if membership.is_vip else '否'}")
+
+                                # 计算变化
+                                if old_membership:
+                                    total_hours_diff = membership.total_hours - old_membership.total_hours
+                                    remaining_diff = float(membership.remaining_hours) - float(old_membership.remaining_hours)
+                                    level_diff = membership.level - old_membership.level
+
+                                    print(f"\n[PaymentCallback] 📈 变化统计:")
+                                    print(f"[PaymentCallback]   充值总时长: +{total_hours_diff} 小时")
+                                    print(f"[PaymentCallback]   剩余时长: {remaining_diff:+.2f} 小时")
+                                    if level_diff > 0:
+                                        print(f"[PaymentCallback]   等级提升: Lv{old_membership.level} → Lv{membership.level} 🎉")
+                                    elif level_diff == 0:
+                                        print(f"[PaymentCallback]   等级保持: Lv{membership.level}")
+                                    else:
+                                        print(f"[PaymentCallback]   等级: Lv{old_membership.level} → Lv{membership.level}")
+
+                                # 验证计算公式
+                                expected_remaining = membership.total_hours - float(membership.used_hours)
+                                print(f"\n[PaymentCallback] 🔍 验证计算公式:")
+                                print(f"[PaymentCallback]   公式: remaining_hours = total_hours - used_hours")
+                                print(f"[PaymentCallback]   计算: {float(membership.total_hours)} - {float(membership.used_hours):.2f} = {expected_remaining:.2f}")
+                                print(f"[PaymentCallback]   实际: {float(membership.remaining_hours):.2f}")
+
+                                if abs(float(membership.remaining_hours) - expected_remaining) < 0.01:
+                                    print(f"[PaymentCallback]   ✅ 计算正确!")
+                                else:
+                                    print(f"[PaymentCallback]   ❌ 计算有误! 差异: {abs(float(membership.remaining_hours) - expected_remaining):.2f}")
+
+                                # 验证等级计算
+                                from base.plugins.customer.services.membership_service import fibonacci_service
+                                expected_level = fibonacci_service.get_level_from_hours(membership.total_hours)
+                                print(f"\n[PaymentCallback] 🔍 验证等级计算:")
+                                print(f"[PaymentCallback]   Fibonacci算法: level = get_level_from_hours({membership.total_hours})")
+                                print(f"[PaymentCallback]   计算等级: Lv{expected_level}")
+                                print(f"[PaymentCallback]   实际等级: Lv{membership.level}")
+
+                                if membership.level == expected_level:
+                                    print(f"[PaymentCallback]   ✅ 等级正确!")
+                                else:
+                                    print(f"[PaymentCallback]   ❌ 等级有误!")
+
+                                # 从数据库重新查询验证
+                                print(f"\n[PaymentCallback] 🔍 重新查询验证...")
+                                verified_membership = await CustomerMembership.get_or_none(
+                                    customer_id=order.customer_id,
+                                    is_active=True
+                                ).prefetch_related("membership_level")
+
+                                if verified_membership:
+                                    print(f"[PaymentCallback]   数据库验证:")
+                                    print(f"[PaymentCallback]     充值总时长: {verified_membership.total_hours} 小时")
+                                    print(f"[PaymentCallback]     剩余时长: {float(verified_membership.remaining_hours):.2f} 小时")
+                                    print(f"[PaymentCallback]     Fibonacci等级: Lv{verified_membership.level}")
+
+                                    if (verified_membership.total_hours == membership.total_hours and
+                                        verified_membership.level == membership.level):
+                                        print(f"[PaymentCallback]   ✅ 数据库保存成功!")
+                                    else:
+                                        print(f"[PaymentCallback]   ❌ 数据库数据不一致!")
+                                else:
+                                    print(f"[PaymentCallback]   ❌ 数据库查询失败!")
+
+                                print(f"{'='*70}\n")
+                            else:
+                                print(f"\n[PaymentCallback] ❌ 会员创建失败! 返回 None\n")
+                        else:
+                            print(f"[PaymentCallback] ERROR: 缺少必要参数! membership_level_id={membership_level_id}, total_hours={total_hours}")
+                    else:
+                        print(f"[PaymentCallback] ERROR: 充值类商品但没有extra_info!")
+                else:
+                    print(f"[PaymentCallback] 跳过非充值类商品: {item.product_type}")
+
+            print(f"\n[PaymentCallback] === 所有明细处理完成 ===\n")
+
         except Exception as e:
-            print(f"[PaymentCallback] 处理会员权益失败: {e}")
+            print(f"[PaymentCallback] 处理订单业务逻辑失败: {e}")
             import traceback
             traceback.print_exc()
-            # 会员创建失败不影响支付成功状态
+            # 业务处理失败不影响支付成功状态
 
         return True
 

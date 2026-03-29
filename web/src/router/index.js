@@ -62,6 +62,18 @@ const routes = [
         meta: { title: '客户管理', icon: 'User' }
       },
       {
+        path: 'customer/create',
+        name: 'CustomerCreate',
+        component: () => import('@/views/customer/Edit.vue'),
+        meta: { title: '新增客户' }
+      },
+      {
+        path: 'customer/edit/:id',
+        name: 'CustomerEdit',
+        component: () => import('@/views/customer/Edit.vue'),
+        meta: { title: '编辑客户' }
+      },
+      {
         path: 'customer/:id',
         name: 'CustomerDetail',
         component: () => import('@/views/customer/Detail.vue'),

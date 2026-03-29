@@ -1,7 +1,10 @@
 """
-客户模块API
+客户管理API - 管理员功能
+职责：客户CRUD、列表查询、状态管理、会员管理、使用记录、支付记录
+
+注意：认证相关功能（注册、登录、修改密码等）已迁移到 auth.py
 """
-from fastapi import APIRouter, Depends, status, Query, Path
+from fastapi import APIRouter, Depends, status, Query, Path, Body
 from typing import Optional
 
 # 导入响应类
@@ -36,7 +39,6 @@ try:
         CustomerResponse,
         CustomerCreate,
         CustomerUpdate,
-        CustomerLogin,
         CustomerListQuery,
         CustomerListResponse,
     )
@@ -67,10 +69,6 @@ except ImportError:
         class Config:
             from_attributes = True
 
-    class CustomerLogin(BaseModel):
-        email: EmailStr
-        password: str
-
     class CustomerListQuery(BaseModel):
         page: int = 1
         page_size: int = 10
@@ -85,14 +83,6 @@ except ImportError:
         items: List[CustomerResponse]
 
     class CustomerService:
-        @staticmethod
-        async def register_customer(customer_data):
-            pass
-
-        @staticmethod
-        async def login_customer(email, password):
-            pass
-
         @staticmethod
         async def get_customer_info(customer_id):
             pass
@@ -117,104 +107,6 @@ customer_router = APIRouter(
     prefix="",
     tags=["客户管理"]
 )
-
-
-@customer_router.post("/register", summary="客户注册")
-async def register_customer(customer_data: CustomerCreate):
-    """
-    客户注册接口
-
-    Args:
-        customer_data: 客户注册数据
-
-    Returns:
-        注册成功的客户信息
-    """
-    try:
-        customer = await CustomerService.register_customer(customer_data)
-        # 使用to_dict方法确保datetime字段被正确转换
-        if hasattr(customer, 'to_dict'):
-            customer_dict = await customer.to_dict()
-        elif hasattr(customer, 'dict'):
-            customer_dict = customer.dict()
-        else:
-            customer_dict = dict(customer)
-        return SuccessResponse(data=customer_dict, msg="注册成功")
-    except Exception as e:
-        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
-
-
-@customer_router.post("/login", summary="客户登录")
-async def login_customer(login_data: CustomerLogin):
-    """
-    客户登录接口
-
-    Args:
-        login_data: 客户登录数据
-
-    Returns:
-        登录成功的客户信息和token
-    """
-    try:
-        result = await CustomerService.login_customer(login_data.email, login_data.password)
-        return SuccessResponse(data=result, msg="登录成功")
-    except Exception as e:
-        return ErrorResponse(msg=str(e), status_code=status.HTTP_401_UNAUTHORIZED)
-
-
-@customer_router.get("/me", summary="获取当前客户信息")
-async def get_current_customer_info(current_customer_id: int = Depends(get_current_user_id)):
-    """
-    获取当前登录客户的详细信息
-
-    Returns:
-        当前客户的详细信息
-    """
-    try:
-        customer = await CustomerService.get_customer_info(current_customer_id)
-        if not customer:
-            return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        # 使用to_dict方法确保datetime字段被正确转换
-        if hasattr(customer, 'to_dict'):
-            customer_dict = await customer.to_dict()
-        elif hasattr(customer, 'dict'):
-            customer_dict = customer.dict()
-        else:
-            customer_dict = dict(customer)
-        return SuccessResponse(data=customer_dict)
-    except Exception as e:
-        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
-
-
-@customer_router.put("/me", summary="更新当前客户信息")
-async def update_current_customer_info(
-        customer_data: CustomerUpdate,
-        current_customer_id: int = Depends(get_current_user_id)
-):
-    """
-    更新当前登录客户的信息
-
-    Args:
-        customer_data: 客户更新数据
-        current_customer_id: 当前客户ID
-
-    Returns:
-        更新后的客户信息
-    """
-    try:
-        updated_customer = await CustomerService.update_customer_info(current_customer_id, customer_data)
-        if not updated_customer:
-            return ErrorResponse(msg="用户不存在", status_code=status.HTTP_404_NOT_FOUND)
-        # 使用to_dict方法确保datetime字段被正确转换
-        if hasattr(updated_customer, 'to_dict'):
-            customer_dict = await updated_customer.to_dict()
-        elif hasattr(updated_customer, 'dict'):
-            customer_dict = updated_customer.dict()
-        else:
-            customer_dict = dict(updated_customer)
-        return SuccessResponse(data=customer_dict, msg="更新成功")
-    except Exception as e:
-        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
 @customer_router.get("/list", summary="获取客户列表(分页)")
@@ -284,14 +176,46 @@ async def get_customer_list(
 
 @customer_router.get("/membership-levels", summary="获取会员等级列表(别名路由)")
 async def get_membership_levels_alias(
-        active_only: bool = Query(True, description="只显示启用的等级")
+        active_only: bool = Query(True, description="只显示启用的等级"),
+        page: Optional[int] = Query(None, ge=1, description="页码"),
+        page_size: Optional[int] = Query(None, ge=1, le=100, description="每页数量")
 ):
-    """获取会员等级列表 (兼容前端调用)"""
+    """获取会员等级列表 (兼容前端调用，支持分页参数但不使用)"""
     try:
         from base.plugins.customer.services.membership_service import MembershipService
         levels = await MembershipService.get_all_levels(active_only=active_only)
-        return SuccessResponse(data=levels)
+
+        # 转换为列表
+        levels_data = []
+        for level in levels:
+            levels_data.append({
+                "id": level.id,
+                "level_type": level.level_type,
+                "level": level.level,
+                "name": level.name,
+                "description": level.description,
+                "duration_days": level.duration_days,
+                "duration_hours": level.duration_hours,
+                "price": float(level.price) if level.price else 0,
+                "original_price": float(level.original_price) if level.original_price else None,
+                "bonus_hours": level.bonus_hours,
+                "features": level.features if level.features else [],
+                "sort_order": level.sort_order,
+                "is_active": level.is_active,
+                "created_at": level.created_at.strftime("%Y-%m-%d %H:%M:%S") if level.created_at else None,
+                "updated_at": level.updated_at.strftime("%Y-%m-%d %H:%M:%S") if level.updated_at else None,
+            })
+
+        return SuccessResponse(data={
+            "items": levels_data,
+            "total": len(levels_data),
+            "page": page or 1,
+            "page_size": page_size or len(levels_data)
+        })
     except Exception as e:
+        import traceback
+        print(f"[MembershipLevels] ERROR: {e}")
+        traceback.print_exc()
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
@@ -479,44 +403,84 @@ async def get_all_usage_logs(
 
 @customer_router.post("/membership-levels", summary="创建会员等级(别名路由)")
 async def create_membership_level_alias(
-    request_data: dict,
+    request_data: dict = Body(...),
     current_user_id: int = Depends(get_current_user_id)
 ):
     """创建会员等级 - 别名路由"""
     try:
+        print(f"[POST membership-levels] 收到创建请求: data={request_data}")
         from base.plugins.customer.services.membership_service import MembershipService
         level = await MembershipService.create_level(request_data)
-        if hasattr(level, 'to_dict'):
-            level_dict = await level.to_dict()
-        elif hasattr(level, 'dict'):
-            level_dict = level.dict()
-        else:
-            level_dict = dict(level)
+        print(f"[POST membership-levels] 创建成功: {level}")
+
+        # 手动构建返回数据
+        from decimal import Decimal
+        level_dict = {
+            "id": level.id,
+            "level_type": level.level_type,
+            "level": level.level,
+            "name": level.name,
+            "description": level.description,
+            "duration_days": level.duration_days,
+            "duration_hours": level.duration_hours,
+            "price": float(level.price) if isinstance(level.price, Decimal) else level.price,
+            "original_price": float(level.original_price) if level.original_price and isinstance(level.original_price, Decimal) else level.original_price,
+            "bonus_hours": level.bonus_hours,
+            "features": level.features if level.features else [],
+            "sort_order": level.sort_order,
+            "is_active": level.is_active,
+            "created_at": level.created_at.strftime("%Y-%m-%d %H:%M:%S") if level.created_at else None,
+            "updated_at": level.updated_at.strftime("%Y-%m-%d %H:%M:%S") if level.updated_at else None,
+        }
         return SuccessResponse(data=level_dict, msg="会员等级创建成功")
     except Exception as e:
+        print(f"[POST membership-levels] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
 @customer_router.put("/membership-levels/{level_id}", summary="更新会员等级(别名路由)")
 async def update_membership_level_alias(
     level_id: int,
-    request_data: dict,
+    request_data: dict = Body(...),
     current_user_id: int = Depends(get_current_user_id)
 ):
     """更新会员等级 - 别名路由"""
     try:
+        print(f"[PUT membership-levels] 收到更新请求: level_id={level_id}, data={request_data}")
         from base.plugins.customer.services.membership_service import MembershipService
         level = await MembershipService.update_level(level_id, request_data)
+        print(f"[PUT membership-levels] 更新成功: {level}")
+
         if not level:
             return ErrorResponse(msg="会员等级不存在", status_code=status.HTTP_404_NOT_FOUND)
-        if hasattr(level, 'to_dict'):
-            level_dict = await level.to_dict()
-        elif hasattr(level, 'dict'):
-            level_dict = level.dict()
-        else:
-            level_dict = dict(level)
+
+        # 手动构建返回数据，避免 to_dict() 的问题
+        from decimal import Decimal
+        level_dict = {
+            "id": level.id,
+            "level_type": level.level_type,
+            "level": level.level,
+            "name": level.name,
+            "description": level.description,
+            "duration_days": level.duration_days,
+            "duration_hours": level.duration_hours,
+            "price": float(level.price) if isinstance(level.price, Decimal) else level.price,
+            "original_price": float(level.original_price) if level.original_price and isinstance(level.original_price, Decimal) else level.original_price,
+            "bonus_hours": level.bonus_hours,
+            "features": level.features if level.features else [],
+            "sort_order": level.sort_order,
+            "is_active": level.is_active,
+            "created_at": level.created_at.strftime("%Y-%m-%d %H:%M:%S") if level.created_at else None,
+            "updated_at": level.updated_at.strftime("%Y-%m-%d %H:%M:%S") if level.updated_at else None,
+        }
+        print(f"[PUT membership-levels] 返回数据: {level_dict}")
         return SuccessResponse(data=level_dict, msg="会员等级更新成功")
     except Exception as e:
+        print(f"[PUT membership-levels] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
@@ -539,27 +503,47 @@ async def delete_membership_level_alias(
 @customer_router.patch("/membership-levels/{level_id}", summary="切换会员等级状态(别名路由)")
 async def toggle_membership_level_status_alias(
     level_id: int,
-    request_data: dict = None,
+    request_data: dict = Body(None),
     current_user_id: int = Depends(get_current_user_id)
 ):
     """切换会员等级状态 - 别名路由"""
     try:
+        print(f"[PATCH membership-levels] 收到切换状态请求: level_id={level_id}, data={request_data}")
         from base.plugins.customer.services.membership_service import MembershipService
         if request_data is None:
             request_data = {}
         is_active = request_data.get("is_active", True)
         level = await MembershipService.update_level(level_id, {"is_active": is_active})
+        print(f"[PATCH membership-levels] 更新成功: {level}")
+
         if not level:
             return ErrorResponse(msg="会员等级不存在", status_code=status.HTTP_404_NOT_FOUND)
-        if hasattr(level, 'to_dict'):
-            level_dict = await level.to_dict()
-        elif hasattr(level, 'dict'):
-            level_dict = level.dict()
-        else:
-            level_dict = dict(level)
+
+        # 手动构建返回数据
+        from decimal import Decimal
+        level_dict = {
+            "id": level.id,
+            "level_type": level.level_type,
+            "level": level.level,
+            "name": level.name,
+            "description": level.description,
+            "duration_days": level.duration_days,
+            "duration_hours": level.duration_hours,
+            "price": float(level.price) if isinstance(level.price, Decimal) else level.price,
+            "original_price": float(level.original_price) if level.original_price and isinstance(level.original_price, Decimal) else level.original_price,
+            "bonus_hours": level.bonus_hours,
+            "features": level.features if level.features else [],
+            "sort_order": level.sort_order,
+            "is_active": level.is_active,
+            "created_at": level.created_at.strftime("%Y-%m-%d %H:%M:%S") if level.created_at else None,
+            "updated_at": level.updated_at.strftime("%Y-%m-%d %H:%M:%S") if level.updated_at else None,
+        }
         status_text = "启用" if is_active else "禁用"
         return SuccessResponse(data=level_dict, msg=f"会员等级已{status_text}")
     except Exception as e:
+        print(f"[PATCH membership-levels] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 

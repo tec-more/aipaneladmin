@@ -173,7 +173,13 @@ class CustomerOrder(BaseModel, TimestampMixin):
                 product = await Product.get_or_none(id=item['product_id'])
                 if product:
                     product_detail['product_description'] = product.description
-                    product_detail['product_image'] = product.image_url
+                    # images 是 JSON 数组，取第一个图片或返回整个数组
+                    if product.images and isinstance(product.images, list) and len(product.images) > 0:
+                        product_detail['product_image'] = product.images[0]
+                        product_detail['product_images'] = product.images
+                    else:
+                        product_detail['product_image'] = None
+                        product_detail['product_images'] = []
             product_details.append(product_detail)
 
         data = {

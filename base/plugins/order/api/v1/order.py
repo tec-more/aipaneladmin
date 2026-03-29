@@ -163,6 +163,9 @@ async def create_membership_order(
 @order_router.get("/by-order-no/{order_no}", response_model=OrderOut, summary="根据订单号获取订单详情")
 async def get_order_by_no(order_no: str):
     """根据订单编号获取订单详情（包含明细）"""
+    # 检查订单是否过期并自动取消
+    await OrderService.check_and_cancel_expired_order(order_no)
+
     order = await OrderService.get_order_by_no(order_no)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
@@ -324,6 +327,12 @@ async def get_order(order_id: int):
     order = await OrderService.get_order_by_id(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
+
+    # 检查订单是否过期并自动取消
+    await OrderService.check_and_cancel_expired_order(order.order_no)
+
+    # 重新获取订单（以防状态被更新）
+    order = await OrderService.get_order_by_id(order_id)
 
     # 转换为字典确保datetime字段被正确格式化
     if hasattr(order, 'to_dict'):

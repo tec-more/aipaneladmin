@@ -47,7 +47,17 @@ class CustomerMembership(BaseModel, TimestampMixin):
     @property
     def is_expired(self) -> bool:
         """是否已过期"""
-        return datetime.now() > self.expire_time if self.expire_time else True
+        if not self.expire_time:
+            return True
+        # 确保 time_zone aware 比较
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        # 如果 expire_time 是 naive，视为 UTC 时间
+        if self.expire_time.tzinfo is None:
+            expire_time = self.expire_time.replace(tzinfo=timezone.utc)
+        else:
+            expire_time = self.expire_time
+        return now > expire_time
 
     @property
     def is_vip(self) -> bool:

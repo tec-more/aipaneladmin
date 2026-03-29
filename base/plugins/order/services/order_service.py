@@ -87,12 +87,12 @@ class OrderService:
             print(f"[OrderService]   item[{idx+1}]: quantity={quantity}, unit_price={unit_price}, total={item_total}")
         print(f"[OrderService] 订单总金额: {total_amount}")
 
-        # 生成订单号和过期时间
+        # 生成订单号和过期时间（30分钟有效期）
         print(f"[OrderService] 生成订单号和过期时间...")
         order_no = await OrderService.generate_order_no()
-        expire_time = datetime.now() + timedelta(minutes=15)
+        expire_time = datetime.now() + timedelta(minutes=30)
         print(f"[OrderService] order_no: {order_no}")
-        print(f"[OrderService] expire_time: {expire_time}")
+        print(f"[OrderService] expire_time: {expire_time} (30分钟后过期)")
 
         # 将字符串转换为枚举
         print(f"[OrderService] 转换支付方式枚举...")
@@ -144,17 +144,47 @@ class OrderService:
             print(f"[OrderService]     total_price: {total_price}")
             print(f"[OrderService]     extra_info: {item_data.get('extra_info')}")
 
+            # 处理充值类商品的 extra_info
+            product_type = item_data.get("product_type")
+            extra_info = item_data.get("extra_info")
+            product_id = item_data.get("product_id")
+
+            # 如果是充值类商品但 extra_info 为空，从 Product 表获取
+            if product_type in ["hours", "membership"] and not extra_info and product_id:
+                print(f"[OrderService]   检测到充值类商品，extra_info为空，从Product表获取充值信息...")
+                product = await Product.get_or_none(id=product_id)
+                if product:
+                    # 自动构建 extra_info
+                    recharge_hours = product.recharge_hours or 0
+                    bonus_hours = product.bonus_hours or 0
+                    total_hours = recharge_hours + bonus_hours
+
+                    extra_info = {
+                        "membership_level_id": 1,  # 默认等级1
+                        "hours": recharge_hours,
+                        "bonus_hours": bonus_hours,
+                        "total_hours": total_hours
+                    }
+
+                    print(f"[OrderService]   自动构建 extra_info:")
+                    print(f"[OrderService]     membership_level_id: {extra_info['membership_level_id']}")
+                    print(f"[OrderService]     hours: {extra_info['hours']}")
+                    print(f"[OrderService]     bonus_hours: {extra_info['bonus_hours']}")
+                    print(f"[OrderService]     total_hours: {extra_info['total_hours']}")
+                else:
+                    print(f"[OrderService]   WARNING: 产品ID {product_id} 不存在")
+
             try:
                 order_item = await OrderItem.create(
                     order_id=order.id,
-                    product_id=item_data.get("product_id"),
+                    product_id=product_id,
                     product_name=item_data.get("product_name"),
-                    product_type=item_data.get("product_type"),
+                    product_type=product_type,
                     product_image=item_data.get("product_image"),
                     quantity=quantity,
                     unit_price=unit_price,
                     total_price=total_price,
-                    extra_info=item_data.get("extra_info")
+                    extra_info=extra_info
                 )
                 print(f"[OrderService]     明细创建成功! item_id={order_item.id}")
             except Exception as e:
@@ -393,3 +423,65 @@ class OrderService:
                 )
 
         return True
+
+    @staticmethod
+    async def cancel_expired_orders() -> int:
+        """
+        取消过期订单（定时任务调用）
+
+        检查所有待支付订单，如果超过过期时间，则自动取消
+
+        Returns:
+            取消的订单数量
+        """
+        now = datetime.now()
+
+        # 查找所有过期的待支付订单
+        expired_orders = await CustomerOrder.filter(
+            payment_status=OrderStatus.PENDING,
+            expire_time__lt=now
+        )
+
+        cancelled_count = 0
+        for order in expired_orders:
+            try:
+                # 更新订单状态为已取消
+                order.payment_status = OrderStatus.CANCELLED
+                await order.save()
+                cancelled_count += 1
+                print(f"[OrderService] 订单 {order.order_no} 已过期，自动取消")
+            except Exception as e:
+                print(f"[OrderService] 取消订单 {order.order_no} 失败: {e}")
+
+        if cancelled_count > 0:
+            print(f"[OrderService] 定时任务执行完成，取消 {cancelled_count} 个过期订单")
+
+        return cancelled_count
+
+    @staticmethod
+    async def check_and_cancel_expired_order(order_no: str) -> bool:
+        """
+        检查单个订单是否过期，如果过期则取消（被动检查）
+
+        Args:
+            order_no: 订单号
+
+        Returns:
+            是否取消了订单（True=已取消，False=未取消或订单不存在）
+        """
+        order = await OrderService.get_order_by_no(order_no)
+        if not order:
+            return False
+
+        # 只检查待支付订单
+        if order.payment_status != OrderStatus.PENDING:
+            return False
+
+        # 检查是否过期
+        if datetime.now() > order.expire_time:
+            order.payment_status = OrderStatus.CANCELLED
+            await order.save()
+            print(f"[OrderService] 订单 {order.order_no} 已过期，自动取消")
+            return True
+
+        return False

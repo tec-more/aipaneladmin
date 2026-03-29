@@ -4,7 +4,7 @@
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="客户名称">
-          <el-input v-model="searchForm.name" placeholder="请输入客户名称" clearable />
+          <el-input v-model="searchForm.username" placeholder="请输入客户名称" clearable />
         </el-form-item>
         <el-form-item label="邮箱">
           <el-input v-model="searchForm.email" placeholder="请输入邮箱" clearable />
@@ -36,21 +36,67 @@
 
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="name" label="客户名称" min-width="120" />
+        <el-table-column prop="nickname" label="客户名称" min-width="120" />
         <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column prop="phone" label="手机号" min-width="120" />
-        <el-table-column prop="points" label="点卷余额" width="100" align="center" />
-        <el-table-column label="会员状态" width="120" align="center">
+        <el-table-column label="等级" width="90" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.membership_expiry_date && new Date(row.membership_expiry_date) > new Date()" type="success">
-              会员
+            <el-tag v-if="row.level > 0" type="warning" effect="dark">
+              Lv{{ row.level }}
             </el-tag>
-            <el-tag v-else type="info">
-              普通用户
+            <el-tag v-else type="info" effect="plain">
+              Lv0
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="membership_expiry_date" label="会员到期日期" width="180" />
+        <el-table-column label="充值总时长" width="120" align="center">
+          <template #default="{ row }">
+            <span v-if="row.membership && row.membership.total_hours" style="color: #409EFF; font-weight: bold;">
+              {{ row.membership.total_hours }}h
+            </span>
+            <span v-else style="color: #909399;">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="剩余时长" width="120" align="center">
+          <template #default="{ row }">
+            <span v-if="row.remaining_hours > 0" style="color: #67C23A; font-weight: bold;">
+              {{ Number(row.remaining_hours).toFixed(1) }}h
+            </span>
+            <span v-else style="color: #909399;">0h</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="已用时长" width="120" align="center">
+          <template #default="{ row }">
+            <span v-if="row.membership && row.membership.used_hours" style="color: #E6A23C;">
+              {{ Number(row.membership.used_hours).toFixed(1) }}h
+            </span>
+            <span v-else style="color: #909399;">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="会员状态" width="130" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="!row.membership" type="info" effect="plain">
+              未充值
+            </el-tag>
+            <el-tag v-else-if="row.membership.is_expired" type="danger" effect="plain">
+              已过期
+            </el-tag>
+            <el-tag v-else-if="row.remaining_hours > 0" type="success">
+              有效期中
+            </el-tag>
+            <el-tag v-else type="warning" effect="plain">
+              已用完
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="会员到期" width="180" align="center">
+          <template #default="{ row }">
+            <span v-if="row.membership && row.membership.expire_time" :style="{ color: row.membership.is_expired ? '#F56C6C' : '#67C23A' }">
+              {{ formatDateTime(row.membership.expire_time) }}
+            </span>
+            <span v-else style="color: #909399;">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-switch v-model="row.is_active" @change="handleToggleStatus(row)" />
@@ -165,7 +211,7 @@ const tableData = ref([])
 const currentCustomer = ref(null)
 
 const searchForm = reactive({
-  name: '',
+  username: '',
   email: '',
   phone: '',
   is_active: null
@@ -230,7 +276,7 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
-  searchForm.name = ''
+  searchForm.username = ''
   searchForm.email = ''
   searchForm.phone = ''
   searchForm.is_active = null
@@ -238,15 +284,7 @@ const handleReset = () => {
 }
 
 const handleAdd = () => {
-  isEdit.value = false
-  form.value = {
-    name: '',
-    email: '',
-    phone: '',
-    points: 0,
-    membership_expiry_date: null
-  }
-  dialogVisible.value = true
+  router.push('/customer/create')
 }
 
 const handleDetail = (row) => {
@@ -254,16 +292,7 @@ const handleDetail = (row) => {
 }
 
 const handleEdit = (row) => {
-  isEdit.value = true
-  form.value = {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    phone: row.phone || '',
-    points: row.points || 0,
-    membership_expiry_date: row.membership_expiry_date ? new Date(row.membership_expiry_date) : null
-  }
-  dialogVisible.value = true
+  router.push(`/customer/edit/${row.id}`)
 }
 
 const handleSubmit = async () => {
@@ -342,6 +371,20 @@ const handlePointsSubmit = async () => {
 const resetForm = () => {
   formRef.value?.resetFields()
   pointsFormRef.value?.resetFields()
+}
+
+// 格式化日期时间
+const formatDateTime = (dateTime) => {
+  if (!dateTime) return '-'
+  const date = new Date(dateTime)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
 }
 
 onMounted(() => {

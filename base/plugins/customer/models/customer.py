@@ -36,8 +36,62 @@ class Customer(BaseModel, TimestampMixin):
         return self.nickname or self.username or self.phone or self.email or str(self.id)
 
     async def to_dict(self):
-        """转换为字典"""
-        return {
+        """
+        转换为字典（包含会员信息）
+
+        会员数据计算规则：
+        - total_hours: 累计充值总时长（从会员表）
+        - level: 基于total_hours的Fibonacci等级
+        - used_hours: 从usage_logs表实时汇总计算
+        - remaining_hours: total_hours - used_hours
+        """
+        # 预加载会员信息
+        from base.plugins.customer.models.customer_membership import CustomerMembership
+        from base.plugins.customer.models.usage_log import UsageLog
+
+        print(f"\n{'='*70}")
+        print(f"[Customer.to_dict] 🔔 开始转换客户信息")
+        print(f"[Customer.to_dict] 客户ID: {self.id}")
+        print(f"[Customer.to_dict] 客户名称: {self.nickname or self.username or self.phone or self.email}")
+        print(f"{'='*70}\n")
+
+        # 获取当前激活的会员信息
+        membership = await CustomerMembership.get_or_none(
+            customer_id=self.id,
+            is_active=True
+        ).prefetch_related("membership_level")
+
+        print(f"[Customer.to_dict] 📊 会员记录查询:")
+        if membership:
+            print(f"[Customer.to_dict]   ✅ 找到激活的会员记录")
+            print(f"[Customer.to_dict]   会员ID: {membership.id}")
+            print(f"[Customer.to_dict]   充值总时长: {membership.total_hours} 小时")
+            print(f"[Customer.to_dict]   Fibonacci等级: Lv{membership.level}")
+            print(f"[Customer.to_dict]   激活状态: {'是' if membership.is_active else '否'}")
+            print(f"[Customer.to_dict]   过期状态: {'是' if membership.is_expired else '否'}")
+        else:
+            print(f"[Customer.to_dict]   ⚠️  未找到激活的会员记录")
+        print()
+
+        # 从使用记录中实时计算已用时长
+        usage_logs = await UsageLog.filter(customer_id=self.id)
+        total_seconds = sum(log.duration_seconds for log in usage_logs)
+        used_hours = total_seconds / 3600.0  # 转换为小时
+
+        print(f"[Customer.to_dict] 📊 使用记录汇总:")
+        print(f"[Customer.to_dict]   记录数量: {len(usage_logs)} 条")
+        print(f"[Customer.to_dict]   总使用秒数: {total_seconds} 秒")
+        print(f"[Customer.to_dict]   计算已用时长: {used_hours:.2f} 小时")
+
+        if usage_logs:
+            print(f"[Customer.to_dict]   最近3条记录:")
+            for log in usage_logs[:3]:
+                hours = log.duration_seconds / 3600.0
+                print(f"[Customer.to_dict]     - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.duration_seconds}秒 ({hours:.2f}小时)")
+        print()
+
+        # 构建基础数据
+        data = {
             "id": self.id,
             "username": self.username,
             "email": self.email,
@@ -50,4 +104,83 @@ class Customer(BaseModel, TimestampMixin):
             "login_count": self.login_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            # 会员信息
+            "membership": None,
+            "level": 0,
+            "remaining_hours": 0,
+            "is_vip": False,
         }
+
+        # 如果有会员信息，添加到数据中
+        if membership:
+            try:
+                # 重新计算剩余时长 = 总时长 - 已用时长（从日志汇总）
+                total_hours = membership.total_hours
+                remaining_hours = total_hours - used_hours
+                if remaining_hours < 0:
+                    remaining_hours = 0
+
+                print(f"[Customer.to_dict] 🧮 会员数据计算:")
+                print(f"[Customer.to_dict]   充值总时长: {total_hours} 小时")
+                print(f"[Customer.to_dict]   已用时长: {used_hours:.2f} 小时")
+                print(f"[Customer.to_dict]   剩余时长: {remaining_hours:.2f} 小时")
+                print(f"[Customer.to_dict]   Fibonacci等级: Lv{membership.level}")
+                print()
+
+                # 验证等级计算
+                from base.plugins.customer.services.membership_service import fibonacci_service
+                expected_level = fibonacci_service.get_level_from_hours(total_hours)
+
+                print(f"[Customer.to_dict] 🔍 验证等级计算:")
+                print(f"[Customer.to_dict]   Fibonacci算法: level = get_level_from_hours({total_hours})")
+                print(f"[Customer.to_dict]   计算等级: Lv{expected_level}")
+                print(f"[Customer.to_dict]   实际等级: Lv{membership.level}")
+
+                if membership.level == expected_level:
+                    print(f"[Customer.to_dict]   ✅ 等级正确!")
+                else:
+                    print(f"[Customer.to_dict]   ❌ 等级有误! 应该是 Lv{expected_level}")
+                print()
+
+                data["membership"] = {
+                    "id": membership.id,
+                    "level": membership.level,
+                    "total_hours": membership.total_hours or 0,
+                    "used_hours": used_hours or 0,
+                    "remaining_hours": remaining_hours or 0,
+                    "is_active": membership.is_active,
+                    "is_expired": membership.is_expired,
+                    "is_vip": membership.is_vip and remaining_hours > 0,
+                    "start_time": membership.start_time.isoformat() if membership.start_time else None,
+                    "expire_time": membership.expire_time.isoformat() if membership.expire_time else None,
+                    "level_name": membership.membership_level.name if membership.membership_level else None,
+                    "level_description": membership.membership_level.description if membership.membership_level else None,
+                }
+                data["level"] = membership.level
+                data["remaining_hours"] = remaining_hours
+                data["is_vip"] = membership.is_vip and remaining_hours > 0
+
+                print(f"[Customer.to_dict] ✅ 会员信息已添加到返回数据:")
+                print(f"[Customer.to_dict]   level: Lv{data['level']}")
+                print(f"[Customer.to_dict]   total_hours: {data['membership']['total_hours']}h")
+                print(f"[Customer.to_dict]   used_hours: {data['membership']['used_hours']:.2f}h")
+                print(f"[Customer.to_dict]   remaining_hours: {data['remaining_hours']:.2f}h")
+                print(f"[Customer.to_dict]   is_vip: {data['is_vip']}")
+                print()
+
+            except Exception as e:
+                print(f"[Customer.to_dict] ❌ ERROR: 添加会员信息失败: {e}")
+                import traceback
+                traceback.print_exc()
+
+        else:
+            print(f"[Customer.to_dict] ⚠️  无会员信息，返回默认值:")
+            print(f"[Customer.to_dict]   level: Lv0")
+            print(f"[Customer.to_dict]   remaining_hours: 0.00h")
+            print(f"[Customer.to_dict]   is_vip: False")
+            print()
+
+        print(f"[Customer.to_dict] ✅ 转换完成")
+        print(f"{'='*70}\n")
+
+        return data

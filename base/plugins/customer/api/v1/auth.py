@@ -1,5 +1,8 @@
 """
-客户认证API - 注册、登录、验证码
+客户认证API - 认证相关功能
+职责：客户注册、登录（密码/验证码）、Token管理、密码管理、验证码
+
+注意：客户管理功能（CRUD、列表等）已迁移到 customer.py
 """
 from datetime import timedelta
 from fastapi import APIRouter, Query, Depends
@@ -373,6 +376,9 @@ async def check_customer_email(email: str = Query(..., description="邮箱地址
 async def get_current_customer(user_id: int = Depends(get_current_user_id)):
     """
     获取当前登录客户的信息
+
+    这是唯一获取当前用户信息的端点（位于认证模块）
+    客户管理模块中已删除重复的 /me 端点
 
     Returns:
         客户信息
