@@ -83,8 +83,8 @@ async def update_membership_data_task():
             print(f"[定时任务] 🔔 开始更新会员数据 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print("="*70)
 
-            # 获取所有激活的会员
-            memberships = await CustomerMembership.filter(is_active=True)
+            # 获取所有激活的会员（预加载membership_level关联）
+            memberships = await CustomerMembership.filter(is_active=True).select_related('membership_level')
             print(f"[信息] 找到 {len(memberships)} 个激活的会员\n")
 
             if not memberships:
@@ -169,6 +169,13 @@ async def update_membership_data_task():
                     else:
                         print(f"  ✅ [有效期] 会员在有效期内")
 
+                    # 混合系统信息
+                    membership_level = membership.membership_level.level_type if membership.membership_level else "unknown"
+                    print(f"  ✅ [会员类别] {membership_level}")
+                    print(f"  ✅ [VIP状态] {'是' if membership.is_vip else '否'}")
+                    print(f"  ✅ [SVIP状态] {'是' if membership.is_svip else '否'}")
+                    print(f"  ✅ [Fibonacci动态等级] Lv{membership.level}")
+
                     # Fibonacci等级验证
                     from base.plugins.customer.services.membership_service import fibonacci_service
                     expected_level = fibonacci_service.get_level_from_hours(total_hours)
@@ -176,6 +183,7 @@ async def update_membership_data_task():
                         print(f"  ✅ [等级正确] Lv{membership.level}")
                     else:
                         print(f"  ⚠️  [等级异常] 当前Lv{membership.level}, 应该Lv{expected_level}")
+                    #     print(f"  ⚠️  [等级异常] 当前Lv{membership.level}, 应该Lv{expected_level}")
 
                 except Exception as e:
                     print(f"  ❌ [错误] 处理失败: {e}")

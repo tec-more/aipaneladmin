@@ -2,24 +2,45 @@
 会员相关 API
 """
 
-from fastapi import APIRouter, Depends, Query
-from typing import List
+from fastapi import APIRouter, Depends, Query, Body
+from typing import List, Optional
+from pydantic import BaseModel
+from decimal import Decimal
 from base.common.response import success_response, fail_response
 from base.plugins.customer.schemas import (
     MembershipLevelOut,
-    FibonacciLevelOut,
-    MembershipLevelIn
+    MembershipLevelIn,
+    CustomerMembershipOut
 )
 from base.plugins.customer.services.membership_service import MembershipService
+from base.plugins.customer.services.purchase_service import purchase_service
 from base.core.users.models.users import User
 from base.common.security import get_current_user
 
 membership_router = APIRouter(prefix="/membership", tags=["客户会员"])
 
 
+class CalculatePriceIn(BaseModel):
+    """计算价格输入"""
+    customer_id: int
+    original_price: Decimal
+
+
+class CalculatePriceOut(BaseModel):
+    """计算价格输出"""
+    original_price: str
+    final_price: str
+    discount_percentage: int
+    save_amount: str
+    has_discount: bool
+    discount_text: str
+    level_info: Optional[dict] = None
+
+
 async def get_or_create_customer(user: User) -> "Customer":
     """获取或创建客户记录"""
     from base.plugins.customer.models.customer import Customer
+    from base.plugins.customer.services.membership_service import MembershipService
 
     # 首先通过system_user关联查找
     customer = await Customer.get_or_none(system_user_id=user.id)
@@ -38,47 +59,43 @@ async def get_or_create_customer(user: User) -> "Customer":
                 avatar=getattr(user, "avatar", None),
                 is_active=True
             )
+
+            # 🎁 新用户注册时自动赠送普通会员
+            try:
+                await MembershipService.initialize_regular_member(customer.id)
+                print(f"[Membership] ✅ 新用户 {customer.username} 已自动初始化为普通会员")
+            except Exception as e:
+                print(f"[Membership] ⚠️  初始化普通会员失败: {e}")
+                # 不影响用户注册流程
         else:
             # 如果通过email找到了，更新关联
             customer.system_user_id = user.id
             await customer.save()
+    else:
+        # 检查是否已经有会员记录，如果没有则创建
+        from base.plugins.customer.models.customer_membership import CustomerMembership
+        existing_membership = await CustomerMembership.get_or_none(customer_id=customer.id)
+        if not existing_membership:
+            try:
+                await MembershipService.initialize_regular_member(customer.id)
+                print(f"[Membership] ✅ 为老用户 {customer.username} 补充创建普通会员记录")
+            except Exception as e:
+                print(f"[Membership] ⚠️  补充创建普通会员失败: {e}")
 
     return customer
 
 
-@membership_router.get("/levels", response_model=List[MembershipLevelOut], summary="获取会员等级列表")
+@membership_router.get("/levels", summary="获取会员等级列表")
 async def get_membership_levels(
     active_only: bool = True
 ):
     """
     获取所有可用的会员等级
 
-    参数：
-    - active_only: 只显示启用的等级（默认True）
-
-    返回：
-    - 会员等级列表
-    - 包含价格、时长、特权等信息
+    返回：普通会员、VIP会员、SVIP会员
     """
     levels = await MembershipService.get_all_levels(active_only=active_only)
     return success_response(data=levels)
-
-
-@membership_router.get("/fibonacci-level", summary="计算Fibonacci等级")
-async def calculate_fibonacci_level(
-    hours: int = Query(..., ge=0, description="总充值小时数")
-):
-    """
-    根据充值小时数计算Fibonacci等级
-
-    返回：
-    - 当前等级
-    - 下一等级需要的小时数
-    - 距离下一等级还差多少小时
-    - 当前等级特权列表
-    """
-    result = await MembershipService.calculate_fibonacci_level(hours)
-    return success_response(data=result)
 
 
 @membership_router.get("/my-level", summary="获取我的会员等级")
@@ -89,27 +106,88 @@ async def get_my_membership_level(
     获取当前用户的会员等级信息
 
     包含：
-    - 会员等级详情
-    - Fibonacci等级计算
-    - 特权列表
+    - 会员等级类型（普通/VIP/SVIP）
+    - 是否可享受折扣
+    - 过期时间
+    - 充值总小时数
+    - 剩余小时数
     """
     customer = await get_or_create_customer(current_user)
+    membership_info = await purchase_service.get_customer_membership_info(customer.id)
 
-    membership = await MembershipService.get_customer_membership(customer.id)
+    return success_response(data=membership_info)
 
-    if not membership:
-        return success_response(data={
-            "message": "暂未开通会员",
-            "level": 0
-        })
 
-    # 计算Fibonacci等级
-    fibonacci_info = await MembershipService.calculate_fibonacci_level(membership.total_hours)
+@membership_router.post("/calculate-price", summary="计算购买价格（应用会员折扣）")
+async def calculate_purchase_price(
+    request_data: CalculatePriceIn,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    计算充值包购买价格（根据会员等级应用折扣）
+
+    请求示例：
+    ```json
+    {
+        "customer_id": 123,
+        "original_price": 99.00
+    }
+    ```
+
+    返回示例：
+    ```json
+    {
+        "original_price": "¥99.00",
+        "final_price": "¥89.10",
+        "discount_percentage": 10,
+        "save_amount": "¥9.90",
+        "has_discount": true,
+        "discount_text": "10% OFF",
+        "level_info": {
+            "level_type": "vip",
+            "level_name": "VIP会员",
+            "discount_percentage": 10
+        }
+    }
+    ```
+    """
+    final_price, discount_percentage, level = await purchase_service.calculate_purchase_price(
+        request_data.customer_id,
+        request_data.original_price
+    )
+
+    price_display = purchase_service.format_price_display(
+        request_data.original_price,
+        final_price,
+        discount_percentage
+    )
+
+    # 添加会员等级信息
+    level_info = None
+    if level:
+        level_info = {
+            "level_type": level.level_type,
+            "level_name": level.name,
+            "discount_percentage": level.discount_percentage
+        }
 
     return success_response(data={
-        "membership": membership,
-        "fibonacci_level": fibonacci_info
+        **price_display,
+        "level_info": level_info
     })
+
+
+@membership_router.get("/level-benefits/{level_type}", summary="获取会员等级权益")
+async def get_level_benefits(
+    level_type: str
+):
+    """
+    获取指定会员等级的权益说明
+
+    支持的等级类型：regular, vip, svip
+    """
+    benefits = purchase_service.get_level_benefits(level_type)
+    return success_response(data=benefits)
 
 
 @membership_router.post("/levels", summary="创建会员等级")

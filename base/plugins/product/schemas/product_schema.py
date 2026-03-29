@@ -14,6 +14,7 @@ class ProductBase(BaseModel):
     price: Decimal = Field(..., ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="销售价格")
     original_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
     stock: int = Field(default=0, ge=0, description="库存数量")
+    sort: int = Field(default=0, ge=0, description="排序")
     category: Optional[str] = Field(None, max_length=50, description="产品分类")
     tags: Optional[List[str]] = Field(None, description="产品标签")
     images: Optional[List[str]] = Field(None, description="产品图片")
@@ -57,6 +58,9 @@ class ProductUpdate(BaseModel):
     recharge_hours: Optional[int] = Field(None, ge=0, description="充值时长（小时）")
     bonus_hours: Optional[int] = Field(None, ge=0, description="赠送时长（小时）")
     discount_description: Optional[str] = Field(None, max_length=255, description="优惠描述")
+    membership_level_id: Optional[int] = Field(None, description="关联的会员等级ID")
+
+    model_config = {"populate_by_name": True}
 
 
 class ProductResponse(BaseModel):

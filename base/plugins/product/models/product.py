@@ -73,6 +73,15 @@ class Product(BaseModel, TimestampMixin):
     bonus_hours = fields.IntField(default=0, description="赠送时长（小时）")
     discount_description = fields.CharField(max_length=255, null=True, description="优惠描述")
 
+    # 会员套餐相关字段（混合方案）
+    membership_level_id = fields.IntField(null=True, description="关联的会员等级ID")
+    product_type = fields.CharField(max_length=50, default="item", description="产品类型：item/membership/hours")
+    price_mode = fields.CharField(
+        max_length=20,
+        default="dynamic",
+        description="价格模式：dynamic(跟随会员等级) 或 fixed(独立定价)"
+    )
+
     class Meta:
         table = "product"
 
@@ -102,8 +111,50 @@ class Product(BaseModel, TimestampMixin):
         bonus = self.bonus_hours or 0
         return recharge + bonus
 
+    async def get_effective_config(self) -> dict:
+        """
+        获取有效的产品配置（混合方案）
+
+        Returns:
+            dict: 包含 hours, price, discount_percentage, duration_days, features 等配置
+        """
+        # 动态模式：从会员等级获取最新配置
+        if self.price_mode == "dynamic" and self.membership_level_id:
+            try:
+                from base.plugins.customer.models.membership import MembershipLevel
+                level = await MembershipLevel.get_or_none(id=self.membership_level_id)
+                if level:
+                    return {
+                        "hours": level.hours,
+                        "price": float(level.price),
+                        "discount_percentage": level.discount_percentage,
+                        "duration_days": level.duration_days,
+                        "features": level.features,
+                        "mode": "dynamic",
+                        "membership_level_name": level.name,
+                        "membership_level_type": level.level_type
+                    }
+            except Exception as e:
+                print(f"[Product] 获取会员等级配置失败: {e}")
+
+        # 固定模式或没有会员等级：使用产品自身配置
+        extra_info = self.extra_info if hasattr(self, 'extra_info') else None
+        return {
+            "hours": extra_info.get("hours") if extra_info else (self.recharge_hours or 0),
+            "price": float(self.price),
+            "discount_percentage": extra_info.get("discount_percentage", 0) if extra_info else 0,
+            "duration_days": extra_info.get("duration_days", 0) if extra_info else 0,
+            "features": extra_info.get("features", []) if extra_info else [],
+            "mode": "fixed",
+            "membership_level_name": extra_info.get("membership_level_name") if extra_info else self.name,
+            "membership_level_type": extra_info.get("membership_level_type") if extra_info else None
+        }
+
     async def to_dict(self):
         """转换为字典"""
+        # 获取有效配置（包含动态或固定模式的信息）
+        effective_config = await self.get_effective_config()
+
         data = {
             "id": self.id,
             "name": self.name,
@@ -119,6 +170,21 @@ class Product(BaseModel, TimestampMixin):
             "category": self.category,
             "tags": self.tags,
             "images": self.images,
+            "is_active": self.is_active,
+            "is_hot": self.is_hot,
+            "is_new": self.is_new,
+            "view_count": self.view_count,
+            "sales_count": self.sales_count,
+            "recharge_hours": self.recharge_hours,
+            "bonus_hours": self.bonus_hours,
+            "total_hours": self.total_hours,
+            "discount_description": self.discount_description,
+            # 新增：会员套餐相关字段
+            "membership_level_id": self.membership_level_id,
+            "product_type": self.product_type,
+            "price_mode": self.price_mode,
+            # 新增：有效配置信息
+            "effective_config": effective_config,
             "is_active": self.is_active,
             "is_hot": self.is_hot,
             "is_new": self.is_new,

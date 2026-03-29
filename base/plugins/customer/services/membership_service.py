@@ -18,6 +18,20 @@ class FibonacciMembershipSystem:
     Fibonacci会员系统
     基于Fibonacci数列的无限等级系统
 
+    📢 **混合系统说明**
+
+    此系统现在是混合会员系统的一部分，与三级会员制度（regular/vip/svip）协同工作：
+
+    1. **会员类别**（MembershipLevel）：决定折扣和特权
+    2. **Fibonacci动态等级**：基于累计充值总时长计算，用于显示等级称号
+
+    两个系统独立但协同工作：
+    - 会员类别影响购买价格（折扣）
+    - Fibonacci等级影响显示和荣誉感
+    - 购买任何充值包都会增加total_hours，从而提升Fibonacci等级
+
+    详见文档：[MEMBERSHIP_HYBRID_SYSTEM.md](./docs/MEMBERSHIP_HYBRID_SYSTEM.md)
+
     与Flutter端保持完全一致的等级计算逻辑
     """
 
@@ -326,6 +340,7 @@ class FibonacciMembershipSystem:
 
 
 # 创建全局实例
+# Fibonacci动态等级计算服务（混合系统的一部分）
 fibonacci_service = FibonacciMembershipSystem()
 
 
@@ -333,12 +348,16 @@ class MembershipService:
     """会员服务"""
 
     @staticmethod
-    async def get_all_levels(active_only: bool = True) -> List[MembershipLevel]:
+    async def get_all_levels(active_only: bool = True) -> List[dict]:
         """获取所有会员等级"""
         query = MembershipLevel.all()
         if active_only:
             query = query.filter(is_active=True)
-        return await query.order_by("sort_order", "level")
+        # 按ID排序（regular=1, vip=2, svip=3）
+        levels = await query.order_by("id")
+
+        # 转换为字典，确保包含所有字段
+        return [level.to_dict() for level in levels]
 
     @staticmethod
     async def get_level_by_id(level_id: int) -> Optional[MembershipLevel]:
@@ -402,141 +421,186 @@ class MembershipService:
     async def create_customer_membership(
         customer_id: int,
         membership_level_id: int,
-        hours: int
+        recharge_hours: int
     ) -> CustomerMembership:
         """
-        创建客户会员或更新现有会员
+        创建或更新客户会员
 
-        计算规则：
-        - total_hours: 累计充值总时长
-        - level: 基于total_hours的Fibonacci等级
-        - used_hours: 从usage_logs表汇总计算
-        - remaining_hours: total_hours - used_hours
+        新的3级会员系统逻辑：
+        - 普通会员: 注册即拥有，无限期，购买无折扣
+        - VIP会员: 付费购买，有有效期，累加充值小时数，享受充值折扣
+        - SVIP会员: 付费购买，有有效期，累加充值小时数，享受更高折扣
+
+        Args:
+            customer_id: 客户ID
+            membership_level_id: 会员等级ID（regular/vip/svip）
+            recharge_hours: 充值小时数（购买套餐时包含的小时数）
+
+        Returns:
+            CustomerMembership: 客户会员对象
         """
+        from base.plugins.customer.models.membership import LevelType
+
         level = await MembershipService.get_level_by_id(membership_level_id)
-
-        # 如果会员等级不存在，创建默认等级
         if not level:
-            print(f"[MembershipService] ⚠️  会员等级ID {membership_level_id} 不存在，创建默认等级...")
-
-            # 检查是否有任何等级记录
-            all_levels = await MembershipLevel.all()
-            if not all_levels:
-                print(f"[MembershipService] 创建默认会员等级...")
-                level = await MembershipLevel.create(
-                    id=1,
-                    level_type="yearly",  # 年度会员
-                    name="默认等级",
-                    description="系统默认会员等级",
-                    level=1,
-                    sort_order=1,
-                    is_active=True,
-                    duration_days=365,
-                    duration_hours=0,
-                    price=0.01,  # 默认价格
-                    bonus_hours=0,
-                    features=["基础功能"]
-                )
-                print(f"[MembershipService] ✅ 默认会员等级创建成功! id={level.id}, name={level.name}")
-            else:
-                # 使用第一个可用等级
-                level = all_levels[0]
-                print(f"[MembershipService] 使用现有等级: id={level.id}, name={level.name}")
-
-            if not level:
-                raise ValueError("无法获取或创建会员等级")
+            raise ValueError(f"会员等级ID {membership_level_id} 不存在")
 
         now = datetime.now()
 
         # 从使用记录中计算实际已用时长
         used_hours = await MembershipService.calculate_used_hours_from_logs(customer_id)
 
-        # 检查客户是否已有会员记录（包括非激活的）
-        all_memberships = await CustomerMembership.filter(customer_id=customer_id)
-        print(f"[MembershipService] 客户 {customer_id} 共有 {len(all_memberships)} 条会员记录")
+        # 检查客户是否已有会员记录
+        existing_membership = await CustomerMembership.get_or_none(
+            customer_id=customer_id
+        ).prefetch_related("membership_level")
 
-        # 找到最新的会员记录（不管是否激活）
-        if all_memberships:
-            latest = all_memberships[0]  # 按created_at倒序，第一个是最新的
-            print(f"[MembershipService] 找到现有会员记录: ID={latest.id}, total_hours={latest.total_hours}, is_active={latest.is_active}")
+        if existing_membership:
+            print(f"[MembershipService] 更新现有会员: customer_id={customer_id}")
+            print(f"[MembershipService] 当前等级: {existing_membership.membership_level.level_type if existing_membership.membership_level else 'None'}")
+            print(f"[MembershipService] 购买等级: {level.level_type}")
 
-            # 如果最新的记录不是激活的，需要激活它
-            if not latest.is_active:
-                print(f"[MembershipService] 现有会员未激活，将激活并累加充值")
+            # 累加充值小时数到total_hours
+            new_total_hours = existing_membership.total_hours + recharge_hours
 
-            # 累加充值总时长
-            total_hours = latest.total_hours + hours
-
-            # 重新计算剩余时长 = 总时长 - 已用时长（从日志汇总）
-            remaining_hours = total_hours - used_hours
+            # 重新计算剩余时长
+            remaining_hours = new_total_hours - used_hours
             if remaining_hours < 0:
                 remaining_hours = 0
 
-            print(f"[MembershipService] 更新会员: customer_id={customer_id}")
-            print(f"[MembershipService]   旧: total={latest.total_hours}h, used={latest.used_hours}h, remaining={latest.remaining_hours}h")
-            print(f"[MembershipService]   新充值: +{hours}h")
-            print(f"[MembershipService]   从日志计算已用: {used_hours:.2f}h")
-            print(f"[MembershipService]   新: total={total_hours}h, used={used_hours:.2f}h, remaining={remaining_hours:.2f}h")
+            # 更新会员等级
+            existing_membership.membership_level_id = membership_level_id
 
-            # 如果未过期，延长有效期；否则重新计算
-            if not latest.is_expired:
-                new_expire_time = latest.expire_time + timedelta(hours=hours)
+            # 计算新的过期时间
+            if level.level_type == 'regular':
+                # 普通会员：无限期
+                existing_membership.expire_time = None
             else:
-                new_expire_time = now + timedelta(
-                    days=level.duration_days,
-                    hours=level.duration_hours
-                )
+                # VIP/SVIP：有有效期
+                # 如果当前会员未过期，则延长有效期；否则从现在开始计算
+                if existing_membership.expire_time and not existing_membership.is_expired:
+                    # 延长有效期
+                    from datetime import timedelta
+                    existing_membership.expire_time = existing_membership.expire_time + timedelta(days=level.duration_days)
+                else:
+                    # 重新计算有效期
+                    from datetime import timedelta
+                    existing_membership.start_time = now
+                    existing_membership.expire_time = now + timedelta(days=level.duration_days)
 
-            latest.total_hours = total_hours
-            latest.used_hours = used_hours
-            latest.remaining_hours = remaining_hours
-            latest.expire_time = new_expire_time
-            latest.level = fibonacci_service.get_level_from_hours(total_hours)
-            latest.is_active = True  # 激活会员
+            # 更新小时数
+            existing_membership.total_hours = new_total_hours
+            existing_membership.used_hours = used_hours
+            existing_membership.remaining_hours = remaining_hours
+            existing_membership.is_active = True
 
-            await latest.save()
+            # 更新 Fibonacci 动态等级
+            existing_membership.update_fibonacci_level()
 
-            print(f"[MembershipService] ✅ 会员更新成功: ID={latest.id}")
-            return latest
+            await existing_membership.save()
+
+            print(f"[MembershipService] ✅ 会员更新成功")
+            print(f"[MembershipService]   会员类别: {level.name}")
+            print(f"[MembershipService]   Fibonacci动态等级: Lv{existing_membership.level}")
+            print(f"[MembershipService]   充值: +{recharge_hours}h")
+            print(f"[MembershipService]   总充值: {new_total_hours}h")
+            print(f"[MembershipService]   已用: {used_hours:.2f}h")
+            print(f"[MembershipService]   剩余: {remaining_hours:.2f}h")
+            print(f"[MembershipService]   过期时间: {existing_membership.expire_time}")
+
+            return existing_membership
         else:
-            # 创建新会员之前，先停用所有旧的会员记录
-            print(f"[MembershipService] 创建新会员前，停用所有旧会员记录...")
-            old_memberships = await CustomerMembership.filter(customer_id=customer_id, is_active=True)
-            for old_m in old_memberships:
-                old_m.is_active = False
-                await old_m.save()
-                print(f"[MembershipService]   停用旧会员: ID={old_m.id}")
-
             # 创建新会员
-            total_hours = hours
-            remaining_hours = total_hours - used_hours
+            print(f"[MembershipService] 创建新会员: customer_id={customer_id}")
+
+            # 计算过期时间
+            if level.level_type == 'regular':
+                # 普通会员：无限期
+                expire_time = None
+                start_time = None
+            else:
+                # VIP/SVIP：有有效期
+                from datetime import timedelta
+                start_time = now
+                expire_time = now + timedelta(days=level.duration_days)
+
+            # 计算剩余时长
+            remaining_hours = recharge_hours - used_hours
             if remaining_hours < 0:
                 remaining_hours = 0
-
-            print(f"[MembershipService] 创建新会员: customer_id={customer_id}")
-            print(f"[MembershipService]   充值: {hours}h")
-            print(f"[MembershipService]   从日志计算已用: {used_hours:.2f}h")
-            print(f"[MembershipService]   初始: total={total_hours}h, used={used_hours:.2f}h, remaining={remaining_hours:.2f}h")
-
-            expire_time = now + timedelta(
-                days=level.duration_days,
-                hours=level.duration_hours
-            )
 
             customer_membership = await CustomerMembership.create(
                 customer_id=customer_id,
                 membership_level_id=membership_level_id,
-                start_time=now,
+                start_time=start_time,
                 expire_time=expire_time,
-                total_hours=total_hours,
+                total_hours=recharge_hours,
+                level=0,  # 将在创建后计算
                 used_hours=used_hours if used_hours > 0 else 0,
                 remaining_hours=remaining_hours,
-                level=fibonacci_service.get_level_from_hours(total_hours),
                 is_active=True
             )
 
-            print(f"[MembershipService] ✅ 新会员创建成功: ID={customer_membership.id}")
+            # 计算 Fibonacci 动态等级
+            customer_membership.update_fibonacci_level()
+            await customer_membership.save()
+
+            print(f"[MembershipService] ✅ 新会员创建成功")
+            print(f"[MembershipService]   会员类别: {level.name}")
+            print(f"[MembershipService]   Fibonacci动态等级: Lv{customer_membership.level}")
+            print(f"[MembershipService]   充值: {recharge_hours}h")
+            print(f"[MembershipService]   已用: {used_hours:.2f}h")
+            print(f"[MembershipService]   剩余: {remaining_hours:.2f}h")
+            print(f"[MembershipService]   过期时间: {expire_time}")
+
             return customer_membership
+
+    @staticmethod
+    async def initialize_regular_member(customer_id: int) -> CustomerMembership:
+        """
+        为新注册用户初始化普通会员
+
+        普通会员特点：
+        - 无限期（expire_time = None）
+        - 无充值折扣（discount_percentage = 0）
+        - 可以正常使用基础功能
+        """
+        # 查找或创建普通会员等级
+        regular_level = await MembershipLevel.get_or_none(level_type='regular')
+        if not regular_level:
+            print(f"[MembershipService] ⚠️  普通会员等级不存在，创建默认等级...")
+            regular_level = await MembershipLevel.create(
+                level_type='regular',
+                name='普通会员',
+                description='注册即拥有的基础会员',
+                duration_days=0,  # 0表示无限期
+                price=0,
+                discount_percentage=0,  # 无折扣
+                features=['基础功能', '正常使用'],
+                is_active=True
+            )
+            print(f"[MembershipService] ✅ 默认普通会员等级创建成功")
+
+        # 检查是否已有会员记录
+        existing = await CustomerMembership.get_or_none(customer_id=customer_id)
+        if existing:
+            print(f"[MembershipService] 客户 {customer_id} 已有会员记录，跳过初始化")
+            return existing
+
+        # 创建普通会员记录
+        membership = await CustomerMembership.create(
+            customer_id=customer_id,
+            membership_level_id=regular_level.id,
+            start_time=None,  # 普通会员无开始时间
+            expire_time=None,  # 普通会员无过期时间
+            total_hours=0,
+            used_hours=0,
+            remaining_hours=0,
+            is_active=True
+        )
+
+        print(f"[MembershipService] ✅ 客户 {customer_id} 初始化为普通会员")
+        return membership
 
     @staticmethod
     async def update_membership_usage(customer_id: int, used_hours: float) -> bool:

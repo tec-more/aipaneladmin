@@ -194,8 +194,10 @@ class ProductService:
             if await ProductService.check_name_exists(product_data.name, exclude_id=product_id):
                 raise ValueError("产品名称已被使用")
 
-        # 只更新提供的字段
-        update_data = product_data.model_dump(exclude_unset=True)
+        # 只更新非None的字段
+        update_data = product_data.model_dump(exclude_none=True)
+        print(f"[ProductService.update_product] product_id={product_id}")
+        print(f"[ProductService.update_product] update_data={update_data}")
         await product.update_from_dict(update_data).save()
 
         return product

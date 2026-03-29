@@ -36,73 +36,24 @@
 
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="nickname" label="客户名称" min-width="120" />
+        <el-table-column prop="username" label="用户名" width="120" />
+        <el-table-column prop="nickname" label="昵称" width="120" />
         <el-table-column prop="email" label="邮箱" min-width="180" />
-        <el-table-column prop="phone" label="手机号" min-width="120" />
-        <el-table-column label="等级" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.level > 0" type="warning" effect="dark">
-              Lv{{ row.level }}
-            </el-tag>
-            <el-tag v-else type="info" effect="plain">
-              Lv0
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="充值总时长" width="120" align="center">
-          <template #default="{ row }">
-            <span v-if="row.membership && row.membership.total_hours" style="color: #409EFF; font-weight: bold;">
-              {{ row.membership.total_hours }}h
-            </span>
-            <span v-else style="color: #909399;">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="剩余时长" width="120" align="center">
-          <template #default="{ row }">
-            <span v-if="row.remaining_hours > 0" style="color: #67C23A; font-weight: bold;">
-              {{ Number(row.remaining_hours).toFixed(1) }}h
-            </span>
-            <span v-else style="color: #909399;">0h</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="已用时长" width="120" align="center">
-          <template #default="{ row }">
-            <span v-if="row.membership && row.membership.used_hours" style="color: #E6A23C;">
-              {{ Number(row.membership.used_hours).toFixed(1) }}h
-            </span>
-            <span v-else style="color: #909399;">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="会员状态" width="130" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="!row.membership" type="info" effect="plain">
-              未充值
-            </el-tag>
-            <el-tag v-else-if="row.membership.is_expired" type="danger" effect="plain">
-              已过期
-            </el-tag>
-            <el-tag v-else-if="row.remaining_hours > 0" type="success">
-              有效期中
-            </el-tag>
-            <el-tag v-else type="warning" effect="plain">
-              已用完
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="会员到期" width="180" align="center">
-          <template #default="{ row }">
-            <span v-if="row.membership && row.membership.expire_time" :style="{ color: row.membership.is_expired ? '#F56C6C' : '#67C23A' }">
-              {{ formatDateTime(row.membership.expire_time) }}
-            </span>
-            <span v-else style="color: #909399;">-</span>
-          </template>
-        </el-table-column>
+        <el-table-column prop="phone" label="手机号" width="120" />
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-switch v-model="row.is_active" @change="handleToggleStatus(row)" />
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" />
+        <el-table-column label="认证" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.is_verified" type="success" size="small">已认证</el-tag>
+            <el-tag v-else type="info" size="small">未认证</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="last_login" label="最后登录" width="160" />
+        <el-table-column prop="login_count" label="登录次数" width="100" align="center" />
+        <el-table-column prop="created_at" label="创建时间" width="160" />
         <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="{ row }">
             <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>

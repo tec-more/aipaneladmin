@@ -6,96 +6,10 @@ from datetime import datetime
 from tortoise.expressions import Q
 from tortoise.queryset import QuerySet
 
-# 尝试导入依赖项
-try:
-    from base.plugins.customer.models.customer import Customer
-    from base.plugins.customer.schemas.customer_schema import CustomerCreate, CustomerUpdate
-    from base.common.security import get_password_hash, verify_password
-except ImportError:
-    # 定义临时依赖，以便在没有base模块的情况下也能工作
-    from typing import Any
-    from datetime import datetime
-    from decimal import Decimal
-
-    class Customer:
-        def __init__(self, **kwargs):
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-
-        @classmethod
-        async def create(cls, **kwargs):
-            instance = cls(**kwargs)
-            instance.id = 1  # 模拟ID
-            instance.created_at = datetime.now()
-            instance.updated_at = datetime.now()
-            instance.last_login = None
-            instance.login_count = 0
-            instance.is_active = True
-            instance.is_verified = False
-            instance.points = 0
-            instance.balance = Decimal("0.00")
-            return instance
-
-        @classmethod
-        async def filter(cls, **kwargs):
-            # 模拟过滤
-            class MockQuerySet:
-                async def first(self):
-                    return None
-
-                async def exists(self):
-                    return False
-
-                async def delete(self):
-                    return 0
-
-                async def count(self):
-                    return 0
-
-                async def offset(self, offset):
-                    return self
-
-                async def limit(self, limit):
-                    return self
-
-                async def order_by(self, order):
-                    return self
-
-            return MockQuerySet()
-
-        async def update_from_dict(self, data):
-            for key, value in data.items():
-                setattr(self, key, value)
-            self.updated_at = datetime.now()
-            return self
-
-        async def save(self):
-            pass
-
-        async def exclude(self, **kwargs):
-            return await self.filter()
-
-    class CustomerCreate:
-        def __init__(self, username, email, password, **kwargs):
-            self.username = username
-            self.email = email
-            self.password = password
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-
-    class CustomerUpdate:
-        def __init__(self, **kwargs):
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-
-        def model_dump(self, exclude_unset=False):
-            return {k: v for k, v in self.__dict__.items() if v is not None}
-
-    def get_password_hash(password):
-        return f"hashed_{password}"
-
-    def verify_password(plain_password, hashed_password):
-        return hashed_password == f"hashed_{plain_password}"
+# 导入依赖项
+from base.plugins.customer.models.customer import Customer
+from base.plugins.customer.schemas.customer_schema import CustomerCreate, CustomerUpdate
+from base.common.security import get_password_hash, verify_password
 
 
 class CustomerService:

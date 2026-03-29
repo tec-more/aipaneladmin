@@ -24,6 +24,11 @@ class ASGIAppWithPrefix:
             # 打印访问日志
             print(f'INFO:     {client} - "{method} {original_path} HTTP/1.1"', flush=True)
 
+            # OPTIONS 请求（CORS 预检）直接透传
+            if method == "OPTIONS":
+                await self.app(scope, receive, send)
+                return
+
             # 静态资源路径也直接透传
             if (original_path.startswith("/docs") or
                 original_path.startswith("/openapi") or
@@ -40,6 +45,14 @@ class ASGIAppWithPrefix:
                 scope = dict(scope)  # 创建副本
                 scope["path"] = new_path
                 scope["root_path"] = self.prefix
+
+            # 如果路径不以 prefix 开头，但是是API路径（/v1/开头），自动添加前缀
+            elif original_path.startswith("/v1/"):
+                # 自动为API路径添加 /api 前缀（兼容前端）
+                new_path = original_path
+                scope = dict(scope)
+                scope["path"] = new_path
+                scope["root_path"] = ""
 
             # 如果路径不以 prefix 开头，添加 404 响应（API 路由必须带 /api）
             elif not original_path.startswith("/static") and not original_path.startswith("/docs"):

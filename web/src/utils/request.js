@@ -29,13 +29,23 @@ request.interceptors.response.use(
     if (res.code === 0 || res.code === 200 || res.success === true) {
       return res
     } else {
-      ElMessage.error(res.msg || '请求失败1')
-      return Promise.reject(new Error(res.msg || '请求失败2'))
+      ElMessage.error(res.msg || res.message || '请求失败')
+      return Promise.reject(new Error(res.msg || res.message || '请求失败'))
     }
   },
   (error) => {
+    console.error('[Request Error]', error)
+
     if (error.response) {
       const { status, data } = error.response
+
+      // 打印详细错误信息
+      console.error('[Response Error]', {
+        status,
+        data,
+        message: data?.msg || data?.message || error.message
+      })
+
       if (status === 401) {
         // 清除本地存储并跳转登录页
         localStorage.removeItem('token')
@@ -44,12 +54,20 @@ request.interceptors.response.use(
         router.push('/login')
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
+      } else if (status === 400) {
+        // 400 Bad Request - 显示详细错误信息
+        const errorMsg = data?.msg || data?.message || error.message || '请求参数错误'
+        ElMessage.error(errorMsg)
+        console.error('[400 Error Details]', data)
       } else {
-        ElMessage.error(data?.msg || error.message || '请求失败3')
+        ElMessage.error(data?.msg || data?.message || error.message || `请求失败 (${status})`)
       }
-    } else {
+    } else if (error.request) {
       ElMessage.error('网络错误，请检查网络连接')
+    } else {
+      ElMessage.error(error.message || '请求失败')
     }
+
     return Promise.reject(error)
   }
 )
