@@ -3,8 +3,8 @@
     <div class="login-card">
       <div class="login-header">
         <img src="@/assets/logo.svg" alt="logo" class="logo" />
-        <h1>AI Panel Admin</h1>
-        <p>后台管理系统</p>
+        <h1>笑话面对面</h1>
+        <p>管理后台</p>
       </div>
 
       <el-form
@@ -90,7 +90,7 @@ const handleLogin = async () => {
     // 使用 nextTick 确保状态更新后再跳转
     await nextTick()
 
-    const redirect = route.query.redirect || '/dashboard'
+    const redirect = route.query.redirect || '/panel/dashboard'
     router.push(redirect)
   } catch (e) {
     // 错误已在拦截器中处理

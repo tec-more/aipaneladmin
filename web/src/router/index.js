@@ -2,16 +2,25 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useMenuStore } from '@/stores/menu'
 
 const routes = [
-  {
-    path: '/login',
-    name: 'Login',
-    component: () => import('@/views/auth/Login.vue'),
-    meta: { title: '登录', public: true }
-  },
+  // 主页：笑话面对面介绍页面
   {
     path: '/',
+    name: 'LandingPage',
+    component: () => import('@/views/LandingPage.vue'),
+    meta: { title: '笑话面对面', public: true }
+  },
+  // 管理后台登录
+  {
+    path: '/panel',
+    name: 'Login',
+    component: () => import('@/views/auth/Login.vue'),
+    meta: { title: '管理后台登录', public: true }
+  },
+  // 管理后台主界面
+  {
+    path: '/panel',
     component: () => import('@/layouts/MainLayout.vue'),
-    redirect: '/dashboard',
+    redirect: '/panel/dashboard',
     children: [
       {
         path: 'dashboard',
@@ -150,22 +159,22 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
-  document.title = `${to.meta.title || ''} - AI Panel Admin`
+  document.title = `${to.meta.title || ''} - 笑话面对面`
 
   // 直接从 localStorage 读取 token 判断登录状态
   const token = localStorage.getItem('token')
   const isLoggedIn = !!token
 
-  // 已登录用户访问登录页，直接跳转到首页
-  if (to.path === '/login' && isLoggedIn) {
-    next({ path: '/' })
+  // 已登录用户访问登录页，直接跳转到后台首页
+  if (to.path === '/panel' && isLoggedIn) {
+    next({ path: '/panel/dashboard' })
     return
   }
 
   if (to.meta.public) {
     next()
   } else if (!isLoggedIn) {
-    next({ path: '/login', query: { redirect: to.fullPath } })
+    next({ path: '/panel', query: { redirect: to.fullPath } })
   } else {
     // 已登录，加载用户菜单
     const menuStore = useMenuStore()
