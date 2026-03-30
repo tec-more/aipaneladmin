@@ -51,7 +51,7 @@ request.interceptors.response.use(
         localStorage.removeItem('token')
         localStorage.removeItem('userInfo')
         ElMessage.error('登录已过期，请重新登录')
-        router.push('/login')
+        router.push('/panel')
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
       } else if (status === 400) {

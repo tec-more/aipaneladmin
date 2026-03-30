@@ -14,12 +14,13 @@
         background-color="#304156"
         text-color="#bfcbd9"
         active-text-color="#409eff"
-        router
+        :default-openeds="defaultOpenedMenus"
+        @select="handleMenuSelect"
       >
         <!-- 动态菜单渲染 -->
         <template v-for="menu in menuStore.menuTree" :key="menu.id">
           <!-- 有子菜单的情况 -->
-          <el-sub-menu v-if="menu.children && menu.children.length > 0" :index="menu.path || `menu-${menu.id}`">
+          <el-sub-menu v-if="menu.children && menu.children.length > 0" :index="getMenuIndexPath(menu.path, menu.id)">
             <template #title>
               <el-icon>
                 <component :is="getIconComponent(menu.icon)" />
@@ -28,21 +29,21 @@
             </template>
             <!-- 递归渲染子菜单 -->
             <template v-for="child in menu.children" :key="child.id">
-              <el-sub-menu v-if="child.children && child.children.length > 0" :index="child.path || `menu-${child.id}`">
+              <el-sub-menu v-if="child.children && child.children.length > 0" :index="getMenuIndexPath(child.path, child.id)">
                 <template #title>
                   <el-icon>
                     <component :is="getIconComponent(child.icon)" />
                   </el-icon>
                   <span>{{ child.name }}</span>
                 </template>
-                <el-menu-item v-for="subChild in child.children" :key="subChild.id" :index="subChild.path">
+                <el-menu-item v-for="subChild in child.children" :key="subChild.id" :index="getMenuIndexPath(subChild.path, subChild.id)" @click="handleMenuClick(subChild.path)">
                   <el-icon>
                     <component :is="getIconComponent(subChild.icon)" />
                   </el-icon>
                   <template #title>{{ subChild.name }}</template>
                 </el-menu-item>
               </el-sub-menu>
-              <el-menu-item v-else :index="child.path">
+              <el-menu-item v-else :index="getMenuIndexPath(child.path, child.id)" @click="handleMenuClick(child.path)">
                 <el-icon>
                   <component :is="getIconComponent(child.icon)" />
                 </el-icon>
@@ -51,7 +52,7 @@
             </template>
           </el-sub-menu>
           <!-- 没有子菜单的情况 -->
-          <el-menu-item v-else :index="menu.path">
+          <el-menu-item v-else :index="getMenuIndexPath(menu.path, menu.id)" @click="handleMenuClick(menu.path)">
             <el-icon>
               <component :is="getIconComponent(menu.icon)" />
             </el-icon>
@@ -234,6 +235,46 @@ const passwordRules = {
 const currentRoute = computed(() => route.path)
 const currentMeta = computed(() => route.meta || {})
 
+// 添加 /panel 前缀到菜单路径
+const getMenuIndexPath = (path, id) => {
+  if (!path) return `menu-${id}`
+  // 确保路径以 /panel 开头
+  if (!path.startsWith('/panel')) {
+    return `/panel${path}`
+  }
+  return path
+}
+
+// 处理菜单点击
+const handleMenuClick = (path) => {
+  if (path) {
+    // 确保路径以 /panel 开头
+    const targetPath = path.startsWith('/panel') ? path : `/panel${path}`
+    router.push(targetPath)
+  }
+}
+
+// 计算默认展开的菜单
+const defaultOpenedMenus = computed(() => {
+  const currentPath = route.path
+  const opened = []
+
+  menuStore.menuTree.forEach(menu => {
+    if (menu.children && menu.children.length > 0) {
+      const hasActiveChild = menu.children.some(child => {
+        const childPath = child.path.startsWith('/panel') ? child.path : `/panel${child.path}`
+        return currentPath.startsWith(childPath)
+      })
+      if (hasActiveChild) {
+        const parentPath = menu.path.startsWith('/panel') ? menu.path : `/panel${menu.path}`
+        opened.push(parentPath)
+      }
+    }
+  })
+
+  return opened
+})
+
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
 }
@@ -246,7 +287,7 @@ const handleCommand = async (command) => {
       })
       await userStore.logout()
       menuStore.resetMenus()
-      router.push('/login')
+      router.push('/panel')
     } catch {
       // 取消操作
     }

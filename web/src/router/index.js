@@ -141,6 +141,31 @@ const routes = [
         name: 'OrderDetail',
         component: () => import('@/views/order/Detail.vue'),
         meta: { title: '订单详情' }
+      },
+      // LLM大模型管理
+      {
+        path: 'llm/models',
+        name: 'LLMModels',
+        component: () => import('@/views/llm/models/index.vue'),
+        meta: { title: '模型管理', icon: 'Management' }
+      },
+      {
+        path: 'llm/api-keys',
+        name: 'LLMApiKeys',
+        component: () => import('@/views/llm/api-keys/index.vue'),
+        meta: { title: 'API密钥', icon: 'Key' }
+      },
+      {
+        path: 'llm/conversations',
+        name: 'LLMConversations',
+        component: () => import('@/views/llm/conversations/index.vue'),
+        meta: { title: '对话记录', icon: 'ChatDotRound' }
+      },
+      {
+        path: 'llm/usage',
+        name: 'LLMUsage',
+        component: () => import('@/views/llm/usage/index.vue'),
+        meta: { title: '使用统计', icon: 'DataAnalysis' }
       }
     ]
   },
@@ -176,11 +201,25 @@ router.beforeEach(async (to, from, next) => {
   } else if (!isLoggedIn) {
     next({ path: '/panel', query: { redirect: to.fullPath } })
   } else {
-    // 已登录，加载用户菜单
+    // 已登录，加载用户菜单并添加动态路由
     const menuStore = useMenuStore()
     if (!menuStore.isLoaded && !menuStore.loading) {
       try {
         await menuStore.fetchUserMenus()
+
+        // 添加动态路由到 router
+        const dynamicRoutes = menuStore.generateRoutes()
+        dynamicRoutes.forEach(route => {
+          // 查找 /panel 的子路由位置
+          const panelRoute = router.resolve('/panel')
+          if (panelRoute && panelRoute.route.value && panelRoute.route.value.children) {
+            // 添加到已有子路由中
+            router.addRoute('/panel', route)
+          } else {
+            // 直接添加
+            router.addRoute('panel', route)
+          }
+        })
       } catch (error) {
         console.error('加载菜单失败:', error)
       }
