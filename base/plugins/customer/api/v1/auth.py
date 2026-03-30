@@ -90,9 +90,10 @@ async def get_or_create_customer_by_email(email: str, user: User = None) -> "Cus
 @auth_router.post("/register", summary="客户注册")
 async def customer_register(register_data: CustomerRegisterSchema):
     """
-    客户注册
+    客户注册（API调用，前端页面不显示注册按钮）
 
     需要提供邮箱、密码和验证码
+    用于PC端程序调用
 
     Returns:
         客户信息和Token

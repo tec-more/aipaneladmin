@@ -5,10 +5,10 @@ export function login(data) {
   return request.post('/v1/auth/login', data)
 }
 
-// 用户注册
-export function register(data) {
-  return request.post('/v1/auth/register', data)
-}
+// 用户注册（已禁用）
+// export function register(data) {
+//   return request.post('/v1/auth/register', data)
+// }
 
 // 获取当前用户信息
 export function getCurrentUser() {

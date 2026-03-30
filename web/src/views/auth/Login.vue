@@ -46,53 +46,7 @@
           </el-button>
         </el-form-item>
       </el-form>
-
-      <div class="login-footer">
-        <span>还没有账号？</span>
-        <el-button type="primary" link @click="showRegister = true">
-          立即注册
-        </el-button>
-      </div>
     </div>
-
-    <!-- 注册弹窗 -->
-    <el-dialog v-model="showRegister" title="用户注册" width="400px">
-      <el-form
-        ref="registerFormRef"
-        :model="registerForm"
-        :rules="registerRules"
-        label-width="80px"
-      >
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="registerForm.username" placeholder="请输入用户名" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="registerForm.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input
-            v-model="registerForm.password"
-            type="password"
-            placeholder="请输入密码"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item label="确认密码" prop="confirm_password">
-          <el-input
-            v-model="registerForm.confirm_password"
-            type="password"
-            placeholder="请确认密码"
-            show-password
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showRegister = false">取消</el-button>
-        <el-button type="primary" :loading="registerLoading" @click="handleRegister">
-          注册
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -102,60 +56,22 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
-import { register } from '@/api/auth'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
 const formRef = ref(null)
-const registerFormRef = ref(null)
 const loading = ref(false)
-const registerLoading = ref(false)
-const showRegister = ref(false)
 
 const form = ref({
   username: '',
   password: ''
 })
 
-const registerForm = ref({
-  username: '',
-  email: '',
-  password: '',
-  confirm_password: ''
-})
-
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
-}
-
-const validateConfirm = (rule, value, callback) => {
-  if (value !== registerForm.value.password) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
-
-const registerRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 20, message: '用户名长度在3-20个字符', trigger: 'blur' }
-  ],
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
-  ],
-  confirm_password: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
-    { validator: validateConfirm, trigger: 'blur' }
-  ]
 }
 
 const handleLogin = async () => {
@@ -180,34 +96,6 @@ const handleLogin = async () => {
     // 错误已在拦截器中处理
   } finally {
     loading.value = false
-  }
-}
-
-const handleRegister = async () => {
-  await registerFormRef.value.validate()
-
-  registerLoading.value = true
-  try {
-    await register({
-      username: registerForm.value.username,
-      email: registerForm.value.email,
-      password: registerForm.value.password
-    })
-    ElMessage.success('注册成功，请登录')
-    showRegister.value = false
-
-    // 自动填充用户名
-    form.value.username = registerForm.value.username
-    registerForm.value = {
-      username: '',
-      email: '',
-      password: '',
-      confirm_password: ''
-    }
-  } catch (e) {
-    // 错误已在拦截器中处理
-  } finally {
-    registerLoading.value = false
   }
 }
 </script>
