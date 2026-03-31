@@ -6,11 +6,15 @@ from .model import LLMModel
 from .api_key import LLMApiKey
 from .conversation import LLMConversation
 from .usage import LLMUsage
+from .voice import LLMVoiceRecord, LLMTTSRecord, LLMVoiceClone
 
 __all__ = [
     "LLMProvider",
     "LLMModel",
     "LLMApiKey",
     "LLMConversation",
-    "LLMUsage"
+    "LLMUsage",
+    "LLMVoiceRecord",
+    "LLMTTSRecord",
+    "LLMVoiceClone"
 ]

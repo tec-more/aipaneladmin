@@ -14,13 +14,13 @@ class LLMApiKey(BaseModel, TimestampMixin):
         related_name="api_keys",
         on_delete=fields.CASCADE
     )
-    name = fields.CharField(max_length=100, description="密钥名称")
-    api_key = fields.CharField(max_length=255, description="加密后的API密钥")
+    app_id = fields.CharField(max_length=100, description="APP ID")
+    access_token = fields.CharField(max_length=255, description="Access Token")
     api_secret = fields.CharField(max_length=255, null=True, description="API密钥(某些厂商需要)")
     endpoint_url = fields.CharField(max_length=255, null=True, description="自定义端点URL")
     max_quota = fields.IntField(default=100000, description="每日配额限制(tokens/天)")
     used_quota = fields.IntField(default=0, description="已使用配额")
-    quota_reset_date = fields.DateField(auto_now_add=False, default=None, description="配额重置日期")
+    quota_reset_date = fields.DateField(default=datetime.now().date, description="配额重置日期")
     status = fields.CharField(max_length=20, default="active", description="状态")
     last_used_at = fields.DatetimeField(null=True, description="最后使用时间")
     expires_at = fields.DatetimeField(null=True, description="过期时间")
@@ -30,7 +30,13 @@ class LLMApiKey(BaseModel, TimestampMixin):
         table = "llm_api_key"
 
     def __str__(self):
-        return f"{self.provider.name} - {self.name}"
+        return f"{self.provider.name} - {self.app_id}"
+
+    async def save(self, *args, **kwargs):
+        """保存前自动设置 quota_reset_date"""
+        if not self.quota_reset_date:
+            self.quota_reset_date = datetime.now().date()
+        await super().save(*args, **kwargs)
 
     @property
     def is_available(self) -> bool:

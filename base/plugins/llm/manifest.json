@@ -15,7 +15,8 @@
         "model",
         "api_key",
         "conversation",
-        "usage"
+        "usage",
+        "voice"
     ],
     "schemas": [
         "provider",

@@ -10,6 +10,7 @@ from base.common.middleware import register_middlewares
 from base.common.exceptions import register_exceptions
 from base.common.router import register_routers
 from base.common.json_encoder import DateTimeEncoder
+from base.common.logging_config import register_exceptions_with_logging
 from base.plugins import plugin_manager
 import asyncio
 
@@ -245,7 +246,7 @@ def init_app() -> FastAPI:
     app.openapi = custom_openapi
 
     # 注册中间件、路由和异常处理
-    register_exceptions(app)
+    register_exceptions_with_logging(app)  # 使用带详细日志的异常处理器
     register_middlewares(app)
 
     # 使用自动路由注册机制

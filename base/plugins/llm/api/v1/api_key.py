@@ -1,12 +1,21 @@
 """
 API密钥管理API
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from datetime import datetime
 
 from base.common.response import SuccessResponse, ErrorResponse
+from base.common.security import get_current_user_id
 from base.plugins.llm.models.api_key import LLMApiKey
+
+# 导入管理员权限验证
+try:
+    from base.plugins.llm.utils.auth import check_admin_permission
+except ImportError:
+    from fastapi import Depends
+    async def check_admin_permission():
+        return 1
 from base.plugins.llm.models.provider import LLMProvider
 from base.plugins.llm.schemas.llm import (
     ApiKeyCreate,
@@ -14,14 +23,18 @@ from base.plugins.llm.schemas.llm import (
     ApiKeyResponse
 )
 
-api_key_router = APIRouter(prefix="/api-keys", tags=["API密钥管理"])
+api_key_router = APIRouter(
+    prefix="/api-keys",
+    tags=["API密钥管理"],
+    dependencies=[Depends(get_current_user_id)]
+)
 
 
-def mask_api_key(api_key: str) -> str:
-    """遮蔽API密钥显示"""
-    if not api_key or len(api_key) < 8:
+def mask_access_token(access_token: str) -> str:
+    """遮蔽Access Token显示"""
+    if not access_token or len(access_token) < 8:
         return "****"
-    return api_key[:4] + "****" + api_key[-4:]
+    return access_token[:4] + "****" + access_token[-4:]
 
 
 @api_key_router.get("", summary="获取API密钥列表")
@@ -32,45 +45,116 @@ async def get_api_keys(
     page_size: int = Query(10, ge=1, le=100, description="每页数量")
 ):
     """获取API密钥列表"""
-    query = LLMApiKey.all()
+    print("\n" + "="*80)
+    print("[DEBUG] ===== API Keys 列表接口被调用 =====")
+    print("="*80)
+    print(f"[DEBUG] 请求参数:")
+    print(f"  provider_id: {provider_id}")
+    print(f"  status: {status}")
+    print(f"  page: {page}")
+    print(f"  page_size: {page_size}")
 
-    if provider_id:
-        query = query.filter(provider_id=provider_id)
-    if status:
-        query = query.filter(status=status)
+    try:
+        print(f"\n[DEBUG] 步骤 1: 创建查询")
+        query = LLMApiKey.all()
+        print(f"  [OK] 查询对象创建成功")
 
-    total = await query.count()
-    api_keys = await query.offset((page - 1) * page_size).limit(page_size).prefetch_related('provider')
+        if provider_id:
+            print(f"\n[DEBUG] 步骤 2: 过滤 provider_id = {provider_id}")
+            query = query.filter(provider_id=provider_id)
+        if status:
+            print(f"\n[DEBUG] 步骤 3: 过滤 status = {status}")
+            query = query.filter(status=status)
 
-    # 转换为响应格式
-    result = []
-    for key in api_keys:
-        result.append({
-            "id": key.id,
-            "provider_id": key.provider_id,
-            "provider_name": key.provider.name if key.provider else None,
-            "name": key.name,
-            "api_key": mask_api_key(key.api_key),
-            "api_secret": mask_api_key(key.api_secret) if key.api_secret else None,
-            "endpoint_url": key.endpoint_url,
-            "max_quota": key.max_quota,
-            "used_quota": key.used_quota,
-            "remaining_quota": key.remaining_quota,
-            "is_available": key.is_available,
-            "status": key.status,
-            "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
-            "expires_at": key.expires_at.isoformat() if key.expires_at else None,
-            "description": key.description,
-            "created_at": key.created_at.isoformat() if key.created_at else None,
-            "updated_at": key.updated_at.isoformat() if key.updated_at else None
-        })
+        print(f"\n[DEBUG] 步骤 4: 执行 count 查询")
+        total = await query.count()
+        print(f"  [OK] 总记录数: {total}")
 
-    return SuccessResponse(data={
-        "items": result,
-        "total": total,
-        "page": page,
-        "page_size": page_size
-    })
+        print(f"\n[DEBUG] 步骤 5: 执行分页查询 (offset={(page - 1) * page_size}, limit={page_size})")
+        print(f"[DEBUG] 步骤 6: 预加载 provider 关系")
+        api_keys = await query.offset((page - 1) * page_size).limit(page_size).prefetch_related('provider')
+        print(f"  [OK] 查询到 {len(api_keys)} 条记录")
+
+        # 转换为响应格式
+        print(f"\n[DEBUG] 步骤 7: 转换响应格式")
+        result = []
+        for i, key in enumerate(api_keys, 1):
+            print(f"\n[DEBUG] 处理第 {i} 条记录:")
+            print(f"  ID: {key.id}")
+
+            try:
+                # 检查字段是否存在
+                print(f"  检查字段 app_id: {hasattr(key, 'app_id')}")
+                print(f"  检查字段 access_token: {hasattr(key, 'access_token')}")
+
+                if not hasattr(key, 'app_id'):
+                    print(f"  [ERROR] app_id 字段不存在!")
+                    raise AttributeError("LLMApiKey missing app_id field")
+
+                if not hasattr(key, 'access_token'):
+                    print(f"  [ERROR] access_token 字段不存在!")
+                    raise AttributeError("LLMApiKey missing access_token field")
+
+                # 尝试访问 provider
+                print(f"  检查 provider: {key.provider is not None}")
+                provider_name = None
+                if key.provider:
+                    print(f"    provider.name: {key.provider.name}")
+                    provider_name = key.provider.name
+
+                record = {
+                    "id": key.id,
+                    "provider_id": key.provider_id,
+                    "provider_name": provider_name,
+                    "app_id": key.app_id,
+                    "access_token": mask_access_token(key.access_token),
+                    "api_secret": mask_access_token(key.api_secret) if key.api_secret else None,
+                    "endpoint_url": key.endpoint_url,
+                    "max_quota": key.max_quota,
+                    "used_quota": key.used_quota,
+                    "remaining_quota": key.remaining_quota,
+                    "is_available": key.is_available,
+                    "status": key.status,
+                    "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
+                    "expires_at": key.expires_at.isoformat() if key.expires_at else None,
+                    "description": key.description,
+                    "created_at": key.created_at.isoformat() if key.created_at else None,
+                    "updated_at": key.updated_at.isoformat() if key.updated_at else None
+                }
+
+                result.append(record)
+                print(f"  [OK] 记录处理成功")
+
+            except Exception as e:
+                print(f"  [ERROR] 处理记录失败: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                raise
+
+        print(f"\n[DEBUG] 步骤 8: 构建响应")
+        response_data = {
+            "items": result,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+        print(f"  [OK] 响应数据准备完成: {len(result)} 条记录")
+
+        print("\n" + "="*80)
+        print("[DEBUG] ===== API Keys 列表接口执行成功 =====")
+        print("="*80 + "\n")
+
+        return SuccessResponse(data=response_data)
+
+    except Exception as e:
+        print("\n" + "="*80)
+        print(f"[ERROR] ===== API Keys 列表接口执行失败 =====")
+        print(f"错误信息: {str(e)}")
+        print("="*80)
+        import traceback
+        traceback.print_exc()
+        print("="*80 + "\n")
+        raise
 
 
 @api_key_router.get("/{key_id}", summary="获取API密钥详情")
@@ -89,9 +173,9 @@ async def get_api_key(key_id: int):
             "name_en": key.provider.name_en,
             "logo_url": key.provider.logo_url
         } if key.provider else None,
-        "name": key.name,
-        "api_key": mask_api_key(key.api_key),
-        "api_secret": mask_api_key(key.api_secret) if key.api_secret else None,
+        "app_id": key.app_id,
+        "access_token": mask_access_token(key.access_token),
+        "api_secret": mask_access_token(key.api_secret) if key.api_secret else None,
         "endpoint_url": key.endpoint_url,
         "max_quota": key.max_quota,
         "used_quota": key.used_quota,
@@ -108,7 +192,10 @@ async def get_api_key(key_id: int):
 
 
 @api_key_router.post("", summary="创建API密钥")
-async def create_api_key(data: ApiKeyCreate):
+async def create_api_key(
+    data: ApiKeyCreate,
+    user_id: int = Depends(check_admin_permission)
+):
     """创建API密钥"""
     # 检查厂商是否存在
     provider = await LLMProvider.get_or_none(id=data.provider_id)
@@ -121,8 +208,8 @@ async def create_api_key(data: ApiKeyCreate):
 
     api_key = await LLMApiKey.create(
         provider_id=data.provider_id,
-        name=data.name,
-        api_key=data.api_key,  # 实际应该存加密后的
+        app_id=data.app_id,
+        access_token=data.access_token,  # 实际应该存加密后的
         api_secret=data.api_secret,  # 实际应该存加密后的
         endpoint_url=data.endpoint_url,
         max_quota=data.max_quota,
@@ -131,14 +218,18 @@ async def create_api_key(data: ApiKeyCreate):
 
     return SuccessResponse(data={
         "id": api_key.id,
-        "name": api_key.name,
-        "api_key": mask_api_key(api_key.api_key),
+        "app_id": api_key.app_id,
+        "access_token": mask_access_token(api_key.access_token),
         "provider_name": provider.name
     }, msg="API密钥创建成功")
 
 
 @api_key_router.put("/{key_id}", summary="更新API密钥")
-async def update_api_key(key_id: int, data: ApiKeyUpdate):
+async def update_api_key(
+    key_id: int,
+    data: ApiKeyUpdate,
+    user_id: int = Depends(check_admin_permission)
+):
     """更新API密钥"""
     key = await LLMApiKey.get_or_none(id=key_id)
     if not key:
@@ -166,13 +257,16 @@ async def update_api_key(key_id: int, data: ApiKeyUpdate):
 
     return SuccessResponse(data={
         "id": key.id,
-        "name": key.name,
-        "api_key": mask_api_key(key.api_key)
+        "app_id": key.app_id,
+        "access_token": mask_access_token(key.access_token)
     }, msg="API密钥更新成功")
 
 
 @api_key_router.delete("/{key_id}", summary="删除API密钥")
-async def delete_api_key(key_id: int):
+async def delete_api_key(
+    key_id: int,
+    user_id: int = Depends(check_admin_permission)
+):
     """删除API密钥"""
     key = await LLMApiKey.get_or_none(id=key_id)
     if not key:
@@ -184,7 +278,10 @@ async def delete_api_key(key_id: int):
 
 
 @api_key_router.post("/{key_id}/reset-quota", summary="重置配额")
-async def reset_quota(key_id: int):
+async def reset_quota(
+    key_id: int,
+    user_id: int = Depends(check_admin_permission)
+):
     """重置API密钥配额"""
     key = await LLMApiKey.get_or_none(id=key_id)
     if not key:
@@ -199,7 +296,10 @@ async def reset_quota(key_id: int):
 
 
 @api_key_router.get("/{key_id}/test", summary="测试API密钥")
-async def test_api_key(key_id: int):
+async def test_api_key(
+    key_id: int,
+    user_id: int = Depends(check_admin_permission)
+):
     """测试API密钥是否可用"""
     key = await LLMApiKey.get_or_none(id=key_id).prefetch_related('provider')
     if not key:

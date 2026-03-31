@@ -1,11 +1,20 @@
 """
 大模型管理API
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
 
 from base.common.response import SuccessResponse, ErrorResponse
+from base.common.security import get_current_user_id
 from base.plugins.llm.models.model import LLMModel
+
+# 导入管理员权限验证
+try:
+    from base.plugins.llm.utils.auth import check_admin_permission
+except ImportError:
+    from fastapi import Depends
+    async def check_admin_permission():
+        return 1
 from base.plugins.llm.models.provider import LLMProvider
 from base.plugins.llm.schemas.llm import (
     ModelCreate,
@@ -13,7 +22,11 @@ from base.plugins.llm.schemas.llm import (
     ModelResponse
 )
 
-model_router = APIRouter(prefix="/models", tags=["大模型管理"])
+model_router = APIRouter(
+    prefix="/models",
+    tags=["大模型管理"],
+    dependencies=[Depends(get_current_user_id)]
+)
 
 
 @model_router.get("", summary="获取大模型列表")
@@ -97,7 +110,10 @@ async def get_model(model_id: int):
 
 
 @model_router.post("", summary="创建大模型")
-async def create_model(data: ModelCreate):
+async def create_model(
+    data: ModelCreate,
+    user_id: int = Depends(check_admin_permission)
+):
     """创建大模型"""
     # 检查厂商是否存在
     provider = await LLMProvider.get_or_none(id=data.provider_id)
@@ -123,7 +139,11 @@ async def create_model(data: ModelCreate):
 
 
 @model_router.put("/{model_id}", summary="更新大模型")
-async def update_model(model_id: int, data: ModelUpdate):
+async def update_model(
+    model_id: int,
+    data: ModelUpdate,
+    user_id: int = Depends(check_admin_permission)
+):
     """更新大模型"""
     model = await LLMModel.get_or_none(id=model_id)
     if not model:
@@ -160,7 +180,10 @@ async def update_model(model_id: int, data: ModelUpdate):
 
 
 @model_router.delete("/{model_id}", summary="删除大模型")
-async def delete_model(model_id: int):
+async def delete_model(
+    model_id: int,
+    user_id: int = Depends(check_admin_permission)
+):
     """删除大模型"""
     model = await LLMModel.get_or_none(id=model_id)
     if not model:

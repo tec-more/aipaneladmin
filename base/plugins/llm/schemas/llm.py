@@ -97,8 +97,8 @@ class ModelResponse(ModelBase):
 class ApiKeyBase(BaseModel):
     """API密钥基础模型"""
     provider_id: int = Field(..., description="厂商ID")
-    name: str = Field(..., min_length=1, max_length=100, description="密钥名称")
-    api_key: str = Field(..., min_length=1, description="API密钥")
+    app_id: str = Field(..., min_length=1, max_length=100, description="APP ID")
+    access_token: str = Field(..., min_length=1, description="Access Token")
     api_secret: Optional[str] = Field(None, description="API密钥(某些厂商需要)")
     endpoint_url: Optional[str] = Field(None, description="自定义端点URL")
     max_quota: int = Field(100000, description="每日配额限制")
@@ -113,8 +113,8 @@ class ApiKeyCreate(ApiKeyBase):
 class ApiKeyUpdate(BaseModel):
     """更新API密钥"""
     provider_id: Optional[int] = None
-    name: Optional[str] = None
-    api_key: Optional[str] = None
+    app_id: Optional[str] = None
+    access_token: Optional[str] = None
     api_secret: Optional[str] = None
     endpoint_url: Optional[str] = None
     max_quota: Optional[int] = None
@@ -145,14 +145,13 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     """对话请求"""
-    model: str = Field(..., description="模型标识")
+    model: int = Field(..., description="模型数据库ID")
     messages: List[Message] = Field(..., min_items=1, description="对话历史")
     stream: bool = Field(False, description="是否流式响应")
     temperature: Optional[float] = Field(0.7, ge=0, le=2, description="温度参数")
-    max_tokens: Optional[int] = Field(None, description="最大Token数")
-    top_p: Optional[float] = Field(None, ge=0, le=1, description="top_p采样")
-    frequency_penalty: Optional[float] = Field(None, ge=-2, le=2, description="频率惩罚")
-    presence_penalty: Optional[float] = Field(None, ge=-2, le=2, description="存在惩罚")
+    max_tokens: Optional[int] = Field(2000, description="最大Token数")
+    top_p: Optional[float] = Field(0.9, ge=0, le=1, description="top_p采样")
+    stop: Optional[List[str]] = Field(None, description="停止词列表")
 
 
 class ChatResponse(BaseModel):

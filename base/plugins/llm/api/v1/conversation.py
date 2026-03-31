@@ -1,14 +1,27 @@
 """
 对话记录管理API
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 
 from base.common.response import SuccessResponse
+from base.common.security import get_current_user_id
 from base.plugins.llm.models.conversation import LLMConversation
+
+# 导入管理员权限验证
+try:
+    from base.plugins.llm.utils.auth import check_admin_permission
+except ImportError:
+    from fastapi import Depends
+    async def check_admin_permission():
+        return 1
 from base.plugins.llm.models.usage import LLMUsage
 
-conversation_router = APIRouter(prefix="/conversations", tags=["对话记录管理"])
+conversation_router = APIRouter(
+    prefix="/conversations",
+    tags=["对话记录管理"],
+    dependencies=[Depends(check_admin_permission)]
+)
 
 
 @conversation_router.get("", summary="获取对话列表")

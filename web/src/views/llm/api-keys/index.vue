@@ -30,10 +30,10 @@
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
         <el-table-column prop="provider_name" label="厂商" width="120" />
-        <el-table-column prop="name" label="密钥名称" min-width="150" />
-        <el-table-column prop="api_key" label="API Key" min-width="200">
+        <el-table-column prop="app_id" label="APP ID" min-width="150" />
+        <el-table-column prop="access_token" label="Access Token" min-width="200">
           <template #default="{ row }">
-            <el-tag>{{ row.api_key }}</el-tag>
+            <el-tag>{{ row.access_token }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="endpoint_url" label="端点URL" min-width="200" show-overflow-tooltip />
@@ -99,11 +99,11 @@
             <el-option v-for="provider in providerList" :key="provider.id" :label="provider.name" :value="provider.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="密钥名称" prop="name">
-          <el-input v-model="form.name" placeholder="如：OpenAI主账号" />
+        <el-form-item label="APP ID" prop="app_id">
+          <el-input v-model="form.app_id" placeholder="如：my_app_001" />
         </el-form-item>
-        <el-form-item label="API Key" prop="api_key">
-          <el-input v-model="form.api_key" type="password" placeholder="sk-..." show-password />
+        <el-form-item label="Access Token" prop="access_token">
+          <el-input v-model="form.access_token" type="password" placeholder="sk-..." show-password />
         </el-form-item>
         <el-form-item label="API Secret">
           <el-input v-model="form.api_secret" type="password" placeholder="某些厂商需要" show-password />
@@ -186,8 +186,8 @@ const pagination = reactive({
 const form = reactive({
   id: null,
   provider_id: null,
-  name: '',
-  api_key: '',
+  app_id: '',
+  access_token: '',
   api_secret: '',
   endpoint_url: '',
   max_quota: 100000,
@@ -203,8 +203,8 @@ const testResult = reactive({
 
 const rules = {
   provider_id: [{ required: true, message: '请选择厂商', trigger: 'change' }],
-  name: [{ required: true, message: '请输入密钥名称', trigger: 'blur' }],
-  api_key: [{ required: true, message: '请输入API Key', trigger: 'blur' }]
+  app_id: [{ required: true, message: '请输入APP ID', trigger: 'blur' }],
+  access_token: [{ required: true, message: '请输入Access Token', trigger: 'blur' }]
 }
 
 const fetchData = async () => {
@@ -237,8 +237,8 @@ const handleAdd = () => {
   Object.assign(form, {
     id: null,
     provider_id: null,
-    name: '',
-    api_key: '',
+    app_id: '',
+    access_token: '',
     api_secret: '',
     endpoint_url: '',
     max_quota: 100000,
@@ -249,10 +249,10 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
-  // 不直接复制api_key和api_secret，编辑时重新填写
+  // 不直接复制access_token和api_secret，编辑时重新填写
   Object.assign(form, {
     ...row,
-    api_key: '',
+    access_token: '',
     api_secret: ''
   })
   isEdit.value = true
@@ -265,7 +265,7 @@ const submit = async () => {
     if (isEdit.value) {
       // 如果没填密钥，只更新其他字段
       const updateData = { ...form }
-      if (!updateData.api_key) delete updateData.api_key
+      if (!updateData.access_token) delete updateData.access_token
       if (!updateData.api_secret) delete updateData.api_secret
       await updateApiKey(form.id, updateData)
       ElMessage.success('更新成功')
@@ -281,7 +281,7 @@ const submit = async () => {
 }
 
 const handleDelete = (row) => {
-  ElMessageBox.confirm(`确定要删除密钥"${row.name}"吗？`, '提示', {
+  ElMessageBox.confirm(`确定要删除密钥"${row.app_id}"吗？`, '提示', {
     type: 'warning'
   }).then(async () => {
     try {
