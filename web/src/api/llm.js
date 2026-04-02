@@ -139,3 +139,56 @@ export const getModelStatistics = (params) => {
 export const getCustomerStatistics = (params) => {
   return request.get('/v1/llm/usage/statistics/customer', { params })
 }
+
+// ============ 语音服务 ============
+
+// 流式语音识别
+export const streamingASR = (formData) => {
+  return request.post('/v1/llm/voice/asr/streaming', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+// 录音文件识别
+export const fileASR = (formData) => {
+  return request.post('/v1/llm/voice/asr/file', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+// 语音合成
+export const textToSpeech = (formData) => {
+  return request.post('/v1/llm/voice/tts', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    responseType: 'blob'
+  })
+}
+
+// 提交声音复刻任务
+export const submitVoiceClone = (formData) => {
+  return request.post('/v1/llm/voice/clone/submit', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+// 查询声音复刻状态
+export const checkCloneStatus = (cloneId, params) => {
+  return request.get(`/v1/llm/voice/clone/${cloneId}`, { params })
+}
+
+// 同声传译
+export const streamingTranslation = (formData) => {
+  return request.post('/v1/llm/voice/translation/streaming', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+// 获取语音记录列表
+export const getVoiceRecords = (params) => {
+  return request.get('/v1/llm/voice/records', { params })
+}
+
+// 获取语音合成记录
+export const getTTSRecords = (params) => {
+  return request.get('/v1/llm/voice/tts/records', { params })
+}

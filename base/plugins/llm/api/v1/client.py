@@ -144,7 +144,7 @@ async def create_chat(
         # 3. 获取厂商服务实例
         service = await ChatService.get_provider_service(
             provider_name_en=model.provider.name_en,
-            api_key=api_key_obj.access_token,
+            api_key=api_key_obj.app_key,
             endpoint_url=api_key_obj.endpoint_url or model.provider.official_url,
             api_secret=api_key_obj.api_secret
         )

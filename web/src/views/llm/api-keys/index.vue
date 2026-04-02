@@ -15,6 +15,17 @@
             <el-option v-for="provider in providerList" :key="provider.id" :label="provider.name" :value="provider.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="服务类型">
+          <el-select v-model="searchForm.model_service_type" placeholder="请选择" clearable style="width: 150px">
+            <el-option label="大语言模型" value="llm" />
+            <el-option label="流式语音识别" value="streaming_asr" />
+            <el-option label="录音文件识别" value="file_asr" />
+            <el-option label="语音合成" value="tts" />
+            <el-option label="声音复刻" value="voice_clone" />
+            <el-option label="P2P实时语音" value="p2p_voice" />
+            <el-option label="同声传译" value="translation" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px">
             <el-option label="启用" value="active" />
@@ -30,13 +41,26 @@
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
         <el-table-column prop="provider_name" label="厂商" width="120" />
-        <el-table-column prop="app_id" label="APP ID" min-width="150" />
-        <el-table-column prop="access_token" label="Access Token" min-width="200">
+        <el-table-column label="服务类型" width="130" align="center">
           <template #default="{ row }">
-            <el-tag>{{ row.access_token }}</el-tag>
+            <el-tag :type="getServiceTypeColor(row.model_service_type)" size="small">
+              {{ row.model_service_type_display || row.model_service_type }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="endpoint_url" label="端点URL" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="api_id" label="API ID" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="api_key" label="API Key" min-width="200">
+          <template #default="{ row }">
+            <el-tag>{{ row.api_key }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="可用性" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.is_available ? 'success' : 'danger'">
+              {{ row.is_available ? '可用' : '不可用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="配额使用" width="180" align="center">
           <template #default="{ row }">
             <div class="quota-info">
@@ -49,13 +73,6 @@
                 {{ row.used_quota }} / {{ row.max_quota }}
               </div>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="可用性" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.is_available ? 'success' : 'danger'">
-              {{ row.is_available ? '可用' : '不可用' }}
-            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
@@ -92,29 +109,97 @@
     </el-card>
 
     <!-- 新增/编辑弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑密钥' : '新增密钥'" width="600px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑密钥' : '新增密钥'" width="700px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="140px">
         <el-form-item label="所属厂商" prop="provider_id">
           <el-select v-model="form.provider_id" placeholder="请选择厂商" style="width: 100%">
             <el-option v-for="provider in providerList" :key="provider.id" :label="provider.name" :value="provider.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="APP ID" prop="app_id">
-          <el-input v-model="form.app_id" placeholder="如：my_app_001" />
+
+        <el-form-item label="服务类型" prop="model_service_type">
+          <el-select v-model="form.model_service_type" placeholder="请选择服务类型" style="width: 100%">
+            <el-option label="大语言模型" value="llm">
+              <div>大语言模型 - 文本生成、对话、问答</div>
+            </el-option>
+            <el-option label="流式语音识别" value="streaming_asr">
+              <div>流式语音识别 - 实时语音转文字</div>
+            </el-option>
+            <el-option label="录音文件识别" value="file_asr">
+              <div>录音文件识别 - 上传音频文件识别</div>
+            </el-option>
+            <el-option label="语音合成" value="tts">
+              <div>语音合成 - 文字转语音</div>
+            </el-option>
+            <el-option label="声音复刻" value="voice_clone">
+              <div>声音复刻 - 克隆指定人的声音</div>
+            </el-option>
+            <el-option label="P2P实时语音" value="p2p_voice">
+              <div>P2P实时语音 - 点对点实时语音通话</div>
+            </el-option>
+            <el-option label="同声传译" value="translation">
+              <div>同声传译 - 实时语音翻译</div>
+            </el-option>
+          </el-select>
+          <div class="text-gray text-xs mt-1">选择此API密钥提供的服务类型</div>
         </el-form-item>
-        <el-form-item label="Access Token" prop="access_token">
-          <el-input v-model="form.access_token" type="password" placeholder="sk-..." show-password />
+
+        <!-- 认证字段 -->
+        <el-divider content-position="left">
+          <el-icon><Lock /></el-icon>
+          认证信息
+        </el-divider>
+
+        <el-form-item label="API ID">
+          <el-input v-model="form.api_id" placeholder="如：my_app_001（可选）" />
+          <div class="text-gray text-xs mt-1">某些厂商需要的API ID</div>
         </el-form-item>
+
+        <el-form-item label="API Key" prop="api_key">
+          <el-input
+            v-model="form.api_key"
+            type="password"
+            :placeholder="isEdit && form.api_key && form.api_key.includes('****') ? '当前显示遮蔽后的值，留空则不修改' : 'sk-...'"
+            show-password
+          />
+          <div v-if="isEdit && form.api_key && form.api_key.includes('****')" class="text-gray text-xs mt-1">
+            提示：当前显示遮蔽后的值，如需修改请输入新的 API Key，留空则保持原值不变
+          </div>
+        </el-form-item>
+
         <el-form-item label="API Secret">
-          <el-input v-model="form.api_secret" type="password" placeholder="某些厂商需要" show-password />
+          <el-input
+            v-model="form.api_secret"
+            type="password"
+            :placeholder="isEdit && form.api_secret && form.api_secret.includes('****') ? '当前显示遮蔽后的值，留空则不修改' : '某些厂商需要'"
+            show-password
+          />
         </el-form-item>
+
+        <el-form-item label="Access Token">
+          <el-input
+            v-model="form.access_token"
+            type="password"
+            :placeholder="isEdit && form.access_token && form.access_token.includes('****') ? '当前显示遮蔽后的值，留空则不修改' : 'OAuth等Token认证（可选）'"
+            show-password
+          />
+        </el-form-item>
+
         <el-form-item label="端点URL">
           <el-input v-model="form.endpoint_url" placeholder="自定义端点，留空使用默认" />
         </el-form-item>
+
+        <!-- 配额和备注 -->
+        <el-divider content-position="left">
+          <el-icon><Setting /></el-icon>
+          配置
+        </el-divider>
+
         <el-form-item label="每日配额限制" prop="max_quota">
           <el-input-number v-model="form.max_quota" :min="0" :step="10000" style="width: 100%" />
           <div class="text-gray text-xs">tokens/天，0表示不限制</div>
         </el-form-item>
+
         <el-form-item label="备注">
           <el-input v-model="form.description" type="textarea" :rows="3" />
         </el-form-item>
@@ -152,7 +237,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Plus, Edit, Delete, Search, Refresh, RefreshRight, Connection } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Search, Refresh, RefreshRight, Connection, Lock, Setting, Service } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getProviderList,
@@ -174,6 +259,7 @@ const isEdit = ref(false)
 
 const searchForm = reactive({
   provider_id: null,
+  model_service_type: null,
   status: ''
 })
 
@@ -186,10 +272,14 @@ const pagination = reactive({
 const form = reactive({
   id: null,
   provider_id: null,
-  app_id: '',
-  access_token: '',
+  model_service_type: 'llm',
+  // 统一的认证字段
+  api_id: '',
+  api_key: '',
   api_secret: '',
+  access_token: '',
   endpoint_url: '',
+  // 其他
   max_quota: 100000,
   description: ''
 })
@@ -203,8 +293,8 @@ const testResult = reactive({
 
 const rules = {
   provider_id: [{ required: true, message: '请选择厂商', trigger: 'change' }],
-  app_id: [{ required: true, message: '请输入APP ID', trigger: 'blur' }],
-  access_token: [{ required: true, message: '请输入Access Token', trigger: 'blur' }]
+  model_service_type: [{ required: true, message: '请选择服务类型', trigger: 'change' }]
+  // api_key 不再是必填，因为有些服务可能只需要其他认证方式
 }
 
 const fetchData = async () => {
@@ -234,27 +324,43 @@ const fetchProviders = async () => {
 }
 
 const handleAdd = () => {
-  Object.assign(form, {
-    id: null,
-    provider_id: null,
-    app_id: '',
-    access_token: '',
-    api_secret: '',
-    endpoint_url: '',
-    max_quota: 100000,
-    description: ''
-  })
+  // 重置所有字段为默认值
+  form.id = null
+  form.provider_id = null
+  form.model_service_type = 'llm'
+  // 统一的认证字段
+  form.api_id = ''
+  form.api_key = ''
+  form.api_secret = ''
+  form.access_token = ''
+  form.endpoint_url = ''
+  // 其他
+  form.max_quota = 100000
+  form.description = ''
+
   isEdit.value = false
   dialogVisible.value = true
 }
 
 const handleEdit = (row) => {
-  // 不直接复制access_token和api_secret，编辑时重新填写
-  Object.assign(form, {
-    ...row,
-    access_token: '',
-    api_secret: ''
-  })
+  // 编辑时显示遮蔽后的值
+  console.log('[handleEdit] 收到的API数据:', row)
+
+  form.id = row.id
+  form.provider_id = row.provider_id
+  form.model_service_type = row.model_service_type || 'llm'
+  // 统一的认证字段
+  form.api_id = row.api_id ?? ''
+  form.api_key = row.api_key ?? row.app_key ?? ''
+  form.api_secret = row.api_secret ?? ''
+  form.access_token = row.access_token ?? ''
+  form.endpoint_url = row.endpoint_url ?? ''
+  // 其他
+  form.max_quota = row.max_quota ?? 100000
+  form.description = row.description ?? ''
+
+  console.log('[handleEdit] 设置后的form对象:', JSON.parse(JSON.stringify(form)))
+
   isEdit.value = true
   dialogVisible.value = true
 }
@@ -263,25 +369,45 @@ const submit = async () => {
   await formRef.value.validate()
   try {
     if (isEdit.value) {
-      // 如果没填密钥，只更新其他字段
       const updateData = { ...form }
-      if (!updateData.access_token) delete updateData.access_token
-      if (!updateData.api_secret) delete updateData.api_secret
+
+      // 处理空字符串：转换为null
+      const fields = ['api_id', 'api_key', 'api_secret', 'access_token', 'endpoint_url']
+      fields.forEach(field => {
+        if (updateData[field] === '') {
+          updateData[field] = null
+        }
+      })
+
+      // 处理遮蔽值：如果字段包含****，则不更新该字段
+      if (updateData.api_key && updateData.api_key.includes('****')) {
+        delete updateData.api_key
+      }
+      if (updateData.api_secret && updateData.api_secret.includes('****')) {
+        delete updateData.api_secret
+      }
+      if (updateData.access_token && updateData.access_token.includes('****')) {
+        delete updateData.access_token
+      }
+
       await updateApiKey(form.id, updateData)
       ElMessage.success('更新成功')
+      dialogVisible.value = false
+      fetchData()  // 刷新列表
+
     } else {
       await createApiKey(form)
       ElMessage.success('创建成功')
+      dialogVisible.value = false
+      fetchData()
     }
-    dialogVisible.value = false
-    fetchData()
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '操作失败')
   }
 }
 
 const handleDelete = (row) => {
-  ElMessageBox.confirm(`确定要删除密钥"${row.app_id}"吗？`, '提示', {
+  ElMessageBox.confirm(`确定要删除密钥"${row.api_id}"吗？`, '提示', {
     type: 'warning'
   }).then(async () => {
     try {
@@ -320,8 +446,23 @@ const handleTest = async (row) => {
 
 const handleReset = () => {
   searchForm.provider_id = null
+  searchForm.model_service_type = null
   searchForm.status = ''
   fetchData()
+}
+
+// 辅助函数：获取服务类型颜色
+const getServiceTypeColor = (type) => {
+  const colors = {
+    'llm': 'primary',
+    'streaming_asr': 'success',
+    'file_asr': 'success',
+    'tts': 'warning',
+    'voice_clone': 'danger',
+    'p2p_voice': 'info',
+    'translation': 'warning'
+  }
+  return colors[type] || 'info'
 }
 
 const getQuotaPercentage = (row) => {
@@ -383,5 +524,9 @@ onMounted(() => {
 
 .mb-4 {
   margin-bottom: 16px;
+}
+
+.ml-1 {
+  margin-left: 4px;
 }
 </style>

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
+from base.plugins.llm.models.enums import ModelServiceType
 
 
 # ============ 厂商相关 ============
@@ -97,10 +98,28 @@ class ModelResponse(ModelBase):
 class ApiKeyBase(BaseModel):
     """API密钥基础模型"""
     provider_id: int = Field(..., description="厂商ID")
-    app_id: str = Field(..., min_length=1, max_length=100, description="APP ID")
-    access_token: str = Field(..., min_length=1, description="Access Token")
-    api_secret: Optional[str] = Field(None, description="API密钥(某些厂商需要)")
-    endpoint_url: Optional[str] = Field(None, description="自定义端点URL")
+
+    # 服务类型
+    model_service_type: str = Field(
+        ModelServiceType.LLM.value,
+        description="模型服务类型"
+    )
+
+    # 统一的认证字段（至少需要一个）
+    api_id: Optional[str] = Field(None, max_length=255, description="API ID")
+    api_key: Optional[str] = Field(None, max_length=512, description="API Key")
+    api_secret: Optional[str] = Field(None, max_length=512, description="API Secret")
+    access_token: Optional[str] = Field(None, max_length=512, description="Access Token")
+    endpoint_url: Optional[str] = Field(None, max_length=512, description="自定义端点URL")
+
+    # 旧字段（保留用于向后兼容，标记为deprecated）
+    app_key: Optional[str] = Field(None, description="[Deprecated] App Key - 请使用api_key")
+    api_id_voice: Optional[str] = Field(None, max_length=100, description="[Deprecated] API ID (语音服务) - 请使用model_service_type")
+    app_key_voice: Optional[str] = Field(None, description="[Deprecated] App Key (语音服务) - 请使用model_service_type")
+    api_secret_voice: Optional[str] = Field(None, description="[Deprecated] API密钥(语音服务) - 请使用model_service_type")
+    endpoint_url_voice: Optional[str] = Field(None, description="[Deprecated] 自定义端点URL (语音服务) - 请使用model_service_type")
+
+    # 配额和备注
     max_quota: int = Field(100000, description="每日配额限制")
     description: Optional[str] = Field(None, description="备注")
 
@@ -113,10 +132,23 @@ class ApiKeyCreate(ApiKeyBase):
 class ApiKeyUpdate(BaseModel):
     """更新API密钥"""
     provider_id: Optional[int] = None
-    app_id: Optional[str] = None
-    access_token: Optional[str] = None
+    model_service_type: Optional[str] = None
+
+    # 统一的认证字段
+    api_id: Optional[str] = None
+    api_key: Optional[str] = None
     api_secret: Optional[str] = None
+    access_token: Optional[str] = None
     endpoint_url: Optional[str] = None
+
+    # 旧字段（保留用于向后兼容）
+    app_key: Optional[str] = None
+    api_id_voice: Optional[str] = None
+    app_key_voice: Optional[str] = None
+    api_secret_voice: Optional[str] = None
+    endpoint_url_voice: Optional[str] = None
+
+    # 配额和备注
     max_quota: Optional[int] = None
     description: Optional[str] = None
 
@@ -127,6 +159,8 @@ class ApiKeyResponse(ApiKeyBase):
     provider: ProviderResponse
     remaining_quota: int
     is_available: bool
+    is_voice_service: bool  # 是否为语音服务类型（替代has_voice_credentials）
+    has_voice_credentials: bool  # 保留用于向后兼容
     last_used_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime

@@ -9,9 +9,10 @@ LLM插件API v1路由
 - usage_router
 - client_router (客户端API)
 - voice_router (语音API)
+- translation_stream_router (流式翻译API)
 """
 from fastapi import APIRouter
-from base.plugins.llm.api.v1 import provider, model, api_key, conversation, usage, client, voice
+from base.plugins.llm.api.v1 import provider, model, api_key, conversation, usage, client, voice, voice_translation_stream
 
 # 创建主路由
 api_router = APIRouter()
@@ -24,5 +25,6 @@ api_router.include_router(conversation.conversation_router)
 api_router.include_router(usage.usage_router)
 api_router.include_router(client.client_router)
 api_router.include_router(voice.voice_router)
+api_router.include_router(voice_translation_stream.translation_stream_router)
 
 __all__ = ["api_router"]
