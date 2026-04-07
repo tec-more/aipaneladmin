@@ -59,6 +59,7 @@ async def websocket_translation_v3(
     session_id = None
     record = None
     config = {}
+    final_result = {}  # 存储最终翻译结果
 
     # 豆包WebSocket连接
     doubao_ws = None
@@ -103,6 +104,15 @@ async def websocket_translation_v3(
                     #logger.info(f"[实时翻译V3] 收到控制消息: {msg_type}")
 
                     if msg_type == "start":
+                        # 如果已有记录，先更新状态
+                        if record and record.status == "processing":
+                            from datetime import datetime
+                            import pytz
+                            record.status = "failed"
+                            record.end_time = datetime.now(pytz.UTC)
+                            await record.save()
+                            logger.warning(f"[实时翻译V3] ⚠️  检测到未完成的旧记录，已标记为失败")
+
                         # 创建会话
                         session_id = f"rt_v3_{uuid.uuid4().hex[:16]}"
                         config = {
@@ -171,7 +181,8 @@ async def websocket_translation_v3(
                                 additional_headers=headers,
                                 max_size=1000000000,
                                 ping_interval=None,
-                                close_timeout=30
+                                close_timeout=30,
+                                open_timeout=60  # 增加连接超时时间到60秒
                             )
 
                             doubao_connected = True
@@ -282,6 +293,7 @@ async def websocket_translation_v3(
                             # 启动翻译接收任务
                             async def receive_translation_from_doubao():
                                 """接收豆包AST的翻译结果"""
+                                nonlocal final_result  # 声明使用外部变量
                                 try:
                                     source_segments = []  # 原文片段
                                     translation_segments = []  # 译文片段
@@ -537,9 +549,61 @@ async def websocket_translation_v3(
                         if record:
                             from datetime import datetime
                             import pytz
+                            from base.plugins.llm.services.cost_calculator import HumorousChatCostCalculator
+                            
+                            # 计算会话时长
+                            duration_seconds = 0
+                            if record.start_time:
+                                duration_seconds = int((datetime.now(pytz.UTC) - record.start_time).total_seconds())
+                            
+                            # 计算费用
+                            total_cost = 0
+                            source_text = ""
+                            translation_text = ""
+                            total_tokens = 0
+                            
+                            if final_result:
+                                source_text = final_result.get("source_text", "")
+                                translation_text = final_result.get("translation_text", "")
+                                tokens_info = final_result.get("tokens", {})
+                                total_tokens = sum(tokens_info.values()) if tokens_info else 0
+                                
+                                # 计算ASR费用（根据音频时长）
+                                asr_cost = HumorousChatCostCalculator.calculate_asr_cost(
+                                    duration_seconds=duration_seconds,
+                                    provider="doubao"
+                                )
+                                
+                                # 计算LLM费用（根据翻译文本）
+                                llm_cost = HumorousChatCostCalculator.calculate_llm_cost(
+                                    input_text=source_text,
+                                    output_text=translation_text,
+                                    model="doubao_pro"
+                                )
+                                
+                                total_cost = float(asr_cost) + float(llm_cost)
+                                
+                                logger.info(f"[实时翻译V3] 💰 费用计算:")
+                                logger.info(f"  音频时长: {duration_seconds}秒")
+                                logger.info(f"  ASR费用: ¥{float(asr_cost):.4f}")
+                                logger.info(f"  LLM费用: ¥{float(llm_cost):.4f}")
+                                logger.info(f"  总费用: ¥{total_cost:.4f}")
+                            
+                            # 更新记录
                             record.status = "completed"
-                            record.end_time = datetime.now(pytz.UTC) 
+                            record.end_time = datetime.now(pytz.UTC)
+                            record.tokens = total_tokens
+                            record.cost = total_cost
+                            record.input_text = source_text
+                            record.output_text = translation_text
                             await record.save()
+                            
+                            # 更新API密钥使用量
+                            if total_tokens > 0:
+                                await VoiceServiceHelper.update_voice_usage(
+                                    service,
+                                    tokens=int(total_tokens)
+                                )
 
                         try:
                             await websocket.send_json({
@@ -617,7 +681,7 @@ async def websocket_translation_v3(
                     logger.warning(f"[实时翻译V3] ⚠️  豆包未连接，丢弃音频块")
 
     except WebSocketDisconnect:
-        #logger.info(f"[实时翻译V3] 客户端断开连接")
+        logger.info(f"[实时翻译V3] 客户端断开连接")
         is_running = False
         stop_event.set()
 
@@ -630,12 +694,73 @@ async def websocket_translation_v3(
         if doubao_ws:
             await doubao_ws.close()
 
-        if record and record.status == "processing":
+        # 更新当前记录
+        if record:
             from datetime import datetime
             import pytz
-            record.status = "failed"
-            record.end_time = datetime.now(pytz.UTC) 
-            await record.save()
+            from base.plugins.llm.services.cost_calculator import HumorousChatCostCalculator
+            
+            if record.status == "processing":
+                # 计算会话时长
+                duration_seconds = 0
+                if record.start_time:
+                    duration_seconds = int((datetime.now(pytz.UTC) - record.start_time).total_seconds())
+                
+                # 计算费用（失败的会话，如果有部分结果则计算部分费用）
+                total_cost = 0
+                source_text = ""
+                translation_text = ""
+                total_tokens = 0
+                
+                if final_result:
+                    source_text = final_result.get("source_text", "")
+                    translation_text = final_result.get("translation_text", "")
+                    tokens_info = final_result.get("tokens", {})
+                    total_tokens = sum(tokens_info.values()) if tokens_info else 0
+                    
+                    # 计算ASR费用（根据音频时长）
+                    asr_cost = HumorousChatCostCalculator.calculate_asr_cost(
+                        duration_seconds=duration_seconds,
+                        provider="doubao"
+                    )
+                    
+                    # 计算LLM费用（根据翻译文本）
+                    llm_cost = HumorousChatCostCalculator.calculate_llm_cost(
+                        input_text=source_text,
+                        output_text=translation_text,
+                        model="doubao_pro"
+                    )
+                    
+                    total_cost = float(asr_cost) + float(llm_cost)
+                    
+                    logger.info(f"[实时翻译V3] 💰 失败会话的部分费用:")
+                    logger.info(f"  音频时长: {duration_seconds}秒")
+                    logger.info(f"  ASR费用: ¥{float(asr_cost):.4f}")
+                    logger.info(f"  LLM费用: ¥{float(llm_cost):.4f}")
+                    logger.info(f"  总费用: ¥{total_cost:.4f}")
+                
+                record.status = "failed"
+                record.end_time = datetime.now(pytz.UTC)
+                record.tokens = total_tokens
+                record.cost = total_cost
+                record.input_text = source_text
+                record.output_text = translation_text
+                await record.save()
+                logger.info(f"[实时翻译V3] 记录已标记为失败: {record.record_id}")
+
+        # 确保所有相关的processing记录都被更新
+        if session_id:
+            from datetime import datetime
+            import pytz
+            processing_records = await LLMUsageRecord.filter(
+                record_id=session_id,
+                status="processing"
+            )
+            for rec in processing_records:
+                rec.status = "failed"
+                rec.end_time = datetime.now(pytz.UTC)
+                await rec.save()
+                logger.info(f"[实时翻译V3] 清理残留记录: {rec.record_id}")
 
     except Exception as e:
         logger.error(f"[实时翻译V3] 异常: {e}", exc_info=True)

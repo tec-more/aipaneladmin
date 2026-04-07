@@ -205,6 +205,30 @@ async def websocket_translation_realtime(
 
     except WebSocketDisconnect:
         logger.info(f"[实时翻译] 客户端断开连接: {session_id}")
+        
+        # 更新当前记录
+        if record:
+            from datetime import datetime
+            import pytz
+            if record.status == "processing":
+                record.status = "failed"
+                record.end_time = datetime.now(pytz.UTC)
+                await record.save()
+                logger.info(f"[实时翻译] 记录已标记为失败: {record.record_id}")
+
+        # 确保所有相关的processing记录都被更新
+        if session_id:
+            from datetime import datetime
+            import pytz
+            processing_records = await LLMUsageRecord.filter(
+                record_id=session_id,
+                status="processing"
+            )
+            for rec in processing_records:
+                rec.status = "failed"
+                rec.end_time = datetime.now(pytz.UTC)
+                await rec.save()
+                logger.info(f"[实时翻译] 清理残留记录: {rec.record_id}")
     except Exception as e:
         logger.error(f"[实时翻译] 处理异常: {e}", exc_info=True)
     finally:

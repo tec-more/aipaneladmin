@@ -16,7 +16,7 @@ import json
 logger = logging.getLogger(__name__)
 
 # 添加官方demo的protobuf路径
-ast_demo_protogen = Path(__file__).parent.parent.parent.parent.parent / "tests" / "ast_python" / "python_protogen"
+ast_demo_protogen = Path(__file__).parent.parent.parent.parent.parent / "python_protogen"
 if ast_demo_protogen.exists():
     sys.path.insert(0, str(ast_demo_protogen))
     from products.understanding.ast.ast_service_pb2 import TranslateRequest, TranslateResponse
