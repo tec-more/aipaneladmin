@@ -11,7 +11,7 @@ import asyncio
 
 from base.common.response import SuccessResponse
 from base.common.security import get_current_user_id
-from base.plugins.llm.models.voice import LLMVoiceRecord
+from base.plugins.llm.models.usage import LLMUsageRecord
 from base.plugins.llm.services.voice_helper import VoiceServiceHelper
 
 logger = logging.getLogger(__name__)
@@ -107,11 +107,11 @@ async def streaming_translation_sse(
             # 创建记录（使用UUID避免重复）
             import uuid
             record_id = f"trans_{uuid.uuid4().hex[:16]}"
-            record = await LLMVoiceRecord.create(
+            record = await LLMUsageRecord.create(
                 record_id=record_id,
                 customer_id=current_user_id,
                 model_id=provider_id,
-                recognition_type="translation",
+                record_type="voice",
                 audio_file=audio_file.filename,
                 audio_format=format,
                 source_language=source_language,
@@ -142,9 +142,9 @@ async def streaming_translation_sse(
 
             # 更新记录
             if final_result and record:
-                await LLMVoiceRecord.filter(id=record.id).update(
-                    recognized_text=final_result.get("source_text", ""),
-                    translated_text=final_result.get("translation_text", ""),
+                await LLMUsageRecord.filter(id=record.id).update(
+                    input_text=final_result.get("source_text", ""),
+                    output_text=final_result.get("translation_text", ""),
                     status="completed"
                 )
 
@@ -166,7 +166,7 @@ async def streaming_translation_sse(
             # 更新记录状态为失败
             if record:
                 try:
-                    await LLMVoiceRecord.filter(id=record.id).update(
+                    await LLMUsageRecord.filter(id=record.id).update(
                         status="failed"
                     )
                 except:

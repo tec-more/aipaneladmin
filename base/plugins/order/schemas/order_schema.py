@@ -254,23 +254,6 @@ class AlipayNotifyIn(BaseModel):
     pass
 
 
-# ========== 使用记录相关 Schema ==========
-
-class UsageLogOut(BaseModel):
-    """使用记录输出"""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    customer_id: int
-    session_id: str
-    duration_seconds: int
-    service_type: str
-    details: Dict[str, Any]
-    characters_count: int
-    api_cost: Decimal
-    created_at: datetime
-
-
 # ========== 向后兼容的旧 Schema ==========
 
 class OrderBase(BaseModel):

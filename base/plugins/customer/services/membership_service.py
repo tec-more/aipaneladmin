@@ -407,12 +407,12 @@ class MembershipService:
         Returns:
             已用时长（小时）
         """
-        from base.plugins.customer.models.usage_log import UsageLog
+        from base.plugins.llm.models.usage import LLMUsageRecord
 
         # 获取所有使用记录并汇总时长
-        usage_logs = await UsageLog.filter(customer_id=customer_id)
-        total_seconds = sum(log.duration_seconds for log in usage_logs)
-        used_hours = total_seconds / 3600.0  # 转换为小时
+        usage_logs = await LLMUsageRecord.filter(customer_id=customer_id)
+        total_tokens = sum(log.tokens for log in usage_logs)
+        used_hours = total_tokens / 3600.0  # 转换为小时
 
         print(f"[MembershipService] 计算客户 {customer_id} 的已用时长: {len(usage_logs)} 条记录, 总计 {used_hours:.2f} 小时")
         return used_hours

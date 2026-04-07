@@ -14,8 +14,7 @@
         "customer",
         "membership",
         "customer_membership",
-        "payment_transaction",
-        "usage_log"
+        "payment_transaction"
     ],
     "schemas": [
         "customer_schema",
@@ -50,13 +49,6 @@
                     "icon": "Money",
                     "component": "customer/payments/index",
                     "sort": 3
-                },
-                {
-                    "name": "使用记录",
-                    "path": "/customer/usage",
-                    "icon": "Document",
-                    "component": "customer/usage/index",
-                    "sort": 4
                 }
             ]
         }
@@ -85,12 +77,6 @@
             "code": "customer:membership_level",
             "module": "customer",
             "description": "管理会员等级配置"
-        },
-        {
-            "name": "使用记录查看",
-            "code": "customer:usage:view",
-            "module": "customer",
-            "description": "查看客户使用记录"
         }
     ],
     "hooks": {

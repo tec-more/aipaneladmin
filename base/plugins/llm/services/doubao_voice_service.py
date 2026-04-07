@@ -736,8 +736,26 @@ class DoubaoVoiceService:
                                         # 会话结束
                                         elif event == 152:  # SessionFinished
                                             logger.info(f"[AST] 会话正常结束")
-                                            final_result["source_text"] = " ".join(final_result["source_segments"])
-                                            final_result["translation_text"] = " ".join(final_result["translation_segments"])
+                                            # 智能合并原文和译文片段，确保标点符号对齐
+                                            def smart_join(segments):
+                                                result = ""
+                                                for seg in segments:
+                                                    if not result:
+                                                        result = seg
+                                                    else:
+                                                        # 如果前一个字符是标点符号，直接连接
+                                                        if result[-1] in ["，", "。", "！", "？", ",", ".", "!", "?"]:
+                                                            result += seg
+                                                        # 如果当前片段以标点符号开头，直接连接
+                                                        elif seg and seg[0] in ["，", "。", "！", "？", ",", ".", "!", "?"]:
+                                                            result += seg
+                                                        # 否则添加空格
+                                                        else:
+                                                            result += " " + seg
+                                                return result
+                                            
+                                            final_result["source_text"] = smart_join(final_result["source_segments"])
+                                            final_result["translation_text"] = smart_join(final_result["translation_segments"])
                                             yield {
                                                 "event": "session_finished",
                                                 "result": final_result

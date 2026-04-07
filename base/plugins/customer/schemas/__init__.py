@@ -21,7 +21,6 @@ from base.plugins.order.schemas import (
     PaymentWebhookIn,
     WechatPayNotifyIn,
     AlipayNotifyIn,
-    UsageLogOut,
 )
 
 __all__ = [
@@ -42,5 +41,4 @@ __all__ = [
     "PaymentWebhookIn",
     "WechatPayNotifyIn",
     "AlipayNotifyIn",
-    "UsageLogOut",
 ]

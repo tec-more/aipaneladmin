@@ -7,13 +7,13 @@ from fastapi import FastAPI
 from base.common.log import log
 
 
-# 导出WebSocket路由，确保plugin_manager能找到它
+# 导出包含所有API路由的主路由
 try:
-    from base.plugins.llm.api.v1 import voice_websocket
-    llm_router = voice_websocket.voice_websocket_router
+    from base.plugins.llm.api.v1 import api_router
+    llm_router = api_router
 except ImportError:
     llm_router = None
-    log.warning("voice_websocket模块未找到")
+    log.warning("api_router模块未找到")
 
 
 async def on_enable(app: FastAPI) -> bool:

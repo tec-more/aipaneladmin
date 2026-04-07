@@ -119,7 +119,7 @@ async def update_membership_data_task():
             await asyncio.sleep(600)  # 10分钟 = 600秒
 
             from base.plugins.customer.models.customer_membership import CustomerMembership
-            from base.plugins.customer.models.usage_log import UsageLog
+            from base.plugins.llm.models.usage import LLMUsageRecord
             from datetime import datetime
 
             print("\n" + "="*70)
@@ -156,20 +156,19 @@ async def update_membership_data_task():
                     print()
 
                     # 从使用记录计算实际已用时长
-                    usage_logs = await UsageLog.filter(customer_id=membership.customer_id)
-                    total_seconds = sum(log.duration_seconds for log in usage_logs)
-                    used_hours = total_seconds / 3600.0
+                    usage_logs = await LLMUsageRecord.filter(customer_id=membership.customer_id)
+                    total_tokens = sum(log.tokens for log in usage_logs)
+                    used_hours = total_tokens / 3600.0
 
                     print(f"📋 【使用记录汇总】")
                     print(f"  记录数量: {len(usage_logs)} 条")
-                    print(f"  总使用秒数: {total_seconds} 秒")
+                    print(f"  总Token数: {total_tokens} ")
                     print(f"  💵 实际已用时长: {used_hours:.2f} 小时")
 
                     if usage_logs:
                         print(f"  📝 最近3条记录:")
                         for log in usage_logs[:3]:
-                            hours = log.duration_seconds / 3600.0
-                            print(f"    - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.duration_seconds}秒 ({hours:.2f}小时)")
+                            print(f"    - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.record_type}, {log.tokens} tokens, ${float(log.cost):.4f}")
                     print()
 
                     # 计算剩余时长

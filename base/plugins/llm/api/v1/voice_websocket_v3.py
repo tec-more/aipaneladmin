@@ -14,7 +14,8 @@ from pathlib import Path
 import time
 
 from base.common.security import get_current_user_id_ws
-from base.plugins.llm.models.voice import LLMVoiceRecord
+# 从统一的使用记录表导入
+from base.plugins.llm.models.usage import LLMUsageRecord
 from base.plugins.llm.services.voice_helper import VoiceServiceHelper
 
 logger = logging.getLogger(__name__)
@@ -50,10 +51,10 @@ async def websocket_translation_v3(
 
     预期延迟：200-500ms
     """
-    logger.info(f"[实时翻译V3] ========== 新连接 ==========")
+    # #logger.info(f"[实时翻译V3] ========== 新连接 ==========")
 
     await websocket.accept()
-    logger.info(f"[实时翻译V3] ✅ WebSocket已accept")
+    # #logger.info(f"[实时翻译V3] ✅ WebSocket已accept")
 
     session_id = None
     record = None
@@ -81,11 +82,14 @@ async def websocket_translation_v3(
         # 验证用户
         user_id = await get_current_user_id_ws(token)
         if not user_id:
-            await websocket.send_json({"type": "error", "message": "未授权"})
+            try:
+                await websocket.send_json({"type": "error", "message": "未授权"})
+            except (WebSocketDisconnect, RuntimeError):
+                pass
             await websocket.close(code=1008, reason="Unauthorized")
             return
 
-        logger.info(f"[实时翻译V3] ✅ 用户验证成功: {user_id}")
+        #logger.info(f"[实时翻译V3] ✅ 用户验证成功: {user_id}")
 
         while True:
             message = await websocket.receive()
@@ -96,7 +100,7 @@ async def websocket_translation_v3(
                     data = json.loads(message["text"])
                     msg_type = data.get("type")
 
-                    logger.info(f"[实时翻译V3] 收到控制消息: {msg_type}")
+                    #logger.info(f"[实时翻译V3] 收到控制消息: {msg_type}")
 
                     if msg_type == "start":
                         # 创建会话
@@ -108,31 +112,38 @@ async def websocket_translation_v3(
                             "target_language": data.get("target_language", "en"),
                         }
 
-                        logger.info(f"[实时翻译V3] ========== 🎬 会话开始 ==========")
-                        logger.info(f"[实时翻译V3] SessionID: {session_id}")
-                        logger.info(f"[实时翻译V3] 源语言: {config['source_language']}")
-                        logger.info(f"[实时翻译V3] 目标语言: {config['target_language']}")
-                        logger.info(f"[实时翻译V3] 音频格式: {config['format']}")
-                        logger.info(f"[实时翻译V3] 采样率: {config['sample_rate']} Hz")
-                        logger.info(f"[实时翻译V3] ========================================")
+                        #logger.info(f"[实时翻译V3] ========== 🎬 会话开始 ==========")
+                        #logger.info(f"[实时翻译V3] SessionID: {session_id}")
+                        #logger.info(f"[实时翻译V3] 源语言: {config['source_language']}")
+                        #logger.info(f"[实时翻译V3] 目标语言: {config['target_language']}")
+                        #logger.info(f"[实时翻译V3] 音频格式: {config['format']}")
+                        #logger.info(f"[实时翻译V3] 采样率: {config['sample_rate']} Hz")
+                        #logger.info(f"[实时翻译V3] ========================================")
 
                         # 创建数据库记录
-                        record = await LLMVoiceRecord.create(
+                        from datetime import datetime
+                        import pytz
+                        from base.plugins.llm.models.usage import LLMUsageRecord
+                        record = await LLMUsageRecord.create(
                             record_id=session_id,
                             customer_id=user_id,
                             model_id=provider_id,
-                            recognition_type="translation",
+                            record_type="voice",
                             audio_file="websocket_v3",
                             audio_format=config["format"],
                             source_language=config["source_language"],
                             target_language=config["target_language"],
-                            status="processing"
+                            status="processing",
+                            start_time=datetime.now(pytz.UTC) 
                         )
 
-                        logger.info(f"[实时翻译V3] ✅ 数据库记录已创建")
+
+
+
+                        #logger.info(f"[实时翻译V3] ✅ 数据库记录已创建")
 
                         # 连接豆包AST
-                        logger.info(f"[实时翻译V3] ========== 连接豆包AST ==========")
+                        #logger.info(f"[实时翻译V3] ========== 连接豆包AST ==========")
 
                         try:
                             service = await VoiceServiceHelper.get_voice_service(provider_id)
@@ -152,7 +163,7 @@ async def websocket_translation_v3(
                                 "X-Api-Connect-Id": conn_id
                             })
 
-                            logger.info(f"[实时翻译V3] 连接到豆包AST...")
+                            #logger.info(f"[实时翻译V3] 连接到豆包AST...")
 
                             # 连接豆包AST
                             doubao_ws = await websockets.connect(
@@ -164,7 +175,7 @@ async def websocket_translation_v3(
                             )
 
                             doubao_connected = True
-                            logger.info(f"[实时翻译V3] ✅ 豆包AST连接成功")
+                            #logger.info(f"[实时翻译V3] ✅ 豆包AST连接成功")
 
                             # 发送StartSession
                             from python_protogen.products.understanding.ast.ast_service_pb2 import TranslateRequest, TranslateResponse
@@ -188,12 +199,12 @@ async def websocket_translation_v3(
                             await doubao_ws.send(request_data.SerializeToString())
 
                             # 打印翻译配置信息
-                            logger.info(f"[实时翻译V3] ========== 🌐 翻译配置 ==========")
-                            logger.info(f"[实时翻译V3] 源语言 (source_language): {config['source_language']}")
-                            logger.info(f"[实时翻译V3] 目标语言 (target_language): {config['target_language']}")
-                            logger.info(f"[实时翻译V3] 翻译模式 (mode): s2s (Speech-to-Speech)")
-                            logger.info(f"[实时翻译V3] =============================")
-                            logger.info(f"[实时翻译V3] ✅ StartSession已发送")
+                            #logger.info(f"[实时翻译V3] ========== 🌐 翻译配置 ==========")
+                            #logger.info(f"[实时翻译V3] 源语言 (source_language): {config['source_language']}")
+                            #logger.info(f"[实时翻译V3] 目标语言 (target_language): {config['target_language']}")
+                            #logger.info(f"[实时翻译V3] 翻译模式 (mode): s2s (Speech-to-Speech)")
+                            #logger.info(f"[实时翻译V3] =============================")
+                            #logger.info(f"[实时翻译V3] ✅ StartSession已发送")
 
                             # 等待SessionStarted
                             response_data = await doubao_ws.recv()
@@ -203,10 +214,13 @@ async def websocket_translation_v3(
                             if Response_data.event != Type.SessionStarted:
                                 error_msg = f"会话建立失败: {Response_data.response_meta.Message}"
                                 logger.error(f"[实时翻译V3] {error_msg}")
-                                await websocket.send_json({"type": "error", "message": error_msg})
+                                try:
+                                    await websocket.send_json({"type": "error", "message": error_msg})
+                                except (WebSocketDisconnect, RuntimeError):
+                                    pass
                                 break
 
-                            logger.info(f"[实时翻译V3] ✅ 会话已建立")
+                            #logger.info(f"[实时翻译V3] ✅ 会话已建立")
 
                             # 初始化缓冲
                             audio_buffer.clear()
@@ -217,7 +231,7 @@ async def websocket_translation_v3(
                             async def flush_buffer_periodically():
                                 """每300ms发送一次缓冲的音频"""
                                 try:
-                                    flush_interval = 0.3  # 300ms
+                                    flush_interval = 0.2  # 200ms
                                     min_buffer_size = 3200  # 最小3200字节
 
                                     while is_running and not stop_event.is_set():
@@ -233,10 +247,10 @@ async def websocket_translation_v3(
                                                 duration_ms = len(chunk) / 2 / 16  # (字节数 / 2字节/采样) / 16kHz * 1000
                                                 duration_s = duration_ms / 1000
 
-                                                logger.info(f"[实时翻译V3-刷新] ========== 发送缓冲音频 ==========")
-                                                logger.info(f"[实时翻译V3-刷新] 大小: {len(chunk)} bytes")
-                                                logger.info(f"[实时翻译V3-刷新] 时长: {duration_s:.2f} 秒 ({duration_ms:.0f} 毫秒)")
-                                                logger.info(f"[实时翻译V3-刷新] 采样率: 16000 Hz, 16bit, 单声道")
+                                                #logger.info(f"[实时翻译V3-刷新] ========== 发送缓冲音频 ==========")
+                                                #logger.info(f"[实时翻译V3-刷新] 大小: {len(chunk)} bytes")
+                                                #logger.info(f"[实时翻译V3-刷新] 时长: {duration_s:.2f} 秒 ({duration_ms:.0f} 毫秒)")
+                                                #logger.info(f"[实时翻译V3-刷新] 采样率: 16000 Hz, 16bit, 单声道")
 
                                                 request_data = TranslateRequest()
                                                 request_data.request_meta.SessionID = session_id
@@ -257,8 +271,8 @@ async def websocket_translation_v3(
 
                                                 serialized = request_data.SerializeToString()
                                                 await doubao_ws.send(serialized)
-                                                logger.info(f"[实时翻译V3-刷新] ✅ 已发送到豆包AST ({len(serialized)} bytes)")
-                                                logger.info(f"[实时翻译V3-刷新] ===============================")
+                                                #logger.info(f"[实时翻译V3-刷新] ✅ 已发送到豆包AST ({len(serialized)} bytes)")
+                                                #logger.info(f"[实时翻译V3-刷新] ===============================")
 
                                 except Exception as e:
                                     logger.error(f"[实时翻译V3-刷新] 异常: {e}", exc_info=True)
@@ -273,7 +287,7 @@ async def websocket_translation_v3(
                                     translation_segments = []  # 译文片段
                                     response_count = 0
 
-                                    logger.info(f"[实时翻译V3-接收] ========== 开始接收 ==========")
+                                    #logger.info(f"[实时翻译V3-接收] ========== 开始接收 ==========")
 
                                     while is_running and not stop_event.is_set():
                                         try:
@@ -289,56 +303,80 @@ async def websocket_translation_v3(
                                         Response_data.ParseFromString(response_data)
 
                                         event_type = Response_data.event
-                                        logger.info(f"[实时翻译V3-接收] 响应#{response_count}: Event={event_type} ({Type.Name(event_type)})")
+                                        #logger.info(f"[实时翻译V3-接收] 响应#{response_count}: Event={event_type} ({Type.Name(event_type)})")
 
                                         # 会话失败
                                         if event_type == 153:  # SessionFailed
                                             error_msg = Response_data.response_meta.Message
                                             logger.error(f"[实时翻译V3] ❌ 会话失败: {error_msg}")
-                                            await websocket.send_json({"type": "error", "message": error_msg})
+                                            try:
+                                                await websocket.send_json({"type": "error", "message": error_msg})
+                                            except (WebSocketDisconnect, RuntimeError):
+                                                pass
                                             break
 
                                         # 会话完成
                                         if event_type == 152:  # SessionFinished
-                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                            logger.info(f"[实时翻译V3] 🎉 会话完成")
-                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            #logger.info(f"[实时翻译V3] 🎉 会话完成")
+                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
 
                                             from google.protobuf.json_format import MessageToDict
                                             response_dict = MessageToDict(Response_data)
 
+                                            # 智能合并原文和译文片段，确保标点符号对齐
+                                            def smart_join(segments):
+                                                result = ""
+                                                for seg in segments:
+                                                    if not result:
+                                                        result = seg
+                                                    else:
+                                                        # 如果前一个字符是标点符号，直接连接
+                                                        if result[-1] in ["，", "。", "！", "？", ",", ".", "!", "?"]:
+                                                            result += seg
+                                                        # 如果当前片段以标点符号开头，直接连接
+                                                        elif seg and seg[0] in ["，", "。", "！", "？", ",", ".", "!", "?"]:
+                                                            result += seg
+                                                        # 否则添加空格
+                                                        else:
+                                                            result += " " + seg
+                                                return result
+                                            
                                             final_result = {
                                                 "session_id": session_id,
-                                                "source_text": " ".join(source_segments),
-                                                "translation_text": " ".join(translation_segments),
+                                                "source_text": smart_join(source_segments),
+                                                "translation_text": smart_join(translation_segments),
                                                 "source_segments": source_segments,
                                                 "translation_segments": translation_segments,
                                                 "tokens": response_dict
                                             }
 
                                             # 打印最终汇总
-                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                            logger.info(f"[实时翻译V3] 📊 最终翻译汇总")
-                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                            logger.info(f"[实时翻译V3] 源语言      : {config['source_language']}")
-                                            logger.info(f"[实时翻译V3] 目标语言    : {config['target_language']}")
-                                            logger.info(f"[实时翻译V3] 原文片段数  : {len(source_segments)}")
-                                            logger.info(f"[实时翻译V3] 译文片段数  : {len(translation_segments)}")
-                                            logger.info(f"[实时翻译V3] 完整原文    : {' '.join(source_segments)}")
-                                            logger.info(f"[实时翻译V3] 完整译文    : {' '.join(translation_segments)}")
-                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            #logger.info(f"[实时翻译V3] 📊 最终翻译汇总")
+                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            #logger.info(f"[实时翻译V3] 源语言      : {config['source_language']}")
+                                            #logger.info(f"[实时翻译V3] 目标语言    : {config['target_language']}")
+                                            #logger.info(f"[实时翻译V3] 原文片段数  : {len(source_segments)}")
+                                            #logger.info(f"[实时翻译V3] 译文片段数  : {len(translation_segments)}")
+                                            #logger.info(f"[实时翻译V3] 完整原文    : {' '.join(source_segments)}")
+                                            #logger.info(f"[实时翻译V3] 完整译文    : {' '.join(translation_segments)}")
+                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
 
-                                            await websocket.send_json({
-                                                "type": "session_finished",
-                                                "result": final_result
-                                            })
+                                            try:
+                                                await websocket.send_json({
+                                                    "type": "session_finished",
+                                                    "result": final_result
+                                                })
+                                            except (WebSocketDisconnect, RuntimeError):
+                                                pass
                                             break
 
                                         # Token使用情况
                                         if event_type == 154:  # UsageResponse
                                             from google.protobuf.json_format import MessageToDict
                                             response_dict = MessageToDict(Response_data)
-                                            logger.info(f"[实时翻译V3] 📊 Token使用情况: {response_dict}")
+                                            #logger.info(f"[实时翻译V3] 📊 Token使用情况: {response_dict}")
 
                                         # ========== 原文事件 (650-652) ==========
                                         elif event_type == 650:  # SourceSubtitleStart
@@ -349,21 +387,26 @@ async def websocket_translation_v3(
                                             if hasattr(Response_data, 'text') and Response_data.text:
                                                 source_segments.append(Response_data.text)
 
-                                                logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                                logger.info(f"[实时翻译V3] 📖 原文片段 #{len(source_segments)}")
-                                                logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                                logger.info(f"[实时翻译V3] 源语言    : {config['source_language']}")
-                                                logger.info(f"[实时翻译V3] 原文      : {Response_data.text}")
-                                                logger.info(f"[实时翻译V3] 累积原文  : {' '.join(source_segments)}")
-                                                logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                                #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                                #logger.info(f"[实时翻译V3] 📖 原文片段 #{len(source_segments)}")
+                                                #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                                #logger.info(f"[实时翻译V3] 源语言    : {config['source_language']}")
+                                                #logger.info(f"[实时翻译V3] 原文      : {Response_data.text}")
+                                                #logger.info(f"[实时翻译V3] 累积原文  : {' '.join(source_segments)}")
+                                                #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
 
                                                 # 发送给客户端
-                                                await websocket.send_json({
-                                                    "type": "source",
-                                                    "text": Response_data.text,
-                                                    "language": config["source_language"],
-                                                    "segment_index": len(source_segments)
-                                                })
+                                                try:
+                                                    await websocket.send_json({
+                                                        "type": "source",
+                                                        "text": Response_data.text,
+                                                        "language": config["source_language"],
+                                                        "source_segments": ' '.join(source_segments),
+                                                        "segment_index": len(source_segments)
+                                                    })
+                                                except (WebSocketDisconnect, RuntimeError):
+                                                    # WebSocket已关闭，跳过发送
+                                                    break
 
                                         elif event_type == 652:  # SourceSubtitleEnd
                                             logger.info(f"[实时翻译V3] ========== 📖 原文结束 ==========")
@@ -377,21 +420,26 @@ async def websocket_translation_v3(
                                             if hasattr(Response_data, 'text') and Response_data.text:
                                                 translation_segments.append(Response_data.text)
 
-                                                logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                                logger.info(f"[实时翻译V3] 📝 译文片段 #{len(translation_segments)}")
-                                                logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                                logger.info(f"[实时翻译V3] 目标语言  : {config['target_language']}")
-                                                logger.info(f"[实时翻译V3] 译文      : {Response_data.text}")
-                                                logger.info(f"[实时翻译V3] 累积译文  : {' '.join(translation_segments)}")
-                                                logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                                #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                                #logger.info(f"[实时翻译V3] 📝 译文片段 #{len(translation_segments)}")
+                                                #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                                #logger.info(f"[实时翻译V3] 目标语言  : {config['target_language']}")
+                                                #logger.info(f"[实时翻译V3] 译文      : {Response_data.text}")
+                                                #logger.info(f"[实时翻译V3] 累积译文  : {' '.join(translation_segments)}")
+                                                #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
 
                                                 # 发送给客户端
-                                                await websocket.send_json({
-                                                    "type": "translation",
-                                                    "text": Response_data.text,
-                                                    "language": config["target_language"],
-                                                    "segment_index": len(translation_segments)
-                                                })
+                                                try:
+                                                    await websocket.send_json({
+                                                        "type": "translation",
+                                                        "text": Response_data.text,
+                                                        "language": config["target_language"],
+                                                        "translation_segments": ' '.join(translation_segments),
+                                                        "segment_index": len(translation_segments)
+                                                    })
+                                                except (WebSocketDisconnect, RuntimeError):
+                                                    # WebSocket已关闭，跳过发送
+                                                    break
 
                                         elif event_type == 655:  # TranslationSubtitleEnd
                                             logger.info(f"[实时翻译V3] ========== 📝 译文结束 ==========")
@@ -401,23 +449,29 @@ async def websocket_translation_v3(
 
                             receiver_task = asyncio.create_task(receive_translation_from_doubao())
 
-                            await websocket.send_json({
-                                "type": "started",
-                                "session_id": session_id
-                            })
+                            try:
+                                await websocket.send_json({
+                                    "type": "started",
+                                    "session_id": session_id
+                                })
+                            except (WebSocketDisconnect, RuntimeError):
+                                pass
 
-                            logger.info(f"[实时翻译V3] ✅ 会话已启动，缓冲机制已启用")
+                            #logger.info(f"[实时翻译V3] ✅ 会话已启动，缓冲机制已启用")
 
                         except Exception as e:
                             logger.error(f"[实时翻译V3] 连接豆包AST失败: {e}", exc_info=True)
-                            await websocket.send_json({
-                                "type": "error",
-                                "message": f"连接翻译服务失败: {str(e)}"
-                            })
+                            try:
+                                await websocket.send_json({
+                                    "type": "error",
+                                    "message": f"连接翻译服务失败: {str(e)}"
+                                })
+                            except (WebSocketDisconnect, RuntimeError):
+                                pass
                             break
 
                     elif msg_type == "end":
-                        logger.info(f"[实时翻译V3] ========== 收到end消息 ==========")
+                        #logger.info(f"[实时翻译V3] ========== 收到end消息 ==========")
 
                         is_running = False
                         stop_event.set()
@@ -425,7 +479,7 @@ async def websocket_translation_v3(
                         # 发送剩余的缓冲
                         async with buffer_lock:
                             if len(audio_buffer) > 0:
-                                logger.info(f"[实时翻译V3] 发送剩余缓冲: {len(audio_buffer)} bytes")
+                                #logger.info(f"[实时翻译V3] 发送剩余缓冲: {len(audio_buffer)} bytes")
 
                                 from python_protogen.products.understanding.ast.ast_service_pb2 import TranslateRequest
                                 from python_protogen.common.events_pb2 import Type
@@ -466,7 +520,7 @@ async def websocket_translation_v3(
                         request_data.target_audio.rate = 24000
 
                         await doubao_ws.send(request_data.SerializeToString())
-                        logger.info(f"[实时翻译V3] ✅ FinishSession已发送")
+                        #logger.info(f"[实时翻译V3] ✅ FinishSession已发送")
 
                         # 等待任务完成
                         if buffer_flush_task:
@@ -481,36 +535,49 @@ async def websocket_translation_v3(
 
                         # 更新数据库
                         if record:
+                            from datetime import datetime
+                            import pytz
                             record.status = "completed"
+                            record.end_time = datetime.now(pytz.UTC) 
                             await record.save()
 
-                        await websocket.send_json({
-                            "type": "ended",
-                            "session_id": session_id
-                        })
+                        try:
+                            await websocket.send_json({
+                                "type": "ended",
+                                "session_id": session_id
+                            })
+                        except (WebSocketDisconnect, RuntimeError):
+                            # WebSocket已关闭，跳过发送
+                            pass
 
-                        logger.info(f"[实时翻译V3] ✅ 会话正常结束")
+                        #logger.info(f"[实时翻译V3] ✅ 会话正常结束")
                         break
 
                     else:
-                        await websocket.send_json({
-                            "type": "error",
-                            "message": f"未知消息类型: {msg_type}"
-                        })
+                        try:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": f"未知消息类型: {msg_type}"
+                            })
+                        except (WebSocketDisconnect, RuntimeError):
+                            pass
 
                 except json.JSONDecodeError as e:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": f"JSON解析错误: {str(e)}"
-                    })
+                    try:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"JSON解析错误: {str(e)}"
+                        })
+                    except (WebSocketDisconnect, RuntimeError):
+                        pass
 
             # 处理音频数据 - 放入缓冲区
             elif "bytes" in message:
                 audio_chunk = message["bytes"]
 
-                logger.info(f"[实时翻译V3] ========== 📥 收到音频块 ==========")
-                logger.info(f"[实时翻译V3] 原始大小: {len(audio_chunk)} bytes")
-                logger.info(f"[实时翻译V3] 是否WAV: {'是' if len(audio_chunk) >= 4 and audio_chunk[:4] == b'RIFF' else '否'}")
+                #logger.info(f"[实时翻译V3] ========== 📥 收到音频块 ==========")
+                #logger.info(f"[实时翻译V3] 原始大小: {len(audio_chunk)} bytes")
+                #logger.info(f"[实时翻译V3] 是否WAV: {'是' if len(audio_chunk) >= 4 and audio_chunk[:4] == b'RIFF' else '否'}")
 
                 # 提取PCM（如果是WAV格式）
                 pcm_data = audio_chunk
@@ -521,8 +588,8 @@ async def websocket_translation_v3(
                         audio_file_obj = io.BytesIO(audio_chunk)
                         with wave.open(audio_file_obj, 'rb') as wf:
                             pcm_data = wf.readframes(wf.getnframes())
-                        logger.info(f"[实时翻译V3] 提取PCM: {len(audio_chunk)} -> {len(pcm_data)} bytes")
-                        logger.info(f"[实时翻译V3] WAV头部: {len(audio_chunk) - len(pcm_data)} bytes")
+                        #logger.info(f"[实时翻译V3] 提取PCM: {len(audio_chunk)} -> {len(pcm_data)} bytes")
+                        #logger.info(f"[实时翻译V3] WAV头部: {len(audio_chunk) - len(pcm_data)} bytes")
                     else:
                         logger.info(f"[实时翻译V3] 纯PCM数据")
                 except Exception as e:
@@ -530,7 +597,7 @@ async def websocket_translation_v3(
 
                 # 计算音频时长
                 duration_ms = len(pcm_data) / 2 / 16  # 毫秒
-                logger.info(f"[实时翻译V3] 音频时长: {duration_ms:.0f} 毫秒 ({duration_ms/1000:.2f} 秒)")
+                #logger.info(f"[实时翻译V3] 音频时长: {duration_ms:.0f} 毫秒 ({duration_ms/1000:.2f} 秒)")
 
                 # 放入缓冲区
                 if doubao_connected:
@@ -540,17 +607,17 @@ async def websocket_translation_v3(
                         after_size = len(audio_buffer)
                         added_size = after_size - before_size
 
-                        logger.info(f"[实时翻译V3] ========== 缓冲区状态 ==========")
-                        logger.info(f"[实时翻译V3] 添加: {added_size} bytes")
-                        logger.info(f"[实时翻译V3] 当前缓冲: {after_size} bytes")
-                        logger.info(f"[实时翻译V3] 缓冲时长: {after_size / 2 / 16 / 1000:.2f} 秒")
-                        logger.info(f"[实时翻译V3] 距离最小缓冲: {max(0, 3200 - after_size)} bytes")
-                        logger.info(f"[实时翻译V3] =============================")
+                        #logger.info(f"[实时翻译V3] ========== 缓冲区状态 ==========")
+                        #logger.info(f"[实时翻译V3] 添加: {added_size} bytes")
+                        #logger.info(f"[实时翻译V3] 当前缓冲: {after_size} bytes")
+                        #logger.info(f"[实时翻译V3] 缓冲时长: {after_size / 2 / 16 / 1000:.2f} 秒")
+                        #logger.info(f"[实时翻译V3] 距离最小缓冲: {max(0, 3200 - after_size)} bytes")
+                        #logger.info(f"[实时翻译V3] =============================")
                 else:
                     logger.warning(f"[实时翻译V3] ⚠️  豆包未连接，丢弃音频块")
 
     except WebSocketDisconnect:
-        logger.info(f"[实时翻译V3] 客户端断开连接")
+        #logger.info(f"[实时翻译V3] 客户端断开连接")
         is_running = False
         stop_event.set()
 
@@ -564,7 +631,10 @@ async def websocket_translation_v3(
             await doubao_ws.close()
 
         if record and record.status == "processing":
+            from datetime import datetime
+            import pytz
             record.status = "failed"
+            record.end_time = datetime.now(pytz.UTC) 
             await record.save()
 
     except Exception as e:
@@ -592,8 +662,11 @@ async def websocket_translation_v3(
 
         if record:
             try:
+                from datetime import datetime
+                import pytz
                 record.status = "failed"
                 record.error_message = str(e)
+                record.end_time = datetime.now(pytz.UTC) 
                 await record.save()
             except:
                 pass

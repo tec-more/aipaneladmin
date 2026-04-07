@@ -230,12 +230,12 @@ async def get_usage_logs_alias(
     """获取使用记录列表 (兼容前端调用)"""
     try:
         print(f"[UsageLogs] 开始导入模型...")
-        from base.plugins.customer.models.usage_log import UsageLog
+        from base.plugins.llm.models.usage import LLMUsageRecord
         from base.plugins.customer.models.customer import Customer
 
         print(f"[UsageLogs] 模型导入成功")
 
-        query = UsageLog.all()
+        query = LLMUsageRecord.all()
         print(f"[UsageLogs] 构建基础查询")
 
         if customer_id:
@@ -254,7 +254,15 @@ async def get_usage_logs_alias(
 
         if service_type and service_type.strip():
             print(f"[UsageLogs] 按服务类型过滤: {service_type}")
-            query = query.filter(service_type=service_type)
+            # 映射服务类型到记录类型
+            service_type_map = {
+                'text_generation': 'conversation',
+                'translation': 'voice',
+                'tts': 'tts',
+                'voice_clone': 'voice_clone'
+            }
+            record_type = service_type_map.get(service_type, service_type)
+            query = query.filter(record_type=record_type)
 
         total = await query.count()
         print(f"[UsageLogs] 总记录数: {total}")
@@ -264,17 +272,19 @@ async def get_usage_logs_alias(
 
         log_list = []
         for log in logs:
-            if hasattr(log, 'to_dict'):
-                log_dict = await log.to_dict()
-            elif hasattr(log, 'dict'):
-                log_dict = log.dict()
-            else:
-                log_dict = dict(log)
-
-            # 转换 Decimal
-            if 'api_cost' in log_dict and log_dict['api_cost'] is not None:
-                log_dict['api_cost'] = float(log_dict['api_cost'])
-
+            # 构建适配的记录字典
+            log_dict = {
+                "id": log.id,
+                "customer_id": log.customer_id,
+                "session_id": log.record_id,
+                "duration_seconds": log.tokens,  # 使用tokens作为使用量指标
+                "service_type": log.record_type,
+                "details": log.extra_info or {},
+                "characters_count": len(log.input_text) + len(log.output_text) if log.input_text and log.output_text else 0,
+                "api_cost": float(log.cost) if log.cost else 0,
+                "created_at": log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else None,
+                "updated_at": log.updated_at.strftime("%Y-%m-%d %H:%M:%S") if log.updated_at else None
+            }
             log_list.append(log_dict)
 
         response_data = {"total": total, "page": page, "page_size": page_size, "items": log_list}
@@ -293,7 +303,7 @@ async def create_test_usage_log(
 ):
     """创建测试使用记录（用于演示）"""
     try:
-        from base.plugins.customer.models.usage_log import UsageLog
+        from base.plugins.llm.models.usage import LLMUsageRecord
         from base.plugins.customer.models.customer import Customer
         import uuid
 
@@ -309,13 +319,16 @@ async def create_test_usage_log(
         # 创建测试记录
         test_logs = [
             {
+                "record_id": f"test_{uuid.uuid4().hex[:16]}",
                 "customer_id": customer.id,
-                "session_id": str(uuid.uuid4())[:32],
-                "duration_seconds": 120,
-                "service_type": "text_generation",
-                "characters_count": 1500,
-                "api_cost": 0.0150,
-                "details": {
+                "model_id": 1,
+                "record_type": "conversation",
+                "status": "completed",
+                "tokens": 500,
+                "cost": 0.0150,
+                "input_text": "测试输入文本",
+                "output_text": "测试输出文本",
+                "extra_info": {
                     "model": "claude-3-opus",
                     "prompt_tokens": 100,
                     "completion_tokens": 400,
@@ -323,53 +336,36 @@ async def create_test_usage_log(
                 }
             },
             {
+                "record_id": f"test_{uuid.uuid4().hex[:16]}",
                 "customer_id": customer.id,
-                "session_id": str(uuid.uuid4())[:32],
-                "duration_seconds": 60,
-                "service_type": "image_generation",
-                "characters_count": 0,
-                "api_cost": 0.0250,
-                "details": {
-                    "model": "dall-e-3",
-                    "image_size": "1024x1024",
-                    "prompt": "A beautiful sunset"
-                }
-            },
-            {
-                "customer_id": customer.id,
-                "session_id": str(uuid.uuid4())[:32],
-                "duration_seconds": 30,
-                "service_type": "tts",
-                "characters_count": 500,
-                "api_cost": 0.0060,
-                "details": {
-                    "model": "tts-1",
-                    "voice": "alloy",
-                    "text_length": 500
+                "model_id": 1,
+                "record_type": "voice",
+                "status": "completed",
+                "tokens": 300,
+                "cost": 0.0090,
+                "input_text": "测试语音输入",
+                "output_text": "测试语音输出",
+                "extra_info": {
+                    "model": "whisper-1",
+                    "audio_duration": 10,
+                    "language": "zh"
                 }
             }
         ]
 
-        created_count = 0
+        # 批量创建记录
+        created_logs = []
         for log_data in test_logs:
-            try:
-                await UsageLog.create(**log_data)
-                created_count += 1
-                print(f"[UsageLogs] 创建记录成功: {log_data['service_type']}")
-            except Exception as e:
-                print(f"[UsageLogs] 创建记录失败: {e}")
+            log = await LLMUsageRecord.create(**log_data)
+            created_logs.append(log)
 
-        print(f"[UsageLogs] 成功创建 {created_count} 条测试记录\n")
-
-        return SuccessResponse(
-            data={"created": created_count, "total": len(test_logs)},
-            msg=f"成功创建 {created_count} 条测试使用记录"
-        )
+        print(f"[UsageLogs] 创建了 {len(created_logs)} 条测试记录")
+        return SuccessResponse(msg="测试使用记录创建成功")
     except Exception as e:
-        print(f"[ERROR] 创建测试记录失败: {e}")
+        print(f"[ERROR] 创建测试使用记录失败: {e}")
         import traceback
         traceback.print_exc()
-        return ErrorResponse(msg=str(e), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
 @customer_router.get("/usage-logs", summary="获取所有使用记录列表(管理员)")

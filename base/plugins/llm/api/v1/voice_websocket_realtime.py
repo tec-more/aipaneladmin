@@ -14,7 +14,7 @@ import asyncio
 from pathlib import Path
 
 from base.common.security import get_current_user_id_ws
-from base.plugins.llm.models.voice import LLMVoiceRecord
+from base.plugins.llm.models.usage import LLMUsageRecord
 from base.plugins.llm.services.voice_helper import VoiceServiceHelper
 
 logger = logging.getLogger(__name__)
@@ -130,11 +130,11 @@ async def websocket_translation_realtime(
                         logger.info(f"[实时翻译] 配置: {config}")
 
                         # 创建记录
-                        record = await LLMVoiceRecord.create(
+                        record = await LLMUsageRecord.create(
                             record_id=session_id,
                             customer_id=user_id,
                             model_id=provider_id,
-                            recognition_type="translation",
+                            record_type="voice",
                             audio_file="websocket_realtime",
                             audio_format=config["format"],
                             source_language=config["source_language"],

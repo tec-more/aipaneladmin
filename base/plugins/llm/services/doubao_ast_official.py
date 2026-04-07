@@ -413,6 +413,12 @@ class DoubaoASTOfficialService:
                     "duration_ms": 0
                 }
 
+                # 用于断句对齐的临时变量
+                source_buffer = []
+                translation_buffer = []
+                pending_source = ""
+                pending_translation = ""
+
                 try:
                     while True:
                         response_data = await ws.recv()
@@ -434,9 +440,23 @@ class DoubaoASTOfficialService:
 
                         elif response.event == Type.SessionFinished:
                             logger.info(f"[AST] 会话正常结束")
+                            
+                            # 处理最后一个片段
+                            if pending_source:
+                                source_buffer.append(pending_source)
+                            if pending_translation:
+                                translation_buffer.append(pending_translation)
+                            
+                            # 确保断句数量一致
+                            while len(source_buffer) < len(translation_buffer):
+                                source_buffer.append("")
+                            while len(translation_buffer) < len(source_buffer):
+                                translation_buffer.append("")
 
-                            final_result["source_text"] = " ".join(final_result["source_segments"])
-                            final_result["translation_text"] = " ".join(final_result["translation_segments"])
+                            final_result["source_segments"] = source_buffer
+                            final_result["translation_segments"] = translation_buffer
+                            final_result["source_text"] = " ".join(source_buffer)
+                            final_result["translation_text"] = " ".join(translation_buffer)
 
                             yield {
                                 "event": "session_finished",
@@ -450,8 +470,26 @@ class DoubaoASTOfficialService:
                             logger.info(f"[AST] 计费信息: {json.dumps(response_dict, indent=2, ensure_ascii=False)}")
                             final_result["tokens"] = response_dict
 
-                        # 原文字幕
-                        elif response.text and response.event not in [Type.UsageResponse]:
+                        # 处理原文事件
+                        elif response.event == 651:  # SourceSubtitleResponse
+                            pending_source += response.text
+                            logger.info(f"[AST] 原文: {response.text}")
+                        elif response.event == 652:  # SourceSubtitleEnd
+                            if pending_source:
+                                source_buffer.append(pending_source)
+                                pending_source = ""
+                            logger.info(f"[AST] 原文片段结束")
+                        # 处理译文事件
+                        elif response.event == 654:  # TranslationSubtitleResponse
+                            pending_translation += response.text
+                            logger.info(f"[AST] 译文: {response.text}")
+                        elif response.event == 655:  # TranslationSubtitleEnd
+                            if pending_translation:
+                                translation_buffer.append(pending_translation)
+                                pending_translation = ""
+                            logger.info(f"[AST] 译文片段结束")
+                        # 原文字幕（兼容旧版）
+                        elif response.text and response.event not in [Type.UsageResponse, 651, 652, 654, 655]:
                             if response.data:
                                 # 有音频数据
                                 final_result["audio_data"] += response.data
@@ -459,7 +497,7 @@ class DoubaoASTOfficialService:
 
                             if response.text:
                                 # 文本翻译
-                                final_result["translation_segments"].append(response.text)
+                                translation_buffer.append(response.text)
                                 logger.info(f"[AST] 翻译: {response.text}")
 
                                 yield {

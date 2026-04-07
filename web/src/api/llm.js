@@ -91,28 +91,6 @@ export const testApiKey = (id) => {
   return request.get(`/v1/llm/api-keys/${id}/test`)
 }
 
-// ============ 对话记录管理 ============
-
-// 获取对话列表
-export const getConversationList = (params) => {
-  return request.get('/v1/llm/conversations', { params })
-}
-
-// 获取对话详情
-export const getConversationDetail = (id) => {
-  return request.get(`/v1/llm/conversations/${id}`)
-}
-
-// 获取对话使用记录
-export const getConversationUsage = (id, params) => {
-  return request.get(`/v1/llm/conversations/${id}/usage`, { params })
-}
-
-// 获取对话统计汇总
-export const getConversationSummary = (id) => {
-  return request.get(`/v1/llm/conversations/${id}/summary`)
-}
-
 // ============ 使用统计管理 ============
 
 // 获取使用记录列表
@@ -138,6 +116,11 @@ export const getModelStatistics = (params) => {
 // 获取客户使用统计
 export const getCustomerStatistics = (params) => {
   return request.get('/v1/llm/usage/statistics/customer', { params })
+}
+
+// 获取统一使用记录列表
+export const getUnifiedUsageRecords = (params) => {
+  return request.get('/v1/llm/usage/unified-records', { params })
 }
 
 // ============ 语音服务 ============
@@ -181,14 +164,4 @@ export const streamingTranslation = (formData) => {
   return request.post('/v1/llm/voice/translation/streaming', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
-}
-
-// 获取语音记录列表
-export const getVoiceRecords = (params) => {
-  return request.get('/v1/llm/voice/records', { params })
-}
-
-// 获取语音合成记录
-export const getTTSRecords = (params) => {
-  return request.get('/v1/llm/voice/tts/records', { params })
 }

@@ -1,452 +1,273 @@
 <template>
-  <div class="usage-stats">
-    <!-- 统计卡片 -->
-    <el-row :gutter="20" class="stats-cards">
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon" style="background-color: #409eff">
-              <el-icon :size="24"><ChatLineRound /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ statistics.total_records || 0 }}</div>
-              <div class="stat-label">总请求数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon" style="background-color: #67c23a">
-              <el-icon :size="24"><Tickets /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ formatNumber(statistics.total_tokens || 0) }}</div>
-              <div class="stat-label">总Token数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon" style="background-color: #e6a23c">
-              <el-icon :size="24"><Coin /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">¥{{ statistics.total_cost?.toFixed(2) || '0.00' }}</div>
-              <div class="stat-label">总成本</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon" style="background-color: #f56c6c">
-              <el-icon :size="24"><TrendCharts /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ formatNumber(statistics.average_tokens_per_request || 0) }}</div>
-              <div class="stat-label">平均Token/请求</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 图表区域 -->
-    <el-row :gutter="20" class="charts-row">
-      <el-col :span="16">
-        <el-card shadow="never">
-          <template #header>
-            <div class="card-header">
-              <span>每日使用趋势</span>
-              <el-select v-model="dailyDays" @change="fetchDailyStats" style="width: 120px">
-                <el-option label="最近7天" :value="7" />
-                <el-option label="最近14天" :value="14" />
-                <el-option label="最近30天" :value="30" />
-              </el-select>
-            </div>
-          </template>
-          <div ref="dailyChartRef" style="height: 300px"></div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card shadow="never">
-          <template #header>
-            <span>模型使用分布</span>
-          </template>
-          <div ref="modelChartRef" style="height: 300px"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 使用记录 -->
-    <el-card shadow="never" class="mt-20">
+  <div class="usage-records">
+    <!-- 统一使用记录管理 -->
+    <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span>使用记录</span>
-          <div>
-            <el-select v-model="searchForm.customer_id" placeholder="客户ID" clearable filterable style="width: 150px; margin-right: 10px">
-              <el-option v-for="item in customerTopList" :key="item.customer_id" :label="`客户${item.customer_id}`" :value="item.customer_id" />
-            </el-select>
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              value-format="YYYY-MM-DD"
-              @change="handleDateChange"
-              style="margin-right: 10px"
-            />
-            <el-button type="primary" :icon="Search" @click="fetchRecords">搜索</el-button>
-            <el-button :icon="Refresh" @click="handleReset">重置</el-button>
-          </div>
+          <span>大模型使用记录管理</span>
         </div>
       </template>
 
-      <el-table v-loading="recordsLoading" :data="recordsList" border stripe>
+      <!-- 搜索栏 -->
+      <el-form :inline="true" :model="searchForm" class="search-form mb-4">
+        <el-form-item label="客户ID">
+          <el-input v-model="searchForm.customer_id" placeholder="请输入客户ID" clearable style="width: 150px" />
+        </el-form-item>
+        <el-form-item label="模型ID">
+          <el-input v-model="searchForm.model_id" placeholder="请输入模型ID" clearable style="width: 150px" />
+        </el-form-item>
+        <el-form-item label="记录类型">
+          <el-select v-model="searchForm.record_type" placeholder="请选择" clearable style="width: 150px">
+            <el-option label="语音识别/同声传译" value="voice" />
+            <el-option label="语音合成" value="tts" />
+            <el-option label="声音复刻" value="voice_clone" />
+            <el-option label="文本对话" value="conversation" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px">
+            <el-option label="处理中" value="processing" />
+            <el-option label="完成" value="completed" />
+            <el-option label="失败" value="failed" />
+            <el-option label="活跃" value="active" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="fetchUsageRecords">搜索</el-button>
+          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+
+      <el-table v-loading="loading" :data="recordsList" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="conversation_id" label="对话ID" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="model_id" label="模型ID" width="100" align="center" />
+        <el-table-column prop="record_id" label="记录ID" min-width="150" show-overflow-tooltip />
         <el-table-column prop="customer_id" label="客户ID" width="100" align="center" />
-        <el-table-column label="Token统计" width="200" align="center">
+        <el-table-column prop="model_id" label="模型ID" width="100" align="center" />
+        <el-table-column prop="record_type" label="记录类型" width="150" align="center">
           <template #default="{ row }">
-            <div>输入: {{ formatNumber(row.prompt_tokens) }}</div>
-            <div>输出: {{ formatNumber(row.completion_tokens) }}</div>
+            <el-tag v-if="row.record_type === 'voice'" type="primary">语音识别/同声传译</el-tag>
+            <el-tag v-else-if="row.record_type === 'tts'" type="success">语音合成</el-tag>
+            <el-tag v-else-if="row.record_type === 'voice_clone'" type="info">声音复刻</el-tag>
+            <el-tag v-else-if="row.record_type === 'conversation'" type="warning">文本对话</el-tag>
+            <span v-else>{{ row.record_type }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="total_tokens" label="总计" width="100" align="center">
+        <el-table-column label="内容" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ formatNumber(row.total_tokens) }}
+            <div v-if="row.input_text">{{ row.input_text.length > 50 ? row.input_text.substring(0, 50) + '...' : row.input_text }}</div>
+            <div v-else-if="row.audio_file">{{ row.audio_file }}</div>
+            <div v-else-if="row.voice_name">声音复刻: {{ row.voice_name }}</div>
+            <div v-else>-</div>
           </template>
         </el-table-column>
-        <el-table-column prop="cost" label="成本(元)" width="120" align="center">
+        <el-table-column label="语言" width="180" align="center">
           <template #default="{ row }">
-            ¥{{ row.cost?.toFixed(4) || '0.0000' }}
+            <div v-if="row.source_language">{{ row.source_language }} → {{ row.target_language || '-' }}</div>
+            <div v-else>-</div>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="时间" width="180" />
+        <el-table-column prop="status" label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.status === 'processing'" type="info">处理中</el-tag>
+            <el-tag v-else-if="row.status === 'completed'" type="success">完成</el-tag>
+            <el-tag v-else-if="row.status === 'failed'" type="danger">失败</el-tag>
+            <el-tag v-else-if="row.status === 'active'" type="warning">活跃</el-tag>
+            <span v-else>{{ row.status }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="时间" width="200" align="center">
+          <template #default="{ row }">
+            <div v-if="row.start_time">{{ formatDateTime(row.start_time) }}</div>
+            <div v-else>{{ formatDateTime(row.created_at) }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="时长" width="100" align="center">
+          <template #default="{ row }">
+            <div v-if="row.start_time && row.end_time">{{ calculateDuration(row.start_time, row.end_time) }}</div>
+            <div v-else>-</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="费用" width="100" align="center">
+          <template #default="{ row }">
+            <div>¥{{ (row.cost || 0).toFixed(4) }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="handleViewDetail(row)">查看</el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="recordsPagination.page"
-          v-model:page-size="recordsPagination.pageSize"
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
           :page-sizes="[10, 20, 50, 100]"
-          :total="recordsPagination.total"
+          :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="fetchRecords"
-          @current-change="fetchRecords"
+          @size-change="fetchUsageRecords"
+          @current-change="fetchUsageRecords"
         />
       </div>
     </el-card>
+
+    <!-- 详情弹窗 -->
+    <el-dialog v-model="detailDialogVisible" title="记录详情" width="800px">
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="记录ID">{{ detailRecord.record_id }}</el-descriptions-item>
+        <el-descriptions-item label="客户ID">{{ detailRecord.customer_id }}</el-descriptions-item>
+        <el-descriptions-item label="模型ID">{{ detailRecord.model_id }}</el-descriptions-item>
+        <el-descriptions-item label="记录类型">
+          <el-tag v-if="detailRecord.record_type === 'voice'" type="primary">语音识别/同声传译</el-tag>
+          <el-tag v-else-if="detailRecord.record_type === 'tts'" type="success">语音合成</el-tag>
+          <el-tag v-else-if="detailRecord.record_type === 'voice_clone'" type="info">声音复刻</el-tag>
+          <el-tag v-else-if="detailRecord.record_type === 'conversation'" type="warning">文本对话</el-tag>
+          <span v-else>{{ detailRecord.record_type }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="音频文件" v-if="detailRecord.audio_file">{{ detailRecord.audio_file }}</el-descriptions-item>
+        <el-descriptions-item label="音频格式" v-if="detailRecord.audio_format">{{ detailRecord.audio_format }}</el-descriptions-item>
+        <el-descriptions-item label="源语言" v-if="detailRecord.source_language">{{ detailRecord.source_language }}</el-descriptions-item>
+        <el-descriptions-item label="目标语言" v-if="detailRecord.target_language">{{ detailRecord.target_language }}</el-descriptions-item>
+        <el-descriptions-item label="音色" v-if="detailRecord.voice_type">{{ detailRecord.voice_type }}</el-descriptions-item>
+        <el-descriptions-item label="复刻ID" v-if="detailRecord.clone_id">{{ detailRecord.clone_id }}</el-descriptions-item>
+        <el-descriptions-item label="音色ID" v-if="detailRecord.voice_id">{{ detailRecord.voice_id }}</el-descriptions-item>
+        <el-descriptions-item label="音色名称" v-if="detailRecord.voice_name">{{ detailRecord.voice_name }}</el-descriptions-item>
+        <el-descriptions-item label="对话ID" v-if="detailRecord.conversation_id">{{ detailRecord.conversation_id }}</el-descriptions-item>
+        <el-descriptions-item label="开始时间" :span="2">{{ detailRecord.start_time ? formatDateTime(detailRecord.start_time) : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="结束时间" :span="2">{{ detailRecord.end_time ? formatDateTime(detailRecord.end_time) : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="状态" :span="2">
+          <el-tag v-if="detailRecord.status === 'processing'" type="info">处理中</el-tag>
+          <el-tag v-else-if="detailRecord.status === 'completed'" type="success">完成</el-tag>
+          <el-tag v-else-if="detailRecord.status === 'failed'" type="danger">失败</el-tag>
+          <el-tag v-else-if="detailRecord.status === 'active'" type="warning">活跃</el-tag>
+          <span v-else>{{ detailRecord.status }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="错误信息" :span="2">{{ detailRecord.error_message || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="输入文本" :span="2" v-if="detailRecord.input_text">
+          <el-popover placement="top" :width="600" trigger="click">
+            <template #reference>
+              <span class="text-primary cursor-pointer">{{ detailRecord.input_text.length > 50 ? detailRecord.input_text.substring(0, 50) + '...' : detailRecord.input_text }}</span>
+            </template>
+            <div class="text-break">{{ detailRecord.input_text }}</div>
+          </el-popover>
+        </el-descriptions-item>
+        <el-descriptions-item label="输出文本" :span="2" v-if="detailRecord.output_text">
+          <el-popover placement="top" :width="600" trigger="click">
+            <template #reference>
+              <span class="text-primary cursor-pointer">{{ detailRecord.output_text.length > 50 ? detailRecord.output_text.substring(0, 50) + '...' : detailRecord.output_text }}</span>
+            </template>
+            <div class="text-break">{{ detailRecord.output_text }}</div>
+          </el-popover>
+        </el-descriptions-item>
+        <el-descriptions-item label="Token统计" :span="2">
+          <div>总计: {{ detailRecord.tokens || 0 }}</div>
+        </el-descriptions-item>
+        <el-descriptions-item label="费用" :span="2">¥{{ (detailRecord.cost || 0).toFixed(4) }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
-import { Search, Refresh, ChatLineRound, Tickets, Coin, TrendCharts } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted } from 'vue'
+import { Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
-import {
-  getUsageStatistics,
-  getDailyStatistics,
-  getModelStatistics,
-  getCustomerStatistics,
-  getUsageRecords
-} from '@/api/llm'
+import { getUnifiedUsageRecords } from '@/api/llm'
 
-let dailyChart = null
-let modelChart = null
-
-const dailyChartRef = ref()
-const modelChartRef = ref()
-const dailyDays = ref(7)
-const dateRange = ref([])
-const recordsLoading = ref(false)
-
-const statistics = ref({})
-const dailyStats = ref([])
-const modelStats = ref([])
-const customerTopList = ref([])
+const loading = ref(false)
 const recordsList = ref([])
+const detailDialogVisible = ref(false)
+const detailRecord = ref({})
 
 const searchForm = reactive({
   customer_id: null,
-  start_date: null,
-  end_date: null
+  model_id: null,
+  record_type: null,
+  status: null
 })
 
-const recordsPagination = reactive({
+const pagination = reactive({
   page: 1,
   pageSize: 10,
   total: 0
 })
 
-const fetchStatistics = async () => {
+// 获取统一使用记录列表
+const fetchUsageRecords = async () => {
+  loading.value = true
   try {
-    const { data } = await getUsageStatistics({ days: 7 })
-    statistics.value = data
-  } catch (error) {
-    ElMessage.error('获取统计数据失败')
-  }
-}
-
-const fetchDailyStats = async () => {
-  try {
-    const { data } = await getDailyStatistics({ days: dailyDays.value })
-    dailyStats.value = data.daily_stats || []
-    renderDailyChart()
-  } catch (error) {
-    ElMessage.error('获取每日统计失败')
-  }
-}
-
-const fetchModelStats = async () => {
-  try {
-    const { data } = await getModelStatistics()
-    modelStats.value = data.model_stats || []
-    renderModelChart()
-  } catch (error) {
-    ElMessage.error('获取模型统计失败')
-  }
-}
-
-const fetchCustomerStats = async () => {
-  try {
-    const { data } = await getCustomerStatistics({ top_n: 20 })
-    customerTopList.value = data.customer_stats || []
-  } catch (error) {
-    console.error('获取客户统计失败', error)
-  }
-}
-
-const fetchRecords = async () => {
-  recordsLoading.value = true
-  try {
-    const { data } = await getUsageRecords({
+    const { data } = await getUnifiedUsageRecords({
       ...searchForm,
-      page: recordsPagination.page,
-      page_size: recordsPagination.pageSize
+      page: pagination.page,
+      page_size: pagination.pageSize
     })
     recordsList.value = data.items || []
-    recordsPagination.total = data.total || 0
+    pagination.total = data.total || 0
   } catch (error) {
     ElMessage.error('获取使用记录失败')
   } finally {
-    recordsLoading.value = false
+    loading.value = false
   }
 }
 
-const handleDateChange = (dates) => {
-  if (dates && dates.length === 2) {
-    searchForm.start_date = dates[0]
-    searchForm.end_date = dates[1]
-  } else {
-    searchForm.start_date = null
-    searchForm.end_date = null
-  }
+// 查看详情
+const handleViewDetail = (row) => {
+  detailRecord.value = { ...row }
+  detailDialogVisible.value = true
 }
 
+// 重置
 const handleReset = () => {
   searchForm.customer_id = null
-  searchForm.start_date = null
-  searchForm.end_date = null
-  dateRange.value = []
-  fetchRecords()
+  searchForm.model_id = null
+  searchForm.record_type = null
+  searchForm.status = null
+  pagination.page = 1
+  fetchUsageRecords()
 }
 
-const renderDailyChart = () => {
-  if (!dailyChartRef.value) return
+// 格式化日期时间
+const formatDateTime = (dateTime) => {
+  if (!dateTime) return ''
+  const date = new Date(dateTime)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
 
-  if (!dailyChart) {
-    dailyChart = echarts.init(dailyChartRef.value)
+// 计算时长
+const calculateDuration = (startTime, endTime) => {
+  if (!startTime || !endTime) return ''
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  const duration = (end - start) / 1000 // 秒
+  if (duration < 60) {
+    return `${duration.toFixed(1)}秒`
+  } else {
+    const minutes = Math.floor(duration / 60)
+    const seconds = Math.floor(duration % 60)
+    return `${minutes}分${seconds}秒`
   }
-
-  const dates = dailyStats.value.map(item => item.date)
-  const tokens = dailyStats.value.map(item => item.total_tokens)
-  const costs = dailyStats.value.map(item => item.total_cost)
-
-  const option = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'cross'
-      }
-    },
-    legend: {
-      data: ['Token数', '成本(元)']
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: dates,
-      boundaryGap: false
-    },
-    yAxis: [
-      {
-        type: 'value',
-        name: 'Token数',
-        position: 'left'
-      },
-      {
-        type: 'value',
-        name: '成本(元)',
-        position: 'right'
-      }
-    ],
-    series: [
-      {
-        name: 'Token数',
-        type: 'line',
-        data: tokens,
-        smooth: true,
-        itemStyle: { color: '#409eff' }
-      },
-      {
-        name: '成本(元)',
-        type: 'line',
-        yAxisIndex: 1,
-        data: costs,
-        smooth: true,
-        itemStyle: { color: '#67c23a' }
-      }
-    ]
-  }
-
-  dailyChart.setOption(option)
 }
 
-const renderModelChart = () => {
-  if (!modelChartRef.value) return
-
-  if (!modelChart) {
-    modelChart = echarts.init(modelChartRef.value)
-  }
-
-  const modelNames = modelStats.value.map(item => `模型${item.model_id}`)
-  const tokenData = modelStats.value.map(item => ({
-    value: item.total_tokens,
-    name: `模型${item.model_id}`
-  }))
-
-  const option = {
-    tooltip: {
-      trigger: 'item',
-      formatter: '{b}: {c} tokens ({d}%)'
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left'
-    },
-    series: [
-      {
-        type: 'pie',
-        radius: '50%',
-        data: tokenData,
-        emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
-        }
-      }
-    ]
-  }
-
-  modelChart.setOption(option)
-}
-
-const formatNumber = (num) => {
-  if (!num) return '0'
-  return num.toLocaleString()
-}
-
-const handleResize = () => {
-  dailyChart?.resize()
-  modelChart?.resize()
-}
-
-onMounted(async () => {
-  await fetchStatistics()
-  await fetchDailyStats()
-  await fetchModelStats()
-  await fetchCustomerStats()
-  await fetchRecords()
-
-  await nextTick()
-  renderDailyChart()
-  renderModelChart()
-
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-  dailyChart?.dispose()
-  modelChart?.dispose()
+onMounted(() => {
+  fetchUsageRecords()
 })
 </script>
 
 <style scoped>
-.usage-stats {
+.usage-records {
   padding: 20px;
-}
-
-.stats-cards {
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  height: 100px;
-}
-
-.stat-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.stat-info {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #303133;
-  line-height: 1.2;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-.charts-row {
-  margin-bottom: 20px;
 }
 
 .card-header {
@@ -455,13 +276,29 @@ onUnmounted(() => {
   align-items: center;
 }
 
+.search-form {
+  margin-bottom: 16px;
+}
+
 .pagination-wrapper {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
 }
 
-.mt-20 {
-  margin-top: 20px;
+.text-primary {
+  color: #409eff;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.text-break {
+  word-break: break-all;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
 }
 </style>

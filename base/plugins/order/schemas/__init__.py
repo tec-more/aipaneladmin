@@ -4,7 +4,6 @@ from .order_schema import (
     PaymentWebhookIn,
     WechatPayNotifyIn,
     AlipayNotifyIn,
-    UsageLogOut,
     # 保留旧的Schema以兼容
     OrderBase,
     OrderCreateRequest as OrderCreate,
@@ -23,7 +22,6 @@ __all__ = [
     'PaymentWebhookIn',
     'WechatPayNotifyIn',
     'AlipayNotifyIn',
-    'UsageLogOut',
     # 旧的Schema（兼容）
     'OrderBase',
     'OrderCreate',

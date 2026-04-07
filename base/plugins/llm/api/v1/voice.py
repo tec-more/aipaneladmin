@@ -9,7 +9,8 @@ import json
 
 from base.common.response import SuccessResponse
 from base.common.security import get_current_user_id
-from base.plugins.llm.models.voice import LLMVoiceRecord, LLMTTSRecord, LLMVoiceClone
+# 从统一的使用记录表导入
+from base.plugins.llm.models.usage import LLMUsageRecord
 from base.plugins.llm.services.voice_helper import VoiceServiceHelper
 
 logger = logging.getLogger(__name__)
@@ -72,14 +73,17 @@ async def streaming_asr(
 
         # 创建记录（使用UUID避免重复）
         import uuid
-        record = await LLMVoiceRecord.create(
+        from datetime import datetime
+        import pytz
+        record = await LLMUsageRecord.create(
             record_id=f"asr_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
-            recognition_type="streaming",
+            record_type="voice",
             audio_file=audio_file.filename,
             audio_format=format,
-            status="processing"
+            status="processing",
+            start_time=datetime.now(pytz.UTC)
         )
 
         # 调用服务
@@ -90,10 +94,10 @@ async def streaming_asr(
         # 更新记录
         if results:
             final_result = results[-1]
-            await LLMVoiceRecord.filter(id=record.id).update(
-                recognized_text=final_result.get("text", ""),
-                confidence=final_result.get("confidence", 0),
-                status="completed"
+            await LLMUsageRecord.filter(id=record.id).update(
+                input_text=final_result.get("text", ""),
+                status="completed",
+                end_time=datetime.now(pytz.UTC)
             )
 
         # 更新使用量
@@ -141,14 +145,17 @@ async def file_asr(
 
         # 创建记录（使用UUID避免重复）
         import uuid
-        record = await LLMVoiceRecord.create(
+        from datetime import datetime
+        import pytz
+        record = await LLMUsageRecord.create(
             record_id=f"file_asr_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
-            recognition_type="file",
+            record_type="voice",
             audio_file=audio_path,
             audio_format=format,
-            status="processing"
+            status="processing",
+            start_time=datetime.now(pytz.UTC)
         )
 
         # 调用服务
@@ -156,10 +163,10 @@ async def file_asr(
 
         # 更新记录
         if result.get("result") == "success":
-            await LLMVoiceRecord.filter(id=record.id).update(
-                recognized_text=result.get("text", ""),
-                confidence=result.get("confidence", 0),
-                status="completed"
+            await LLMUsageRecord.filter(id=record.id).update(
+                input_text=result.get("text", ""),
+                status="completed",
+                end_time=datetime.now(pytz.UTC)
             )
 
         # 更新使用量
@@ -199,18 +206,21 @@ async def text_to_speech(
 
         # 创建记录（使用UUID避免重复）
         import uuid
-        record = await LLMTTSRecord.create(
+        from datetime import datetime
+        import pytz
+        record = await LLMUsageRecord.create(
             record_id=f"tts_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
+            record_type="tts",
             input_text=text,
-            text_length=len(text),
             voice_type=voice_type,
             speed=speed,
             pitch=pitch,
             volume=volume,
             audio_format=format,
-            status="processing"
+            status="processing",
+            start_time=datetime.now(pytz.UTC)
         )
 
         # 调用服务
@@ -224,12 +234,14 @@ async def text_to_speech(
 
         # 更新记录
         from pathlib import Path
+        from datetime import datetime
+        import pytz
         audio_size = len(audio_data)
-        await LLMTTSRecord.filter(id=record.id).update(
+        await LLMUsageRecord.filter(id=record.id).update(
             audio_file=audio_path,
-            audio_size=audio_size,
             tokens=DoubaoVoiceService.estimate_tokens(text),
-            status="completed"
+            status="completed",
+            end_time=datetime.now(pytz.UTC)
         )
 
         # 更新使用量
@@ -282,14 +294,20 @@ async def submit_clone(
         audio_path = await DoubaoVoiceService.save_audio_file(audio_data)
 
         # 创建记录
-        clone = await LLMVoiceClone.create(
+        from datetime import datetime
+        import pytz
+        import uuid
+        clone = await LLMUsageRecord.create(
+            record_id=f"clone_{uuid.uuid4().hex[:16]}",
             clone_id=f"clone_{hash(audio_path)}",
             customer_id=current_user_id,
             model_id=provider_id,
+            record_type="voice_clone",
             reference_audio=audio_path,
             voice_name=voice_name,
             voice_description=description,
-            status="processing"
+            status="processing",
+            start_time=datetime.now(pytz.UTC)
         )
 
         # 调用服务
@@ -297,9 +315,12 @@ async def submit_clone(
 
         # 更新记录
         if result.get("voice_id"):
-            await LLMVoiceClone.filter(id=clone.id).update(
+            from datetime import datetime
+            import pytz
+            await LLMUsageRecord.filter(id=clone.id).update(
                 voice_id=result.get("voice_id"),
-                status="completed"
+                status="completed",
+                end_time=datetime.now(pytz.UTC)
             )
 
         # 更新使用量
@@ -462,16 +483,19 @@ async def streaming_translation(
 
         # 创建记录（使用UUID避免重复）
         import uuid
-        record = await LLMVoiceRecord.create(
+        from datetime import datetime
+        import pytz
+        record = await LLMUsageRecord.create(
             record_id=f"trans_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
-            recognition_type="translation",
+            record_type="voice",
             audio_file=audio_file.filename,
             audio_format=format,
             source_language=source_language,
             target_language=target_language,
-            status="processing"
+            status="processing",
+            start_time=datetime.now(pytz.UTC)
         )
 
         # 调用服务
@@ -489,10 +513,11 @@ async def streaming_translation(
 
         # 更新记录
         if final_result:
-            await LLMVoiceRecord.filter(id=record.id).update(
-                recognized_text=final_result.get("source_text", ""),
-                translated_text=final_result.get("translation_text", ""),
-                status="completed"
+            await LLMUsageRecord.filter(id=record.id).update(
+                input_text=final_result.get("source_text", ""),
+                output_text=final_result.get("translation_text", ""),
+                status="completed",
+                end_time=datetime.now(pytz.UTC)
             )
 
             # 更新使用量（如果有token信息）
@@ -518,17 +543,17 @@ async def streaming_translation(
 
 @voice_router.get("/records", summary="获取语音记录列表")
 async def get_voice_records(
-    recognition_type: Optional[str] = None,
+    record_type: Optional[str] = None,
     status: Optional[str] = None,
     page: int = 1,
     page_size: int = 10,
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """获取语音识别记录"""
-    query = LLMVoiceRecord.filter(customer_id=current_user_id)
+    """获取语音相关记录"""
+    query = LLMUsageRecord.filter(customer_id=current_user_id, record_type__in=["voice", "tts", "voice_clone"])
 
-    if recognition_type:
-        query = query.filter(recognition_type=recognition_type)
+    if record_type:
+        query = query.filter(record_type=record_type)
     if status:
         query = query.filter(status=status)
 
@@ -540,10 +565,13 @@ async def get_voice_records(
         result.append({
             "id": record.id,
             "record_id": record.record_id,
-            "recognition_type": record.recognition_type,
+            "record_type": record.record_type,
             "audio_file": record.audio_file,
-            "recognized_text": record.recognized_text,
-            "translated_text": record.translated_text,
+            "input_text": record.input_text,
+            "output_text": record.output_text,
+            "voice_type": record.voice_type,
+            "source_language": record.source_language,
+            "target_language": record.target_language,
             "status": record.status,
             "created_at": record.created_at.isoformat() if record.created_at else None
         })
@@ -564,7 +592,7 @@ async def get_tts_records(
     current_user_id: int = Depends(get_current_user_id)
 ):
     """获取语音合成记录"""
-    query = LLMTTSRecord.filter(customer_id=current_user_id)
+    query = LLMUsageRecord.filter(customer_id=current_user_id, record_type="tts")
 
     if status:
         query = query.filter(status=status)

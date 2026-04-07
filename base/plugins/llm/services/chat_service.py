@@ -7,8 +7,8 @@ from fastapi import HTTPException
 
 from base.plugins.llm.models.model import LLMModel
 from base.plugins.llm.models.api_key import LLMApiKey
-from base.plugins.llm.models.conversation import LLMConversation
-from base.plugins.llm.models.usage import LLMUsage
+# 从统一的使用记录表导入
+from base.plugins.llm.models.usage import LLMUsageRecord
 from base.plugins.llm.models.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ class ChatService:
         customer_id: int,
         model_id: int,
         messages: List[Dict]
-    ) -> LLMConversation:
+    ) -> LLMUsageRecord:
         """
         创建新对话记录
 
@@ -175,21 +175,25 @@ class ChatService:
             english_chars = len(content) - chinese_chars
             total_tokens += int(chinese_chars / 1.5 + english_chars / 4)
 
-        conversation = await LLMConversation.create(
+        from datetime import datetime
+        import pytz
+        conversation = await LLMUsageRecord.create(
+            record_id=conversation_id,
             conversation_id=conversation_id,
             customer_id=customer_id,
             model_id=model_id,
-            messages=messages,
-            total_tokens=total_tokens,
-            total_cost=0,
-            status="active"
+            record_type="conversation",
+            input_text=messages[0].get("content", ""),
+            tokens=total_tokens,
+            status="active",
+            start_time=datetime.now(pytz.UTC)
         )
 
         return conversation
 
     @staticmethod
     async def update_conversation(
-        conversation: LLMConversation,
+        conversation: LLMUsageRecord,
         assistant_message: str,
         prompt_tokens: int,
         completion_tokens: int,
@@ -205,27 +209,13 @@ class ChatService:
             completion_tokens: 输出token数
             total_cost: 总费用
         """
-        # 添加助手消息到历史
-        conversation.messages.append({
-            "role": "assistant",
-            "content": assistant_message
-        })
-
         # 更新统计
-        conversation.total_tokens += (prompt_tokens + completion_tokens)
-        conversation.total_cost += total_cost
+        conversation.output_text = assistant_message
+        conversation.tokens += (prompt_tokens + completion_tokens)
+        conversation.cost += total_cost
         await conversation.save()
 
-        # 创建使用记录
-        await LLMUsage.create(
-            conversation_id=conversation.conversation_id,
-            customer_id=conversation.customer_id,
-            model_id=conversation.model_id,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
-            cost=total_cost
-        )
+        # 不再需要创建额外的使用记录，因为我们已经使用统一的表
 
     @staticmethod
     async def calculate_cost(model_id: int, prompt_tokens: int, completion_tokens: int) -> float:

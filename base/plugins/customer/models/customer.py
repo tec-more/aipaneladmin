@@ -52,7 +52,7 @@ class Customer(BaseModel, TimestampMixin):
         """
         # 预加载会员信息
         from base.plugins.customer.models.customer_membership import CustomerMembership
-        from base.plugins.customer.models.usage_log import UsageLog
+        from base.plugins.llm.models.usage import LLMUsageRecord
 
         print(f"\n{'='*70}")
         print(f"[Customer.to_dict] 🔔 开始转换客户信息")
@@ -88,20 +88,20 @@ class Customer(BaseModel, TimestampMixin):
         print()
 
         # 从使用记录中实时计算已用时长
-        usage_logs = await UsageLog.filter(customer_id=self.id)
-        total_seconds = sum(log.duration_seconds for log in usage_logs)
+        from base.plugins.llm.models.usage import LLMUsageRecord
+        usage_logs = await LLMUsageRecord.filter(customer_id=self.id)
+        total_seconds = sum(log.tokens for log in usage_logs)  # 使用tokens作为使用量指标
         used_hours = total_seconds / 3600.0  # 转换为小时
 
         print(f"[Customer.to_dict] 📊 使用记录汇总:")
         print(f"[Customer.to_dict]   记录数量: {len(usage_logs)} 条")
-        print(f"[Customer.to_dict]   总使用秒数: {total_seconds} 秒")
-        print(f"[Customer.to_dict]   计算已用时长: {used_hours:.2f} 小时")
+        print(f"[Customer.to_dict]   总Token数: {total_seconds} ")
+        print(f"[Customer.to_dict]   已用时长: {used_hours:.2f} 小时")
 
         if usage_logs:
             print(f"[Customer.to_dict]   最近3条记录:")
             for log in usage_logs[:3]:
-                hours = log.duration_seconds / 3600.0
-                print(f"[Customer.to_dict]     - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.duration_seconds}秒 ({hours:.2f}小时)")
+                print(f"[Customer.to_dict]     - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.record_type}, {log.tokens} tokens, ${float(log.cost):.4f}")
         print()
 
         # 构建基础数据

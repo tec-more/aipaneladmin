@@ -14,9 +14,7 @@
         "provider",
         "model",
         "api_key",
-        "conversation",
-        "usage",
-        "voice"
+        "usage"
     ],
     "schemas": [
         "provider",
@@ -48,18 +46,11 @@
                     "sort": 2
                 },
                 {
-                    "name": "对话记录",
-                    "path": "/llm/conversations",
-                    "icon": "ChatDotRound",
-                    "component": "llm/conversations/index",
-                    "sort": 3
-                },
-                {
-                    "name": "使用统计",
+                    "name": "使用记录",
                     "path": "/llm/usage",
                     "icon": "DataAnalysis",
                     "component": "llm/usage/index",
-                    "sort": 4
+                    "sort": 3
                 }
             ]
         }

@@ -113,12 +113,6 @@ const routes = [
         meta: { title: '支付记录' }
       },
       {
-        path: 'customer/usage',
-        name: 'CustomerUsage',
-        component: () => import('@/views/customer/usage/index.vue'),
-        meta: { title: '使用记录' }
-      },
-      {
         path: 'product',
         name: 'Product',
         component: () => import('@/views/product/Index.vue'),
@@ -155,18 +149,7 @@ const routes = [
         component: () => import('@/views/llm/api-keys/index.vue'),
         meta: { title: 'API密钥', icon: 'Key' }
       },
-      {
-        path: 'llm/conversations',
-        name: 'LLMConversations',
-        component: () => import('@/views/llm/conversations/index.vue'),
-        meta: { title: '对话记录', icon: 'ChatDotRound' }
-      },
-      {
-        path: 'llm/usage',
-        name: 'LLMUsage',
-        component: () => import('@/views/llm/usage/index.vue'),
-        meta: { title: '使用统计', icon: 'DataAnalysis' }
-      }
+      { path: 'llm/usage', name: 'LLMUsage', component: () => import('@/views/llm/usage/index.vue'), meta: { title: '使用记录', icon: 'DataAnalysis' } }
     ]
   },
   {

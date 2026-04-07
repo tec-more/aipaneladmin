@@ -34,7 +34,8 @@ else:
 
 async def streaming_translation_official(self, audio_data: bytes, source_language: str = "zh",
                                         target_language: str = "en", format: str = "wav",
-                                        sample_rate: int = 16000) -> AsyncIterator[Dict]:
+                                        sample_rate: int = 16000, asr_config: dict = None,
+                                        llm_config: dict = None) -> AsyncIterator[Dict]:
     """
     同声传译（流式）- 使用官方demo的实现
 
@@ -51,6 +52,8 @@ async def streaming_translation_official(self, audio_data: bytes, source_languag
         return
 
     logger.info(f"[AST官方实现] 接收到音频数据: {len(audio_data)} bytes")
+
+    
 
     # 验证音频长度
     if len(audio_data) < 8000:
@@ -210,6 +213,12 @@ async def streaming_translation_official(self, audio_data: bytes, source_languag
                     "duration_ms": 0
                 }
 
+                # 用于断句对齐的临时变量
+                source_buffer = []
+                translation_buffer = []
+                pending_source = ""
+                pending_translation = ""
+
                 try:
                     while True:
                         response_data = await ws.recv()
@@ -229,8 +238,22 @@ async def streaming_translation_official(self, audio_data: bytes, source_languag
 
                         if Response_data.event == Type.SessionFinished:
                             logger.info(f"[AST官方实现] 会话完成")
-                            final_result["source_text"] = " ".join(final_result["source_segments"])
-                            final_result["translation_text"] = " ".join(final_result["translation_segments"])
+                            # 处理最后一个片段
+                            if pending_source:
+                                source_buffer.append(pending_source)
+                            if pending_translation:
+                                translation_buffer.append(pending_translation)
+                            
+                            # 确保断句数量一致
+                            while len(source_buffer) < len(translation_buffer):
+                                source_buffer.append("")
+                            while len(translation_buffer) < len(source_buffer):
+                                translation_buffer.append("")
+                            
+                            final_result["source_segments"] = source_buffer
+                            final_result["translation_segments"] = translation_buffer
+                            final_result["source_text"] = " ".join(source_buffer)
+                            final_result["translation_text"] = " ".join(translation_buffer)
                             yield {
                                 "event": "session_finished",
                                 "result": final_result
@@ -241,8 +264,27 @@ async def streaming_translation_official(self, audio_data: bytes, source_languag
                             response_dict = MessageToDict(Response_data)
                             final_result["tokens"] = response_dict
                         else:
-                            if Response_data.text:
-                                final_result["translation_segments"].append(Response_data.text)
+                            # 处理原文事件
+                            if Response_data.event == 651:  # SourceSubtitleResponse
+                                pending_source += Response_data.text
+                                logger.info(f"[AST官方实现] 原文: {Response_data.text}")
+                            elif Response_data.event == 652:  # SourceSubtitleEnd
+                                if pending_source:
+                                    source_buffer.append(pending_source)
+                                    pending_source = ""
+                                logger.info(f"[AST官方实现] 原文片段结束")
+                            # 处理译文事件
+                            elif Response_data.event == 654:  # TranslationSubtitleResponse
+                                pending_translation += Response_data.text
+                                logger.info(f"[AST官方实现] 译文: {Response_data.text}")
+                            elif Response_data.event == 655:  # TranslationSubtitleEnd
+                                if pending_translation:
+                                    translation_buffer.append(pending_translation)
+                                    pending_translation = ""
+                                logger.info(f"[AST官方实现] 译文片段结束")
+                            # 处理其他文本事件（兼容旧版）
+                            elif Response_data.text and Response_data.event not in [651, 652, 654, 655]:
+                                translation_buffer.append(Response_data.text)
                                 logger.info(f"[AST官方实现] 翻译: {Response_data.text}")
                                 yield {
                                     "event": "translation",

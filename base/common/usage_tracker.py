@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import uuid
 
-from base.plugins.customer.models.usage_log import UsageLog
+from base.plugins.llm.models.usage import LLMUsageRecord
 
 
 class UsageTracker:
@@ -22,7 +22,7 @@ class UsageTracker:
         details: Dict[str, Any],
         characters_count: int = 0,
         session_id: Optional[str] = None
-    ) -> UsageLog:
+    ) -> LLMUsageRecord:
         """
         记录服务使用情况
 
@@ -42,15 +42,27 @@ class UsageTracker:
         if not session_id:
             session_id = str(uuid.uuid4())[:32]
 
+        # 映射服务类型到记录类型
+        record_type_map = {
+            'text_generation': 'conversation',
+            'translation': 'voice',
+            'tts': 'tts',
+            'voice_clone': 'voice_clone'
+        }
+        record_type = record_type_map.get(service_type, 'conversation')
+
         # 创建使用记录
-        log = await UsageLog.create(
+        log = await LLMUsageRecord.create(
+            record_id=session_id,
             customer_id=customer_id,
-            session_id=session_id,
-            duration_seconds=duration_seconds,
-            service_type=service_type,
-            details=details,
-            characters_count=characters_count,
-            api_cost=Decimal(str(api_cost))
+            model_id=details.get('model_id', 1),  # 默认模型ID
+            record_type=record_type,
+            status='completed',
+            tokens=details.get('total_tokens', 0),
+            cost=Decimal(str(api_cost)),
+            input_text=details.get('input_text', ''),
+            output_text=details.get('output_text', ''),
+            extra_info=details
         )
 
         print(f"[UsageTracker] 记录使用: customer={customer_id}, type={service_type}, cost=${api_cost}")
@@ -65,7 +77,7 @@ class UsageTracker:
         completion_tokens: int,
         duration_seconds: int,
         details: Optional[Dict[str, Any]] = None
-    ) -> UsageLog:
+    ) -> LLMUsageRecord:
         """
         记录 OpenAI API 使用（便捷方法）
 
@@ -118,7 +130,7 @@ class UsageTracker:
         prompt: str,
         duration_seconds: int,
         cost: float
-    ) -> UsageLog:
+    ) -> LLMUsageRecord:
         """
         记录图像生成使用（便捷方法）
 
@@ -153,7 +165,7 @@ class UsageTracker:
         duration_seconds: int,
         cost: float,
         voice: str = "alloy"
-    ) -> UsageLog:
+    ) -> LLMUsageRecord:
         """
         记录语音合成使用（便捷方法）
 
