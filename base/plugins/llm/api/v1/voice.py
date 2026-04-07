@@ -60,12 +60,20 @@ async def streaming_asr(
         # 获取语音服务（自动使用语音专用API Key）
         service = await VoiceServiceHelper.get_voice_service(provider_id)
 
-        # 读取音频数据
-        audio_data = await audio_file.read()
+        # 读取音频数据（支持流式传输）
+        audio_data = b''
+        chunk_size = 8192
+        while True:
+            chunk = await audio_file.read(chunk_size)
+            if not chunk:
+                break
+            audio_data += chunk
+        logger.info(f"[streaming_asr] 读取音频数据: {len(audio_data)} bytes")
 
-        # 创建记录
+        # 创建记录（使用UUID避免重复）
+        import uuid
         record = await LLMVoiceRecord.create(
-            record_id=f"asr_{audio_file.filename}",
+            record_id=f"asr_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
             recognition_type="streaming",
@@ -119,13 +127,22 @@ async def file_asr(
         # 获取语音服务
         service = await VoiceServiceHelper.get_voice_service(provider_id)
 
-        # 保存音频文件
-        from base.plugins.llm.services.doubao_voice_service import DoubaoVoiceService
-        audio_path = await DoubaoVoiceService.save_audio_file(await audio_file.read())
+        # 保存音频文件（支持流式传输）
+        audio_data = b''
+        chunk_size = 8192
+        while True:
+            chunk = await audio_file.read(chunk_size)
+            if not chunk:
+                break
+            audio_data += chunk
 
-        # 创建记录
+        from base.plugins.llm.services.doubao_voice_service import DoubaoVoiceService
+        audio_path = await DoubaoVoiceService.save_audio_file(audio_data)
+
+        # 创建记录（使用UUID避免重复）
+        import uuid
         record = await LLMVoiceRecord.create(
-            record_id=f"file_asr_{audio_file.filename}",
+            record_id=f"file_asr_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
             recognition_type="file",
@@ -180,9 +197,10 @@ async def text_to_speech(
         # 获取语音服务（自动使用语音专用API Key）
         service = await VoiceServiceHelper.get_voice_service(provider_id)
 
-        # 创建记录
+        # 创建记录（使用UUID避免重复）
+        import uuid
         record = await LLMTTSRecord.create(
-            record_id=f"tts_{hash(text)}",
+            record_id=f"tts_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
             input_text=text,
@@ -251,9 +269,17 @@ async def submit_clone(
         # 获取语音服务
         service = await VoiceServiceHelper.get_voice_service(provider_id)
 
-        # 保存参考音频
+        # 保存参考音频（支持流式传输）
+        audio_data = b''
+        chunk_size = 8192
+        while True:
+            chunk = await reference_audio.read(chunk_size)
+            if not chunk:
+                break
+            audio_data += chunk
+
         from base.plugins.llm.services.doubao_voice_service import DoubaoVoiceService
-        audio_path = await DoubaoVoiceService.save_audio_file(await reference_audio.read())
+        audio_path = await DoubaoVoiceService.save_audio_file(audio_data)
 
         # 创建记录
         clone = await LLMVoiceClone.create(
@@ -330,50 +356,114 @@ async def streaming_translation(
         # 获取语音服务
         service = await VoiceServiceHelper.get_voice_service(provider_id)
 
-        # 读取音频数据
-        raw_audio_data = await audio_file.read()
-        logger.info(f"[DEBUG] 原始音频数据大小: {len(raw_audio_data)} bytes")
+        # 读取音频数据（支持流式传输，持续读取所有数据）
+        raw_audio_data = b''
+        chunk_size = 8192
+        while True:
+            chunk = await audio_file.read(chunk_size)
+            if not chunk:
+                break
+            raw_audio_data += chunk
+            logger.info(f"[DEBUG] 读取音频块: {len(chunk)} bytes, 总计: {len(raw_audio_data)} bytes")
 
-        # 智能处理音频数据（支持Float32自动检测和转换）
-        logger.info(f"[DEBUG] 开始导入 audio_format_utils")
-        from base.plugins.llm.services.audio_format_utils import convert_audio_to_wav
-        logger.info(f"[DEBUG] audio_format_utils 导入成功")
+        logger.info(f"[DEBUG] 原始音频数据读取完成: {len(raw_audio_data)} bytes")
 
-        logger.info(f"[DEBUG] 调用 convert_audio_to_wav...")
-        audio_data, audio_info = convert_audio_to_wav(
-            raw_audio_data,
-            filename=audio_file.filename,
-            sample_rate=sample_rate,
-            channels=1,
-            bits=16
-        )
-        logger.info(f"[DEBUG] convert_audio_to_wav 返回成功")
+        # 关键修复：提取纯PCM数据（不包含WAV头）
+        # 豆包AST需要纯PCM数据，不是完整的WAV文件
+        logger.info(f"[DEBUG] 提取纯PCM数据...")
 
-        logger.info(f"[音频处理] 原始大小: {audio_info['original_size']} bytes")
-        logger.info(f"[音频处理] 原始格式: {audio_info['original_format']}")
-        if audio_info.get('converted'):
-            logger.info(f"[音频处理] ✅ 音频转换完成")
-            logger.info(f"[音频处理] 最终大小: {audio_info['final_size']} bytes")
-        else:
-            logger.info(f"[音频处理] 格式: {audio_info['final_format']}")
+        import wave
+        import io
 
-        # 保存音频文件用于调试
-        import time
-        from pathlib import Path
-        debug_dir = Path("debug_audio")
-        debug_dir.mkdir(exist_ok=True)
+        try:
+            # 使用wave库读取WAV文件并提取纯PCM数据
+            audio_file_obj = io.BytesIO(raw_audio_data)
+            with wave.open(audio_file_obj, 'rb') as wf:
+                # 验证音频格式
+                if wf.getnchannels() != 1:
+                    raise ValueError(f"音频必须是单声道，当前为{wf.getnchannels()}声道")
+                if wf.getframerate() != 16000:
+                    raise ValueError(f"音频采样率必须是16000Hz，当前为{wf.getframerate()}Hz")
+                if wf.getsampwidth() != 2:
+                    raise ValueError(f"音频位深度必须是16bit，当前为{wf.getsampwidth()*8}bit")
 
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        debug_filename = debug_dir / f"translation_{timestamp}.wav"
+                # 读取纯PCM数据（不包含WAV头）
+                audio_data = wf.readframes(wf.getnframes())
 
-        with open(debug_filename, 'wb') as f:
-            f.write(audio_data)
+            logger.info(f"[DEBUG] PCM数据提取成功: {len(audio_data)} bytes")
+            logger.info(f"[DEBUG] 原始WAV大小: {len(raw_audio_data)} bytes")
+            logger.info(f"[DEBUG] PCM数据大小: {len(audio_data)} bytes")
+            logger.info(f"[DEBUG] WAV头大小: {len(raw_audio_data) - len(audio_data)} bytes")
 
-        logger.info(f"[音频调试] 文件已保存: {debug_filename}")
+            # 保存调试音频文件（分步骤保存，便于对比）
+            import time
+            from pathlib import Path
+            debug_dir = Path("debug_audio")
+            debug_dir.mkdir(exist_ok=True)
 
-        # 创建记录
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+
+            # 步骤1: 保存原始上传文件
+            raw_filename = debug_dir / f"1_raw_upload_{timestamp}.wav"
+            with open(str(raw_filename), 'wb') as f:
+                f.write(raw_audio_data)
+            logger.info(f"[音频调试-步骤1] 原始上传文件: {raw_filename.name} ({len(raw_audio_data)} bytes)")
+
+            # 步骤2: 保存提取的PCM数据
+            pcm_filename = debug_dir / f"2_extracted_pcm_{timestamp}.pcm"
+            with open(str(pcm_filename), 'wb') as f:
+                f.write(audio_data)
+            logger.info(f"[音频调试-步骤2] 提取的PCM数据: {pcm_filename.name} ({len(audio_data)} bytes)")
+
+            # 步骤3: 重建WAV文件（用于验证提取是否正确）
+            import wave as wave_module
+            reconstructed_filename = debug_dir / f"3_reconstructed_wav_{timestamp}.wav"
+            with wave_module.open(str(reconstructed_filename), 'wb') as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(16000)
+                wf.writeframes(audio_data)
+            logger.info(f"[音频调试-步骤3] 重建的WAV文件: {reconstructed_filename.name}")
+
+            # 验证重建的文件
+            with wave_module.open(str(reconstructed_filename), 'rb') as vf:
+                reconstructed_pcm = vf.readframes(vf.getnframes())
+            logger.info(f"[音频调试-步骤4] 验证重建文件: PCM大小={len(reconstructed_pcm)} bytes, 一致性={len(reconstructed_pcm) == len(audio_data)}")
+
+            # 步骤5: 保存发送给豆包的数据
+            doubao_filename = debug_dir / f"4_for_doubao_{timestamp}.pcm"
+            with open(str(doubao_filename), 'wb') as f:
+                f.write(audio_data)
+            logger.info(f"[音频调试-步骤5] 发送给豆包的数据: {doubao_filename.name} ({len(audio_data)} bytes)")
+            logger.info(f"[音频调试] 总计保存了5个文件用于对比分析")
+
+        except wave.Error as e:
+            # 如果不是WAV格式，尝试其他方式
+            logger.warning(f"[DEBUG] 无法用wave库读取: {e}")
+            logger.info(f"[DEBUG] 尝试使用audio_format_utils...")
+
+            from base.plugins.llm.services.audio_format_utils import convert_audio_to_wav
+            converted_data, audio_info = convert_audio_to_wav(
+                raw_audio_data,
+                filename=audio_file.filename,
+                sample_rate=sample_rate,
+                channels=1,
+                bits=16
+            )
+
+            # 转换后的数据仍然是WAV格式，需要再次提取PCM
+            if audio_info['final_format'] == 'wav':
+                audio_file_obj = io.BytesIO(converted_data)
+                with wave.open(audio_file_obj, 'rb') as wf:
+                    audio_data = wf.readframes(wf.getnframes())
+                logger.info(f"[DEBUG] 转换后PCM数据: {len(audio_data)} bytes")
+            else:
+                audio_data = converted_data
+
+        # 创建记录（使用UUID避免重复）
+        import uuid
         record = await LLMVoiceRecord.create(
-            record_id=f"trans_{audio_file.filename}",
+            record_id=f"trans_{uuid.uuid4().hex[:16]}",
             customer_id=current_user_id,
             model_id=provider_id,
             recognition_type="translation",

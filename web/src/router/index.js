@@ -67,8 +67,14 @@ const routes = [
       {
         path: 'customer',
         name: 'Customer',
-        component: () => import('@/views/customer/Index.vue'),
+        redirect: 'customer/list',
         meta: { title: '客户管理', icon: 'User' }
+      },
+      {
+        path: 'customer/list',
+        name: 'CustomerList',
+        component: () => import('@/views/customer/Index.vue'),
+        meta: { title: '客户列表' }
       },
       {
         path: 'customer/create',
@@ -83,16 +89,10 @@ const routes = [
         meta: { title: '编辑客户' }
       },
       {
-        path: 'customer/:id',
+        path: 'customer/detail/:id',
         name: 'CustomerDetail',
         component: () => import('@/views/customer/Detail.vue'),
         meta: { title: '客户详情' }
-      },
-      {
-        path: 'customer/list',
-        name: 'CustomerList',
-        component: () => import('@/views/customer/Index.vue'),
-        meta: { title: '客户列表' }
       },
       {
         path: 'customer/membership-levels',

@@ -16,6 +16,27 @@ class ASGIAppWithPrefix:
         self.prefix = prefix
 
     async def __call__(self, scope, receive, send):
+        # 处理 WebSocket 连接
+        if scope["type"] == "websocket":
+            client = scope.get("client", ["", ""])[0] if scope.get("client") else ""
+            original_path = scope.get("path", "")
+
+            # 处理 /api 前缀（与HTTP请求保持一致）
+            path = original_path
+            if path.startswith(self.prefix):
+                # 移除 /api 前缀
+                new_path = path[len(self.prefix):] or "/"
+                scope = dict(scope)  # 创建副本
+                scope["path"] = new_path
+                scope["root_path"] = self.prefix
+
+            # 打印日志
+            print(f'INFO:     ({client}, -) "WebSocket {original_path}"', flush=True)
+
+            await self.app(scope, receive, send)
+            return
+
+        # 处理 HTTP 请求
         if scope["type"] == "http":
             original_path = scope.get("path", "")
             method = scope.get("method", "")

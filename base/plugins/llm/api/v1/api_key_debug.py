@@ -29,9 +29,9 @@ from base.plugins.llm.schemas.llm import (
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-api_key_router = APIRouter(
+api_key_debug_router = APIRouter(
     prefix="/api-keys",
-    tags=["API密钥管理"],
+    tags=["API密钥管理-调试"],
     dependencies=[Depends(get_current_user_id)]
 )
 
@@ -43,7 +43,7 @@ def mask_app_key(app_key: str) -> str:
     return app_key[:4] + "****" + app_key[-4:]
 
 
-@api_key_router.put("/{key_id}", summary="更新API密钥（调试版）")
+@api_key_debug_router.put("/{key_id}", summary="更新API密钥（调试版）")
 async def update_api_key_debug(
     key_id: int,
     data: ApiKeyUpdate,

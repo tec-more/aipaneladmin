@@ -18,6 +18,10 @@ import asyncio
 async def lifespan(app: FastAPI):
     # 启动逻辑
     print("Application starting up...")
+
+    # 存储后台任务引用，便于清理
+    background_tasks = []
+
     try:
         await init_data()
 
@@ -29,20 +33,58 @@ async def lifespan(app: FastAPI):
 
         # 启动订单过期检查定时任务
         task1 = asyncio.create_task(cancel_expired_orders_task())
+        background_tasks.append(task1)
         print("订单过期检查定时任务已启动")
 
         # 启动会员数据更新定时任务
         task2 = asyncio.create_task(update_membership_data_task())
+        background_tasks.append(task2)
         print("会员数据更新定时任务已启动（每10分钟）")
 
         yield
 
-        # 关闭插件系统
-        await plugin_manager.shutdown()
-        await Tortoise.close_connections()
     finally:
-        # 确保所有资源正确关闭
+        # 清理逻辑
         print("Application shutting down...")
+
+        # 1. 取消所有后台任务
+        print("正在取消后台任务...")
+        for task in background_tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+
+        # 2. 关闭插件系统
+        print("正在关闭插件系统...")
+        try:
+            await plugin_manager.shutdown()
+        except Exception as e:
+            print(f"关闭插件系统时出错: {e}")
+
+        # 3. 关闭数据库连接
+        print("正在关闭数据库连接...")
+        try:
+            await Tortoise.close_connections()
+        except Exception as e:
+            print(f"关闭数据库连接时出错: {e}")
+
+        # 4. 清理WebSocket连接
+        print("正在清理WebSocket连接...")
+        try:
+            # 获取所有活动连接并关闭
+            if hasattr(app, 'state') and hasattr(app.state, 'websockets'):
+                for ws in app.state.websockets.copy():
+                    try:
+                        await ws.close(code=1001, reason="Server shutdown")
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"清理WebSocket连接时出错: {e}")
+
+        print("所有资源已清理完成，端口9998已释放")
 
 
 async def cancel_expired_orders_task():
@@ -251,5 +293,13 @@ def init_app() -> FastAPI:
 
     # 使用自动路由注册机制
     register_routers(app)
+
+    # 手动注册WebSocket路由（绕过plugin_manager的缓存问题）
+    try:
+        from base.plugins.llm.api.v1 import voice_websocket
+        app.include_router(voice_websocket.voice_websocket_router, prefix="/v1/llm")
+        print("[手动注册] WebSocket路由已注册: /v1/llm/voice/translation/streaming")
+    except ImportError as e:
+        print(f"[警告] 无法导入voice_websocket: {e}")
 
     return app

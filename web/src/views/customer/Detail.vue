@@ -300,11 +300,11 @@ const fetchCustomerDetail = async () => {
 }
 
 const handleBack = () => {
-  router.push('/customer')
+  router.push('/panel/customer/list')
 }
 
 const handleEdit = () => {
-  router.push(`/customer/edit/${customerId.value}`)
+  router.push(`/panel/customer/edit/${customerId.value}`)
 }
 
 const handleToggleStatus = async () => {
@@ -328,7 +328,7 @@ const handleDelete = async () => {
     )
     await deleteCustomer(customerId.value)
     ElMessage.success('删除成功')
-    router.push('/customer')
+    router.push('/panel/customer/list')
   } catch (e) {
     // 取消或错误
   }

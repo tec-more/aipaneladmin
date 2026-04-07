@@ -155,3 +155,34 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         )
 
     return user
+
+
+async def get_current_user_id_ws(token: str = None) -> Optional[int]:
+    """
+    从JWT令牌中获取当前用户ID（WebSocket专用）
+    
+    WebSocket不支持HTTP Authorization header，所以通过query parameter传递token
+    
+    Args:
+        token: JWT令牌字符串（通过query parameter传递）
+    
+    Returns:
+        Optional[int]: 用户ID，如果token无效返回None
+    """
+    if not token:
+        return None
+    
+    payload = decode_access_token(token)
+    
+    if payload is None:
+        return None
+    
+    user_id_str = payload.get("sub")
+    if user_id_str is None:
+        return None
+    
+    try:
+        user_id = int(user_id_str)
+        return user_id
+    except (ValueError, TypeError):
+        return None

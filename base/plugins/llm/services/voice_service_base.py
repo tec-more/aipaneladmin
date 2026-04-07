@@ -60,6 +60,18 @@ try:
 except ImportError:
     DoubaoVoiceService = None
 
+# 应用官方demo的AST实现修复（Monkey Patch）
+try:
+    from base.plugins.llm.services.use_official_demo import streaming_translation_official
+    if DoubaoVoiceService:
+        DoubaoVoiceService.streaming_translation = streaming_translation_official
+        logger.info("[AST] 已应用官方demo实现修复")
+except ImportError as e:
+    logger.warning(f"[AST] 无法应用官方demo修复: {e}")
+except Exception as e:
+    logger.warning(f"[AST] 应用官方demo修复时出错: {e}")
+
+
 try:
     from base.plugins.llm.services.openai_voice_service import OpenAIVoiceService
     VoiceServiceFactory.register("openai", OpenAIVoiceService)

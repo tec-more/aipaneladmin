@@ -230,7 +230,7 @@ const handleSubmit = async () => {
 }
 
 const handleBack = () => {
-  router.push('/customer')
+  router.push('/panel/customer/list')
 }
 
 onMounted(() => {

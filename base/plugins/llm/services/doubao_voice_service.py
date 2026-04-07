@@ -385,93 +385,96 @@ class DoubaoVoiceService:
                 }
                 return
 
-            # 验证音频格式
-            audio_file = io.BytesIO(audio_data)
-            try:
-                with wave.open(audio_file, 'rb') as wav:
-                    nchannels = wav.getnchannels()
-                    sampwidth = wav.getsampwidth()
-                    framerate = wav.getframerate()
+            # 检查是否是纯PCM数据（无WAV头）还是完整WAV文件
+            # 纯PCM数据不会以"RIFF"开头
+            has_wav_header = len(audio_data) >= 4 and audio_data[:4] == b'RIFF'
 
-                    logger.info(f"[AST] 音频格式: {nchannels}ch, {sampwidth*8}bit, {framerate}Hz")
+            if has_wav_header:
+                # 完整WAV文件，需要验证格式
+                logger.info(f"[AST] 检测到WAV文件头，进行格式验证")
+                audio_file = io.BytesIO(audio_data)
+                try:
+                    with wave.open(audio_file, 'rb') as wav:
+                        nchannels = wav.getnchannels()
+                        sampwidth = wav.getsampwidth()
+                        framerate = wav.getframerate()
 
-                    if nchannels != 1:
-                        error_msg = f"音频通道数错误: 应为单声道(1)，当前为{nchannels}"
-                        logger.error(f"[AST] {error_msg}")
-                        yield {
-                            "event": "error",
-                            "error": error_msg,
-                            "type": "InvalidAudioFormatError",
-                            "details": {
-                                "expected": "1 (mono)",
-                                "actual": str(nchannels)
-                            }
-                        }
-                        return
+                        logger.info(f"[AST] 音频格式: {nchannels}ch, {sampwidth*8}bit, {framerate}Hz")
 
-                    if framerate != 16000:
-                        error_msg = f"音频采样率错误: 应为16000Hz，当前为{framerate}Hz"
-                        logger.error(f"[AST] {error_msg}")
-                        yield {
-                            "event": "error",
-                            "error": error_msg,
-                            "type": "InvalidAudioFormatError",
-                            "details": {
-                                "expected": "16000",
-                                "actual": str(framerate)
-                            }
-                        }
-                        return
-
-                    if sampwidth != 2:
-                        error_msg = f"音频采样宽度错误: 应为2(16bit)，当前为{sampwidth}"
-                        logger.error(f"[AST] {error_msg}")
-                        yield {
-                            "event": "error",
-                            "error": error_msg,
-                            "type": "InvalidAudioFormatError",
-                            "details": {
-                                "expected": "2 (16bit)",
-                                "actual": str(sampwidth)
-                            }
-                        }
-                        return
-
-                    # 检查音频内容（读取前1000帧）
-                    nframes = wav.getnframes()
-                    duration = nframes / framerate
-                    logger.info(f"[AST] 音频时长: {duration:.2f}秒, 帧数: {nframes}")
-
-                    if duration < 0.5:
-                        logger.warning(f"[AST] 音频较短: {duration:.2f}秒，可能影响识别效果")
-
-                    wav.setpos(0)
-                    check_frames = wav.readframes(min(1000, nframes))
-
-                    if len(check_frames) >= 2:
-                        samples = struct.unpack(f'<{len(check_frames)//2}h', check_frames)
-                        max_amplitude = max(abs(s) for s in samples)
-                        avg_amplitude = sum(abs(s) for s in samples) / len(samples)
-
-                        logger.info(f"[AST] 音频幅度: 最大={max_amplitude}, 平均={avg_amplitude:.1f}")
-
-                        if max_amplitude < 500:
-                            logger.warning(f"[AST] 音频幅度很小: {max_amplitude}，可能无实际语音内容或音量太低")
+                        if nchannels != 1:
+                            error_msg = f"音频通道数错误: 应为单声道(1)，当前为{nchannels}"
+                            logger.error(f"[AST] {error_msg}")
                             yield {
-                                "event": "warning",
-                                "message": f"音频幅度较小({max_amplitude})，可能导致识别失败",
-                                "type": "LowAmplitudeWarning"
+                                "event": "error",
+                                "error": error_msg,
+                                "type": "InvalidAudioFormatError",
+                                "details": {
+                                    "expected": "1 (mono)",
+                                    "actual": str(nchannels)
+                                }
                             }
+                            return
 
-            except wave.Error as e:
-                error_msg = f"音频格式验证失败: {str(e)}"
-                logger.error(f"[AST] {error_msg}")
-                yield {
-                    "event": "error",
-                    "error": error_msg,
-                    "type": "InvalidAudioFormatError"
-                }
-                return
+                        if framerate != 16000:
+                            error_msg = f"音频采样率错误: 应为16000Hz，当前为{framerate}Hz"
+                            logger.error(f"[AST] {error_msg}")
+                            yield {
+                                "event": "error",
+                                "error": error_msg,
+                                "type": "InvalidAudioFormatError",
+                                "details": {
+                                    "expected": "16000",
+                                    "actual": str(framerate)
+                                }
+                            }
+                            return
+
+                        if sampwidth != 2:
+                            error_msg = f"音频采样宽度错误: 应为2(16bit)，当前为{sampwidth}"
+                            logger.error(f"[AST] {error_msg}")
+                            yield {
+                                "event": "error",
+                                "error": error_msg,
+                                "type": "InvalidAudioFormatError",
+                                "details": {
+                                    "expected": "2 (16bit)",
+                                    "actual": str(sampwidth)
+                                }
+                            }
+                            return
+
+                        # 提取PCM数据
+                        wav.setpos(0)
+                        audio_data = wav.readframes(wav.getnframes())
+                        logger.info(f"[AST] 从WAV文件提取PCM数据: {len(audio_data)} bytes")
+
+                        # 检查音频内容
+                        nframes = wav.getnframes()
+                        duration = nframes / framerate
+                        logger.info(f"[AST] 音频时长: {duration:.2f}秒")
+
+                        if duration < 0.5:
+                            logger.warning(f"[AST] 音频较短: {duration:.2f}秒，可能影响识别效果")
+
+                except wave.Error as e:
+                    error_msg = f"音频格式验证失败: {str(e)}"
+                    logger.error(f"[AST] {error_msg}")
+                    yield {
+                        "event": "error",
+                        "error": error_msg,
+                        "type": "InvalidAudioFormatError"
+                    }
+                    return
+            else:
+                # 纯PCM数据（无WAV头），API端点已经验证过格式
+                logger.info(f"[AST] 检测到纯PCM数据（已由API端点验证）")
+                logger.info(f"[AST] 假设格式: 16kHz, 单声道, 16bit")
+                # 计算时长
+                duration = len(audio_data) / 2 / 16000  # bytes / 2bytes_per_sample / sample_rate
+                logger.info(f"[AST] 音频时长: {duration:.2f}秒")
+
+                if duration < 0.5:
+                    logger.warning(f"[AST] 音频较短: {duration:.2f}秒，可能影响识别效果")
 
         except Exception as e:
             logger.error(f"[AST] 音频验证失败: {e}")
@@ -517,18 +520,42 @@ class DoubaoVoiceService:
                 app_key = parts[1]
 
         # 构建认证Header
+        if not app_id or not app_key:
+            error_msg = f"AST认证信息缺失: api_id={'已设置' if app_id else '未设置'}, access_token={'已设置' if app_key else '未设置'}。请在API Key配置中添加 api_id 和 access_token 字段。"
+            logger.error(f"[AST] {error_msg}")
+            logger.error(f"[AST] 请访问数据库表 llm_api_key，为豆包服务(model_service_type='voice')配置正确的 api_id 和 access_token")
+            yield {
+                "event": "error",
+                "error": error_msg,
+                "type": "MissingCredentialsError"
+            }
+            return
+
+        # 生成唯一的连接ID（官方demo包含此字段）
+        import uuid
+        conn_id = str(uuid.uuid4())
+
         headers = {
-            "X-Api-App-Key": app_id or "default_app_id",
-            "X-Api-Access-Key": app_key or "default_access_key",
-            "X-Api-Resource-Id": "volc.service_type.10053"
+            "X-Api-App-Key": app_id,
+            "X-Api-Access-Key": app_key,
+            "X-Api-Resource-Id": "volc.service_type.10053",
+            "X-Api-Connect-Id": conn_id  # 官方demo的关键字段
         }
 
         logger.info(f"[AST] 开始同声传译会话: {session_id}")
         logger.info(f"[AST] 源语言: {source_language}, 目标语言: {target_language}")
         logger.info(f"[AST] 认证信息: app_id={app_id[:8] + '...' if app_id else 'None'}, app_key={app_key[:8] + '...' if app_key else 'None'}")
+        logger.info(f"[AST] 使用官方demo配置: 分块=3200 bytes, 延迟=100ms, ping_interval=None")
+        logger.info(f"[AST] 请求头: X-Api-App-Key={app_id}, X-Api-Connect-Id={conn_id[:8]}...")
 
         try:
-            async with websockets.connect(ws_url, additional_headers=headers) as ws:
+            # 使用官方demo的WebSocket配置
+            async with websockets.connect(
+                ws_url,
+                additional_headers=headers,
+                max_size=1000000000,    # 官方demo: 1GB
+                ping_interval=None      # 官方demo: 禁用ping
+            ) as ws:
                 logger.info(f"[AST] WebSocket连接已建立")
 
                 # ========== 步骤1: 发送StartSession (event=100) ==========
@@ -555,8 +582,8 @@ class DoubaoVoiceService:
                 start_session.source_audio.bits = 16
                 start_session.source_audio.channel = 1
 
-                # 目标音频配置
-                start_session.target_audio.format = "pcm"
+                # 目标音频配置（使用官方demo的格式）
+                start_session.target_audio.format = "ogg_opus"  # 官方demo: ogg_opus
                 start_session.target_audio.rate = 24000
 
                 # 序列化并发送
@@ -579,8 +606,8 @@ class DoubaoVoiceService:
                 logger.info(f"[AST] 会话已建立 (session_id: {response.response_meta.session_id})")
 
                 # ========== 步骤3: 发送音频数据 TaskRequest (event=200) ==========
-                # 将音频数据分成小块发送（每块约80ms）
-                chunk_size = int(16000 * 2 * 0.08)  # 16kHz * 2bytes * 80ms = 2560 bytes
+                # 使用官方demo的分块大小：3200 bytes (100ms)
+                chunk_size = 3200  # 官方demo: 100ms chunks
                 total_chunks = (len(audio_data) + chunk_size - 1) // chunk_size
 
                 logger.info(f"[AST] 发送音频数据: {len(audio_data)} bytes, 分为 {total_chunks} 块")
@@ -598,8 +625,8 @@ class DoubaoVoiceService:
                     if (i // chunk_size + 1) % 10 == 0:  # 每10块打印一次
                         logger.info(f"[AST] 已发送 {i // chunk_size + 1}/{total_chunks} 块")
 
-                    # 稍微延迟，避免发送过快
-                    await asyncio.sleep(0.01)
+                    # 关键修复：使用官方demo的延迟 (100ms)
+                    await asyncio.sleep(0.1)
 
                 # ========== 步骤4: 发送FinishSession (event=102) ==========
                 finish_session = doubao_ast_pb2.FinishSessionRequest()

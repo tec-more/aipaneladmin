@@ -16,13 +16,16 @@ from base.plugins.llm.services.voice_helper import VoiceServiceHelper
 
 logger = logging.getLogger(__name__)
 
-translation_stream_router = APIRouter(
+voice_translation_stream_router = APIRouter(
     prefix="/voice/translation",
     tags=["语音翻译-流式"],
 )
 
+# 别名，用于向后兼容
+translation_stream_router = voice_translation_stream_router
 
-@translation_stream_router.post("/streaming", summary="实时同声传译（流式SSE）")
+
+@voice_translation_stream_router.post("/streaming", summary="实时同声传译（流式SSE）")
 async def streaming_translation_sse(
     audio_file: UploadFile,
     provider_id: int = Form(..., description="厂商ID"),
@@ -84,11 +87,26 @@ async def streaming_translation_sse(
             )
 
             # 读取音频数据
-            audio_data = await audio_file.read()
+            raw_audio_data = await audio_file.read()
 
-            # 创建记录
-            import time
-            record_id = f"trans_{int(time.time())}_{audio_file.filename}"
+            # 关键修复：提取纯PCM数据（不包含WAV头）
+            # 豆包AST需要纯PCM数据，不是完整的WAV文件
+            import wave
+            import io
+
+            try:
+                audio_file_obj = io.BytesIO(raw_audio_data)
+                with wave.open(audio_file_obj, 'rb') as wf:
+                    # 读取纯PCM数据（不包含WAV头）
+                    audio_data = wf.readframes(wf.getnframes())
+                    logger.info(f"[SSE流] 提取PCM数据: {len(audio_data)} bytes (原始WAV: {len(raw_audio_data)} bytes)")
+            except Exception as e:
+                logger.warning(f"[SSE流] 无法提取PCM数据: {e}，使用原始数据")
+                audio_data = raw_audio_data
+
+            # 创建记录（使用UUID避免重复）
+            import uuid
+            record_id = f"trans_{uuid.uuid4().hex[:16]}"
             record = await LLMVoiceRecord.create(
                 record_id=record_id,
                 customer_id=current_user_id,
@@ -172,7 +190,7 @@ async def streaming_translation_sse(
     )
 
 
-@translation_stream_router.post("/streaming/chunked", summary="实时同声传译（分块上传）")
+@voice_translation_stream_router.post("/streaming/chunked", summary="实时同声传译（分块上传）")
 async def streaming_translation_chunked(
     provider_id: int = Form(..., description="厂商ID"),
     source_language: str = Form("zh", description="源语言"),
@@ -213,4 +231,4 @@ async def streaming_translation_chunked(
 
 
 # 导出路由
-__all__ = ["translation_stream_router"]
+__all__ = ["voice_translation_stream_router"]

@@ -235,15 +235,15 @@ const handleReset = () => {
 }
 
 const handleAdd = () => {
-  router.push('/customer/create')
+  router.push('/panel/customer/create')
 }
 
 const handleDetail = (row) => {
-  router.push(`/customer/${row.id}`)
+  router.push(`/panel/customer/detail/${row.id}`)
 }
 
 const handleEdit = (row) => {
-  router.push(`/customer/edit/${row.id}`)
+  router.push(`/panel/customer/edit/${row.id}`)
 }
 
 const handleSubmit = async () => {

@@ -140,6 +140,9 @@ def setup_logging():
     # 步骤8：配置第三方库日志
     for logger_name in logger_name_list:
         _logger = logging.getLogger(logger_name)
+        # 过滤掉过于详细的日志
+        if logger_name in ['websockets.client', 'websockets.server', 'httpx', 'httpcore']:
+            _logger.setLevel(logging.WARNING)
         _logger.handlers = [InterceptHandler()]
         _logger.propagate = False
     
