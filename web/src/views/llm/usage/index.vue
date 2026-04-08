@@ -145,21 +145,31 @@
           <span v-else>{{ detailRecord.status }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="错误信息" :span="2">{{ detailRecord.error_message || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="输入文本" :span="2" v-if="detailRecord.input_text">
-          <el-popover placement="top" :width="600" trigger="click">
-            <template #reference>
-              <span class="text-primary cursor-pointer">{{ detailRecord.input_text.length > 50 ? detailRecord.input_text.substring(0, 50) + '...' : detailRecord.input_text }}</span>
-            </template>
-            <div class="text-break">{{ detailRecord.input_text }}</div>
-          </el-popover>
+        <el-descriptions-item label="输入文本" :span="2">
+          <template v-if="detailRecord.input_text">
+            <el-popover placement="top" :width="600" trigger="click">
+              <template #reference>
+                <span class="text-primary cursor-pointer">{{ detailRecord.input_text.length > 50 ? detailRecord.input_text.substring(0, 50) + '...' : detailRecord.input_text }}</span>
+              </template>
+              <div class="text-break">{{ detailRecord.input_text }}</div>
+            </el-popover>
+          </template>
+          <template v-else>
+            <span class="text-gray">-</span>
+          </template>
         </el-descriptions-item>
-        <el-descriptions-item label="输出文本" :span="2" v-if="detailRecord.output_text">
-          <el-popover placement="top" :width="600" trigger="click">
-            <template #reference>
-              <span class="text-primary cursor-pointer">{{ detailRecord.output_text.length > 50 ? detailRecord.output_text.substring(0, 50) + '...' : detailRecord.output_text }}</span>
-            </template>
-            <div class="text-break">{{ detailRecord.output_text }}</div>
-          </el-popover>
+        <el-descriptions-item label="输出文本" :span="2">
+          <template v-if="detailRecord.output_text">
+            <el-popover placement="top" :width="600" trigger="click">
+              <template #reference>
+                <span class="text-primary cursor-pointer">{{ detailRecord.output_text.length > 50 ? detailRecord.output_text.substring(0, 50) + '...' : detailRecord.output_text }}</span>
+              </template>
+              <div class="text-break">{{ detailRecord.output_text }}</div>
+            </el-popover>
+          </template>
+          <template v-else>
+            <span class="text-gray">-</span>
+          </template>
         </el-descriptions-item>
         <el-descriptions-item label="Token统计" :span="2">
           <div>总计: {{ detailRecord.tokens || 0 }}</div>
@@ -288,6 +298,10 @@ onMounted(() => {
 
 .text-primary {
   color: #409eff;
+}
+
+.text-gray {
+  color: #909399;
 }
 
 .cursor-pointer {

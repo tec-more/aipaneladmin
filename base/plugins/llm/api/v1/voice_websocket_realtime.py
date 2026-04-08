@@ -62,6 +62,8 @@ async def websocket_translation_realtime(
     # 豆包连接和任务
     doubao_task = None
     doubao_queue = asyncio.Queue()
+    config = {}
+    final_result = None
 
     try:
         # 验证用户身份
@@ -79,13 +81,13 @@ async def websocket_translation_realtime(
         # 启动豆包翻译转发任务
         async def forward_to_doubao():
             """转发音频到豆包的异步任务"""
+            nonlocal final_result
             service = await VoiceServiceHelper.get_voice_service(provider_id)
 
             audio_data = await doubao_queue.get()
             logger.info(f"[实时翻译] 豆包任务收到音频: {len(audio_data)} bytes")
 
             # 调用翻译服务
-            final_result = None
             async for result in service.streaming_translation(
                 audio_data,
                 config["source_language"],
@@ -130,6 +132,8 @@ async def websocket_translation_realtime(
                         logger.info(f"[实时翻译] 配置: {config}")
 
                         # 创建记录
+                        from datetime import datetime
+                        import pytz
                         record = await LLMUsageRecord.create(
                             record_id=session_id,
                             customer_id=user_id,
@@ -139,7 +143,8 @@ async def websocket_translation_realtime(
                             audio_format=config["format"],
                             source_language=config["source_language"],
                             target_language=config["target_language"],
-                            status="processing"
+                            status="processing",
+                            start_time=datetime.now(pytz.UTC)
                         )
 
                         logger.info(f"[实时翻译] 数据库记录已创建, ID: {record.id}")
@@ -165,7 +170,21 @@ async def websocket_translation_realtime(
                         logger.info(f"[实时翻译] 翻译完成")
 
                         if record:
+                            from datetime import datetime
+                            import pytz
+                            end_time = datetime.now(pytz.UTC)
+                            duration_seconds = 0
+                            if record.start_time:
+                                duration_seconds = int((end_time - record.start_time).total_seconds())
+                            
+                            # 写入input_text和output_text
+                            if final_result:
+                                record.input_text = final_result.get("source_text", "")
+                                record.output_text = final_result.get("translation_text", "")
+                            
+                            record.audio_duration = duration_seconds
                             record.status = "completed"
+                            record.end_time = end_time
                             await record.save()
 
                 except json.JSONDecodeError as e:
@@ -192,6 +211,11 @@ async def websocket_translation_realtime(
                         # 纯PCM
                         pcm_data = audio_chunk
                         logger.info(f"[实时翻译] 纯PCM数据: {len(pcm_data)} bytes")
+
+                    # 启动豆包任务（如果还没启动）
+                    if not doubao_task:
+                        doubao_task = asyncio.create_task(forward_to_doubao())
+                        logger.info(f"[实时翻译] 启动豆包翻译任务")
 
                     # 发送给豆包任务
                     await doubao_queue.put(pcm_data)

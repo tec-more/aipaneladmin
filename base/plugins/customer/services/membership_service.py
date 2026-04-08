@@ -411,8 +411,23 @@ class MembershipService:
 
         # 获取所有使用记录并汇总时长
         usage_logs = await LLMUsageRecord.filter(customer_id=customer_id)
-        total_tokens = sum(log.tokens for log in usage_logs)
-        used_hours = total_tokens / 3600.0  # 转换为小时
+        
+        # 计算总时长（秒）
+        total_seconds = 0
+        for log in usage_logs:
+            # 对于音频相关记录，使用audio_duration
+            if log.audio_duration:
+                total_seconds += log.audio_duration
+            # 对于对话记录，使用start_time和end_time的差值
+            elif log.start_time and log.end_time:
+                duration = (log.end_time - log.start_time).total_seconds()
+                total_seconds += duration
+            # 如果都没有，使用tokens估算（作为备用方案）
+            elif log.tokens:
+                # 假设100 tokens ≈ 1秒（粗略估算）
+                total_seconds += log.tokens / 100
+        
+        used_hours = total_seconds / 3600.0  # 转换为小时
 
         print(f"[MembershipService] 计算客户 {customer_id} 的已用时长: {len(usage_logs)} 条记录, 总计 {used_hours:.2f} 小时")
         return used_hours

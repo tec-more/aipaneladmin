@@ -142,10 +142,19 @@ async def streaming_translation_sse(
 
             # 更新记录
             if final_result and record:
+                from datetime import datetime
+                import pytz
+                end_time = datetime.now(pytz.UTC)
+                duration_seconds = 0
+                if record.start_time:
+                    duration_seconds = int((end_time - record.start_time).total_seconds())
+                
                 await LLMUsageRecord.filter(id=record.id).update(
                     input_text=final_result.get("source_text", ""),
                     output_text=final_result.get("translation_text", ""),
-                    status="completed"
+                    audio_duration=duration_seconds,
+                    status="completed",
+                    end_time=end_time
                 )
 
                 # 更新使用量
@@ -166,8 +175,17 @@ async def streaming_translation_sse(
             # 更新记录状态为失败
             if record:
                 try:
+                    from datetime import datetime
+                    import pytz
+                    end_time = datetime.now(pytz.UTC)
+                    duration_seconds = 0
+                    if record.start_time:
+                        duration_seconds = int((end_time - record.start_time).total_seconds())
+                    
                     await LLMUsageRecord.filter(id=record.id).update(
-                        status="failed"
+                        audio_duration=duration_seconds,
+                        status="failed",
+                        end_time=end_time
                     )
                 except:
                     pass

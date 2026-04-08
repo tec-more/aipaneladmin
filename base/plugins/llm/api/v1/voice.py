@@ -94,10 +94,16 @@ async def streaming_asr(
         # 更新记录
         if results:
             final_result = results[-1]
+            end_time = datetime.now(pytz.UTC)
+            duration_seconds = 0
+            if record.start_time:
+                duration_seconds = int((end_time - record.start_time).total_seconds())
+            
             await LLMUsageRecord.filter(id=record.id).update(
                 input_text=final_result.get("text", ""),
+                audio_duration=duration_seconds,
                 status="completed",
-                end_time=datetime.now(pytz.UTC)
+                end_time=end_time
             )
 
         # 更新使用量
@@ -163,10 +169,16 @@ async def file_asr(
 
         # 更新记录
         if result.get("result") == "success":
+            end_time = datetime.now(pytz.UTC)
+            duration_seconds = 0
+            if record.start_time:
+                duration_seconds = int((end_time - record.start_time).total_seconds())
+            
             await LLMUsageRecord.filter(id=record.id).update(
                 input_text=result.get("text", ""),
+                audio_duration=duration_seconds,
                 status="completed",
-                end_time=datetime.now(pytz.UTC)
+                end_time=end_time
             )
 
         # 更新使用量
@@ -237,11 +249,17 @@ async def text_to_speech(
         from datetime import datetime
         import pytz
         audio_size = len(audio_data)
+        end_time = datetime.now(pytz.UTC)
+        duration_seconds = 0
+        if record.start_time:
+            duration_seconds = int((end_time - record.start_time).total_seconds())
+        
         await LLMUsageRecord.filter(id=record.id).update(
             audio_file=audio_path,
+            audio_duration=duration_seconds,
             tokens=DoubaoVoiceService.estimate_tokens(text),
             status="completed",
-            end_time=datetime.now(pytz.UTC)
+            end_time=end_time
         )
 
         # 更新使用量
@@ -317,10 +335,16 @@ async def submit_clone(
         if result.get("voice_id"):
             from datetime import datetime
             import pytz
+            end_time = datetime.now(pytz.UTC)
+            duration_seconds = 0
+            if clone.start_time:
+                duration_seconds = int((end_time - clone.start_time).total_seconds())
+            
             await LLMUsageRecord.filter(id=clone.id).update(
                 voice_id=result.get("voice_id"),
+                audio_duration=duration_seconds,
                 status="completed",
-                end_time=datetime.now(pytz.UTC)
+                end_time=end_time
             )
 
         # 更新使用量
@@ -513,11 +537,17 @@ async def streaming_translation(
 
         # 更新记录
         if final_result:
+            end_time = datetime.now(pytz.UTC)
+            duration_seconds = 0
+            if record.start_time:
+                duration_seconds = int((end_time - record.start_time).total_seconds())
+            
             await LLMUsageRecord.filter(id=record.id).update(
                 input_text=final_result.get("source_text", ""),
                 output_text=final_result.get("translation_text", ""),
+                audio_duration=duration_seconds,
                 status="completed",
-                end_time=datetime.now(pytz.UTC)
+                end_time=end_time
             )
 
             # 更新使用量（如果有token信息）

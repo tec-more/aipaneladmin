@@ -592,6 +592,7 @@ async def websocket_translation_v3(
                             # 更新记录
                             record.status = "completed"
                             record.end_time = datetime.now(pytz.UTC)
+                            record.audio_duration = duration_seconds  # 添加音频时长
                             record.tokens = total_tokens
                             record.cost = total_cost
                             record.input_text = source_text
@@ -741,6 +742,7 @@ async def websocket_translation_v3(
                 
                 record.status = "failed"
                 record.end_time = datetime.now(pytz.UTC)
+                record.audio_duration = duration_seconds  # 添加音频时长
                 record.tokens = total_tokens
                 record.cost = total_cost
                 record.input_text = source_text

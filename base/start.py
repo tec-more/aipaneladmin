@@ -157,18 +157,41 @@ async def update_membership_data_task():
 
                     # 从使用记录计算实际已用时长
                     usage_logs = await LLMUsageRecord.filter(customer_id=membership.customer_id)
-                    total_tokens = sum(log.tokens for log in usage_logs)
-                    used_hours = total_tokens / 3600.0
+                    
+                    # 计算总时长（秒）
+                    total_seconds = 0
+                    for log in usage_logs:
+                        # 对于音频相关记录，使用audio_duration
+                        if log.audio_duration:
+                            total_seconds += log.audio_duration
+                        # 对于对话记录，使用start_time和end_time的差值
+                        elif log.start_time and log.end_time:
+                            duration = (log.end_time - log.start_time).total_seconds()
+                            total_seconds += duration
+                        # 如果都没有，使用tokens估算（作为备用方案）
+                        elif log.tokens:
+                            # 假设100 tokens ≈ 1秒（粗略估算）
+                            total_seconds += log.tokens / 100
+                    
+                    used_hours = total_seconds / 3600.0
 
                     print(f"📋 【使用记录汇总】")
                     print(f"  记录数量: {len(usage_logs)} 条")
-                    print(f"  总Token数: {total_tokens} ")
+                    print(f"  总时长: {total_seconds} 秒")
                     print(f"  💵 实际已用时长: {used_hours:.2f} 小时")
 
                     if usage_logs:
                         print(f"  📝 最近3条记录:")
                         for log in usage_logs[:3]:
-                            print(f"    - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.record_type}, {log.tokens} tokens, ${float(log.cost):.4f}")
+                            duration_str = ""
+                            if log.audio_duration:
+                                duration_str = f"{log.audio_duration}秒"
+                            elif log.start_time and log.end_time:
+                                duration = (log.end_time - log.start_time).total_seconds()
+                                duration_str = f"{duration:.1f}秒"
+                            else:
+                                duration_str = f"{log.tokens} tokens"
+                            print(f"    - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.record_type}, {duration_str}, ${float(log.cost):.4f}")
                     print()
 
                     # 计算剩余时长

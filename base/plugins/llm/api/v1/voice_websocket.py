@@ -346,9 +346,18 @@ async def websocket_translation(
                                 logger.info(f"[WebSocket] 译文: {translation_text}")
 
                                 # 更新记录
+                                from datetime import datetime
+                                import pytz
+                                end_time = datetime.now(pytz.UTC)
+                                duration_seconds = 0
+                                if record.start_time:
+                                    duration_seconds = int((end_time - record.start_time).total_seconds())
+                                
                                 record.input_text = source_text
                                 record.output_text = translation_text
+                                record.audio_duration = duration_seconds
                                 record.status = "completed"
+                                record.end_time = end_time
                                 await record.save()
 
                                 # 更新使用量
@@ -364,7 +373,16 @@ async def websocket_translation(
                             else:
                                 logger.error(f"[WebSocket] 未收到最终结果")
                                 if record:
+                                    from datetime import datetime
+                                    import pytz
+                                    end_time = datetime.now(pytz.UTC)
+                                    duration_seconds = 0
+                                    if record.start_time:
+                                        duration_seconds = int((end_time - record.start_time).total_seconds())
+                                    
+                                    record.audio_duration = duration_seconds
                                     record.status = "failed"
+                                    record.end_time = end_time
                                 await record.save()
 
                         except Exception as e:

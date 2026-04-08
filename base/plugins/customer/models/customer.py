@@ -90,18 +90,41 @@ class Customer(BaseModel, TimestampMixin):
         # 从使用记录中实时计算已用时长
         from base.plugins.llm.models.usage import LLMUsageRecord
         usage_logs = await LLMUsageRecord.filter(customer_id=self.id)
-        total_seconds = sum(log.tokens for log in usage_logs)  # 使用tokens作为使用量指标
+        
+        # 计算总时长（秒）
+        total_seconds = 0
+        for log in usage_logs:
+            # 对于音频相关记录，使用audio_duration
+            if log.audio_duration:
+                total_seconds += log.audio_duration
+            # 对于对话记录，使用start_time和end_time的差值
+            elif log.start_time and log.end_time:
+                duration = (log.end_time - log.start_time).total_seconds()
+                total_seconds += duration
+            # 如果都没有，使用tokens估算（作为备用方案）
+            elif log.tokens:
+                # 假设100 tokens ≈ 1秒（粗略估算）
+                total_seconds += log.tokens / 100
+        
         used_hours = total_seconds / 3600.0  # 转换为小时
 
         print(f"[Customer.to_dict] 📊 使用记录汇总:")
         print(f"[Customer.to_dict]   记录数量: {len(usage_logs)} 条")
-        print(f"[Customer.to_dict]   总Token数: {total_seconds} ")
+        print(f"[Customer.to_dict]   总时长: {total_seconds} 秒")
         print(f"[Customer.to_dict]   已用时长: {used_hours:.2f} 小时")
 
         if usage_logs:
             print(f"[Customer.to_dict]   最近3条记录:")
             for log in usage_logs[:3]:
-                print(f"[Customer.to_dict]     - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.record_type}, {log.tokens} tokens, ${float(log.cost):.4f}")
+                duration_str = ""
+                if log.audio_duration:
+                    duration_str = f"{log.audio_duration}秒"
+                elif log.start_time and log.end_time:
+                    duration = (log.end_time - log.start_time).total_seconds()
+                    duration_str = f"{duration:.1f}秒"
+                else:
+                    duration_str = f"{log.tokens} tokens"
+                print(f"[Customer.to_dict]     - {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}: {log.record_type}, {duration_str}, ${float(log.cost):.4f}")
         print()
 
         # 构建基础数据

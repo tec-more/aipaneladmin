@@ -109,6 +109,7 @@ class Settings(BaseSettings):
 	# 项目根目录
 	base_path: Path = Path(__file__).parent.parent.parent
 	LOG_DIR: str = config.config.get("log", "path", fallback=str(base_path / "logs"))
+	STORAGE_DIR: str = config.config.get("storage", "path", fallback=str(base_path / "storage"))
 	# ================================================= #
 	# ******************** 跨域配置 ******************** #
 	# ================================================= #
