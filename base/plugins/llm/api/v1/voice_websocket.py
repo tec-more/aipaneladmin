@@ -504,7 +504,7 @@ def extract_pcm(audio_data: bytes, config: dict) -> bytes:
             return pcm_data
     else:
         # 纯PCM数据
-        logger.info(f"[WebSocket] 检测到纯PCM数据: {len(audio_data)} bytes")
+        # logger.info(f"[WebSocket] 检测到纯PCM数据: {len(audio_data)} bytes")
         return audio_data
 
 

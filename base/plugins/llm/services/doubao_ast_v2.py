@@ -253,8 +253,13 @@ class DoubaoASTServiceV2:
                         else:
                             # 处理翻译结果
                             if Response_data.text:
-                                final_result["translation_segments"].append(Response_data.text)
-                                logger.info(f"[AST] 翻译: {Response_data.text}")
+                                # 检查事件类型，区分原文和译文
+                                if Response_data.event == Type.SourceSubtitleResponse:
+                                    final_result["source_segments"].append(Response_data.text)
+                                    logger.info(f"[AST] 原文: {Response_data.text}")
+                                else:
+                                    final_result["translation_segments"].append(Response_data.text)
+                                    logger.info(f"[AST] 翻译: {Response_data.text}")
 
                                 yield {
                                     "event": "translation",

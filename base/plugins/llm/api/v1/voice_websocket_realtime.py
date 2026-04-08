@@ -84,10 +84,31 @@ async def websocket_translation_realtime(
             nonlocal final_result
             service = await VoiceServiceHelper.get_voice_service(provider_id)
 
-            audio_data = await doubao_queue.get()
-            logger.info(f"[实时翻译] 豆包任务收到音频: {len(audio_data)} bytes")
+            # 收集所有音频数据
+            audio_data = b''
+            while True:
+                chunk = await doubao_queue.get()
+                if chunk is None:
+                    # 收到结束信号
+                    break
+                audio_data += chunk
+                logger.info(f"[实时翻译] 豆包任务收到音频块: {len(chunk)} bytes, 累计: {len(audio_data)} bytes")
+
+            logger.info(f"[实时翻译] 音频数据收集完成: {len(audio_data)} bytes")
+
+            # 验证音频长度
+            if len(audio_data) < 8000:
+                error_msg = f"音频太短: {len(audio_data)} bytes (< 8000)，建议至少1秒"
+                logger.error(f"[实时翻译] {error_msg}")
+                await websocket.send_json({
+                    "event": "error",
+                    "error": error_msg,
+                    "type": "AudioTooShortError"
+                })
+                return None
 
             # 调用翻译服务
+            logger.info(f"[实时翻译] ========== 开始调用翻译服务 ==========")
             async for result in service.streaming_translation(
                 audio_data,
                 config["source_language"],
@@ -98,14 +119,22 @@ async def websocket_translation_realtime(
                 # 实时转发豆包的返回结果给客户端
                 await websocket.send_json(result)
 
-                logger.info(f"[实时翻译] 豆包返回: {result.get('event')}")
+                event_type = result.get('event')
+                logger.info(f"[实时翻译] 豆包返回: event={event_type}")
 
-                if result.get("event") == "session_finished":
+                if event_type == "session_finished":
                     final_result = result.get("result", {})
+                    logger.info(f"[实时翻译] 收到session_finished事件")
+                    logger.info(f"[实时翻译] final_result已设置: {final_result}")
+                    logger.info(f"[实时翻译] final_result中的source_text: '{final_result.get('source_text', '')}'")
+                    logger.info(f"[实时翻译] final_result中的translation_text: '{final_result.get('translation_text', '')}'")
                     break
-                elif result.get("event") == "error":
+                elif event_type == "error":
+                    logger.error(f"[实时翻译] 收到error事件: {result.get('error')}")
                     break
 
+            logger.info(f"[实时翻译] ========== 翻译服务调用结束 ==========")
+            logger.info(f"[实时翻译] final_result最终值: {final_result}")
             return final_result
 
         while True:
@@ -178,14 +207,45 @@ async def websocket_translation_realtime(
                                 duration_seconds = int((end_time - record.start_time).total_seconds())
                             
                             # 写入input_text和output_text
+                            logger.info(f"[实时翻译] ========== 开始写入数据库 ==========")
+                            logger.info(f"[实时翻译] record_id: {record.record_id}")
+                            logger.info(f"[实时翻译] final_result: {final_result}")
+                            
                             if final_result:
-                                record.input_text = final_result.get("source_text", "")
-                                record.output_text = final_result.get("translation_text", "")
+                                source_text = final_result.get("source_text", "")
+                                translation_text = final_result.get("translation_text", "")
+                                logger.info(f"[实时翻译] source_text (从final_result获取): '{source_text}'")
+                                logger.info(f"[实时翻译] translation_text (从final_result获取): '{translation_text}'")
+                                logger.info(f"[实时翻译] source_text长度: {len(source_text)}")
+                                logger.info(f"[实时翻译] translation_text长度: {len(translation_text)}")
+                                
+                                record.input_text = source_text
+                                record.output_text = translation_text
+                                logger.info(f"[实时翻译] 已设置 record.input_text = '{record.input_text}'")
+                                logger.info(f"[实时翻译] 已设置 record.output_text = '{record.output_text}'")
+                            else:
+                                logger.warning(f"[实时翻译] final_result为None，无法写入input_text和output_text")
+                                logger.warning(f"[实时翻译] record.input_text将保持为: '{record.input_text}'")
+                                logger.warning(f"[实时翻译] record.output_text将保持为: '{record.output_text}'")
                             
                             record.audio_duration = duration_seconds
                             record.status = "completed"
                             record.end_time = end_time
+                            
+                            logger.info(f"[实时翻译] 准备保存记录...")
+                            logger.info(f"[实时翻译] record.status: {record.status}")
+                            logger.info(f"[实时翻译] record.end_time: {record.end_time}")
+                            logger.info(f"[实时翻译] record.audio_duration: {record.audio_duration}")
+                            logger.info(f"[实时翻译] record.input_text: '{record.input_text}'")
+                            logger.info(f"[实时翻译] record.output_text: '{record.output_text}'")
+                            
                             await record.save()
+                            
+                            logger.info(f"[实时翻译] 记录已保存")
+                            logger.info(f"[实时翻译] record_id: {record.record_id}")
+                            logger.info(f"[实时翻译] record.input_text (保存后): '{record.input_text}'")
+                            logger.info(f"[实时翻译] record.output_text (保存后): '{record.output_text}'")
+                            logger.info(f"[实时翻译] ======================================")
 
                 except json.JSONDecodeError as e:
                     await websocket.send_json({

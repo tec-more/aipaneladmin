@@ -467,8 +467,8 @@ class DoubaoVoiceService:
                     return
             else:
                 # 纯PCM数据（无WAV头），API端点已经验证过格式
-                logger.info(f"[AST] 检测到纯PCM数据（已由API端点验证）")
-                logger.info(f"[AST] 假设格式: 16kHz, 单声道, 16bit")
+                # logger.info(f"[AST] 检测到纯PCM数据（已由API端点验证）")
+                # logger.info(f"[AST] 假设格式: 16kHz, 单声道, 16bit")
                 # 计算时长
                 duration = len(audio_data) / 2 / 16000  # bytes / 2bytes_per_sample / sample_rate
                 logger.info(f"[AST] 音频时长: {duration:.2f}秒")

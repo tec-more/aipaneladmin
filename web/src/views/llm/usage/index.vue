@@ -151,7 +151,7 @@
               <template #reference>
                 <span class="text-primary cursor-pointer">{{ detailRecord.input_text.length > 50 ? detailRecord.input_text.substring(0, 50) + '...' : detailRecord.input_text }}</span>
               </template>
-              <div class="text-break">{{ detailRecord.input_text }}</div>
+              <div class="text-break popover-content">{{ detailRecord.input_text }}</div>
             </el-popover>
           </template>
           <template v-else>
@@ -164,7 +164,7 @@
               <template #reference>
                 <span class="text-primary cursor-pointer">{{ detailRecord.output_text.length > 50 ? detailRecord.output_text.substring(0, 50) + '...' : detailRecord.output_text }}</span>
               </template>
-              <div class="text-break">{{ detailRecord.output_text }}</div>
+              <div class="text-break popover-content">{{ detailRecord.output_text }}</div>
             </el-popover>
           </template>
           <template v-else>
@@ -310,6 +310,13 @@ onMounted(() => {
 
 .text-break {
   word-break: break-all;
+}
+
+.popover-content {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px;
+  line-height: 1.5;
 }
 
 .mb-4 {

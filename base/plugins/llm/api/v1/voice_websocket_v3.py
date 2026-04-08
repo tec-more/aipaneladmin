@@ -60,6 +60,8 @@ async def websocket_translation_v3(
     record = None
     config = {}
     final_result = {}  # 存储最终翻译结果
+    final_result_lock = asyncio.Lock()  # 用于保护final_result的锁
+    usage_info = {}  # 存储token使用情况
 
     # 豆包WebSocket连接
     doubao_ws = None
@@ -70,9 +72,14 @@ async def websocket_translation_v3(
     last_send_time = None
     buffer_lock = asyncio.Lock()
 
+    # 原文和译文片段
+    source_segments = []  # 原文片段
+    translation_segments = []  # 译文片段
+
     # 控制标志
     is_running = False
     stop_event = asyncio.Event()
+    final_result_ready = asyncio.Event()  # 用于通知final_result已准备好
 
     # 异步任务
     sender_task = None
@@ -166,14 +173,44 @@ async def websocket_translation_v3(
                             ws_url = "wss://openspeech.bytedance.com/api/v4/ast/v2/translate"
                             conn_id = str(uuid.uuid4())
 
-                            headers = Headers({
-                                "X-Api-App-Key": service.api_id or service.api_key,
-                                "X-Api-Access-Key": service.access_token or service.api_key,
-                                "X-Api-Resource-Id": "volc.service_type.10053",
-                                "X-Api-Connect-Id": conn_id
-                            })
+                            # 调试：打印认证信息
+                            logger.info(f"[实时翻译V3] 认证信息:")
+                            logger.info(f"  api_id: {service.api_id}")
+                            logger.info(f"  api_key: {service.api_key[:20]}..." if service.api_key else "  api_key: None")
+                            logger.info(f"  access_token: {service.access_token[:20]}..." if service.access_token else "  access_token: None")
 
-                            #logger.info(f"[实时翻译V3] 连接到豆包AST...")
+                            # 豆包AST 2.0认证方式
+                            # 方式1: 使用App Key + Access Token
+                            # 方式2: 使用API Key (app_id:secret格式)
+                            
+                            # 尝试使用API Key进行认证
+                            api_key = service.api_key
+                            if ':' in api_key:
+                                # API Key格式: app_id:secret
+                                app_id, secret = api_key.split(':', 1)
+                                headers = Headers({
+                                    "X-Api-App-Key": app_id,
+                                    "X-Api-Access-Key": secret,
+                                    "X-Api-Resource-Id": "volc.service_type.10053",
+                                    "X-Api-Connect-Id": conn_id
+                                })
+                                logger.info(f"[实时翻译V3] 使用API Key认证方式 (app_id:secret)")
+                            else:
+                                # 使用Access Token认证方式
+                                headers = Headers({
+                                    "X-Api-App-Key": service.api_id or service.api_key,
+                                    "X-Api-Access-Key": service.access_token or service.api_key,
+                                    "X-Api-Resource-Id": "volc.service_type.10053",
+                                    "X-Api-Connect-Id": conn_id
+                                })
+                                logger.info(f"[实时翻译V3] 使用Access Token认证方式")
+
+                            logger.info(f"[实时翻译V3] 请求头:")
+                            logger.info(f"  X-Api-App-Key: {headers.get('X-Api-App-Key', 'Not Set')}")
+                            logger.info(f"  X-Api-Access-Key: {headers.get('X-Api-Access-Key', 'Not Set')[:20]}..." if headers.get('X-Api-Access-Key') else "  X-Api-Access-Key: Not Set")
+                            logger.info(f"  X-Api-Resource-Id: {headers.get('X-Api-Resource-Id')}")
+
+                            logger.info(f"[实时翻译V3] 连接到豆包AST...")
 
                             # 连接豆包AST
                             doubao_ws = await websockets.connect(
@@ -240,9 +277,9 @@ async def websocket_translation_v3(
 
                             # 启动定时刷新任务
                             async def flush_buffer_periodically():
-                                """每300ms发送一次缓冲的音频"""
+                                """每500ms发送一次缓冲的音频"""
                                 try:
-                                    flush_interval = 0.2  # 200ms
+                                    flush_interval = 0.3  # 300ms
                                     min_buffer_size = 3200  # 最小3200字节
 
                                     while is_running and not stop_event.is_set():
@@ -295,8 +332,7 @@ async def websocket_translation_v3(
                                 """接收豆包AST的翻译结果"""
                                 nonlocal final_result  # 声明使用外部变量
                                 try:
-                                    source_segments = []  # 原文片段
-                                    translation_segments = []  # 译文片段
+                                    # 使用外部的source_segments和translation_segments
                                     response_count = 0
 
                                     #logger.info(f"[实时翻译V3-接收] ========== 开始接收 ==========")
@@ -333,9 +369,6 @@ async def websocket_translation_v3(
                                             #logger.info(f"[实时翻译V3] 🎉 会话完成")
                                             #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
 
-                                            from google.protobuf.json_format import MessageToDict
-                                            response_dict = MessageToDict(Response_data)
-
                                             # 智能合并原文和译文片段，确保标点符号对齐
                                             def smart_join(segments):
                                                 result = ""
@@ -354,26 +387,31 @@ async def websocket_translation_v3(
                                                             result += " " + seg
                                                 return result
                                             
-                                            final_result = {
-                                                "session_id": session_id,
-                                                "source_text": smart_join(source_segments),
-                                                "translation_text": smart_join(translation_segments),
-                                                "source_segments": source_segments,
-                                                "translation_segments": translation_segments,
-                                                "tokens": response_dict
-                                            }
+                                            # 更新外部的final_result变量
+                                            async with final_result_lock:
+                                                final_result.update({
+                                                    "session_id": session_id,
+                                                    "source_text": smart_join(source_segments),
+                                                    "translation_text": smart_join(translation_segments),
+                                                    "source_segments": source_segments,
+                                                    "translation_segments": translation_segments,
+                                                    "tokens": usage_info
+                                                })
+                                            
+                                            # 通知final_result已准备好
+                                            final_result_ready.set()
 
                                             # 打印最终汇总
-                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                            #logger.info(f"[实时翻译V3] 📊 最终翻译汇总")
-                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
-                                            #logger.info(f"[实时翻译V3] 源语言      : {config['source_language']}")
-                                            #logger.info(f"[实时翻译V3] 目标语言    : {config['target_language']}")
-                                            #logger.info(f"[实时翻译V3] 原文片段数  : {len(source_segments)}")
-                                            #logger.info(f"[实时翻译V3] 译文片段数  : {len(translation_segments)}")
-                                            #logger.info(f"[实时翻译V3] 完整原文    : {' '.join(source_segments)}")
-                                            #logger.info(f"[实时翻译V3] 完整译文    : {' '.join(translation_segments)}")
-                                            #logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            logger.info(f"[实时翻译V3] 📊 最终翻译汇总")
+                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
+                                            logger.info(f"[实时翻译V3] 源语言      : {config['source_language']}")
+                                            logger.info(f"[实时翻译V3] 目标语言    : {config['target_language']}")
+                                            logger.info(f"[实时翻译V3] 原文片段数  : {len(source_segments)}")
+                                            logger.info(f"[实时翻译V3] 译文片段数  : {len(translation_segments)}")
+                                            logger.info(f"[实时翻译V3] 完整原文    : {smart_join(source_segments)}")
+                                            logger.info(f"[实时翻译V3] 完整译文    : {smart_join(translation_segments)}")
+                                            logger.info(f"[实时翻译V3] ═══════════════════════════════════════")
 
                                             try:
                                                 await websocket.send_json({
@@ -387,8 +425,8 @@ async def websocket_translation_v3(
                                         # Token使用情况
                                         if event_type == 154:  # UsageResponse
                                             from google.protobuf.json_format import MessageToDict
-                                            response_dict = MessageToDict(Response_data)
-                                            #logger.info(f"[实时翻译V3] 📊 Token使用情况: {response_dict}")
+                                            usage_info.update(MessageToDict(Response_data))
+                                            logger.info(f"[实时翻译V3] 📊 Token使用情况: {usage_info}")
 
                                         # ========== 原文事件 (650-652) ==========
                                         elif event_type == 650:  # SourceSubtitleStart
@@ -545,6 +583,45 @@ async def websocket_translation_v3(
                             await doubao_ws.close()
                             doubao_connected = False
 
+                        # 等待final_result准备好（最多等待5秒）
+                        try:
+                            await asyncio.wait_for(final_result_ready.wait(), timeout=5.0)
+                            logger.info(f"[实时翻译V3] ✅ final_result已准备好")
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[实时翻译V3] ⚠️ 等待final_result超时，可能未收到SessionFinished事件")
+                            # 如果没有收到SessionFinished事件，使用已有的source_segments和translation_segments
+                            if source_segments or translation_segments:
+                                logger.info(f"[实时翻译V3] 使用已有的source_segments和translation_segments")
+                                # 智能合并原文和译文片段，确保标点符号对齐
+                                def smart_join(segments):
+                                    result = ""
+                                    for seg in segments:
+                                        if not result:
+                                            result = seg
+                                        else:
+                                            # 如果前一个字符是标点符号，直接连接
+                                            if result[-1] in ["，", "。", "！", "？", ",", ".", "!", "?"]:
+                                                result += seg
+                                            # 如果当前片段以标点符号开头，直接连接
+                                            elif seg and seg[0] in ["，", "。", "！", "？", ",", ".", "!", "?"]:
+                                                result += seg
+                                            # 否则添加空格
+                                            else:
+                                                result += " " + seg
+                                    return result
+                                
+                                # 更新final_result
+                                async with final_result_lock:
+                                    final_result.update({
+                                        "session_id": session_id,
+                                        "source_text": smart_join(source_segments),
+                                        "translation_text": smart_join(translation_segments),
+                                        "source_segments": source_segments,
+                                        "translation_segments": translation_segments,
+                                        "tokens": usage_info
+                                    })
+                                logger.info(f"[实时翻译V3] 已更新final_result: {final_result}")
+
                         # 更新数据库
                         if record:
                             from datetime import datetime
@@ -562,12 +639,74 @@ async def websocket_translation_v3(
                             translation_text = ""
                             total_tokens = 0
                             
-                            if final_result:
-                                source_text = final_result.get("source_text", "")
-                                translation_text = final_result.get("translation_text", "")
-                                tokens_info = final_result.get("tokens", {})
-                                total_tokens = sum(tokens_info.values()) if tokens_info else 0
+                            logger.info(f"[实时翻译V3] ========== 开始写入数据库 ==========")
+                            logger.info(f"[实时翻译V3] record_id: {record.record_id}")
+                            
+                            # 使用锁保护读取final_result
+                            async with final_result_lock:
+                                logger.info(f"[实时翻译V3] final_result: {final_result}")
                                 
+                                if final_result:
+                                    source_text = final_result.get("source_text", "")
+                                    translation_text = final_result.get("translation_text", "")
+                                    tokens_info = final_result.get("tokens", {})
+                                    
+                                    logger.info(f"[实时翻译V3] final_result中的tokens: {tokens_info}")
+                                    logger.info(f"[实时翻译V3] usage_info: {usage_info}")
+                                    
+                                    # 如果final_result中没有tokens，使用usage_info
+                                    if not tokens_info and usage_info:
+                                        tokens_info = usage_info
+                                        logger.info(f"[实时翻译V3] 使用usage_info作为tokens_info: {usage_info}")
+                                    
+                                    # 计算token数 - 从billing.items中提取
+                                    def calculate_tokens(info):
+                                        """计算token数 - 从豆包AST的billing格式提取"""
+                                        if not info:
+                                            return 0
+                                        
+                                        total = 0
+                                        
+                                        # 豆包AST格式: responseMeta.billing.items
+                                        if isinstance(info, dict):
+                                            # 检查是否是billing结构
+                                            if 'billing' in info and isinstance(info['billing'], dict):
+                                                billing = info['billing']
+                                                if 'items' in billing and isinstance(billing['items'], list):
+                                                    for item in billing['items']:
+                                                        if isinstance(item, dict) and 'quantity' in item:
+                                                            quantity = item['quantity']
+                                                            unit = item.get('unit', '')
+                                                            if isinstance(quantity, (int, float)):
+                                                                total += quantity
+                                                                logger.info(f"[实时翻译V3] Token项目 {unit}: {quantity}")
+                                            
+                                            # 递归检查其他字段
+                                            for key, value in info.items():
+                                                if isinstance(value, dict):
+                                                    total += calculate_tokens(value)
+                                                elif isinstance(value, list):
+                                                    for item in value:
+                                                        if isinstance(item, dict):
+                                                            total += calculate_tokens(item)
+                                        
+                                        return total
+                                    
+                                    total_tokens = calculate_tokens(tokens_info)
+                                    logger.info(f"[实时翻译V3] 计算的token数: {total_tokens}")
+                                    
+                                    logger.info(f"[实时翻译V3] source_text (从final_result获取): '{source_text}'")
+                                    logger.info(f"[实时翻译V3] translation_text (从final_result获取): '{translation_text}'")
+                                    logger.info(f"[实时翻译V3] source_text长度: {len(source_text)}")
+                                    logger.info(f"[实时翻译V3] translation_text长度: {len(translation_text)}")
+                                    logger.info(f"[实时翻译V3] tokens_info: {tokens_info}")
+                                    logger.info(f"[实时翻译V3] total_tokens: {total_tokens}")
+                                else:
+                                    logger.warning(f"[实时翻译V3] final_result为空，无法写入input_text和output_text")
+                                    logger.warning(f"[实时翻译V3] record.input_text将保持为: '{record.input_text}'")
+                                    logger.warning(f"[实时翻译V3] record.output_text将保持为: '{record.output_text}'")
+                            
+                            if source_text or translation_text:
                                 # 计算ASR费用（根据音频时长）
                                 asr_cost = HumorousChatCostCalculator.calculate_asr_cost(
                                     duration_seconds=duration_seconds,
@@ -597,7 +736,21 @@ async def websocket_translation_v3(
                             record.cost = total_cost
                             record.input_text = source_text
                             record.output_text = translation_text
+                            
+                            logger.info(f"[实时翻译V3] 准备保存记录...")
+                            logger.info(f"[实时翻译V3] record.status: {record.status}")
+                            logger.info(f"[实时翻译V3] record.end_time: {record.end_time}")
+                            logger.info(f"[实时翻译V3] record.audio_duration: {record.audio_duration}")
+                            logger.info(f"[实时翻译V3] record.input_text: '{record.input_text}'")
+                            logger.info(f"[实时翻译V3] record.output_text: '{record.output_text}'")
+                            
                             await record.save()
+                            
+                            logger.info(f"[实时翻译V3] 记录已保存")
+                            logger.info(f"[实时翻译V3] record_id: {record.record_id}")
+                            logger.info(f"[实时翻译V3] record.input_text (保存后): '{record.input_text}'")
+                            logger.info(f"[实时翻译V3] record.output_text (保存后): '{record.output_text}'")
+                            logger.info(f"[实时翻译V3] ======================================")
                             
                             # 更新API密钥使用量
                             if total_tokens > 0:
@@ -655,8 +808,8 @@ async def websocket_translation_v3(
                             pcm_data = wf.readframes(wf.getnframes())
                         #logger.info(f"[实时翻译V3] 提取PCM: {len(audio_chunk)} -> {len(pcm_data)} bytes")
                         #logger.info(f"[实时翻译V3] WAV头部: {len(audio_chunk) - len(pcm_data)} bytes")
-                    else:
-                        logger.info(f"[实时翻译V3] 纯PCM数据")
+                    # else:
+                    #     logger.info(f"[实时翻译V3] 纯PCM数据")
                 except Exception as e:
                     logger.warning(f"[实时翻译V3] PCM提取失败: {e}")
 
@@ -717,7 +870,50 @@ async def websocket_translation_v3(
                     source_text = final_result.get("source_text", "")
                     translation_text = final_result.get("translation_text", "")
                     tokens_info = final_result.get("tokens", {})
-                    total_tokens = sum(tokens_info.values()) if tokens_info else 0
+                    
+                    logger.info(f"[实时翻译V3] final_result中的tokens: {tokens_info}")
+                    logger.info(f"[实时翻译V3] usage_info: {usage_info}")
+                    
+                    # 如果final_result中没有tokens，使用usage_info
+                    if not tokens_info and usage_info:
+                        tokens_info = usage_info
+                        logger.info(f"[实时翻译V3] 使用usage_info作为tokens_info: {usage_info}")
+                    
+                    # 计算token数 - 从billing.items中提取
+                    def calculate_tokens(info):
+                        """计算token数 - 从豆包AST的billing格式提取"""
+                        if not info:
+                            return 0
+                        
+                        total = 0
+                        
+                        # 豆包AST格式: responseMeta.billing.items
+                        if isinstance(info, dict):
+                            # 检查是否是billing结构
+                            if 'billing' in info and isinstance(info['billing'], dict):
+                                billing = info['billing']
+                                if 'items' in billing and isinstance(billing['items'], list):
+                                    for item in billing['items']:
+                                        if isinstance(item, dict) and 'quantity' in item:
+                                            quantity = item['quantity']
+                                            unit = item.get('unit', '')
+                                            if isinstance(quantity, (int, float)):
+                                                total += quantity
+                                                logger.info(f"[实时翻译V3] Token项目 {unit}: {quantity}")
+                            
+                            # 递归检查其他字段
+                            for key, value in info.items():
+                                if isinstance(value, dict):
+                                    total += calculate_tokens(value)
+                                elif isinstance(value, list):
+                                    for item in value:
+                                        if isinstance(item, dict):
+                                            total += calculate_tokens(item)
+                        
+                        return total
+                    
+                    total_tokens = calculate_tokens(tokens_info)
+                    logger.info(f"[实时翻译V3] 计算的token数: {total_tokens}")
                     
                     # 计算ASR费用（根据音频时长）
                     asr_cost = HumorousChatCostCalculator.calculate_asr_cost(
@@ -739,6 +935,8 @@ async def websocket_translation_v3(
                     logger.info(f"  ASR费用: ¥{float(asr_cost):.4f}")
                     logger.info(f"  LLM费用: ¥{float(llm_cost):.4f}")
                     logger.info(f"  总费用: ¥{total_cost:.4f}")
+                    logger.info(f"  tokens_info: {tokens_info}")
+                    logger.info(f"  total_tokens: {total_tokens}")
                 
                 record.status = "failed"
                 record.end_time = datetime.now(pytz.UTC)

@@ -415,7 +415,7 @@ async def streaming_translation(
 
         # 关键修复：提取纯PCM数据（不包含WAV头）
         # 豆包AST需要纯PCM数据，不是完整的WAV文件
-        logger.info(f"[DEBUG] 提取纯PCM数据...")
+        # logger.info(f"[DEBUG] 提取纯PCM数据...")
 
         import wave
         import io

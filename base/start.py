@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from tortoise import Tortoise
@@ -13,6 +14,15 @@ from base.common.json_encoder import DateTimeEncoder
 from base.common.logging_config import register_exceptions_with_logging
 from base.plugins import plugin_manager
 import asyncio
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# 禁用websockets.client的调试日志
+logging.getLogger('websockets.client').setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
