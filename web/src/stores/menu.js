@@ -53,7 +53,7 @@ const iconMap = {
 }
 
 // 视图组件映射 - 根据后端返回的 component 路径映射到实际组件
-const viewModules = import.meta.glob('@/views/**/*.vue')
+const viewModules = import.meta.glob('@/views/**/*.vue', { eager: false, import: 'default' })
 
 // 根据 component 路径获取组件
 function loadComponent(component) {
@@ -70,8 +70,9 @@ function loadComponent(component) {
 
   // 尝试匹配视图组件
   const matchPath = `/src/views${path}`
+  const aliasPath = `@/views${path}`
   for (const [key, value] of Object.entries(viewModules)) {
-    if (key.includes(matchPath) || key.endsWith(path)) {
+    if (key.includes(matchPath) || key.endsWith(path) || key === aliasPath) {
       return value
     }
   }

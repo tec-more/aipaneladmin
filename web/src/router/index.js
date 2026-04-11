@@ -130,25 +130,14 @@ const routes = [
         component: () => import('@/views/order/Index.vue'),
         meta: { title: '订单管理', icon: 'Document' }
       },
-      {
-        path: 'order/:id',
-        name: 'OrderDetail',
-        component: () => import('@/views/order/Detail.vue'),
-        meta: { title: '订单详情' }
-      },
+      { path: 'order/:id', name: 'OrderDetail', component: () => import('@/views/order/Detail.vue'), meta: { title: '订单详情' } },
+      // 第三方平台管理
+      { path: 'thirdparty', name: 'ThirdParty', redirect: 'thirdparty/platforms', meta: { title: '第三方平台', icon: 'CloudServer' } },
+      { path: 'thirdparty/platforms', name: 'ThirdPartyPlatforms', component: () => import('@/views/thirdparty/platforms/index.vue'), meta: { title: '平台管理', icon: 'Setting' } },
+      { path: 'thirdparty/agents', name: 'ThirdPartyAgents', component: () => import('@/views/thirdparty/agents/index.vue'), meta: { title: '智能体管理', icon: 'Bot' } },
       // LLM大模型管理
-      {
-        path: 'llm/models',
-        name: 'LLMModels',
-        component: () => import('@/views/llm/models/index.vue'),
-        meta: { title: '模型管理', icon: 'Management' }
-      },
-      {
-        path: 'llm/api-keys',
-        name: 'LLMApiKeys',
-        component: () => import('@/views/llm/api-keys/index.vue'),
-        meta: { title: 'API密钥', icon: 'Key' }
-      },
+      { path: 'llm/models', name: 'LLMModels', component: () => import('@/views/llm/models/index.vue'), meta: { title: '模型管理', icon: 'Management' } },
+      { path: 'llm/api-keys', name: 'LLMApiKeys', component: () => import('@/views/llm/api-keys/index.vue'), meta: { title: 'API密钥', icon: 'Key' } },
       { path: 'llm/usage', name: 'LLMUsage', component: () => import('@/views/llm/usage/index.vue'), meta: { title: '使用记录', icon: 'DataAnalysis' } }
     ]
   },

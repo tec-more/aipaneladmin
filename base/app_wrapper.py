@@ -73,7 +73,7 @@ class ASGIAppWithPrefix:
                 new_path = original_path
                 scope = dict(scope)
                 scope["path"] = new_path
-                scope["root_path"] = ""
+                scope["root_path"] = self.prefix
 
             # 如果路径不以 prefix 开头，添加 404 响应（API 路由必须带 /api）
             elif not original_path.startswith("/static") and not original_path.startswith("/docs"):
