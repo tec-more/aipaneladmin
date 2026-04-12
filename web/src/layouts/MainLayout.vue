@@ -71,8 +71,18 @@
             <Fold v-if="!isCollapse" />
             <Expand v-else />
           </el-icon>
+          <el-button 
+            type="text" 
+            size="small" 
+            @click="goBack" 
+            class="back-btn"
+            v-if="showBackButton"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+            返回
+          </el-button>
           <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/panel/dashboard' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item v-if="currentMeta.title">
               {{ currentMeta.title }}
             </el-breadcrumb-item>
@@ -138,7 +148,7 @@ import {
   Delete, Plus, Minus, Check, Close, Warning, InfoFilled, QuestionFilled,
   Star, Message, Bell, Calendar, Clock, Location, Phone, Picture,
   VideoCamera, Upload, Download, Link, Share, Lock, Unlock, Tools,
-  Monitor, DataLine, PieChart, TrendCharts, Histogram
+  Monitor, DataLine, PieChart, TrendCharts, Histogram, ArrowLeft
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useMenuStore } from '@/stores/menu'
@@ -235,6 +245,16 @@ const passwordRules = {
 const currentRoute = computed(() => route.path)
 const currentMeta = computed(() => route.meta || {})
 
+const showBackButton = computed(() => {
+  // 在非首页的后台页面显示返回按钮
+  return currentRoute.value !== '/panel/dashboard'
+})
+
+const goBack = () => {
+  // 返回到上一个页面
+  router.back()
+}
+
 // 添加 /panel 前缀到菜单路径
 const getMenuIndexPath = (path, id) => {
   if (!path) return `menu-${id}`
@@ -252,6 +272,13 @@ const handleMenuClick = (path) => {
     const targetPath = path.startsWith('/panel') ? path : `/panel${path}`
     router.push(targetPath)
   }
+}
+
+// 处理菜单选择事件（el-menu 的 @select 事件）
+const handleMenuSelect = (index) => {
+  // index 是菜单项的 index 属性值，这里不需要额外处理
+  // 因为点击事件已经在 handleMenuClick 中处理了
+  console.log('[菜单选择]', index)
 }
 
 // 计算默认展开的菜单
@@ -326,6 +353,9 @@ onMounted(async () => {
   background-color: #304156;
   transition: width 0.3s;
   overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 
   .logo {
     height: 60px;
@@ -351,6 +381,26 @@ onMounted(async () => {
 
   .el-menu {
     border-right: none;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
+  .el-menu::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .el-menu::-webkit-scrollbar-track {
+    background: #263445;
+  }
+  
+  .el-menu::-webkit-scrollbar-thumb {
+    background: #409eff;
+    border-radius: 2px;
+  }
+  
+  .el-menu::-webkit-scrollbar-thumb:hover {
+    background: #66b1ff;
   }
 }
 
@@ -376,6 +426,15 @@ onMounted(async () => {
       font-size: 20px;
       cursor: pointer;
       margin-right: 16px;
+
+      &:hover {
+        color: #409eff;
+      }
+    }
+
+    .back-btn {
+      margin-right: 16px;
+      color: #606266;
 
       &:hover {
         color: #409eff;

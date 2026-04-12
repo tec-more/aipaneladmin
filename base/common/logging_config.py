@@ -95,11 +95,14 @@ async def ResponseValidationHandle(req: Request, exc: Exception) -> JSONResponse
 async def GeneralExceptionHandle(req: Request, exc: Exception) -> JSONResponse:
     """处理所有其他未捕获的异常"""
     await log_exception(exc, req)
+    
+    import traceback
+    tb_str = traceback.format_exc()
 
     content = dict(
         code=500,
-        msg=f"服务器内部错误: {type(exc).__name__}",
-        data={"error": str(exc)} if req.app.debug else None
+        msg=f"服务器内部错误: {type(exc).__name__}: {str(exc)}",
+        data={"error": str(exc), "traceback": tb_str} if req.app.debug else None
     )
     return JSONResponse(content=content, status_code=500)
 

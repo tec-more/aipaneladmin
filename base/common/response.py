@@ -3,6 +3,7 @@ from fastapi import status
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from starlette.background import BackgroundTask
 from pydantic import Field, BaseModel
+from datetime import datetime
 
 from base.common.constant import RET
 
@@ -39,10 +40,29 @@ class SuccessResponse(JSONResponse):
         返回:
         - None
         """
+        # 确保数据中的datetime对象被序列化
+        def serialize_datetime(obj):
+            # 处理Pydantic模型
+            if hasattr(obj, 'model_dump'):
+                return serialize_datetime(obj.model_dump())
+            # 处理字典
+            elif isinstance(obj, dict):
+                return {k: serialize_datetime(v) for k, v in obj.items()}
+            # 处理列表
+            elif isinstance(obj, list):
+                return [serialize_datetime(item) for item in obj]
+            # 处理datetime对象
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
+            # 其他类型直接返回
+            return obj
+        
+        serialized_data = serialize_datetime(data)
+        
         content = ResponseSchema(
             code=code,
             msg=msg,
-            data=data,
+            data=serialized_data,
             status_code=status_code,
             success=success
         ).model_dump()
@@ -73,10 +93,29 @@ class ErrorResponse(JSONResponse):
         返回:
         - None
         """
+        # 确保数据中的datetime对象被序列化
+        def serialize_datetime(obj):
+            # 处理Pydantic模型
+            if hasattr(obj, 'model_dump'):
+                return serialize_datetime(obj.model_dump())
+            # 处理字典
+            elif isinstance(obj, dict):
+                return {k: serialize_datetime(v) for k, v in obj.items()}
+            # 处理列表
+            elif isinstance(obj, list):
+                return [serialize_datetime(item) for item in obj]
+            # 处理datetime对象
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
+            # 其他类型直接返回
+            return obj
+        
+        serialized_data = serialize_datetime(data)
+        
         content = ResponseSchema(
             code=code,
             msg=msg,
-            data=data,
+            data=serialized_data,
             status_code=status_code,
             success=success
         ).model_dump()

@@ -1,0 +1,75 @@
+{
+    "name": "agent",
+    "display_name": "Agent Development Base",
+    "version": "1.0.0",
+    "description": "Agent development base with skill and memory capabilities",
+    "author": "AI Panel Admin",
+    "website": "",
+    "route_prefix": "/v1/agent",
+    "routes": [
+        "api/v1"
+    ],
+    "models": [
+        "agent",
+        "skill",
+        "memory",
+        "workflow",
+        "dialog_flow"
+    ],
+    "schemas": [
+        "agent",
+        "skill",
+        "memory",
+        "workflow",
+        "dialog_flow"
+    ],
+    "dependencies": [],
+    "is_installed": true,
+    "is_enabled": true,
+    "menus": [
+        {
+            "name": "智能体管理",
+            "path": "/agent",
+            "icon": "icon-agent",
+            "component": "agent/index",
+            "sort": 10,
+            "children": [
+                {
+                    "name": "智能体列表",
+                    "path": "/agent/list",
+                    "component": "agent/agents"
+                },
+                {
+                    "name": "技能管理",
+                    "path": "/agent/skills",
+                    "component": "agent/skills"
+                },
+                {
+                    "name": "记忆管理",
+                    "path": "/agent/memory",
+                    "component": "agent/memory"
+                },
+                {
+                    "name": "工作流管理",
+                    "path": "/agent/workflows",
+                    "component": "agent/workflows"
+                },
+                {
+                    "name": "工作流执行记录",
+                    "path": "/agent/workflow-executions",
+                    "component": "agent/workflow-executions"
+                },
+                {
+                    "name": "对话流管理",
+                    "path": "/agent/dialog-flows",
+                    "component": "agent/dialog-flows"
+                },
+                {
+                    "name": "对话流执行记录",
+                    "path": "/agent/dialog-flow-executions",
+                    "component": "agent/dialog-flow-executions"
+                }
+            ]
+        }
+    ]
+}

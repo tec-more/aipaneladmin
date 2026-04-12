@@ -1,0 +1,343 @@
+<template>
+  <div class="agent-list">
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>智能体管理</span>
+          <el-button type="primary" @click="handleAdd">
+            <el-icon><Plus /></el-icon>
+            新增智能体
+          </el-button>
+        </div>
+      </template>
+      
+      <el-form :inline="true" :model="searchForm" class="mb-4">
+        <el-form-item label="智能体名称">
+          <el-input v-model="searchForm.name" placeholder="请输入智能体名称" clearable />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+            <el-option label="启用" value="active" />
+            <el-option label="禁用" value="inactive" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">
+            <el-icon><Search /></el-icon>
+            搜索
+          </el-button>
+          <el-button @click="resetSearch">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </el-button>
+        </el-form-item>
+      </el-form>
+      
+      <el-table :data="agents" style="width: 100%" v-loading="loading">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="name" label="智能体名称" min-width="120" />
+        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
+              {{ row.status === 'active' ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="skill_count" label="关联技能" width="100" />
+        <el-table-column prop="memory_count" label="记忆数量" width="100" />
+        <el-table-column prop="memory_capacity" label="记忆容量" width="100" />
+        <el-table-column prop="created_at" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatDate(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="280" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="handleEdit(row)">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <el-button type="info" size="small" @click="handleSkills(row)">
+              <el-icon><Connection /></el-icon>
+              技能
+            </el-button>
+            <el-button type="warning" size="small" @click="handleMemory(row)">
+              <el-icon><Memo /></el-icon>
+              记忆
+            </el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row.id)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      
+      <div class="mt-4">
+        <el-pagination
+          v-model:current-page="pageInfo.currentPage"
+          v-model:page-size="pageInfo.pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="pageInfo.total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
+
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px">
+      <el-form :model="formData" :rules="rules" ref="formRef" label-width="100px">
+        <el-form-item label="智能体名称" prop="name">
+          <el-input v-model="formData.name" placeholder="请输入智能体名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入描述" />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="formData.status" placeholder="请选择状态">
+            <el-option label="启用" value="active" />
+            <el-option label="禁用" value="inactive" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="记忆容量" prop="memory_capacity">
+          <el-input-number v-model="formData.memory_capacity" :min="1" :max="10000" />
+        </el-form-item>
+        <el-form-item label="配置">
+          <el-input v-model="configJson" type="textarea" :rows="4" placeholder="JSON格式配置" />
+        </el-form-item>
+        <el-form-item label="关联技能">
+          <el-select v-model="formData.skill_ids" multiple placeholder="请选择技能" style="width: 100%">
+            <el-option v-for="skill in allSkills" :key="skill.id" :label="skill.name" :value="skill.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="skillsDialogVisible" title="管理技能关联" width="500px">
+      <el-transfer
+        v-model="selectedSkillIds"
+        :data="allSkillsForTransfer"
+        :titles="['可选技能', '已关联技能']"
+        :props="{ key: 'id', label: 'name' }"
+      />
+      <template #footer>
+        <el-button @click="skillsDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveSkills">保存</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { Plus, Search, Refresh, Edit, Delete, Connection, Memo } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getAgents, createAgent, updateAgent, deleteAgent, getAgentSkills, setAgentSkills } from '@/api/agent'
+import { getSkills } from '@/api/agent'
+
+const router = useRouter()
+const loading = ref(false)
+const agents = ref([])
+const allSkills = ref([])
+
+const searchForm = reactive({
+  name: '',
+  status: ''
+})
+
+const pageInfo = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0
+})
+
+const dialogVisible = ref(false)
+const dialogTitle = ref('新增智能体')
+const formRef = ref(null)
+const formData = reactive({
+  id: null,
+  name: '',
+  description: '',
+  status: 'active',
+  memory_capacity: 100,
+  config: {},
+  skill_ids: []
+})
+
+const configJson = computed({
+  get: () => JSON.stringify(formData.config, null, 2),
+  set: (val) => {
+    try {
+      formData.config = JSON.parse(val)
+    } catch (e) {
+      // ignore parse error
+    }
+  }
+})
+
+const rules = {
+  name: [{ required: true, message: '请输入智能体名称', trigger: 'blur' }],
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+}
+
+const skillsDialogVisible = ref(false)
+const currentAgentId = ref(null)
+const selectedSkillIds = ref([])
+const allSkillsForTransfer = computed(() => allSkills.value.map(s => ({ id: s.id, name: s.name })))
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+const fetchAgents = async () => {
+  loading.value = true
+  try {
+    const res = await getAgents({
+      skip: (pageInfo.currentPage - 1) * pageInfo.pageSize,
+      limit: pageInfo.pageSize,
+      ...searchForm
+    })
+    if (res.data) {
+      agents.value = res.data.items || res.data
+      pageInfo.total = res.data.total || agents.value.length
+    }
+  } catch (error) {
+    ElMessage.error('获取智能体列表失败')
+    console.error(error)
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchSkills = async () => {
+  try {
+    const res = await getSkills({ limit: 1000 })
+    if (res.data) {
+      allSkills.value = res.data.items || res.data
+    }
+  } catch (error) {
+    console.error('获取技能列表失败', error)
+  }
+}
+
+const handleSearch = () => {
+  pageInfo.currentPage = 1
+  fetchAgents()
+}
+
+const resetSearch = () => {
+  searchForm.name = ''
+  searchForm.status = ''
+  handleSearch()
+}
+
+const handleSizeChange = (size) => {
+  pageInfo.pageSize = size
+  fetchAgents()
+}
+
+const handleCurrentChange = (current) => {
+  pageInfo.currentPage = current
+  fetchAgents()
+}
+
+const handleAdd = () => {
+  router.push('/panel/agent/create')
+}
+
+const handleEdit = (row) => {
+  router.push(`/panel/agent/edit/${row.id}`)
+}
+
+const handleSubmit = async () => {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        if (formData.id) {
+          await updateAgent(formData.id, formData)
+          ElMessage.success('编辑成功')
+        } else {
+          await createAgent(formData)
+          ElMessage.success('新增成功')
+        }
+        dialogVisible.value = false
+        fetchAgents()
+      } catch (error) {
+        ElMessage.error('操作失败')
+        console.error(error)
+      }
+    }
+  })
+}
+
+const handleDelete = async (id) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该智能体吗？', '提示', { type: 'warning' })
+    await deleteAgent(id)
+    ElMessage.success('删除成功')
+    fetchAgents()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+      console.error(error)
+    }
+  }
+}
+
+const handleSkills = async (row) => {
+  currentAgentId.value = row.id
+  try {
+    const res = await getAgentSkills(row.id)
+    selectedSkillIds.value = res.data || []
+    skillsDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error('获取技能关联失败')
+    console.error(error)
+  }
+}
+
+const handleSaveSkills = async () => {
+  try {
+    await setAgentSkills(currentAgentId.value, selectedSkillIds.value)
+    ElMessage.success('保存成功')
+    skillsDialogVisible.value = false
+    fetchAgents()
+  } catch (error) {
+    ElMessage.error('保存失败')
+    console.error(error)
+  }
+}
+
+const handleMemory = (row) => {
+  // 跳转到记忆管理页面，带上智能体ID
+  window.location.href = `/panel/agent/memory?agent_id=${row.id}`
+}
+
+onMounted(() => {
+  fetchAgents()
+  fetchSkills()
+})
+</script>
+
+<style scoped>
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.mb-4 {
+  margin-bottom: 16px;
+}
+.mt-4 {
+  margin-top: 16px;
+}
+</style>

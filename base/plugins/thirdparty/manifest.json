@@ -35,7 +35,7 @@
                     "sort": 1
                 },
                 {
-                    "name": "智能体管理",
+                    "name": "三方智能体管理",
                     "path": "/thirdparty/agents",
                     "icon": "Bot",
                     "component": "thirdparty/agents/index",

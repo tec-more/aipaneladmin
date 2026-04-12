@@ -45,15 +45,11 @@ def get_plugin_models_from_manifest(plugin_name: str) -> List[str]:
 		try:
 			with open(manifest_file, "r", encoding="utf-8") as f:
 				manifest = json.load(f)
-				# 从 manifest 中读取 models 字段
-				model_files = manifest.get("models", [])
-				for model_file in model_files:
-					# model_file 格式: "greeting" 或 "models/greeting"
-					if "/" in model_file:
-						model_path = model_file.replace("/", ".")
-					else:
-						model_path = f"models.{model_file}"
-					models.append(f"base.plugins.{plugin_name}.{model_path}")
+				# 检查是否有模型配置
+				if manifest.get("models"):
+					# 添加每个模型的具体路径
+					for model_name in manifest.get("models", []):
+						models.append(f"base.plugins.{plugin_name}.models.{model_name}")
 		except Exception:
 			pass
 
@@ -89,17 +85,92 @@ def get_model_list() -> List[str]:
 	model_list = core_models + plugin_models + ['aerich.models']
 	return model_list
 
+# 数据库配置
+db_host: str = config.config.get("db", "host", fallback="127.0.0.1")
+db_name: str = config.config.get("db", "name", fallback="aipaneladmin")
+db_user: str = config.config.get("db", "user", fallback="admin")
+db_password: str = config.config.get("db", "password", fallback="123456")
+db_port: int = config.config.getint("db", "port", fallback=5432)
+
+# 模块级别的TORTOISE_ORM配置，用于aerich命令
+TORTOISE_ORM: dict = {
+	"connections": {
+		# SQLite configuration
+		# "sqlite": {
+		#     "engine": "tortoise.backends.sqlite",
+		#     "credentials": {"file_path": f"{BASE_DIR}/db.sqlite3"},  # Path to SQLite database file
+		# },
+		# MySQL/MariaDB configuration
+		# Install with: tortoise-orm[asyncmy]
+		# "mysql": {
+		#     "engine": "tortoise.backends.mysql",
+		#     "credentials": {
+		#         "host": "localhost",  # Database host address
+		#         "port": 3306,  # Database port
+		#         "user": "yourusername",  # Database username
+		#         "password": "yourpassword",  # Database password
+		#         "database": "yourdatabase",  # Database name
+		#     },
+		# },
+		# PostgreSQL configuration
+		# Install with: tortoise-orm[asyncpg]
+		"postgres": {
+			"engine": "tortoise.backends.asyncpg",
+			"credentials": {
+				"host": db_host,  # Database host address
+				"port": db_port,  # Database port
+				"user": db_user,  # Database username
+				"password": db_password,  # Database password
+				"database": db_name,  # Database name
+				"ssl": False,  # Disable SSL
+			},
+		},
+		# MSSQL/Oracle configuration
+		# Install with: tortoise-orm[asyncodbc]
+		# "oracle": {
+		#     "engine": "tortoise.backends.asyncodbc",
+		#     "credentials": {
+		#         "host": "localhost",  # Database host address
+		#         "port": 1433,  # Database port
+		#         "user": "yourusername",  # Database username
+		#         "password": "yourpassword",  # Database password
+		#         "database": "yourdatabase",  # Database name
+		#     },
+		# },
+		# SQLServer configuration
+		# Install with: tortoise-orm[asyncodbc]
+		# "sqlserver": {
+		#     "engine": "tortoise.backends.asyncodbc",
+		#     "credentials": {
+		#         "host": "localhost",  # Database host address
+		#         "port": 1433,  # Database port
+		#         "user": "yourusername",  # Database username
+		#         "password": "yourpassword",  # Database password
+		#         "database": "yourdatabase",  # Database name
+		#     },
+		# },
+	},
+	"apps": {
+        "models": {
+            "models": get_model_list(),
+            "default_connection": "postgres",
+        },
+    },
+	"use_tz": False,  # Whether to use timezone-aware datetimes
+	"timezone": "Asia/Shanghai",  # Timezone setting
+}
+
 class Settings(BaseSettings):
 
 	app_name: str = config.config.get("app", "name", fallback="AIPanelAdmin")
 	app_description: str = config.config.get("app", "description", fallback="AIPanelAdmin API Documentation")
 	app_version: str = config.config.get("app", "version", fallback="0.1.0")
 	debug: bool = config.config.getboolean("app", "debug", fallback=True)
-	db_host: str = config.config.get("db", "host", fallback="127.0.0.1")
-	db_name: str = config.config.get("db", "name", fallback="aipaneladmin")
-	db_user: str = config.config.get("db", "user", fallback="admin")
-	db_password: str = config.config.get("db", "password", fallback="123456")
-	db_port: int = config.config.getint("db", "port", fallback=5432)
+	db_host: str = db_host
+	db_name: str = db_name
+	db_user: str = db_user
+	db_password: str = db_password
+	db_port: int = db_port
 	# Redis配置
 	REDIS_ENABLED: bool = config.config.getboolean("redis", "enabled", fallback=False)
 	REDIS_HOST: str = config.config.get("redis", "host", fallback="127.0.0.1")
@@ -131,72 +202,7 @@ class Settings(BaseSettings):
 	ALLOW_CREDENTIALS: bool = True     # 是否允许携带cookie
 	CORS_EXPOSE_HEADERS: list[str] = ['X-Request-ID']	
 	# ================================================= #	
-	TORTOISE_ORM: dict = {
-		"connections": {
-			# SQLite configuration
-			# "sqlite": {
-			#     "engine": "tortoise.backends.sqlite",
-			#     "credentials": {"file_path": f"{BASE_DIR}/db.sqlite3"},  # Path to SQLite database file
-			# },
-			# MySQL/MariaDB configuration
-			# Install with: tortoise-orm[asyncmy]
-			# "mysql": {
-			#     "engine": "tortoise.backends.mysql",
-			#     "credentials": {
-			#         "host": "localhost",  # Database host address
-			#         "port": 3306,  # Database port
-			#         "user": "yourusername",  # Database username
-			#         "password": "yourpassword",  # Database password
-			#         "database": "yourdatabase",  # Database name
-			#     },
-			# },
-			# PostgreSQL configuration
-			# Install with: tortoise-orm[asyncpg]
-			"postgres": {
-				"engine": "tortoise.backends.asyncpg",
-				"credentials": {
-					"host": db_host,  # Database host address
-					"port": db_port,  # Database port
-					"user": db_user,  # Database username
-					"password": db_password,  # Database password
-					"database": db_name,  # Database name
-					"ssl": False,  # Disable SSL
-				},
-			},
-			# MSSQL/Oracle configuration
-			# Install with: tortoise-orm[asyncodbc]
-			# "oracle": {
-			#     "engine": "tortoise.backends.asyncodbc",
-			#     "credentials": {
-			#         "host": "localhost",  # Database host address
-			#         "port": 1433,  # Database port
-			#         "user": "yourusername",  # Database username
-			#         "password": "yourpassword",  # Database password
-			#         "database": "yourdatabase",  # Database name
-			#     },
-			# },
-			# SQLServer configuration
-			# Install with: tortoise-orm[asyncodbc]
-			# "sqlserver": {
-			#     "engine": "tortoise.backends.asyncodbc",
-			#     "credentials": {
-			#         "host": "localhost",  # Database host address
-			#         "port": 1433,  # Database port
-			#         "user": "yourusername",  # Database username
-			#         "password": "yourpassword",  # Database password
-			#         "database": "yourdatabase",  # Database name
-			#     },
-			# },
-		},
-		"apps": {
-            "models": {
-                "models": get_model_list(),
-                "default_connection": "postgres",
-            },
-        },
-		"use_tz": False,  # Whether to use timezone-aware datetimes
-		"timezone": "Asia/Shanghai",  # Timezone setting
-	}
+	TORTOISE_ORM: dict = TORTOISE_ORM
 
 	DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 	OPERATION_LOG_RECORD: bool = True

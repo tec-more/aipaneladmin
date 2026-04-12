@@ -1,0 +1,169 @@
+"""
+Memory API routes
+"""
+from typing import List
+from fastapi import APIRouter, HTTPException, Depends
+from base.plugins.agent.schemas.memory import MemoryCreate, MemoryUpdate, MemoryResponse
+from base.plugins.agent.services.memory_service import MemoryService
+from base.common.response import success_response, fail_response
+
+memory_router = APIRouter(prefix="/memories", tags=["memories"])
+
+
+@memory_router.post("/")
+async def create_memory(memory: MemoryCreate):
+    """Create a new memory"""
+    try:
+        created_memory = await MemoryService.create_memory(memory)
+        data = MemoryResponse(
+            id=created_memory.id,
+            agent_id=created_memory.agent_id,
+            content=created_memory.content,
+            type=created_memory.type,
+            importance=created_memory.importance,
+            created_at=created_memory.created_at,
+            updated_at=created_memory.updated_at,
+            recall_count=created_memory.recall_count,
+            last_recalled_at=created_memory.last_recalled_at
+        )
+        return success_response(data=data.model_dump(), msg="记忆创建成功")
+    except ValueError as e:
+        return fail_response(msg=str(e), code=404)
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@memory_router.get("/")
+async def get_memories(skip: int = 0, limit: int = 100, agent_id: int = None):
+    """Get all memories"""
+    if agent_id:
+        memories = await MemoryService.get_memories_by_agent(agent_id)
+    else:
+        memories = await MemoryService.get_memories(skip=skip, limit=limit)
+    response = []
+    for memory in memories:
+        response.append(MemoryResponse(
+            id=memory.id,
+            agent_id=memory.agent_id,
+            content=memory.content,
+            type=memory.type,
+            importance=memory.importance,
+            created_at=memory.created_at,
+            updated_at=memory.updated_at,
+            recall_count=memory.recall_count,
+            last_recalled_at=memory.last_recalled_at
+        ).model_dump())
+    return success_response(data={"items": response, "total": len(response)})
+
+
+@memory_router.get("/{memory_id}")
+async def get_memory(memory_id: int):
+    """Get memory by ID"""
+    memory = await MemoryService.get_memory_by_id(memory_id)
+    if not memory:
+        return fail_response(msg="记忆不存在", code=404)
+    
+    data = MemoryResponse(
+        id=memory.id,
+        agent_id=memory.agent_id,
+        content=memory.content,
+        type=memory.type,
+        importance=memory.importance,
+        created_at=memory.created_at,
+        updated_at=memory.updated_at,
+        recall_count=memory.recall_count,
+        last_recalled_at=memory.last_recalled_at
+    )
+    return success_response(data=data.model_dump())
+
+
+@memory_router.put("/{memory_id}")
+async def update_memory(memory_id: int, memory: MemoryUpdate):
+    """Update memory"""
+    updated_memory = await MemoryService.update_memory(memory_id, memory)
+    if not updated_memory:
+        return fail_response(msg="记忆不存在", code=404)
+    
+    data = MemoryResponse(
+        id=updated_memory.id,
+        agent_id=updated_memory.agent_id,
+        content=updated_memory.content,
+        type=updated_memory.type,
+        importance=updated_memory.importance,
+        created_at=updated_memory.created_at,
+        updated_at=updated_memory.updated_at,
+        recall_count=updated_memory.recall_count,
+        last_recalled_at=updated_memory.last_recalled_at
+    )
+    return success_response(data=data.model_dump(), msg="记忆更新成功")
+
+
+@memory_router.delete("/{memory_id}")
+async def delete_memory(memory_id: int):
+    """Delete memory"""
+    success = await MemoryService.delete_memory(memory_id)
+    if not success:
+        return fail_response(msg="记忆不存在", code=404)
+    return success_response(msg="记忆删除成功")
+
+
+@memory_router.get("/agent/{agent_id}")
+async def get_memories_by_agent(agent_id: int):
+    """Get memories by agent"""
+    memories = await MemoryService.get_memories_by_agent(agent_id)
+    response = [MemoryResponse(
+        id=m.id,
+        agent_id=m.agent_id,
+        content=m.content,
+        type=m.type,
+        importance=m.importance,
+        created_at=m.created_at,
+        updated_at=m.updated_at,
+        recall_count=m.recall_count,
+        last_recalled_at=m.last_recalled_at
+    ).model_dump() for m in memories]
+    return success_response(data=response)
+
+
+@memory_router.get("/agent/{agent_id}/type/{memory_type}")
+async def get_memories_by_type(agent_id: int, memory_type: str):
+    """Get memories by type"""
+    memories = await MemoryService.get_memories_by_type(agent_id, memory_type)
+    return success_response(data=memories)
+
+
+@memory_router.post("/{memory_id}/recall")
+async def recall_memory(memory_id: int):
+    """Recall memory"""
+    memory = await MemoryService.recall_memory(memory_id)
+    if not memory:
+        return fail_response(msg="记忆不存在", code=404)
+    return success_response(data=memory)
+
+
+@memory_router.get("/agent/{agent_id}/recent")
+async def get_recent_memories(agent_id: int, limit: int = 10):
+    """Get recent memories"""
+    memories = await MemoryService.get_recent_memories(agent_id, limit)
+    return success_response(data=memories)
+
+
+@memory_router.get("/agent/{agent_id}/important")
+async def get_important_memories(agent_id: int, limit: int = 10):
+    """Get important memories"""
+    memories = await MemoryService.get_important_memories(agent_id, limit)
+    return success_response(data=memories)
+
+
+@memory_router.get("/agent/{agent_id}/search")
+async def search_memories(agent_id: int, query: str):
+    """Search memories"""
+    memories = await MemoryService.search_memories(agent_id, query)
+    return success_response(data=memories)
+
+
+@memory_router.get("/agent/{agent_id}/stats")
+async def get_memory_stats(agent_id: int):
+    """Get memory statistics"""
+    stats = await MemoryService.get_memory_stats(agent_id)
+    return success_response(data=stats)

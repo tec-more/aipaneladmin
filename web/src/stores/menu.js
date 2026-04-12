@@ -53,7 +53,7 @@ const iconMap = {
 }
 
 // 视图组件映射 - 根据后端返回的 component 路径映射到实际组件
-const viewModules = import.meta.glob('@/views/**/*.vue', { eager: false, import: 'default' })
+const viewModules = import.meta.glob('@/views/**/*.vue', { eager: false })
 
 // 根据 component 路径获取组件
 function loadComponent(component) {
@@ -64,20 +64,45 @@ function loadComponent(component) {
   if (!path.startsWith('/')) {
     path = '/' + path
   }
-  if (!path.endsWith('.vue')) {
-    path = path + '.vue'
-  }
 
-  // 尝试匹配视图组件
-  const matchPath = `/src/views${path}`
-  const aliasPath = `@/views${path}`
-  for (const [key, value] of Object.entries(viewModules)) {
-    if (key.includes(matchPath) || key.endsWith(path) || key === aliasPath) {
-      return value
+  // 尝试匹配视图组件的不同格式
+  const possiblePaths = [
+    // 直接路径（带.vue后缀）
+    `${path}.vue`,
+    // 子目录index格式
+    `${path}/index.vue`,
+    // 无前缀路径
+    path,
+    // 子目录index格式（无前缀）
+    `${path}/index`
+  ]
+
+  for (const possiblePath of possiblePaths) {
+    const componentPath = `@/views${possiblePath}`
+    if (viewModules[componentPath]) {
+      return viewModules[componentPath]
+    }
+
+    // 尝试其他可能的路径格式
+    for (const [key, value] of Object.entries(viewModules)) {
+      if (key.endsWith(possiblePath)) {
+        return value
+      }
     }
   }
 
-  return null
+  // 尝试移除 src/ 前缀的路径
+  for (const possiblePath of possiblePaths) {
+    const srcPath = possiblePath.replace(/^\/src\/views/, '')
+    for (const [key, value] of Object.entries(viewModules)) {
+      if (key.endsWith(srcPath)) {
+        return value
+      }
+    }
+  }
+
+  // 如果找不到组件，返回一个默认的组件
+  return () => import('@/views/NotFound.vue')
 }
 
 export const useMenuStore = defineStore('menu', {
@@ -108,10 +133,12 @@ export const useMenuStore = defineStore('menu', {
       this.loading = true
       try {
         const res = await getUserMenus()
+        console.log('[菜单Store] 获取到的菜单数据:', res)
         // 后端返回 code=0 表示成功 (RET.OK)
         if ((res.code === 0 || res.code === 200 || res.success) && res.data) {
           this.menus = res.data
           this.isLoaded = true
+          console.log('[菜单Store] 菜单数据已保存:', this.menus)
         }
       } catch (error) {
         console.error('加载菜单失败:', error)
@@ -124,17 +151,49 @@ export const useMenuStore = defineStore('menu', {
     // 生成动态路由
     generateRoutes() {
       const routes = []
+      console.log('[菜单Store] generateRoutes 开始处理菜单:', this.menus)
 
       const processMenu = (menu, parentPath = '') => {
+        console.log('[菜单Store] 处理菜单:', menu, '父路径:', parentPath)
         // 跳过按钮类型
         if (menu.menu_type === 'button') return null
 
-        const fullPath = menu.path?.startsWith('/')
-          ? menu.path
-          : `${parentPath}/${menu.path || ''}`.replace(/\/+/g, '/')
+        // 处理路径
+        let fullPath = ''
+        if (menu.path) {
+          if (menu.path.startsWith('/')) {
+            fullPath = menu.path
+          } else {
+            fullPath = `${parentPath}/${menu.path}`
+          }
+        } else {
+          fullPath = parentPath
+        }
+        
+        // 移除 /panel 前缀，因为这些路由会被添加到 panel 路由下
+        if (fullPath.startsWith('/panel')) {
+          fullPath = fullPath.replace(/^\/panel/, '')
+        }
+        
+        // 移除开头的 / （因为 addRoute('panel', ...) 会将此作为子路由）
+        if (fullPath.startsWith('/')) {
+          fullPath = fullPath.substring(1)
+        }
+
+        // 移除重复的斜杠
+        fullPath = fullPath.replace(/\/+/g, '/')
+        
+        // 计算相对于父路径的路由 path
+        let routePath = fullPath
+        if (parentPath && fullPath.startsWith(parentPath + '/')) {
+          // 如果是子菜单，提取相对路径部分
+          routePath = fullPath.substring(parentPath.length + 1)
+        }
+        
+        console.log('[菜单Store] 处理后路径:', fullPath, '路由path:', routePath)
 
         const route = {
-          path: fullPath,
+          path: routePath,
           name: menu.name,
           meta: {
             title: menu.name,
@@ -147,8 +206,12 @@ export const useMenuStore = defineStore('menu', {
         // 如果有组件路径，加载组件
         if (menu.component) {
           const component = loadComponent(menu.component)
+          console.log('[菜单Store] 加载组件:', menu.component, '结果:', component)
           if (component) {
             route.component = component
+          } else {
+            // 如果组件加载失败，使用404页面
+            route.component = () => import('@/views/NotFound.vue')
           }
         }
 
@@ -159,6 +222,7 @@ export const useMenuStore = defineStore('menu', {
             .filter(Boolean)
         }
 
+        console.log('[菜单Store] 生成的路由:', route)
         return route
       }
 
@@ -169,6 +233,7 @@ export const useMenuStore = defineStore('menu', {
         }
       })
 
+      console.log('[菜单Store] generateRoutes 完成，生成的路由:', routes)
       return routes
     },
 
