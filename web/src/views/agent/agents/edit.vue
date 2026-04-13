@@ -3,10 +3,6 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <el-button @click="goBack">
-            <el-icon><ArrowLeft /></el-icon>
-            返回
-          </el-button>
           <span>{{ isEdit ? '编辑智能体' : '创建智能体' }}</span>
           <div class="header-right">
             <el-button type="primary" @click="handleSubmit" :loading="saving">
@@ -50,6 +46,16 @@
             <el-option v-for="workflow in allWorkflows" :key="workflow.id" :label="workflow.name" :value="workflow.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="关联对话流">
+          <el-select v-model="formData.dialog_flow_ids" multiple placeholder="请选择对话流" style="width: 100%">
+            <el-option v-for="dialogFlow in allDialogFlows" :key="dialogFlow.id" :label="dialogFlow.name" :value="dialogFlow.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="关联大模型">
+          <el-select v-model="formData.llm_model_id" placeholder="请选择大模型" style="width: 100%">
+            <el-option v-for="llm in allLLMs" :key="llm.id" :label="`${llm.provider_name} - ${llm.model_name}`" :value="llm.id" />
+          </el-select>
+        </el-form-item>
       </el-form>
     </el-card>
   </div>
@@ -60,7 +66,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getAgent, createAgent, updateAgent, getAgentSkills, setAgentSkills, getSkills, getWorkflows } from '@/api/agent'
+import { getAgent, createAgent, updateAgent, getAgentSkills, setAgentSkills, getSkills, getWorkflows, getDialogFlows } from '@/api/agent'
+import { getModelList } from '@/api/llm'
 
 const route = useRoute()
 const router = useRouter()
@@ -68,6 +75,8 @@ const formRef = ref(null)
 const saving = ref(false)
 const allSkills = ref([])
 const allWorkflows = ref([])
+const allLLMs = ref([])
+const allDialogFlows = ref([])
 
 const agentId = route.params.id
 const isEdit = computed(() => !!agentId)
@@ -80,7 +89,9 @@ const formData = reactive({
   system_prompt: '',
   config: {},
   skill_ids: [],
-  workflow_ids: []
+  workflow_ids: [],
+  dialog_flow_ids: [],
+  llm_model_id: null
 })
 
 const configJson = computed({
@@ -114,10 +125,19 @@ const fetchAgent = async () => {
     Object.assign(formData, {
       ...res.data,
       skill_ids: [],
-      workflow_ids: []
+      workflow_ids: [],
+      dialog_flow_ids: []
     })
     const skillsRes = await getAgentSkills(agentId)
     formData.skill_ids = skillsRes.data || []
+    
+    // 从API响应中获取工作流和对话流ID
+    if (res.data.workflow_ids) {
+      formData.workflow_ids = res.data.workflow_ids
+    }
+    if (res.data.dialog_flow_ids) {
+      formData.dialog_flow_ids = res.data.dialog_flow_ids
+    }
   } catch (error) {
     ElMessage.error('获取智能体信息失败')
     console.error(error)
@@ -142,6 +162,24 @@ const fetchWorkflows = async () => {
   }
 }
 
+const fetchLLMs = async () => {
+  try {
+    const res = await getModelList({ page_size: 100, page: 1 })
+    allLLMs.value = res.data?.items || res.data || []
+  } catch (error) {
+    console.error('获取大模型列表失败:', error)
+  }
+}
+
+const fetchDialogFlows = async () => {
+  try {
+    const res = await getDialogFlows({ limit: 1000 })
+    allDialogFlows.value = res.data?.items || res.data || []
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const handleSubmit = async () => {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
@@ -154,18 +192,18 @@ const handleSubmit = async () => {
           status: formData.status,
           memory_capacity: formData.memory_capacity,
           system_prompt: formData.system_prompt,
-          config: formData.config
+          config: formData.config,
+          llm_model_id: formData.llm_model_id,
+          skill_ids: formData.skill_ids,
+          workflow_ids: formData.workflow_ids,
+          dialog_flow_ids: formData.dialog_flow_ids
         }
         
         if (isEdit.value) {
           await updateAgent(agentId, submitData)
-          await setAgentSkills(agentId, formData.skill_ids)
           ElMessage.success('更新成功')
         } else {
           const res = await createAgent(submitData)
-          if (formData.skill_ids.length > 0) {
-            await setAgentSkills(res.data.id, formData.skill_ids)
-          }
           ElMessage.success('创建成功')
           router.push(`/panel/agent/edit/${res.data.id}`)
         }
@@ -182,6 +220,8 @@ const handleSubmit = async () => {
 onMounted(() => {
   fetchSkills()
   fetchWorkflows()
+  fetchLLMs()
+  fetchDialogFlows()
   if (isEdit.value) {
     fetchAgent()
   }

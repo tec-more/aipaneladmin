@@ -160,6 +160,14 @@ export function executeWorkflow(id, params) {
   return request.post(`/v1/agent/workflows/${id}/execute`, params)
 }
 
+export function getWorkflowExecutions(params) {
+  return request.get('/v1/agent/workflow-executions', { params })
+}
+
+export function getWorkflowExecution(id) {
+  return request.get(`/v1/agent/workflow-executions/${id}`)
+}
+
 // ==================== 对话流管理 ====================
 
 export function getDialogFlows(params) {

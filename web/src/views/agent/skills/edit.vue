@@ -3,15 +3,12 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <el-button @click="goBack">
-            <el-icon><ArrowLeft /></el-icon>
-            返回
-          </el-button>
           <span>{{ isEdit ? '编辑技能' : '创建技能' }}</span>
           <div class="header-right">
             <el-button type="primary" @click="handleSubmit" :loading="saving">
               <el-icon><Check /></el-icon>
-              保存
+              <span v-if="isEdit">保存</span>
+              <span v-else>创建</span>
             </el-button>
             <el-button type="success" @click="handleTest" v-if="isEdit" :loading="testing">
               <el-icon><VideoPlay /></el-icon>

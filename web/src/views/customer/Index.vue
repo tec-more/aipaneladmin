@@ -54,14 +54,16 @@
         <el-table-column prop="last_login" label="最后登录" width="160" />
         <el-table-column prop="login_count" label="登录次数" width="100" align="center" />
         <el-table-column prop="created_at" label="创建时间" width="160" />
-        <el-table-column label="操作" width="250" fixed="right" align="center">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
-            <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
-            <el-button type="success" link :icon="Money" @click="handleUpdatePoints(row)">充值</el-button>
-            <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
+              <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
+              <el-button type="success" link :icon="Money" @click="handleUpdatePoints(row)">充值</el-button>
+              <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -368,9 +370,16 @@ onMounted(() => {
   }
 
   .pagination-wrapper {
-    margin-top: 16px;
+    margin-top: 20px;
     display: flex;
     justify-content: flex-end;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 4px;
   }
 
   .points-dialog-content {

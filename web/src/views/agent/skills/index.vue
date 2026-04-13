@@ -63,20 +63,22 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button type="info" size="small" @click="handleTest(row)">
-              <el-icon><VideoPlay /></el-icon>
-              测试
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row.id)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleEdit(row)">
+                <el-icon><Edit /></el-icon>
+                编辑
+              </el-button>
+              <el-button type="info" size="small" @click="handleTest(row)">
+                <el-icon><VideoPlay /></el-icon>
+                测试
+              </el-button>
+              <el-button type="danger" size="small" @click="handleDelete(row.id)">
+                <el-icon><Delete /></el-icon>
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -356,5 +358,11 @@ onMounted(() => {
 }
 .mt-4 {
   margin-top: 16px;
+}
+.action-buttons {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 4px;
 }
 </style>

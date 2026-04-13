@@ -13,6 +13,7 @@ from base.plugins.agent.services.workflow_service import WorkflowService
 from base.common.response import success_response, fail_response
 
 workflow_router = APIRouter(prefix="/workflows", tags=["workflows"])
+workflow_execution_router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 
 
 @workflow_router.post("/")
@@ -189,5 +190,54 @@ async def execute_workflow(workflow_id: int, input_data: Dict[str, Any]):
         return success_response(data=data, msg="工作流执行成功")
     except ValueError as e:
         return fail_response(msg=str(e), code=404)
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@workflow_execution_router.get("/")
+async def get_all_workflow_executions(skip: int = 0, limit: int = 100, status: str = ""):
+    """Get all workflow executions"""
+    try:
+        executions = await WorkflowService.get_all_workflow_executions(skip=skip, limit=limit, status=status)
+        response = []
+        for execution in executions:
+            response.append({
+                "id": execution.id,
+                "workflow_id": execution.workflow_id,
+                "input_data": execution.input_data,
+                "status": execution.status,
+                "output_data": execution.output_data,
+                "error_message": execution.error_message,
+                "started_at": execution.started_at.isoformat() if execution.started_at else None,
+                "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
+                "created_at": execution.created_at.isoformat() if execution.created_at else None,
+                "updated_at": execution.updated_at.isoformat() if execution.updated_at else None
+            })
+        return success_response(data={"items": response, "total": len(response)})
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@workflow_execution_router.get("/{execution_id}")
+async def get_workflow_execution(execution_id: int):
+    """Get workflow execution by ID"""
+    try:
+        execution = await WorkflowService.get_workflow_execution_by_id(execution_id)
+        if not execution:
+            return fail_response(msg="执行记录不存在", code=404)
+        
+        data = {
+            "id": execution.id,
+            "workflow_id": execution.workflow_id,
+            "input_data": execution.input_data,
+            "status": execution.status,
+            "output_data": execution.output_data,
+            "error_message": execution.error_message,
+            "started_at": execution.started_at.isoformat() if execution.started_at else None,
+            "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
+            "created_at": execution.created_at.isoformat() if execution.created_at else None,
+            "updated_at": execution.updated_at.isoformat() if execution.updated_at else None
+        }
+        return success_response(data=data)
     except Exception as e:
         return fail_response(msg=str(e))

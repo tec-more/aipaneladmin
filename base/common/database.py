@@ -46,3 +46,14 @@ async def init_db():
     
 async def init_data():
     await init_db()
+    
+    # 初始化 Tortoise ORM
+    from tortoise import Tortoise
+    print("初始化 Tortoise ORM...")
+    try:
+        await Tortoise.init(config=settings.TORTOISE_ORM)
+        print("Tortoise ORM 初始化完成")
+    except Exception as e:
+        print(f"初始化 Tortoise ORM 时出错: {e}")
+        import traceback
+        traceback.print_exc()

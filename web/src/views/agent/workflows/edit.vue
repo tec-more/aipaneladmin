@@ -1,11 +1,6 @@
 <template>
   <div class="workflow-editor">
     <div class="toolbar">
-      <el-button @click="goBack">
-        <el-icon><ArrowLeft /></el-icon>
-        返回
-      </el-button>
-      <el-divider direction="vertical" />
       <span class="workflow-name">{{ workflow?.name || '工作流编辑' }}</span>
       <el-tag :type="getStatusType(workflow?.status)" size="small">{{ getStatusName(workflow?.status) }}</el-tag>
       <div class="toolbar-right">
@@ -22,9 +17,9 @@
     
     <div class="editor-container">
       <div class="node-panel">
-        <div class="panel-title">节点类型</div>
+        <div class="panel-title">基础节点</div>
         <div 
-          v-for="nodeType in nodeTypes" 
+          v-for="nodeType in nodeTypes.filter(n => n.category === 'basic')" 
           :key="nodeType.type"
           class="node-item"
           draggable="true"
@@ -33,6 +28,43 @@
           <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
           <span>{{ nodeType.label }}</span>
         </div>
+        
+        <div class="panel-title" style="margin-top: 15px">智能体节点</div>
+        <div 
+          v-for="nodeType in nodeTypes.filter(n => n.category === 'agent')" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
+        <div class="panel-title" style="margin-top: 15px">转换节点</div>
+        <div 
+          v-for="nodeType in nodeTypes.filter(n => n.category === 'transform')" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
+        <div class="panel-title" style="margin-top: 15px">工具节点</div>
+        <div 
+          v-for="nodeType in nodeTypes.filter(n => n.category === 'tool')" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
         <div class="panel-title" style="margin-top: 20px">操作提示</div>
         <div class="help-text">
           <p>• 拖拽节点到画布创建</p>
@@ -95,46 +127,301 @@
             <el-form-item label="节点名称">
               <el-input v-model="nodeConfig.label" @change="updateNodeLabel" />
             </el-form-item>
+            <el-form-item label="描述">
+              <el-input v-model="nodeConfig.description" type="textarea" :rows="2" @change="updateNodeData" placeholder="节点功能描述" />
+            </el-form-item>
+            
+            <!-- 下一步节点配置 -->
+            <el-divider content-position="left">下一步节点配置</el-divider>
+            <el-form-item label="目标节点">
+              <div class="target-nodes-container" style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; border: 1px solid #e0e0e0;">
+                <div v-if="targetNodes.length === 0" style="text-align: center; color: #909399; padding: 20px;">
+                  无目标节点
+                </div>
+                <div v-else class="target-nodes-list">
+                  <div v-for="(node, index) in targetNodes" :key="node.id" class="target-node-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #fff; border-radius: 4px; border: 1px solid #e0e0e0;">
+                    <el-icon :size="16" style="color: #409eff; margin-right: 8px;">
+                      <component :is="nodeTypes.find(n => n.type === node.type)?.icon || Document" />
+                    </el-icon>
+                    <span style="flex: 1; color: #303133;">{{ node.data.label }}</span>
+                    <el-tag size="small" type="info" style="margin-left: 10px;">
+                      {{ node.type }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+            </el-form-item>
+            
+            <!-- 智能体节点配置 -->
             <template v-if="selectedNode.type === 'agent'">
+              <el-divider content-position="left">智能体配置</el-divider>
               <el-form-item label="选择智能体">
                 <el-select v-model="nodeConfig.agent_id" placeholder="请选择" @change="updateNodeData">
                   <el-option v-for="agent in agents" :key="agent.id" :label="agent.name" :value="agent.id" />
                 </el-select>
               </el-form-item>
+              <el-form-item label="提示词">
+                <el-input v-model="nodeConfig.prompt" type="textarea" :rows="4" @change="updateNodeData" placeholder="为智能体设置提示词" />
+              </el-form-item>
+              <el-form-item label="等待输入">
+                <el-switch v-model="nodeConfig.wait_for_input" @change="updateNodeData" />
+              </el-form-item>
             </template>
+            
+            <!-- 技能节点配置 -->
             <template v-if="selectedNode.type === 'skill'">
+              <el-divider content-position="left">技能配置</el-divider>
               <el-form-item label="选择技能">
                 <el-select v-model="nodeConfig.skill_id" placeholder="请选择" @change="updateNodeData">
                   <el-option v-for="skill in skills" :key="skill.id" :label="skill.name" :value="skill.id" />
                 </el-select>
               </el-form-item>
+              <el-form-item label="提示词">
+                <el-input v-model="nodeConfig.prompt" type="textarea" :rows="4" @change="updateNodeData" placeholder="为技能设置提示词" />
+              </el-form-item>
+              <el-form-item label="技能参数">
+                <el-input v-model="nodeConfig.skill_params" type="textarea" :rows="2" @change="updateNodeData" placeholder="JSON格式参数" />
+              </el-form-item>
             </template>
+            
+            <!-- 大模型节点配置 -->
             <template v-if="selectedNode.type === 'llm'">
+              <el-divider content-position="left">大模型配置</el-divider>
               <el-form-item label="选择模型">
                 <el-select v-model="nodeConfig.model_id" placeholder="请选择" @change="updateNodeData">
                   <el-option v-for="model in models" :key="model.id" :label="model.name" :value="model.id" />
                 </el-select>
               </el-form-item>
+              <el-form-item label="提示词">
+                <el-input v-model="nodeConfig.prompt" type="textarea" :rows="4" @change="updateNodeData" placeholder="设置提示词" />
+              </el-form-item>
+              <el-form-item label="温度">
+                <el-slider v-model="nodeConfig.temperature" :min="0" :max="2" :step="0.1" @change="updateNodeData" />
+              </el-form-item>
+              <el-form-item label="最大Token">
+                <el-input-number v-model="nodeConfig.max_tokens" :min="1" :max="4096" @change="updateNodeData" />
+              </el-form-item>
             </template>
+            
+            <!-- 条件判断节点配置 -->
             <template v-if="selectedNode.type === 'decision'">
+              <el-divider content-position="left">条件配置</el-divider>
               <el-form-item label="条件表达式">
-                <el-input v-model="nodeConfig.condition" type="textarea" :rows="3" @change="updateNodeData" />
+                <el-input v-model="nodeConfig.condition" type="textarea" :rows="3" @change="updateNodeData" placeholder="如: input.age > 18" />
+              </el-form-item>
+              <el-form-item label="条件描述">
+                <el-input v-model="nodeConfig.condition_desc" @change="updateNodeData" placeholder="条件的简要描述" />
               </el-form-item>
             </template>
+            
+            <!-- 循环节点配置 -->
             <template v-if="selectedNode.type === 'loop'">
+              <el-divider content-position="left">循环配置</el-divider>
               <el-form-item label="循环条件">
-                <el-input v-model="nodeConfig.condition" type="textarea" :rows="3" @change="updateNodeData" />
+                <el-input v-model="nodeConfig.condition" type="textarea" :rows="2" @change="updateNodeData" placeholder="如: index < 10" />
               </el-form-item>
-              <el-form-item label="循环次数">
+              <el-form-item label="最大次数">
                 <el-input-number v-model="nodeConfig.loop_count" :min="1" :max="100" @change="updateNodeData" />
               </el-form-item>
+              <el-form-item label="循环变量">
+                <el-input v-model="nodeConfig.loop_variable" @change="updateNodeData" placeholder="如: i" />
+              </el-form-item>
             </template>
-            <template v-if="selectedNode.type === 'branch'">
-              <el-form-item label="分支条件">
-                <el-input v-model="nodeConfig.condition" type="textarea" :rows="3" @change="updateNodeData" />
+            
+            <!-- 迭代节点配置 -->
+            <template v-if="selectedNode.type === 'iteration'">
+              <el-divider content-position="left">迭代配置</el-divider>
+              <el-form-item label="迭代集合">
+                <el-input v-model="nodeConfig.iteration_collection" @change="updateNodeData" placeholder="如: items" />
+              </el-form-item>
+              <el-form-item label="迭代变量">
+                <el-input v-model="nodeConfig.iteration_variable" @change="updateNodeData" placeholder="如: item" />
+              </el-form-item>
+              <el-form-item label="迭代条件">
+                <el-input v-model="nodeConfig.iteration_condition" type="textarea" :rows="2" @change="updateNodeData" placeholder="如: item.status === 'active'" />
+              </el-form-item>
+            </template>
+            
+            <!-- 输入节点配置 -->
+            <template v-if="selectedNode.type === 'input'">
+              <el-divider content-position="left">输入配置</el-divider>
+              <el-form-item label="输入类型">
+                <el-select v-model="nodeConfig.input_type" @change="updateNodeData">
+                  <el-option label="文本" value="text" />
+                  <el-option label="文件" value="file" />
+                  <el-option label="表单" value="form" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输入提示">
+                <el-input v-model="nodeConfig.input_placeholder" @change="updateNodeData" placeholder="用户输入提示" />
+              </el-form-item>
+            </template>
+            
+            <!-- 等待节点配置 -->
+            <template v-if="selectedNode.type === 'wait'">
+              <el-divider content-position="left">等待配置</el-divider>
+              <el-form-item label="等待时长">
+                <el-input-number v-model="nodeConfig.wait_seconds" :min="1" :max="3600" @change="updateNodeData" /> 秒
+              </el-form-item>
+              <el-form-item label="等待提示">
+                <el-input v-model="nodeConfig.wait_message" @change="updateNodeData" placeholder="等待时显示的消息" />
+              </el-form-item>
+            </template>
+            
+            <!-- HTTP节点配置 -->
+            <template v-if="selectedNode.type === 'http'">
+              <el-divider content-position="left">HTTP配置</el-divider>
+              <el-form-item label="请求方法">
+                <el-select v-model="nodeConfig.http_method" @change="updateNodeData">
+                  <el-option label="GET" value="GET" />
+                  <el-option label="POST" value="POST" />
+                  <el-option label="PUT" value="PUT" />
+                  <el-option label="DELETE" value="DELETE" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="请求URL">
+                <el-input v-model="nodeConfig.http_url" @change="updateNodeData" placeholder="https://api.example.com" />
+              </el-form-item>
+              <el-form-item label="请求头">
+                <el-input v-model="nodeConfig.http_headers" type="textarea" :rows="2" @change="updateNodeData" placeholder="JSON格式" />
+              </el-form-item>
+              <el-form-item label="请求体">
+                <el-input v-model="nodeConfig.http_body" type="textarea" :rows="3" @change="updateNodeData" placeholder="JSON格式" />
+              </el-form-item>
+            </template>
+            
+            <!-- 代码节点配置 -->
+            <template v-if="selectedNode.type === 'code'">
+              <el-divider content-position="left">代码配置</el-divider>
+              <el-form-item label="代码语言">
+                <el-select v-model="nodeConfig.code_language" @change="updateNodeData">
+                  <el-option label="JavaScript" value="javascript" />
+                  <el-option label="Python" value="python" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="代码内容">
+                <el-input v-model="nodeConfig.code_content" type="textarea" :rows="6" @change="updateNodeData" placeholder="// 输入代码" />
+              </el-form-item>
+            </template>
+            
+            <!-- 模板节点配置 -->
+            <template v-if="selectedNode.type === 'template'">
+              <el-divider content-position="left">模板配置</el-divider>
+              <el-form-item label="模板内容">
+                <el-input v-model="nodeConfig.template" type="textarea" :rows="4" @change="updateNodeData" placeholder="使用 {{variable}} 引用变量" />
+              </el-form-item>
+            </template>
+            
+            <!-- 变量聚合器节点配置 -->
+            <template v-if="selectedNode.type === 'variable_aggregator'">
+              <el-divider content-position="left">变量聚合器配置</el-divider>
+              <el-form-item label="输入变量">
+                <el-input v-model="nodeConfig.input_vars" type="textarea" :rows="3" @change="updateNodeData" placeholder="每行一个变量名" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" @change="updateNodeData" placeholder="聚合后的变量名" />
+              </el-form-item>
+            </template>
+            
+            <!-- 文档提取器节点配置 -->
+            <template v-if="selectedNode.type === 'document_extractor'">
+              <el-divider content-position="left">文档提取器配置</el-divider>
+              <el-form-item label="文档变量">
+                <el-input v-model="nodeConfig.document_var" @change="updateNodeData" placeholder="文档内容变量名" />
+              </el-form-item>
+              <el-form-item label="提取规则">
+                <el-input v-model="nodeConfig.extract_rules" type="textarea" :rows="3" @change="updateNodeData" placeholder="提取规则配置" />
+              </el-form-item>
+            </template>
+            
+            <!-- 变量赋值节点配置 -->
+            <template v-if="selectedNode.type === 'variable_assigner'">
+              <el-divider content-position="left">变量赋值配置</el-divider>
+              <el-form-item label="变量名">
+                <el-input v-model="nodeConfig.var_name" @change="updateNodeData" placeholder="变量名称" />
+              </el-form-item>
+              <el-form-item label="变量值">
+                <el-input v-model="nodeConfig.var_value" type="textarea" :rows="2" @change="updateNodeData" placeholder="变量值或表达式" />
+              </el-form-item>
+            </template>
+            
+            <!-- 参数提取器节点配置 -->
+            <template v-if="selectedNode.type === 'parameter_extractor'">
+              <el-divider content-position="left">参数提取器配置</el-divider>
+              <el-form-item label="输入文本">
+                <el-input v-model="nodeConfig.input_text" @change="updateNodeData" placeholder="输入文本变量名" />
+              </el-form-item>
+              <el-form-item label="提取参数">
+                <el-input v-model="nodeConfig.parameters" type="textarea" :rows="3" @change="updateNodeData" placeholder="每行一个参数名" />
+              </el-form-item>
+            </template>
+            
+            <!-- 列表操作节点配置 -->
+            <template v-if="selectedNode.type === 'list_operation'">
+              <el-divider content-position="left">列表操作配置</el-divider>
+              <el-form-item label="操作类型">
+                <el-select v-model="nodeConfig.operation" @change="updateNodeData">
+                  <el-option label="过滤" value="filter" />
+                  <el-option label="映射" value="map" />
+                  <el-option label="排序" value="sort" />
+                  <el-option label="去重" value="unique" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输入列表">
+                <el-input v-model="nodeConfig.input_list" @change="updateNodeData" placeholder="变量名" />
+              </el-form-item>
+            </template>
+            
+            <!-- 知识检索节点配置 -->
+            <template v-if="selectedNode.type === 'knowledge_retrieval'">
+              <el-divider content-position="left">知识检索配置</el-divider>
+              <el-form-item label="知识库">
+                <el-select v-model="nodeConfig.knowledge_base" @change="updateNodeData">
+                  <el-option label="默认知识库" value="default" />
+                  <el-option label="用户知识库" value="user" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="检索查询">
+                <el-input v-model="nodeConfig.query" type="textarea" :rows="2" @change="updateNodeData" placeholder="检索关键词或语句" />
+              </el-form-item>
+              <el-form-item label="检索数量">
+                <el-input-number v-model="nodeConfig.top_k" :min="1" :max="100" @change="updateNodeData" />
+              </el-form-item>
+              <el-form-item label="相似度阈值">
+                <el-slider v-model="nodeConfig.similarity_threshold" :min="0" :max="1" :step="0.1" @change="updateNodeData" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" @change="updateNodeData" placeholder="存储检索结果的变量名" />
+              </el-form-item>
+            </template>
+            
+            <!-- 输出节点配置 -->
+            <template v-if="selectedNode.type === 'output'">
+              <el-divider content-position="left">输出配置</el-divider>
+              <el-form-item label="输出类型">
+                <el-select v-model="nodeConfig.output_type" @change="updateNodeData">
+                  <el-option label="文本" value="text" />
+                  <el-option label="JSON" value="json" />
+                  <el-option label="文件" value="file" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出内容">
+                <el-input v-model="nodeConfig.output_content" type="textarea" :rows="4" @change="updateNodeData" placeholder="输出内容或变量表达式" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" @change="updateNodeData" placeholder="存储输出结果的变量名" />
+              </el-form-item>
+            </template>
+            
+            <!-- 开始和结束节点 -->
+            <template v-if="selectedNode.type === 'start' || selectedNode.type === 'end'">
+              <el-divider content-position="left">节点信息</el-divider>
+              <el-form-item label="节点类型">
+                <el-tag>{{ selectedNode.type === 'start' ? '开始节点' : '结束节点' }}</el-tag>
               </el-form-item>
             </template>
           </el-form>
+          
           <el-button type="danger" size="small" @click="deleteSelectedNode" style="width: 100%">
             删除节点
           </el-button>
@@ -174,7 +461,9 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { 
-  ArrowLeft, Check, VideoPlay, User, Tools, Share, VideoPlay as Play, CircleCheck, Monitor
+  ArrowLeft, Check, VideoPlay, User, Tools, Share, VideoPlay as Play, CircleCheck, Monitor,
+  // Dify 风格节点图标
+  Document, Collection, DocumentChecked, EditPen, Filter, Link, List, Cpu
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getWorkflow, updateWorkflow, executeWorkflow } from '@/api/agent'
@@ -195,24 +484,68 @@ const nodes = ref([])
 const edges = ref([])
 const selectedNode = ref(null)
 const selectedEdge = ref(null)
+
+// 计算当前节点的实际目标节点列表
+const targetNodes = computed(() => {
+  if (!selectedNode.value) return []
+  // 找到所有以当前节点为源节点的边
+  const nodeEdges = edges.value.filter(edge => edge.source === selectedNode.value.id)
+  // 对于每条边，找到对应的目标节点
+  return nodeEdges.map(edge => {
+    const targetNode = getNodeById(edge.target)
+    return targetNode || { id: edge.target, data: { label: '未知节点' } }
+  })
+})
+
 const nodeConfig = reactive({
   label: '',
+  description: '',
   agent_id: null,
   skill_id: null,
   model_id: null,
   condition: '',
-  loop_count: 1
+  loop_count: 1,
+  // 输入节点配置
+  input_type: 'text',
+  input_placeholder: '',
+  // 知识检索节点配置
+  knowledge_base: 'default',
+  query: '',
+  top_k: 5,
+  similarity_threshold: 0.7,
+  // 输出节点配置
+  output_var: '',
+  output_type: 'text',
+  output_content: ''
 })
 
 const nodeTypes = [
-  { type: 'start', label: '开始', icon: Play },
-  { type: 'end', label: '结束', icon: CircleCheck },
-  { type: 'agent', label: '智能体', icon: User },
-  { type: 'skill', label: '技能', icon: Tools },
-  { type: 'llm', label: '大模型', icon: Monitor },
-  { type: 'decision', label: '条件判断', icon: Share },
-  { type: 'loop', label: '循环', icon: Share },
-  { type: 'branch', label: '分支', icon: Share }
+  // 基础节点
+  { type: 'start', label: '开始', icon: Play, category: 'basic', next: ['input', 'agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'end', label: '结束', icon: CircleCheck, category: 'basic', next: [] },
+  { type: 'input', label: '输入', icon: EditPen, category: 'basic', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'output', label: '输出', icon: Monitor, category: 'basic', next: ['end'] },
+  
+  // 智能体相关
+  { type: 'agent', label: '智能体', icon: User, category: 'agent', next: ['skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'skill', label: '技能', icon: Tools, category: 'agent', next: ['agent', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'llm', label: '大模型', icon: Monitor, category: 'agent', next: ['skill', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'decision', label: '条件判断', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'loop', label: '循环', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'iteration', label: '迭代', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  
+  // Dify 风格节点 - 转换类
+  { type: 'code', label: '代码执行', icon: Cpu, category: 'transform', next: ['agent', 'skill', 'llm', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'template', label: '模板转换', icon: Document, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'variable_aggregator', label: '变量聚合器', icon: Collection, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'document_extractor', label: '文档提取器', icon: DocumentChecked, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'variable_assigner', label: '变量赋值', icon: EditPen, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'parameter_extractor', label: '参数提取器', icon: Filter, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  
+  // Dify 风格节点 - 工具类
+  { type: 'http', label: 'HTTP 请求', icon: Link, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'knowledge_retrieval', 'output'] },
+  { type: 'list_operation', label: '列表操作', icon: List, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'knowledge_retrieval', label: '知识检索', icon: Document, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'output'] }
 ]
 
 const executeDialogVisible = ref(false)
@@ -368,11 +701,24 @@ const onNodeClick = (node) => {
   selectedEdge.value = null
   selectedNode.value = node
   nodeConfig.label = node.data.label || ''
+  nodeConfig.description = node.data.description || ''
   nodeConfig.agent_id = node.data.agent_id || null
   nodeConfig.skill_id = node.data.skill_id || null
   nodeConfig.model_id = node.data.model_id || null
   nodeConfig.condition = node.data.condition || ''
   nodeConfig.loop_count = node.data.loop_count || 1
+  // 输入节点配置
+  nodeConfig.input_type = node.data.input_type || 'text'
+  nodeConfig.input_placeholder = node.data.input_placeholder || ''
+  // 知识检索节点配置
+  nodeConfig.knowledge_base = node.data.knowledge_base || 'default'
+  nodeConfig.query = node.data.query || ''
+  nodeConfig.top_k = node.data.top_k || 5
+  nodeConfig.similarity_threshold = node.data.similarity_threshold || 0.7
+  // 输出节点配置
+  nodeConfig.output_var = node.data.output_var || ''
+  nodeConfig.output_type = node.data.output_type || 'text'
+  nodeConfig.output_content = node.data.output_content || ''
 }
 
 const onNodeMouseDown = (event, node) => {
@@ -462,11 +808,25 @@ const updateNodeData = () => {
   if (selectedNode.value) {
     selectedNode.value.data = {
       ...selectedNode.value.data,
+      label: nodeConfig.label,
+      description: nodeConfig.description,
       agent_id: nodeConfig.agent_id,
       skill_id: nodeConfig.skill_id,
       model_id: nodeConfig.model_id,
       condition: nodeConfig.condition,
-      loop_count: nodeConfig.loop_count
+      loop_count: nodeConfig.loop_count,
+      // 输入节点配置
+      input_type: nodeConfig.input_type,
+      input_placeholder: nodeConfig.input_placeholder,
+      // 知识检索节点配置
+      knowledge_base: nodeConfig.knowledge_base,
+      query: nodeConfig.query,
+      top_k: nodeConfig.top_k,
+      similarity_threshold: nodeConfig.similarity_threshold,
+      // 输出节点配置
+      output_var: nodeConfig.output_var,
+      output_type: nodeConfig.output_type,
+      output_content: nodeConfig.output_content
     }
   }
 }
@@ -565,6 +925,9 @@ onMounted(() => {
   background: #fff;
   border-right: 1px solid #e4e7ed;
   padding: 10px;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .panel-title {
@@ -718,6 +1081,24 @@ onMounted(() => {
   border-color: #a8edea;
 }
 
+.knowledge_retrieval-node {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-color: #667eea;
+}
+
+.input-node {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-color: #667eea;
+}
+
+.output-node {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: #fff;
+  border-color: #f093fb;
+}
+
 .node-header {
   display: flex;
   align-items: center;
@@ -771,10 +1152,13 @@ onMounted(() => {
 }
 
 .config-panel {
-  width: 280px;
+  width: 350px;
+  min-width: 300px;
+  max-width: 400px;
   background: #fff;
   border-left: 1px solid #e4e7ed;
   padding: 10px;
+  overflow-y: auto;
 }
 
 .edge-info {

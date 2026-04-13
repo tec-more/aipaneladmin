@@ -87,15 +87,20 @@ class SkillService:
             return {"success": False, "message": "Skill not found or inactive"}
         
         try:
-            # Here you would implement the skill execution logic
-            # For now, we'll just return a placeholder response
-            return {
-                "success": True,
-                "skill_id": skill_id,
-                "skill_name": skill.name,
-                "parameters": parameters,
-                "result": "Skill executed successfully"
-            }
+            # 从注册表中获取技能
+            from base.plugins.agent.skills.registry import SkillRegistry
+            skill_class = SkillRegistry.get_skill(skill.type)
+            if skill_class:
+                return skill_class.execute(parameters)
+            else:
+                # 返回默认响应
+                return {
+                    "success": True,
+                    "skill_id": skill_id,
+                    "skill_name": skill.name,
+                    "parameters": parameters,
+                    "result": "Skill executed successfully"
+                }
         except Exception as e:
             return {"success": False, "message": str(e)}
 

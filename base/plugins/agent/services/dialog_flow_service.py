@@ -31,7 +31,7 @@ class DialogFlowService:
         """列出对话流"""
         query = DialogFlow.all()
         if agent_id:
-            query = query.filter(agent_id=agent_id)
+            query = query.filter(agent__id=agent_id)
         dialog_flows = await query.offset(skip).limit(limit).all()
         return [DialogFlowResponse.from_orm(df) for df in dialog_flows]
     

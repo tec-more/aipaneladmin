@@ -26,11 +26,12 @@ class WorkflowNode(BaseModel, TimestampMixin):
     
     workflow = fields.ForeignKeyField("models.Workflow", related_name="nodes", description="Associated workflow")
     name = fields.CharField(max_length=100, description="Node name")
-    type = fields.CharField(max_length=50, description="Node type: agent/skill/decision/fork/join")
+    type = fields.CharField(max_length=50, description="Node type: agent/skill/llm/decision/fork/join/iteration/code/template/variable_aggregator/document_extractor/variable_assigner/parameter_extractor/http/list_operation")
     config = fields.JSONField(description="Node configuration")
     position = fields.JSONField(description="Node position in UI")
     agent = fields.ForeignKeyField("models.Agent", null=True, related_name="workflow_nodes", description="Associated agent")
     skill = fields.ForeignKeyField("models.Skill", null=True, related_name="workflow_nodes", description="Associated skill")
+    llm = fields.ForeignKeyField("models.LLMModel", null=True, related_name="workflow_nodes", description="Associated LLM model")
     
     class Meta:
         table = "workflow_node"

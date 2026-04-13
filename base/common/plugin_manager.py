@@ -360,6 +360,15 @@ class PluginManager:
     async def _process_plugin_menus(self, name: str, manifest: dict) -> bool:
         """处理插件的菜单配置"""
         try:
+            # # 确保数据库连接已初始化
+            # try:
+            #     from tortoise import Tortoise
+            #     # 尝试获取默认连接，检查数据库是否连接
+            #     await Tortoise.get_connection("postgres")
+            # except Exception as conn_error:
+            #     log.warning(f"数据库连接未初始化，跳过插件 {name} 的菜单配置处理: {conn_error}")
+            #     return True
+            
             from base.core.users.services.menu_service import MenuService
             from base.core.users.schemas.rbac import MenuCreate, MenuUpdate
             
@@ -479,6 +488,15 @@ class PluginManager:
     async def _cleanup_plugin_menus(self, name: str, manifest: dict) -> bool:
         """清理插件的菜单配置"""
         try:
+            # 确保数据库连接已初始化
+            # try:
+            #     from tortoise import Tortoise
+            #     # 尝试获取默认连接，检查数据库是否连接
+            #     await Tortoise.get_connection("postgres")
+            # except Exception as conn_error:
+            #     log.warning(f"数据库连接未初始化，跳过插件 {name} 的菜单配置清理: {conn_error}")
+            #     return True
+            
             from base.core.users.services.menu_service import MenuService
             
             # 获取菜单配置
@@ -670,6 +688,11 @@ class PluginManager:
         
         # 同步数据库状态（如果可用）
         try:
+            # 检查数据库连接状态
+            from tortoise import Tortoise
+            # 尝试获取默认连接，检查数据库是否连接
+            await Tortoise.get_connection("postgres")
+            
             from base.core.extension.models.plugin import Plugin as PluginModel
             db_enabled_plugins = await PluginModel.filter(is_enabled=True, is_installed=True).all()
             for plugin_record in db_enabled_plugins:

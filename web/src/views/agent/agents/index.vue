@@ -45,31 +45,40 @@
           </template>
         </el-table-column>
         <el-table-column prop="skill_count" label="关联技能" width="100" />
+        <el-table-column prop="workflow_count" label="关联工作流" width="100" />
+        <el-table-column prop="dialog_flow_count" label="关联对话流" width="100" />
         <el-table-column prop="memory_count" label="记忆数量" width="100" />
         <el-table-column prop="memory_capacity" label="记忆容量" width="100" />
+        <el-table-column prop="llm_model_name" label="关联大模型" min-width="150" show-overflow-tooltip />
         <el-table-column prop="created_at" label="创建时间" width="180">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="400" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button type="info" size="small" @click="handleSkills(row)">
-              <el-icon><Connection /></el-icon>
-              技能
-            </el-button>
-            <el-button type="warning" size="small" @click="handleMemory(row)">
-              <el-icon><Memo /></el-icon>
-              记忆
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row.id)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleEdit(row)">
+                <el-icon><Edit /></el-icon>
+                编辑
+              </el-button>
+              <el-button type="info" size="small" @click="handleSkills(row)">
+                <el-icon><Connection /></el-icon>
+                技能
+              </el-button>
+              <el-button type="warning" size="small" @click="handleMemory(row)">
+                <el-icon><Memo /></el-icon>
+                记忆
+              </el-button>
+              <el-button type="success" size="small" @click="handleFlow(row)">
+                <el-icon><Share /></el-icon>
+                流程图
+              </el-button>
+              <el-button type="danger" size="small" @click="handleDelete(row.id)">
+                <el-icon><Delete /></el-icon>
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -119,12 +128,13 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="skillsDialogVisible" title="管理技能关联" width="500px">
+    <el-dialog v-model="skillsDialogVisible" title="管理技能关联" width="800px">
       <el-transfer
         v-model="selectedSkillIds"
         :data="allSkillsForTransfer"
         :titles="['可选技能', '已关联技能']"
         :props="{ key: 'id', label: 'name' }"
+        style="width: 100%"
       />
       <template #footer>
         <el-button @click="skillsDialogVisible = false">取消</el-button>
@@ -137,7 +147,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, Connection, Memo } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAgents, createAgent, updateAgent, deleteAgent, getAgentSkills, setAgentSkills } from '@/api/agent'
 import { getSkills } from '@/api/agent'
@@ -322,6 +332,11 @@ const handleMemory = (row) => {
   window.location.href = `/panel/agent/memory?agent_id=${row.id}`
 }
 
+const handleFlow = (row) => {
+  // 跳转到智能体流程图页面，带上智能体ID
+  router.push(`/panel/agent/flow?agent_id=${row.id}`)
+}
+
 onMounted(() => {
   fetchAgents()
   fetchSkills()
@@ -339,5 +354,11 @@ onMounted(() => {
 }
 .mt-4 {
   margin-top: 16px;
+}
+.action-buttons {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 4px;
 }
 </style>

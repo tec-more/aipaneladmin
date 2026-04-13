@@ -1,11 +1,6 @@
 <template>
   <div class="dialog-flow-editor">
     <div class="toolbar">
-      <el-button @click="goBack">
-        <el-icon><ArrowLeft /></el-icon>
-        返回
-      </el-button>
-      <el-divider direction="vertical" />
       <span class="flow-name">{{ dialogFlow?.name || '对话流编辑' }}</span>
       <el-tag :type="getStatusType(dialogFlow?.status)" size="small">{{ getStatusName(dialogFlow?.status) }}</el-tag>
       <div class="toolbar-right">
@@ -97,6 +92,27 @@
               <el-input v-model="nodeConfig.label" @change="updateNodeLabel" />
             </el-form-item>
             
+            <!-- 下一步节点配置 -->
+            <el-divider content-position="left">下一步节点配置</el-divider>
+            <el-form-item label="目标节点">
+              <div class="target-nodes-container" style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; border: 1px solid #e0e0e0;">
+                <div v-if="targetNodes.length === 0" style="text-align: center; color: #909399; padding: 20px;">
+                  无目标节点
+                </div>
+                <div v-else class="target-nodes-list">
+                  <div v-for="(node, index) in targetNodes" :key="node.id" class="target-node-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #fff; border-radius: 4px; border: 1px solid #e0e0e0;">
+                    <el-icon :size="16" style="color: #409eff; margin-right: 8px;">
+                      <component :is="nodeTypes.find(n => n.type === node.type)?.icon || Document" />
+                    </el-icon>
+                    <span style="flex: 1; color: #303133;">{{ node.data.label }}</span>
+                    <el-tag size="small" type="info" style="margin-left: 10px;">
+                      {{ node.type }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+            </el-form-item>
+            
             <template v-if="selectedNode.type === 'message'">
               <el-form-item label="消息内容">
                 <el-input v-model="nodeConfig.content" type="textarea" :rows="4" @change="updateNodeData" placeholder="输入消息内容，支持变量 {{变量名}}" />
@@ -175,7 +191,62 @@
                 </el-select>
               </el-form-item>
             </template>
+            
+            <!-- 知识检索节点配置 -->
+            <template v-if="selectedNode.type === 'knowledge_retrieval'">
+              <el-form-item label="知识库">
+                <el-select v-model="nodeConfig.knowledge_base" @change="updateNodeData" style="width: 100%">
+                  <el-option label="默认知识库" value="default" />
+                  <el-option label="用户知识库" value="user" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="检索查询">
+                <el-input v-model="nodeConfig.query" type="textarea" :rows="2" @change="updateNodeData" placeholder="检索关键词或语句" />
+              </el-form-item>
+              <el-form-item label="检索数量">
+                <el-input-number v-model="nodeConfig.top_k" :min="1" :max="100" @change="updateNodeData" />
+              </el-form-item>
+              <el-form-item label="相似度阈值">
+                <el-slider v-model="nodeConfig.similarity_threshold" :min="0" :max="1" :step="0.1" @change="updateNodeData" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" @change="updateNodeData" placeholder="存储检索结果的变量名" />
+              </el-form-item>
+            </template>
+            
+            <!-- 输入节点配置 -->
+            <template v-if="selectedNode.type === 'input'">
+              <el-form-item label="输入类型">
+                <el-select v-model="nodeConfig.input_type" @change="updateNodeData" style="width: 100%">
+                  <el-option label="文本" value="text" />
+                  <el-option label="文件" value="file" />
+                  <el-option label="表单" value="form" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输入提示">
+                <el-input v-model="nodeConfig.input_placeholder" @change="updateNodeData" placeholder="用户输入提示" />
+              </el-form-item>
+            </template>
+            
+            <!-- 输出节点配置 -->
+            <template v-if="selectedNode.type === 'output'">
+              <el-form-item label="输出类型">
+                <el-select v-model="nodeConfig.output_type" @change="updateNodeData" style="width: 100%">
+                  <el-option label="文本" value="text" />
+                  <el-option label="JSON" value="json" />
+                  <el-option label="文件" value="file" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出内容">
+                <el-input v-model="nodeConfig.output_content" type="textarea" :rows="4" @change="updateNodeData" placeholder="输出内容或变量表达式" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" @change="updateNodeData" placeholder="存储输出结果的变量名" />
+              </el-form-item>
+            </template>
+            
           </el-form>
+          
           <el-button type="danger" size="small" @click="deleteSelectedNode" style="width: 100%; margin-top: 10px;">
             删除节点
           </el-button>
@@ -238,6 +309,19 @@ const nodes = ref([])
 const edges = ref([])
 const selectedNode = ref(null)
 const selectedEdge = ref(null)
+
+// 计算当前节点的实际目标节点列表
+const targetNodes = computed(() => {
+  if (!selectedNode.value) return []
+  // 找到所有以当前节点为源节点的边
+  const nodeEdges = edges.value.filter(edge => edge.source === selectedNode.value.id)
+  // 对于每条边，找到对应的目标节点
+  return nodeEdges.map(edge => {
+    const targetNode = getNodeById(edge.target)
+    return targetNode || { id: edge.target, data: { label: '未知节点' } }
+  })
+})
+
 const nodeConfig = reactive({
   label: '',
   content: '',
@@ -253,19 +337,34 @@ const nodeConfig = reactive({
   url: '',
   method: 'GET',
   headers: '{}',
-  body: '{}'
+  body: '{}',
+  // 输入节点配置
+  input_type: 'text',
+  input_placeholder: '',
+  // 知识检索节点配置
+  knowledge_base: 'default',
+  query: '',
+  top_k: 5,
+  similarity_threshold: 0.7,
+  // 输出节点配置
+  output_type: 'text',
+  output_content: '',
+  output_var: ''
 })
 
 const nodeTypes = [
-  { type: 'start', label: '开始', icon: Play },
-  { type: 'end', label: '结束', icon: CircleCheck },
-  { type: 'message', label: '消息', icon: ChatDotRound },
-  { type: 'text', label: '文本', icon: Document },
-  { type: 'voice', label: '语音', icon: Mic },
-  { type: 'question', label: '问题', icon: QuestionFilled },
-  { type: 'condition', label: '条件判断', icon: Share },
-  { type: 'agent', label: '智能体', icon: User },
-  { type: 'api', label: 'API调用', icon: Connection }
+  { type: 'start', label: '开始', icon: Play, next: ['input', 'message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
+  { type: 'end', label: '结束', icon: CircleCheck, next: [] },
+  { type: 'input', label: '输入', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
+  { type: 'output', label: '输出', icon: CircleCheck, next: ['end'] },
+  { type: 'message', label: '消息', icon: ChatDotRound, next: ['text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+  { type: 'text', label: '文本', icon: Document, next: ['message', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+  { type: 'voice', label: '语音', icon: Mic, next: ['message', 'text', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+  { type: 'question', label: '问题', icon: QuestionFilled, next: ['message', 'text', 'voice', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+  { type: 'condition', label: '条件判断', icon: Share, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+  { type: 'agent', label: '智能体', icon: User, next: ['message', 'text', 'voice', 'question', 'api', 'knowledge_retrieval', 'output'] },
+  { type: 'api', label: 'API调用', icon: Connection, next: ['message', 'text', 'voice', 'question', 'agent', 'knowledge_retrieval', 'output'] },
+  { type: 'knowledge_retrieval', label: '知识检索', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'output'] }
 ]
 
 const executeDialogVisible = ref(false)
@@ -303,7 +402,9 @@ const getNodeIcon = (type) => {
     question: '❓',
     condition: '🔀',
     agent: '🤖',
-    api: '🔗'
+    api: '🔗',
+    knowledge_retrieval: '📚',
+    output: '📤'
   }
   return icons[type] || '📦'
 }
@@ -429,6 +530,18 @@ const onNodeClick = (node) => {
   nodeConfig.method = node.data.method || 'GET'
   nodeConfig.headers = node.data.headers || '{}'
   nodeConfig.body = node.data.body || '{}'
+  // 输入节点配置
+  nodeConfig.input_type = node.data.input_type || 'text'
+  nodeConfig.input_placeholder = node.data.input_placeholder || ''
+  // 知识检索节点配置
+  nodeConfig.knowledge_base = node.data.knowledge_base || 'default'
+  nodeConfig.query = node.data.query || ''
+  nodeConfig.top_k = node.data.top_k || 5
+  nodeConfig.similarity_threshold = node.data.similarity_threshold || 0.7
+  // 输出节点配置
+  nodeConfig.output_var = node.data.output_var || ''
+  nodeConfig.output_type = node.data.output_type || 'text'
+  nodeConfig.output_content = node.data.output_content || ''
 }
 
 const onNodeMouseDown = (event, node) => {
@@ -532,7 +645,19 @@ const updateNodeData = () => {
       url: nodeConfig.url,
       method: nodeConfig.method,
       headers: nodeConfig.headers,
-      body: nodeConfig.body
+      body: nodeConfig.body,
+      // 输入节点配置
+      input_type: nodeConfig.input_type,
+      input_placeholder: nodeConfig.input_placeholder,
+      // 知识检索节点配置
+      knowledge_base: nodeConfig.knowledge_base,
+      query: nodeConfig.query,
+      top_k: nodeConfig.top_k,
+      similarity_threshold: nodeConfig.similarity_threshold,
+      // 输出节点配置
+      output_var: nodeConfig.output_var,
+      output_type: nodeConfig.output_type,
+      output_content: nodeConfig.output_content
     }
   }
 }
@@ -788,6 +913,24 @@ onMounted(() => {
   border-color: #d299c2;
 }
 
+.input-node {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-color: #667eea;
+}
+
+.output-node {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: #fff;
+  border-color: #f093fb;
+}
+
+.knowledge_retrieval-node {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-color: #667eea;
+}
+
 .node-header {
   display: flex;
   align-items: center;
@@ -849,7 +992,9 @@ onMounted(() => {
 }
 
 .config-panel {
-  width: 300px;
+  width: 350px;
+  min-width: 300px;
+  max-width: 400px;
   background: #fff;
   border-left: 1px solid #e4e7ed;
   padding: 10px;

@@ -105,11 +105,23 @@ async def cancel_expired_orders_task():
         try:
             await asyncio.sleep(300)  # 5分钟 = 300秒
 
+            # # 检查数据库连接状态
+            # try:
+            #     from tortoise import Tortoise
+            #     # 尝试获取默认连接，检查数据库是否连接
+            #     await Tortoise.get_connection("postgres")
+            # except Exception as conn_error:
+            #     print(f"[定时任务] 数据库连接未初始化，跳过订单过期检查: {conn_error}")
+            #     continue
+
             from base.plugins.order.services.order_service import OrderService
             cancelled_count = await OrderService.cancel_expired_orders()
 
             if cancelled_count > 0:
                 print(f"[定时任务] 已取消 {cancelled_count} 个过期订单")
+        except asyncio.CancelledError:
+            print("[定时任务] 订单过期检查任务已取消")
+            break
         except Exception as e:
             print(f"[定时任务] 订单过期检查失败: {e}")
             import traceback
@@ -127,6 +139,15 @@ async def update_membership_data_task():
     while True:
         try:
             await asyncio.sleep(600)  # 10分钟 = 600秒
+
+            # 检查数据库连接状态
+            # try:
+            #     from tortoise import Tortoise
+            #     # 尝试获取默认连接，检查数据库是否连接
+            #     await Tortoise.get_connection("postgres")
+            # except Exception as conn_error:
+            #     print(f"[定时任务] 数据库连接未初始化，跳过会员数据更新: {conn_error}")
+            #     continue
 
             from base.plugins.customer.models.customer_membership import CustomerMembership
             from base.plugins.llm.models.usage import LLMUsageRecord
@@ -278,6 +299,9 @@ async def update_membership_data_task():
             print(f"  错误数量: {error_count}")
             print("="*70 + "\n")
 
+        except asyncio.CancelledError:
+            print("[定时任务] 会员数据更新任务已取消")
+            break
         except Exception as e:
             print(f"\n[定时任务] ❌ 执行失败: {e}")
             import traceback

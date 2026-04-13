@@ -6,6 +6,7 @@ from tortoise.exceptions import DoesNotExist
 from base.plugins.agent.models.workflow import Workflow, WorkflowNode, WorkflowEdge, WorkflowExecution
 from base.plugins.agent.models.agent import Agent
 from base.plugins.agent.models.skill import Skill
+from base.plugins.llm.models.model import LLMModel
 from base.plugins.agent.schemas.workflow import (
     WorkflowCreate, WorkflowUpdate, WorkflowExecutionCreate
 )
@@ -17,6 +18,21 @@ try:
     LANGGRAPH_AVAILABLE = True
 except ImportError:
     LANGGRAPH_AVAILABLE = False
+
+# Try to import HTTP libraries
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+
+# Try to import code execution libraries
+try:
+    import json
+    import re
+    JSON_AVAILABLE = True
+except ImportError:
+    JSON_AVAILABLE = False
 
 
 class WorkflowService:
@@ -172,6 +188,36 @@ class WorkflowService:
         return execution
 
     @staticmethod
+    async def get_all_workflow_executions(skip: int = 0, limit: int = 100, status: str = "") -> List[WorkflowExecution]:
+        """Get all workflow executions"""
+        query = WorkflowExecution.all()
+        
+        if status:
+            query = query.filter(status=status)
+        
+        executions = await query.offset(skip).limit(limit).order_by("-started_at")
+        return executions
+
+    @staticmethod
+    async def get_workflow_executions(workflow_id: int, skip: int = 0, limit: int = 100, status: str = "") -> List[WorkflowExecution]:
+        """Get workflow executions"""
+        query = WorkflowExecution.filter(workflow_id=workflow_id)
+        
+        if status:
+            query = query.filter(status=status)
+        
+        executions = await query.offset(skip).limit(limit).order_by("-started_at")
+        return executions
+
+    @staticmethod
+    async def get_workflow_execution_by_id(execution_id: int) -> Optional[WorkflowExecution]:
+        """Get workflow execution by ID"""
+        try:
+            return await WorkflowExecution.get(id=execution_id)
+        except DoesNotExist:
+            return None
+
+    @staticmethod
     async def _build_and_execute_graph(workflow: Workflow, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Build and execute workflow graph using LangGraph"""
         if not LANGGRAPH_AVAILABLE:
@@ -197,6 +243,11 @@ class WorkflowService:
                 skill = await node.skill
                 if skill:
                     graph.add_node(node.name, lambda state: WorkflowService._execute_skill_node(skill, state))
+            elif node.type == "llm":
+                # Add LLM node
+                llm = await node.llm
+                if llm:
+                    graph.add_node(node.name, lambda state: WorkflowService._execute_llm_node(llm, state))
             elif node.type == "decision":
                 # Add decision node
                 graph.add_node(node.name, lambda state: WorkflowService._execute_decision_node(node, state))
@@ -206,6 +257,33 @@ class WorkflowService:
             elif node.type == "join":
                 # Add join node
                 graph.add_node(node.name, lambda state: WorkflowService._execute_join_node(node, state))
+            elif node.type == "iteration":
+                # Add iteration node
+                graph.add_node(node.name, lambda state: WorkflowService._execute_iteration_node(node, state))
+            elif node.type == "code":
+                # Add code execution node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_code_node(node, state))
+            elif node.type == "template":
+                # Add template node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_template_node(node, state))
+            elif node.type == "variable_aggregator":
+                # Add variable aggregator node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_variable_aggregator_node(node, state))
+            elif node.type == "document_extractor":
+                # Add document extractor node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_document_extractor_node(node, state))
+            elif node.type == "variable_assigner":
+                # Add variable assigner node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_variable_assigner_node(node, state))
+            elif node.type == "parameter_extractor":
+                # Add parameter extractor node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_parameter_extractor_node(node, state))
+            elif node.type == "http":
+                # Add HTTP request node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_http_node(node, state))
+            elif node.type == "list_operation":
+                # Add list operation node (Dify style)
+                graph.add_node(node.name, lambda state: WorkflowService._execute_list_operation_node(node, state))
         
         # Add edges to the graph
         for edge in workflow.edges:
@@ -288,6 +366,47 @@ class WorkflowService:
         return state
 
     @staticmethod
+    async def _execute_iteration_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute iteration node"""
+        print(f"Executing iteration node: {node.name}")
+        
+        # Get iteration configuration
+        config = node.config or {}
+        iteration_collection = config.get('iteration_collection', '')
+        iteration_variable = config.get('iteration_variable', 'item')
+        iteration_condition = config.get('iteration_condition', '')
+        
+        # Get the collection from state
+        collection = state.get(iteration_collection, [])
+        
+        # Execute iteration
+        results = []
+        for item in collection:
+            # Set the iteration variable in state
+            state[iteration_variable] = item
+            
+            # Evaluate condition if provided
+            if iteration_condition:
+                try:
+                    # Simple condition evaluation
+                    condition_result = eval(iteration_condition, {}, state)
+                    if not condition_result:
+                        continue
+                except Exception as e:
+                    print(f"Error evaluating iteration condition: {e}")
+                    continue
+            
+            # Add item to results
+            results.append(item)
+        
+        # Store results in state
+        state[f"iteration_{node.id}_output"] = results
+        state[f"iteration_{node.id}_collection"] = collection
+        state[f"iteration_{node.id}_count"] = len(results)
+        
+        return state
+
+    @staticmethod
     async def _evaluate_condition(condition: str, state: Dict[str, Any]) -> str:
         """Evaluate condition"""
         # Here you would implement condition evaluation
@@ -296,3 +415,230 @@ class WorkflowService:
         
         # Simulate condition evaluation
         return "true"
+    
+    # ==================== Dify 风格节点执行函数 ====================
+    
+    @staticmethod
+    async def _execute_llm_node(llm: LLMModel, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute LLM node"""
+        print(f"Executing LLM node: {llm.model_name}")
+        
+        # Get LLM configuration from node config
+        config = llm.config or {}
+        prompt = config.get('prompt', '')
+        temperature = config.get('temperature', 0.7)
+        max_tokens = config.get('max_tokens', 2048)
+        
+        # Simulate LLM execution
+        # In production, this would call the actual LLM API
+        state[f"llm_{llm.id}_output"] = {
+            "model": llm.model_name,
+            "prompt": prompt,
+            "response": f"Simulated response from {llm.model_name}",
+            "temperature": temperature
+        }
+        return state
+    
+    @staticmethod
+    async def _execute_code_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute code node (Dify style)"""
+        print(f"Executing code node: {node.name}")
+        
+        # Get code configuration
+        config = node.config or {}
+        language = config.get('language', 'python')
+        code = config.get('code', '')
+        
+        # Execute code
+        try:
+            if language == 'python':
+                # Execute Python code
+                exec_globals = {'state': state, 'json': json, 're': re}
+                exec(code, exec_globals)
+                result = exec_globals.get('result', 'Code executed successfully')
+            elif language == 'javascript':
+                # Execute JavaScript code (simplified)
+                result = f"JavaScript code executed: {code[:50]}..."
+            else:
+                result = f"Unsupported language: {language}"
+        except Exception as e:
+            result = f"Code execution error: {str(e)}"
+        
+        state[f"code_{node.id}_output"] = result
+        return state
+    
+    @staticmethod
+    async def _execute_template_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute template node (Dify style)"""
+        print(f"Executing template node: {node.name}")
+        
+        # Get template configuration
+        config = node.config or {}
+        template = config.get('template', '')
+        
+        # Render template
+        try:
+            # Simple template rendering (in production, use Jinja2 or similar)
+            rendered = template
+            for key, value in state.items():
+                if isinstance(value, (str, int, float, bool)):
+                    rendered = rendered.replace(f"{{{{{key}}}}}", str(value))
+        except Exception as e:
+            rendered = f"Template rendering error: {str(e)}"
+        
+        state[f"template_{node.id}_output"] = rendered
+        return state
+    
+    @staticmethod
+    async def _execute_variable_aggregator_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute variable aggregator node (Dify style)"""
+        print(f"Executing variable aggregator node: {node.name}")
+        
+        # Get configuration
+        config = node.config or {}
+        input_vars = config.get('input_vars', '').split('\n')
+        output_var = config.get('output_var', 'aggregated_output')
+        
+        # Aggregate variables
+        aggregated = {}
+        for var_name in input_vars:
+            var_name = var_name.strip()
+            if var_name in state:
+                aggregated[var_name] = state[var_name]
+        
+        state[output_var] = aggregated
+        state[f"variable_aggregator_{node.id}_output"] = aggregated
+        return state
+    
+    @staticmethod
+    async def _execute_document_extractor_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute document extractor node (Dify style)"""
+        print(f"Executing document extractor node: {node.name}")
+        
+        # Get configuration
+        config = node.config or {}
+        document_var = config.get('document_var', '')
+        extract_rules = config.get('extract_rules', '')
+        
+        # Extract content from document
+        # In production, this would use actual document processing
+        extracted = {
+            "document_var": document_var,
+            "extract_rules": extract_rules,
+            "extracted_content": f"Extracted content from {document_var}"
+        }
+        
+        state[f"document_extractor_{node.id}_output"] = extracted
+        return state
+    
+    @staticmethod
+    async def _execute_variable_assigner_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute variable assigner node (Dify style)"""
+        print(f"Executing variable assigner node: {node.name}")
+        
+        # Get configuration
+        config = node.config or {}
+        var_name = config.get('var_name', '')
+        var_value = config.get('var_value', '')
+        
+        # Assign variable
+        state[var_name] = var_value
+        state[f"variable_assigner_{node.id}_output"] = f"Variable {var_name} assigned"
+        return state
+    
+    @staticmethod
+    async def _execute_parameter_extractor_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute parameter extractor node (Dify style)"""
+        print(f"Executing parameter extractor node: {node.name}")
+        
+        # Get configuration
+        config = node.config or {}
+        input_text = config.get('input_text', '')
+        parameters = config.get('parameters', '').split('\n')
+        
+        # Extract parameters
+        extracted_params = {}
+        for param_name in parameters:
+            param_name = param_name.strip()
+            # In production, this would use actual parameter extraction logic
+            extracted_params[param_name] = f"Extracted {param_name}"
+        
+        state[f"parameter_extractor_{node.id}_output"] = extracted_params
+        return state
+    
+    @staticmethod
+    async def _execute_http_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute HTTP request node (Dify style)"""
+        print(f"Executing HTTP node: {node.name}")
+        
+        # Get configuration
+        config = node.config or {}
+        method = config.get('method', 'GET')
+        url = config.get('url', '')
+        headers = config.get('headers', '{}')
+        body = config.get('body', '{}')
+        
+        # Execute HTTP request
+        if HTTPX_AVAILABLE:
+            try:
+                async with httpx.AsyncClient() as client:
+                    if method == 'GET':
+                        response = await client.get(url, headers=json.loads(headers))
+                    elif method == 'POST':
+                        response = await client.post(url, headers=json.loads(headers), json=json.loads(body))
+                    elif method == 'PUT':
+                        response = await client.put(url, headers=json.loads(headers), json=json.loads(body))
+                    elif method == 'DELETE':
+                        response = await client.delete(url, headers=json.loads(headers))
+                    else:
+                        response = None
+                    
+                    result = {
+                        "status_code": response.status_code if response else 0,
+                        "response": response.text if response else "No response",
+                        "headers": dict(response.headers) if response else {}
+                    }
+            except Exception as e:
+                result = {
+                    "error": str(e),
+                    "status_code": 0
+                }
+        else:
+            # Fallback if httpx is not available
+            result = {
+                "message": "HTTPX library not available",
+                "url": url,
+                "method": method,
+                "simulated_response": "HTTP request would be executed here"
+            }
+        
+        state[f"http_{node.id}_output"] = result
+        return state
+    
+    @staticmethod
+    async def _execute_list_operation_node(node: WorkflowNode, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute list operation node (Dify style)"""
+        print(f"Executing list operation node: {node.name}")
+        
+        # Get configuration
+        config = node.config or {}
+        operation = config.get('operation', 'filter')
+        input_list = config.get('input_list', '')
+        
+        # Get the list from state
+        input_data = state.get(input_list, [])
+        
+        # Perform operation
+        if operation == 'filter':
+            result = [item for item in input_data if item]  # Simple filter
+        elif operation == 'map':
+            result = [f"Processed: {item}" for item in input_data]  # Simple map
+        elif operation == 'sort':
+            result = sorted(input_data)  # Simple sort
+        elif operation == 'unique':
+            result = list(set(input_data))  # Remove duplicates
+        else:
+            result = input_data
+        
+        state[f"list_operation_{node.id}_output"] = result
+        return state

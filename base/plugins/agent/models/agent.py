@@ -13,6 +13,14 @@ class Agent(BaseModel, TimestampMixin):
     status = fields.CharField(max_length=20, default="active", description="Status: active/inactive")
     config = fields.JSONField(null=True, description="Agent configuration")
     memory_capacity = fields.IntField(default=100, description="Memory capacity")
+    system_prompt = fields.TextField(null=True, description="System prompt")
+    llm_model = fields.ForeignKeyField(
+        "models.LLMModel",
+        related_name="agents",
+        null=True,
+        on_delete=fields.SET_NULL,
+        description="Associated LLM model"
+    )
     skills = fields.ManyToManyField("models.Skill", related_name="agents", description="Associated skills")
     
     class Meta:

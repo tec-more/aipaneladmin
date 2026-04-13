@@ -42,19 +42,21 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="240" fixed="right" align="center">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link :icon="Key" @click="handlePermission(row)">权限</el-button>
-            <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
-            <el-button
-              type="danger"
-              link
-              :icon="Delete"
-              :disabled="row.code === 'admin'"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" link :icon="Key" @click="handlePermission(row)">权限</el-button>
+              <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
+              <el-button
+                type="danger"
+                link
+                :icon="Delete"
+                :disabled="row.code === 'admin'"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -348,6 +350,13 @@ onMounted(() => {
     margin-top: 16px;
     display: flex;
     justify-content: flex-end;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 4px;
   }
 
   .perm-dialog-content {

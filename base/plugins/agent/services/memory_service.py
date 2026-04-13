@@ -1,12 +1,25 @@
 """
 Memory service
 """
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from tortoise.exceptions import DoesNotExist
 from datetime import datetime
 from base.plugins.agent.models.memory import Memory
 from base.plugins.agent.models.agent import Agent
 from base.plugins.agent.schemas.memory import MemoryCreate, MemoryUpdate
+
+# 添加向量检索相关依赖
+try:
+    from langchain.embeddings import OpenAIEmbeddings
+    from langchain.vectorstores import Chroma
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain.docstore.document import Document
+    VECTOR_SUPPORT = True
+except ImportError:
+    VECTOR_SUPPORT = False
+
+# 向量存储目录
+VECTOR_STORE_DIR = "./vector_stores"
 
 
 class MemoryService:
@@ -37,6 +50,10 @@ class MemoryService:
             type=memory_data.type,
             importance=memory_data.importance
         )
+        
+        # 将记忆添加到向量存储
+        await MemoryService.add_memory_to_vector_store(memory_data.agent_id, memory)
+        
         return memory
 
     @staticmethod
@@ -64,6 +81,10 @@ class MemoryService:
         update_data = memory_data.model_dump(exclude_unset=True)
         await memory.update_from_dict(update_data)
         await memory.save()
+        
+        # 更新向量存储中的记忆
+        await MemoryService.update_memory_in_vector_store(memory.agent_id, memory)
+        
         return memory
 
     @staticmethod
@@ -143,3 +164,116 @@ class MemoryService:
             "long_term_memories": long_term_memories,
             "memory_capacity": (await Agent.get(id=agent_id)).memory_capacity
         }
+
+    @staticmethod
+    def get_vector_store(agent_id: int):
+        """获取智能体的向量存储"""
+        if not VECTOR_SUPPORT:
+            return None
+        
+        try:
+            embeddings = OpenAIEmbeddings()
+            vector_store = Chroma(
+                persist_directory=f"{VECTOR_STORE_DIR}/agent_{agent_id}",
+                embedding_function=embeddings
+            )
+            return vector_store
+        except Exception as e:
+            print(f"Error getting vector store: {e}")
+            return None
+
+    @staticmethod
+    async def add_memory_to_vector_store(agent_id: int, memory: Memory):
+        """将记忆添加到向量存储"""
+        if not VECTOR_SUPPORT:
+            return False
+        
+        try:
+            vector_store = MemoryService.get_vector_store(agent_id)
+            if not vector_store:
+                return False
+            
+            # 创建文档对象
+            document = Document(
+                page_content=memory.content,
+                metadata={
+                    "memory_id": memory.id,
+                    "agent_id": agent_id,
+                    "type": memory.type,
+                    "importance": memory.importance,
+                    "created_at": memory.created_at.isoformat()
+                }
+            )
+            
+            # 添加到向量存储
+            vector_store.add_documents([document])
+            vector_store.persist()
+            return True
+        except Exception as e:
+            print(f"Error adding memory to vector store: {e}")
+            return False
+
+    @staticmethod
+    async def retrieve_relevant_memories(agent_id: int, query: str, k: int = 5) -> List[Memory]:
+        """根据查询检索相关记忆"""
+        if not VECTOR_SUPPORT:
+            # 如果不支持向量检索，使用传统搜索
+            return await MemoryService.search_memories(agent_id, query)
+        
+        try:
+            vector_store = MemoryService.get_vector_store(agent_id)
+            if not vector_store:
+                return await MemoryService.search_memories(agent_id, query)
+            
+            # 向量检索
+            results = vector_store.similarity_search(query, k=k)
+            
+            # 获取记忆对象
+            memory_ids = [int(doc.metadata.get("memory_id")) for doc in results if doc.metadata.get("memory_id")]
+            if not memory_ids:
+                return []
+            
+            memories = await Memory.filter(id__in=memory_ids).all()
+            return memories
+        except Exception as e:
+            print(f"Error retrieving relevant memories: {e}")
+            return await MemoryService.search_memories(agent_id, query)
+
+    @staticmethod
+    async def update_memory_in_vector_store(agent_id: int, memory: Memory):
+        """更新向量存储中的记忆"""
+        if not VECTOR_SUPPORT:
+            return False
+        
+        try:
+            # 先删除旧记忆
+            vector_store = MemoryService.get_vector_store(agent_id)
+            if not vector_store:
+                return False
+            
+            # 删除旧记忆
+            vector_store.delete([str(memory.id)])
+            
+            # 添加更新后的记忆
+            return await MemoryService.add_memory_to_vector_store(agent_id, memory)
+        except Exception as e:
+            print(f"Error updating memory in vector store: {e}")
+            return False
+
+    @staticmethod
+    async def clear_vector_store(agent_id: int):
+        """清空智能体的向量存储"""
+        if not VECTOR_SUPPORT:
+            return False
+        
+        try:
+            vector_store = MemoryService.get_vector_store(agent_id)
+            if not vector_store:
+                return False
+            
+            vector_store.delete([])  # 清空所有向量
+            vector_store.persist()
+            return True
+        except Exception as e:
+            print(f"Error clearing vector store: {e}")
+            return False

@@ -18,6 +18,17 @@ async def create_agent(agent: AgentCreate):
         skill_count = await created_agent.skills.all().count()
         memory_count = await created_agent.memories.all().count()
         
+        # Get workflow and dialog flow counts
+        from base.plugins.agent.models.workflow import Workflow
+        from base.plugins.agent.models.dialog_flow import DialogFlow
+        workflow_count = len(await Workflow.filter(agents__id=created_agent.id).all())
+        dialog_flow_count = len(await DialogFlow.filter(agent=created_agent).all())
+        
+        # Get LLM model name
+        llm_model_name = None
+        if created_agent.llm_model:
+            llm_model_name = f"{created_agent.llm_model.provider.name} - {created_agent.llm_model.model_name}"
+        
         data = AgentResponse(
             id=created_agent.id,
             name=created_agent.name,
@@ -25,10 +36,15 @@ async def create_agent(agent: AgentCreate):
             status=created_agent.status,
             config=created_agent.config,
             memory_capacity=created_agent.memory_capacity,
+            system_prompt=created_agent.system_prompt,
+            llm_model_id=created_agent.llm_model.id if created_agent.llm_model else None,
             created_at=created_agent.created_at,
             updated_at=created_agent.updated_at,
             skill_count=skill_count,
-            memory_count=memory_count
+            memory_count=memory_count,
+            workflow_count=workflow_count,
+            dialog_flow_count=dialog_flow_count,
+            llm_model_name=llm_model_name
         )
         return success_response(data=data.model_dump(), msg="智能体创建成功")
     except Exception as e:
@@ -43,6 +59,18 @@ async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: st
     for agent in agents:
         skill_count = await agent.skills.all().count()
         memory_count = await agent.memories.all().count()
+        
+        # Get workflow and dialog flow counts
+        from base.plugins.agent.models.workflow import Workflow
+        from base.plugins.agent.models.dialog_flow import DialogFlow
+        workflow_count = len(await Workflow.filter(agents__id=agent.id).all())
+        dialog_flow_count = len(await DialogFlow.filter(agent=agent).all())
+        
+        # Get LLM model name
+        llm_model_name = None
+        if agent.llm_model:
+            llm_model_name = f"{agent.llm_model.provider.name} - {agent.llm_model.model_name}"
+        
         response.append(AgentResponse(
             id=agent.id,
             name=agent.name,
@@ -50,10 +78,15 @@ async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: st
             status=agent.status,
             config=agent.config,
             memory_capacity=agent.memory_capacity,
+            system_prompt=agent.system_prompt,
+            llm_model_id=agent.llm_model.id if agent.llm_model else None,
             created_at=agent.created_at,
             updated_at=agent.updated_at,
             skill_count=skill_count,
-            memory_count=memory_count
+            memory_count=memory_count,
+            workflow_count=workflow_count,
+            dialog_flow_count=dialog_flow_count,
+            llm_model_name=llm_model_name
         ).model_dump())
     return success_response(data={"items": response, "total": len(response)})
 
@@ -68,19 +101,41 @@ async def get_agent(agent_id: int):
     skill_count = await agent.skills.all().count()
     memory_count = await agent.memories.all().count()
     
-    data = AgentResponse(
-        id=agent.id,
-        name=agent.name,
-        description=agent.description,
-        status=agent.status,
-        config=agent.config,
-        memory_capacity=agent.memory_capacity,
-        created_at=agent.created_at,
-        updated_at=agent.updated_at,
-        skill_count=skill_count,
-        memory_count=memory_count
-    )
-    return success_response(data=data.model_dump())
+    # Get LLM model name
+    llm_model_name = None
+    if agent.llm_model:
+        llm_model_name = f"{agent.llm_model.provider.name} - {agent.llm_model.model_name}"
+    
+    # Get workflow and dialog flow counts and IDs
+    from base.plugins.agent.models.workflow import Workflow
+    from base.plugins.agent.models.dialog_flow import DialogFlow
+    workflows = await Workflow.filter(agents__id=agent.id).all()
+    dialog_flows = await DialogFlow.filter(agent=agent).all()
+    workflow_count = len(workflows)
+    dialog_flow_count = len(dialog_flows)
+    workflow_ids = [workflow.id for workflow in workflows]
+    dialog_flow_ids = [dialog_flow.id for dialog_flow in dialog_flows]
+    
+    data = {
+        "id": agent.id,
+        "name": agent.name,
+        "description": agent.description,
+        "status": agent.status,
+        "config": agent.config,
+        "memory_capacity": agent.memory_capacity,
+        "system_prompt": agent.system_prompt,
+        "llm_model_id": agent.llm_model.id if agent.llm_model else None,
+        "created_at": agent.created_at,
+        "updated_at": agent.updated_at,
+        "skill_count": skill_count,
+        "memory_count": memory_count,
+        "workflow_count": workflow_count,
+        "dialog_flow_count": dialog_flow_count,
+        "workflow_ids": workflow_ids,
+        "dialog_flow_ids": dialog_flow_ids,
+        "llm_model_name": llm_model_name
+    }
+    return success_response(data=data)
 
 
 @agent_router.put("/{agent_id}")
@@ -93,19 +148,41 @@ async def update_agent(agent_id: int, agent: AgentUpdate):
     skill_count = await updated_agent.skills.all().count()
     memory_count = await updated_agent.memories.all().count()
     
-    data = AgentResponse(
-        id=updated_agent.id,
-        name=updated_agent.name,
-        description=updated_agent.description,
-        status=updated_agent.status,
-        config=updated_agent.config,
-        memory_capacity=updated_agent.memory_capacity,
-        created_at=updated_agent.created_at,
-        updated_at=updated_agent.updated_at,
-        skill_count=skill_count,
-        memory_count=memory_count
-    )
-    return success_response(data=data.model_dump(), msg="智能体更新成功")
+    # Get LLM model name
+    llm_model_name = None
+    if updated_agent.llm_model:
+        llm_model_name = f"{updated_agent.llm_model.provider.name} - {updated_agent.llm_model.model_name}"
+    
+    # Get workflow and dialog flow counts and IDs
+    from base.plugins.agent.models.workflow import Workflow
+    from base.plugins.agent.models.dialog_flow import DialogFlow
+    workflows = await Workflow.filter(agents__id=updated_agent.id).all()
+    dialog_flows = await DialogFlow.filter(agent=updated_agent).all()
+    workflow_count = len(workflows)
+    dialog_flow_count = len(dialog_flows)
+    workflow_ids = [workflow.id for workflow in workflows]
+    dialog_flow_ids = [dialog_flow.id for dialog_flow in dialog_flows]
+    
+    data = {
+        "id": updated_agent.id,
+        "name": updated_agent.name,
+        "description": updated_agent.description,
+        "status": updated_agent.status,
+        "config": updated_agent.config,
+        "memory_capacity": updated_agent.memory_capacity,
+        "system_prompt": updated_agent.system_prompt,
+        "llm_model_id": updated_agent.llm_model.id if updated_agent.llm_model else None,
+        "created_at": updated_agent.created_at,
+        "updated_at": updated_agent.updated_at,
+        "skill_count": skill_count,
+        "memory_count": memory_count,
+        "workflow_count": workflow_count,
+        "dialog_flow_count": dialog_flow_count,
+        "workflow_ids": workflow_ids,
+        "dialog_flow_ids": dialog_flow_ids,
+        "llm_model_name": llm_model_name
+    }
+    return success_response(data=data, msg="智能体更新成功")
 
 
 @agent_router.delete("/{agent_id}")
@@ -154,3 +231,54 @@ async def remove_skill_from_agent(agent_id: int, skill_id: int):
     if not success:
         return fail_response(msg="智能体或技能不存在", code=404)
     return success_response(msg="技能移除成功")
+
+
+@agent_router.post("/{agent_id}/execute")
+async def execute_agent(agent_id: int, input_data: dict):
+    """Execute agent"""
+    result = await AgentService.execute_agent(agent_id, input_data)
+    if result.get("success"):
+        return success_response(data=result, msg="智能体执行成功")
+    else:
+        return fail_response(msg=result.get("message", "执行失败"))
+
+
+@agent_router.post("/process-documents")
+async def process_documents(
+    directory_path: str = Query(..., description="文档目录路径"),
+    vector_store_path: str = Query(..., description="向量库存储路径")
+):
+    """处理文档并生成向量库"""
+    try:
+        from base.plugins.agent.services.document_processing_service import DocumentProcessingService, VECTOR_SUPPORT
+        import os
+        
+        # 检查向量支持是否启用
+        if not VECTOR_SUPPORT:
+            return fail_response(msg="向量支持未启用，请安装相关依赖", code=400)
+        
+        # 检查目录是否存在
+        if not os.path.exists(directory_path):
+            return fail_response(msg="文档目录不存在", code=404)
+        
+        # 确保向量库存储路径存在
+        os.makedirs(vector_store_path, exist_ok=True)
+        
+        # 处理文档并创建向量库
+        vector_store = DocumentProcessingService.process_document_directory(directory_path, vector_store_path)
+        
+        # 获取向量库信息
+        collection_name = vector_store._collection.name
+        document_count = vector_store._collection.count()
+        
+        return success_response(
+            data={
+                "vector_store_path": vector_store_path,
+                "collection_name": collection_name,
+                "document_count": document_count,
+                "message": f"成功处理文档并生成向量库，共处理 {document_count} 个文档片段"
+            },
+            msg="文档处理成功"
+        )
+    except Exception as e:
+        return fail_response(msg=str(e), code=500)
