@@ -577,11 +577,18 @@ class AgentFlowService:
         
         # 调用 LLM
         try:
+            endpoint_url = llm_model.endpoint_url or api_key.endpoint_url or provider.official_url
+            if endpoint_url:
+                endpoint_url = endpoint_url.rstrip('/')
+                if endpoint_url.endswith('/chat/completions'):
+                    endpoint_url = endpoint_url[:-len('/chat/completions')]
+            
+            credentials = api_key.get_credentials()
             service = await ChatService.get_provider_service(
                 provider.name_en,
-                api_key.app_key,
-                llm_model.endpoint_url or api_key.endpoint_url or provider.official_url,
-                api_key.api_secret
+                credentials.get("api_key", ""),
+                endpoint_url,
+                credentials.get("api_secret", "")
             )
             
             logger.info(f"[LLM节点] 开始调用LLM API...")

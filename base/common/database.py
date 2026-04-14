@@ -39,6 +39,7 @@ async def init_db():
         print("数据库迁移完成")
     except Exception as e:
         print(f"执行数据库迁移时出错: {e}")
+        print("继续执行，可能是因为迁移已应用...")
         import traceback
         traceback.print_exc()
     
