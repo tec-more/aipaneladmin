@@ -10,6 +10,7 @@ class ModelServiceType(str, Enum):
     用于标识API Key的具体用途，支持大语言模型和各种语音服务
     """
     LLM = "llm"                      # 大语言模型
+    EMBEDDING = "embedding"          # 向量模型
     STREAMING_ASR = "streaming_asr"  # 流式语音识别（实时）
     FILE_ASR = "file_asr"            # 录音文件识别
     TTS = "tts"                      # 语音合成
@@ -34,6 +35,7 @@ class ModelServiceType(str, Enum):
         """获取服务类型的显示名称"""
         names = {
             cls.LLM.value: "大语言模型",
+            cls.EMBEDDING.value: "向量模型",
             cls.STREAMING_ASR.value: "流式语音识别",
             cls.FILE_ASR.value: "录音文件识别",
             cls.TTS.value: "语音合成",

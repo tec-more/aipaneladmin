@@ -37,6 +37,7 @@ async def create_agent(agent: AgentCreate):
             config=created_agent.config,
             memory_capacity=created_agent.memory_capacity,
             system_prompt=created_agent.system_prompt,
+            reasoning_strategy=created_agent.reasoning_strategy,
             llm_model_id=created_agent.llm_model.id if created_agent.llm_model else None,
             created_at=created_agent.created_at,
             updated_at=created_agent.updated_at,
@@ -79,6 +80,7 @@ async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: st
             config=agent.config,
             memory_capacity=agent.memory_capacity,
             system_prompt=agent.system_prompt,
+            reasoning_strategy=agent.reasoning_strategy,
             llm_model_id=agent.llm_model.id if agent.llm_model else None,
             created_at=agent.created_at,
             updated_at=agent.updated_at,
@@ -124,6 +126,7 @@ async def get_agent(agent_id: int):
         "config": agent.config,
         "memory_capacity": agent.memory_capacity,
         "system_prompt": agent.system_prompt,
+        "reasoning_strategy": agent.reasoning_strategy,
         "llm_model_id": agent.llm_model.id if agent.llm_model else None,
         "created_at": agent.created_at,
         "updated_at": agent.updated_at,
@@ -171,6 +174,7 @@ async def update_agent(agent_id: int, agent: AgentUpdate):
         "config": updated_agent.config,
         "memory_capacity": updated_agent.memory_capacity,
         "system_prompt": updated_agent.system_prompt,
+        "reasoning_strategy": updated_agent.reasoning_strategy,
         "llm_model_id": updated_agent.llm_model.id if updated_agent.llm_model else None,
         "created_at": updated_agent.created_at,
         "updated_at": updated_agent.updated_at,
@@ -241,6 +245,47 @@ async def execute_agent(agent_id: int, input_data: dict):
         return success_response(data=result, msg="智能体执行成功")
     else:
         return fail_response(msg=result.get("message", "执行失败"))
+
+
+@agent_router.put("/{agent_id}/flow")
+async def update_agent_flow(agent_id: int, flow_data: dict):
+    """Update agent flow diagram"""
+    try:
+        agent = await AgentService.get_agent_by_id(agent_id)
+        if not agent:
+            return fail_response(msg="智能体不存在", code=404)
+        
+        # 更新智能体配置中的流程图数据
+        if not agent.config:
+            agent.config = {}
+        agent.config["flow_data"] = flow_data
+        await agent.save()
+        
+        return success_response(msg="智能体流程图更新成功")
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@agent_router.post("/{agent_id}/flow/execute")
+async def execute_agent_flow(agent_id: int, input_data: dict):
+    """Execute agent flow diagram"""
+    try:
+        from base.plugins.agent.services.agent_flow_service import AgentFlowService
+        
+        user_id = input_data.get("user_id", None)
+        result = await AgentFlowService.execute_agent_flow(
+            agent_id=agent_id,
+            input_data=input_data,
+            user_id=user_id
+        )
+        
+        if result.get("success"):
+            return success_response(data=result, msg="流程图执行成功")
+        else:
+            return fail_response(msg=result.get("message", "流程图执行失败"))
+    except Exception as e:
+        import traceback
+        return fail_response(msg=f"流程图执行失败: {str(e)}", data={"traceback": traceback.format_exc()})
 
 
 @agent_router.post("/process-documents")

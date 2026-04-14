@@ -9,6 +9,14 @@
               <el-icon><Check /></el-icon>
               保存
             </el-button>
+            <el-button 
+              type="warning" 
+              @click="publishAgent" 
+              v-if="isEdit && formData.status !== 'active'"
+            >
+              <el-icon><Check /></el-icon>
+              发布
+            </el-button>
           </div>
         </div>
       </template>
@@ -29,6 +37,12 @@
         <el-form-item label="记忆容量" prop="memory_capacity">
           <el-input-number v-model="formData.memory_capacity" :min="1" :max="10000" />
           <span style="margin-left: 10px; color: #909399;">条</span>
+        </el-form-item>
+        <el-form-item label="推理策略">
+          <el-select v-model="formData.reasoning_strategy" placeholder="请选择推理策略" style="width: 100%">
+            <el-option label="Function Call 模式" value="function_call" />
+            <el-option label="ReAct 模式" value="react" />
+          </el-select>
         </el-form-item>
         <el-form-item label="系统提示词">
           <el-input v-model="formData.system_prompt" type="textarea" :rows="6" placeholder="请输入系统提示词" />
@@ -56,6 +70,12 @@
             <el-option v-for="llm in allLLMs" :key="llm.id" :label="`${llm.provider_name} - ${llm.model_name}`" :value="llm.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="智能体流程图">
+          <el-button type="primary" @click="goToFlowEditor" style="width: 100%">
+            <el-icon><Share /></el-icon>
+            编辑智能体流程图
+          </el-button>
+        </el-form-item>
       </el-form>
     </el-card>
   </div>
@@ -64,7 +84,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Check } from '@element-plus/icons-vue'
+import { ArrowLeft, Check, Share } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getAgent, createAgent, updateAgent, getAgentSkills, setAgentSkills, getSkills, getWorkflows, getDialogFlows } from '@/api/agent'
 import { getModelList } from '@/api/llm'
@@ -87,6 +107,7 @@ const formData = reactive({
   status: 'active',
   memory_capacity: 100,
   system_prompt: '',
+  reasoning_strategy: 'function_call',
   config: {},
   skill_ids: [],
   workflow_ids: [],
@@ -116,6 +137,14 @@ const rules = {
 
 const goBack = () => {
   router.push('/panel/agent/list')
+}
+
+const goToFlowEditor = () => {
+  if (isEdit.value) {
+    router.push(`/panel/agent/flow?agent_id=${agentId}`)
+  } else {
+    ElMessage.warning('请先保存智能体，再编辑流程图')
+  }
 }
 
 const fetchAgent = async () => {
@@ -192,6 +221,7 @@ const handleSubmit = async () => {
           status: formData.status,
           memory_capacity: formData.memory_capacity,
           system_prompt: formData.system_prompt,
+          reasoning_strategy: formData.reasoning_strategy,
           config: formData.config,
           llm_model_id: formData.llm_model_id,
           skill_ids: formData.skill_ids,
@@ -215,6 +245,19 @@ const handleSubmit = async () => {
       }
     }
   })
+}
+
+const publishAgent = async () => {
+  try {
+    await updateAgent(agentId, {
+      status: 'active'
+    })
+    formData.status = 'active'
+    ElMessage.success('智能体发布成功')
+  } catch (error) {
+    ElMessage.error('智能体发布失败')
+    console.error(error)
+  }
 }
 
 onMounted(() => {

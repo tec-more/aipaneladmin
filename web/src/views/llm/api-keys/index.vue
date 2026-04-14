@@ -18,6 +18,7 @@
         <el-form-item label="服务类型">
           <el-select v-model="searchForm.model_service_type" placeholder="请选择" clearable style="width: 150px">
             <el-option label="大语言模型" value="llm" />
+            <el-option label="向量模型" value="embedding" />
             <el-option label="流式语音识别" value="streaming_asr" />
             <el-option label="录音文件识别" value="file_asr" />
             <el-option label="语音合成" value="tts" />
@@ -121,6 +122,9 @@
           <el-select v-model="form.model_service_type" placeholder="请选择服务类型" style="width: 100%">
             <el-option label="大语言模型" value="llm">
               <div>大语言模型 - 文本生成、对话、问答</div>
+            </el-option>
+            <el-option label="向量模型" value="embedding">
+              <div>向量模型 - 文本向量化、语义搜索</div>
             </el-option>
             <el-option label="流式语音识别" value="streaming_asr">
               <div>流式语音识别 - 实时语音转文字</div>
@@ -455,6 +459,7 @@ const handleReset = () => {
 const getServiceTypeColor = (type) => {
   const colors = {
     'llm': 'primary',
+    'embedding': 'primary',
     'streaming_asr': 'success',
     'file_asr': 'success',
     'tts': 'warning',

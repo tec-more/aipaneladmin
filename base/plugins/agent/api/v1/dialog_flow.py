@@ -154,7 +154,12 @@ async def delete_edge(edge_id: int):
 async def execute_dialog_flow(data: DialogFlowExecutionCreate):
     """执行指定的对话流"""
     try:
-        execution = await DialogFlowService.execute_dialog_flow(data)
+        execution = await DialogFlowService.execute_dialog_flow(
+            dialog_flow_id=data.dialog_flow_id,
+            input_data=data.input_data,
+            agent_id=data.agent_id,
+            user_id=data.user_id
+        )
         return success_response(data=execution, msg="对话流执行成功")
     except Exception as e:
         return fail_response(msg=str(e))

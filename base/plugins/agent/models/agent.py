@@ -14,6 +14,11 @@ class Agent(BaseModel, TimestampMixin):
     config = fields.JSONField(null=True, description="Agent configuration")
     memory_capacity = fields.IntField(default=100, description="Memory capacity")
     system_prompt = fields.TextField(null=True, description="System prompt")
+    reasoning_strategy = fields.CharField(
+        max_length=20,
+        default="function_call",
+        description="Reasoning strategy: function_call/react"
+    )
     llm_model = fields.ForeignKeyField(
         "models.LLMModel",
         related_name="agents",

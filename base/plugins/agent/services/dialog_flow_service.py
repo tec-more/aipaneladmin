@@ -155,15 +155,35 @@ class DialogFlowService:
         return True
     
     @staticmethod
-    async def execute_dialog_flow(data: DialogFlowExecutionCreate) -> DialogFlowExecutionResponse:
+    async def execute_dialog_flow(*args, **kwargs) -> DialogFlowExecutionResponse:
         """执行对话流"""
+        # 向后兼容：支持旧的 DialogFlowExecutionCreate 参数格式
+        if len(args) == 1 and hasattr(args[0], 'dialog_flow_id'):
+            data = args[0]
+            dialog_flow_id = data.dialog_flow_id
+            input_data = data.input_data
+            agent_id = data.agent_id
+            user_id = data.user_id
+        else:
+            # 新的参数格式
+            dialog_flow_id = kwargs.get('dialog_flow_id') or (args[0] if args else None)
+            input_data = kwargs.get('input_data') or (args[1] if len(args) > 1 else None)
+            agent_id = kwargs.get('agent_id') or (args[2] if len(args) > 2 else None)
+            user_id = kwargs.get('user_id') or (args[3] if len(args) > 3 else None)
+        
         # 创建执行记录
-        execution = await DialogFlowExecution.create(**data.dict())
+        execution_data = {
+            "dialog_flow_id": dialog_flow_id,
+            "agent_id": agent_id,
+            "user_id": user_id,
+            "input_data": input_data or {}
+        }
+        execution = await DialogFlowExecution.create(**execution_data)
         
         try:
             # 这里实现对话流的执行逻辑
             # 1. 获取对话流信息
-            dialog_flow = await DialogFlow.get_or_none(id=data.dialog_flow_id)
+            dialog_flow = await DialogFlow.get_or_none(id=dialog_flow_id)
             if not dialog_flow:
                 raise ValueError("对话流不存在")
             

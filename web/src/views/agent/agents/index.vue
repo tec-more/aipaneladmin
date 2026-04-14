@@ -55,7 +55,7 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="400" fixed="right">
+        <el-table-column label="操作" min-width="400" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button type="primary" size="small" @click="handleEdit(row)">
@@ -66,13 +66,17 @@
                 <el-icon><Connection /></el-icon>
                 技能
               </el-button>
+              <el-button type="primary" size="small" @click="handleFlow(row)">
+                <el-icon><Share /></el-icon>
+                工作流
+              </el-button>
+              <el-button type="primary" size="small" @click="handleDialogFlows(row)">
+                <el-icon><DataLine /></el-icon>
+                对话流
+              </el-button>
               <el-button type="warning" size="small" @click="handleMemory(row)">
                 <el-icon><Memo /></el-icon>
                 记忆
-              </el-button>
-              <el-button type="success" size="small" @click="handleFlow(row)">
-                <el-icon><Share /></el-icon>
-                流程图
               </el-button>
               <el-button type="danger" size="small" @click="handleDelete(row.id)">
                 <el-icon><Delete /></el-icon>
@@ -147,7 +151,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share, Setting, DataLine } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAgents, createAgent, updateAgent, deleteAgent, getAgentSkills, setAgentSkills } from '@/api/agent'
 import { getSkills } from '@/api/agent'
@@ -337,6 +341,11 @@ const handleFlow = (row) => {
   router.push(`/panel/agent/flow?agent_id=${row.id}`)
 }
 
+const handleDialogFlows = (row) => {
+  // 跳转到对话流管理页面，带上智能体ID
+  router.push(`/panel/agent/dialog-flows?agent_id=${row.id}`)
+}
+
 onMounted(() => {
   fetchAgents()
   fetchSkills()
@@ -357,6 +366,7 @@ onMounted(() => {
 }
 .action-buttons {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
   gap: 4px;

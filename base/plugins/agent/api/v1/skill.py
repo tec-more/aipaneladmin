@@ -37,22 +37,66 @@ async def create_skill(skill: SkillCreate):
 @skill_router.get("/")
 async def get_skills(skip: int = 0, limit: int = 100, name: str = "", type: str = "", status: str = ""):
     """Get all skills"""
-    skills = await SkillService.get_skills(skip=skip, limit=limit, name=name, type=type, status=status)
+    # 获取数据库中的技能
+    db_skills = await SkillService.get_skills(skip=skip, limit=limit, name=name, type=type, status=status)
+    
+    # 获取代码中注册的技能
+    from base.plugins.agent.skills.registry import SkillRegistry
+    
+    code_skill_types = SkillRegistry.get_skill_types()
+    code_skills = []
+    
+    for skill_type in code_skill_types:
+        # 检查该技能是否已在数据库中存在
+        existing_db_skill = next((s for s in db_skills if s.type == skill_type), None)
+        if not existing_db_skill:
+            # 创建一个代码技能的字典对象
+            skill_class = SkillRegistry.get_skill(skill_type)
+            if skill_class:
+                code_skill = {
+                    "id": None,
+                    "name": skill_class.get_name() if hasattr(skill_class, 'get_name') else skill_type,
+                    "description": f"代码注册技能: {skill_type}",
+                    "type": skill_type,
+                    "parameters": {},
+                    "implementation": None,
+                    "status": "active",
+                    "created_at": None,
+                    "updated_at": None,
+                    "agent_count": 0,
+                    "source": "code"  # 标识技能来源
+                }
+                code_skills.append(code_skill)
+    
+    # 为数据库技能添加来源标识
+    for skill in db_skills:
+        skill.source = "database"
+    
+    # 合并数据库技能和代码技能
+    all_skills = db_skills + code_skills
+    
+    # 构建响应
     response = []
-    for skill in skills:
-        agent_count = await skill.agents.count()
+    for skill in all_skills:
+        if hasattr(skill, 'agents'):
+            agent_count = await skill.agents.count()
+        else:
+            agent_count = skill.get('agent_count', 0)
+        
         response.append(SkillResponse(
-            id=skill.id,
-            name=skill.name,
-            description=skill.description,
-            type=skill.type,
-            parameters=skill.parameters,
-            implementation=skill.implementation,
-            status=skill.status,
-            created_at=skill.created_at,
-            updated_at=skill.updated_at,
-            agent_count=agent_count
+            id=skill.id if hasattr(skill, 'id') else skill.get('id'),
+            name=skill.name if hasattr(skill, 'name') else skill.get('name'),
+            description=skill.description if hasattr(skill, 'description') else skill.get('description'),
+            type=skill.type if hasattr(skill, 'type') else skill.get('type'),
+            parameters=skill.parameters if hasattr(skill, 'parameters') else skill.get('parameters'),
+            implementation=skill.implementation if hasattr(skill, 'implementation') else skill.get('implementation'),
+            status=skill.status if hasattr(skill, 'status') else skill.get('status'),
+            created_at=skill.created_at if hasattr(skill, 'created_at') else skill.get('created_at'),
+            updated_at=skill.updated_at if hasattr(skill, 'updated_at') else skill.get('updated_at'),
+            agent_count=agent_count,
+            source=skill.source if hasattr(skill, 'source') else skill.get('source')
         ).model_dump())
+    
     return success_response(data={"items": response, "total": len(response)})
 
 

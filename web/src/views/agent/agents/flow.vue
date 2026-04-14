@@ -110,7 +110,10 @@
             </div>
             <div class="node-header">
               <span class="node-icon">{{ getNodeIcon(node.type) }}</span>
-              <span class="node-label">{{ node.data.label }}</span>
+              <div class="node-content">
+                <span class="node-label">{{ node.data.label }}</span>
+                <span v-if="node.type === 'llm' && getNodeLLMName(node)" class="node-subtitle">{{ getNodeLLMName(node) }}</span>
+              </div>
             </div>
             <div class="connection-point output"
                  @mousedown.stop="onOutputPointMouseDown($event, node)">
@@ -255,10 +258,15 @@
           </template>
           <template v-if="selectedNode.type === 'llm'">
             <div class="panel-title">大模型配置</div>
+            <div style="margin-bottom: 10px; font-size: 12px; color: #999;">
+              大模型数量: {{ llms.length }}
+            </div>
             <el-form label-width="80px" size="small">
               <el-form-item label="选择模型">
                 <el-select v-model="selectedNode.data.llm_id" placeholder="请选择大模型" @change="onLLMChange" style="width: 100%">
-                  <el-option v-for="llm in llms" :key="llm.id" :label="`${llm.provider_name} - ${llm.model_name}`" :value="llm.id" />
+                  <el-option v-for="llm in llms" :key="llm.id" :value="llm.id">
+                    <span>{{ llm.provider_name }} - {{ llm.model_name }}</span>
+                  </el-option>
                 </el-select>
               </el-form-item>
               <el-form-item label="节点名称">
@@ -281,9 +289,6 @@
                   </el-tag>
                 </p>
               </div>
-              <el-button type="primary" size="small" @click="editLLM(selectedLLM.id)" style="width: 100%; margin-top: 10px">
-                编辑大模型
-              </el-button>
             </el-card>
           </template>
           
@@ -443,6 +448,7 @@
                   <el-option label="文本" value="text" />
                   <el-option label="文件" value="file" />
                   <el-option label="表单" value="form" />
+                  <el-option label="JSON" value="json" />
                 </el-select>
               </el-form-item>
               <el-form-item label="输入提示">
@@ -521,15 +527,93 @@
     </div>
     
     <!-- 执行流程对话框 -->
-    <el-dialog v-model="executeDialogVisible" title="执行流程图" width="500px">
+    <el-dialog v-model="executeDialogVisible" title="执行" width="600px">
       <el-form label-width="100px">
-        <el-form-item label="输入数据">
-          <el-input v-model="executeInput" type="textarea" :rows="4" placeholder="JSON格式" />
+        <el-form-item label="执行类型">
+          <el-radio-group v-model="executeType">
+            <el-radio label="agent">智能体</el-radio>
+            <el-radio label="workflow">工作流</el-radio>
+            <el-radio label="dialog_flow">对话流</el-radio>
+          </el-radio-group>
         </el-form-item>
-        <el-form-item label="执行结果">
-          <el-input v-model="executeResult" type="textarea" :rows="4" readonly />
+        
+        <template v-if="executeType === 'agent'">
+          <el-form-item label="选择智能体">
+            <el-select v-model="selectedExecuteAgentId" placeholder="请选择智能体" style="width: 100%">
+              <el-option 
+                v-for="agent in agents.filter(a => a.status === 'active')" 
+                :key="agent.id" 
+                :label="agent.name" 
+                :value="agent.id" 
+              />
+            </el-select>
+          </el-form-item>
+        </template>
+        
+        <template v-if="executeType === 'workflow'">
+          <el-form-item label="选择工作流">
+            <el-select v-model="selectedExecuteWorkflowId" placeholder="请选择工作流" style="width: 100%">
+              <el-option 
+                v-for="workflow in workflows.filter(w => w.status === 'active')" 
+                :key="workflow.id" 
+                :label="workflow.name" 
+                :value="workflow.id" 
+              />
+            </el-select>
+          </el-form-item>
+        </template>
+        
+        <template v-if="executeType === 'dialog_flow'">
+          <el-form-item label="选择对话流">
+            <el-select v-model="selectedExecuteDialogFlowId" placeholder="请选择对话流" style="width: 100%">
+              <el-option 
+                v-for="dialogFlow in dialogFlows.filter(df => df.status === 'active')" 
+                :key="dialogFlow.id" 
+                :label="dialogFlow.name" 
+                :value="dialogFlow.id" 
+              />
+            </el-select>
+          </el-form-item>
+        </template>
+        
+        <el-form-item label="输入文本">
+          <el-input v-model="executeText" type="textarea" :rows="4" placeholder="请输入要发送的文本" />
+        </el-form-item>
+        
+        <el-form-item label="启用语音输出">
+          <el-switch v-model="executeEnableTTS" />
+        </el-form-item>
+        
+        <el-form-item label="温度" v-if="executeEnableTTS">
+          <el-input-number v-model="executeTemperature" :min="0" :max="2" :step="0.1" />
         </el-form-item>
       </el-form>
+      
+      <el-divider v-if="executeResult" />
+      
+      <div v-if="executeResult" class="execute-result">
+        <h4>执行结果：</h4>
+        <el-alert 
+          :title="executeResult.success ? '执行成功' : '执行失败'" 
+          :type="executeResult.success ? 'success' : 'error'"
+          :closable="false"
+          class="mb-4"
+        />
+        <div v-if="executeResult.result" class="result-content">
+          <h5>输出内容：</h5>
+          <el-input 
+            :model-value="formatExecuteResult(executeResult.result)" 
+            type="textarea" 
+            :rows="6" 
+            readonly
+          />
+        </div>
+        <div v-if="executeResult.audio_output" class="audio-output">
+          <h5>语音输出：</h5>
+          <audio controls :src="'data:audio/mp3;base64,' + executeResult.audio_output.audio_data" />
+        </div>
+      </div>
+      
       <template #footer>
         <el-button @click="executeDialogVisible = false">关闭</el-button>
         <el-button type="primary" @click="doExecute" :loading="executing">执行</el-button>
@@ -547,8 +631,8 @@ import {
   Document, Collection, DocumentChecked, EditPen, Filter, Link, List, Monitor, Cpu
 } from '@element-plus/icons-vue'
 import { ElMessage, ElEmpty, ElCard, ElTag, ElDialog, ElForm, ElFormItem, ElInput } from 'element-plus'
-import { getAgents, getAgent, executeWorkflow } from '@/api/agent'
-import { getWorkflows, getWorkflow } from '@/api/agent'
+import { getAgents, getAgent, executeWorkflow, executeAgent, executeDialogFlow } from '@/api/agent'
+import { getWorkflows, getWorkflow, createWorkflow, updateWorkflow } from '@/api/agent'
 import { getDialogFlows, getDialogFlow } from '@/api/agent'
 import { getModelList, getModelDetail } from '@/api/llm'
 
@@ -557,8 +641,14 @@ const router = useRouter()
 const saving = ref(false)
 const executing = ref(false)
 const executeDialogVisible = ref(false)
-const executeInput = ref('{}')
-const executeResult = ref('')
+const executeType = ref('agent')
+const executeText = ref('')
+const executeEnableTTS = ref(false)
+const executeTemperature = ref(0.7)
+const executeResult = ref(null)
+const selectedExecuteAgentId = ref(null)
+const selectedExecuteWorkflowId = ref(null)
+const selectedExecuteDialogFlowId = ref(null)
 
 const agents = ref([])
 const workflows = ref([])
@@ -569,6 +659,9 @@ const nodes = ref([])
 const edges = ref([])
 const selectedNode = ref(null)
 const selectedEdge = ref(null)
+
+const currentAgentId = ref(null)
+const currentDialogFlowId = ref(null)
 
 // 计算当前节点的实际目标节点列表
 const targetNodes = computed(() => {
@@ -662,6 +755,12 @@ const getNodeById = (id) => {
   return nodes.value.find(n => n.id === id)
 }
 
+const getNodeLLMName = (node) => {
+  if (node.type !== 'llm' || !node.data.llm_id) return ''
+  const llm = llms.value.find(l => l.id === node.data.llm_id)
+  return llm ? `${llm.provider_name} - ${llm.model_name}` : ''
+}
+
 const getEdgePath = (edge) => {
   const sourceNode = getNodeById(edge.source)
   const targetNode = getNodeById(edge.target)
@@ -712,20 +811,48 @@ const fetchDialogFlows = async () => {
 const fetchLLMs = async () => {
   try {
     const res = await getModelList({ page_size: 100, page: 1 })
+    console.log('大模型列表响应:', res)
     llms.value = res.data?.items || res.data || []
+    console.log('处理后的大模型列表:', llms.value)
   } catch (error) {
-    console.error(error)
+    console.error('获取大模型列表失败:', error)
   }
 }
 
 const saveFlow = async () => {
   saving.value = true
   try {
-    // 这里可以保存流程图数据到后端
-    ElMessage.success('保存成功')
+    const flowData = {
+      nodes: nodes.value,
+      edges: edges.value
+    }
+    
+    if (currentAgentId.value) {
+      // 保存到智能体配置中
+      const response = await fetch(`/api/v1/agent/agents/${currentAgentId.value}/flow`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(flowData)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`保存失败: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      if (result.code === 200 || result.success) {
+        ElMessage.success('流程图已保存到智能体配置中')
+      } else {
+        ElMessage.error(`保存失败: ${result.msg || result.message || '未知错误'}`)
+      }
+    } else {
+      ElMessage.warning('请先选择智能体')
+    }
   } catch (error) {
     ElMessage.error('保存失败')
-    console.error(error)
+    console.error('保存流程图错误:', error)
   } finally {
     saving.value = false
   }
@@ -733,39 +860,107 @@ const saveFlow = async () => {
 
 const executeFlow = () => {
   executeDialogVisible.value = true
-  executeInput.value = '{}'
-  executeResult.value = ''
+  executeType.value = 'agent'
+  executeText.value = ''
+  executeEnableTTS.value = false
+  executeTemperature.value = 0.7
+  executeResult.value = null
+  selectedExecuteAgentId.value = currentAgentId.value || null
+  selectedExecuteWorkflowId.value = null
+  selectedExecuteDialogFlowId.value = null
+}
+
+const formatExecuteResult = (data) => {
+  if (typeof data === 'string') {
+    return data
+  }
+  if (typeof data === 'object') {
+    try {
+      return JSON.stringify(data, null, 2)
+    } catch {
+      return String(data)
+    }
+  }
+  return String(data)
 }
 
 const doExecute = async () => {
+  if (!executeText.value.trim()) {
+    ElMessage.warning('请输入文本')
+    return
+  }
+  
+  let targetId = null
+  
+  if (executeType.value === 'agent') {
+    if (!selectedExecuteAgentId.value) {
+      ElMessage.warning('请选择智能体')
+      return
+    }
+    targetId = selectedExecuteAgentId.value
+  } else if (executeType.value === 'workflow') {
+    if (!selectedExecuteWorkflowId.value) {
+      ElMessage.warning('请选择工作流')
+      return
+    }
+    targetId = selectedExecuteWorkflowId.value
+  } else if (executeType.value === 'dialog_flow') {
+    if (!selectedExecuteDialogFlowId.value) {
+      ElMessage.warning('请选择对话流')
+      return
+    }
+    targetId = selectedExecuteDialogFlowId.value
+  }
+  
   executing.value = true
+  executeResult.value = null
+  
   try {
-    // 构建执行数据
-    const executeData = {
-      flow_data: {
-        nodes: nodes.value,
-        edges: edges.value
-      },
-      input_data: JSON.parse(executeInput.value)
+    let res = null
+    
+    if (executeType.value === 'agent') {
+      res = await executeAgent(targetId, {
+        text: executeText.value,
+        enable_tts: executeEnableTTS.value,
+        parameters: {
+          temperature: executeTemperature.value
+        }
+      })
+    } else if (executeType.value === 'workflow') {
+      res = await executeWorkflow(targetId, {
+        text: executeText.value,
+        input_text: executeText.value,
+        parameters: {
+          temperature: executeTemperature.value
+        }
+      })
+    } else if (executeType.value === 'dialog_flow') {
+      res = await executeDialogFlow(targetId, {
+        text: executeText.value,
+        input_text: executeText.value,
+        parameters: {
+          temperature: executeTemperature.value
+        }
+      })
     }
     
-    // 这里可以调用后端执行接口
-    // 暂时模拟执行
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    executeResult.value = JSON.stringify({
-      message: '执行成功',
-      output: '流程执行结果',
-      flow_data: executeData.flow_data
-    }, null, 2)
-    
-    ElMessage.success('执行成功')
+    if (res.data) {
+      executeResult.value = res.data
+      ElMessage.success('执行成功')
+    } else {
+      executeResult.value = {
+        success: false,
+        message: '没有返回数据'
+      }
+      ElMessage.error('执行失败')
+    }
   } catch (error) {
-    executeResult.value = JSON.stringify({
-      error: error.message || '执行失败'
-    }, null, 2)
+    console.error('执行失败:', error)
+    executeResult.value = {
+      success: false,
+      message: error.response?.data?.message || error.message || '执行失败'
+    }
     ElMessage.error('执行失败')
-    console.error(error)
   } finally {
     executing.value = false
   }
@@ -906,8 +1101,8 @@ const onMouseMove = (event) => {
     const canvas = event.currentTarget
     const rect = canvas.getBoundingClientRect()
     currentMousePos.value = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
+      x: event.clientX - rect.left + canvas.scrollLeft,
+      y: event.clientY - rect.top + canvas.scrollTop
     }
   }
   
@@ -915,8 +1110,8 @@ const onMouseMove = (event) => {
     const canvas = event.currentTarget
     const rect = canvas.getBoundingClientRect()
     draggingNode.value.position = {
-      x: event.clientX - rect.left - dragOffset.value.x,
-      y: event.clientY - rect.top - dragOffset.value.y
+      x: event.clientX - rect.left + canvas.scrollLeft - dragOffset.value.x,
+      y: event.clientY - rect.top + canvas.scrollTop - dragOffset.value.y
     }
   }
 }
@@ -969,10 +1164,6 @@ const editDialogFlow = (dialogFlowId) => {
   router.push(`/panel/agent/dialog-flows/edit/${dialogFlowId}`)
 }
 
-const editLLM = (llmId) => {
-  router.push(`/panel/llm/models/edit/${llmId}`)
-}
-
 const onLLMChange = async (llmId) => {
   if (llmId) {
     try {
@@ -1003,6 +1194,23 @@ const updateWorkflowSelection = async () => {
       const workflow = workflows.value.find(w => w.id === workflowId)
       if (workflow) {
         selectedWorkflow.value = workflow
+        
+        // 从工作流关联的智能体中获取大模型信息
+        if (currentAgentId.value) {
+          try {
+            const agentRes = await getAgent(currentAgentId.value)
+            if (agentRes.data && agentRes.data.llm_model_id) {
+              // 获取大模型详情
+              const llmRes = await getModelDetail(agentRes.data.llm_model_id)
+              if (llmRes.data) {
+                selectedLLM.value = llmRes.data
+              }
+            }
+          } catch (error) {
+            console.error('获取智能体大模型信息失败:', error)
+          }
+        }
+        
         ElMessage.success('工作流选择成功')
       }
     } catch (error) {
@@ -1033,47 +1241,69 @@ const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchAgents()
   fetchWorkflows()
   fetchDialogFlows()
   fetchLLMs()
   
-  // 默认添加一个智能体节点
-  nodes.value = [
-    {
-      id: 'start-1',
-      type: 'start',
-      position: { x: 100, y: 200 },
-      data: { label: '开始' }
-    },
-    {
-      id: 'agent-1',
-      type: 'agent',
-      position: { x: 300, y: 200 },
-      data: { label: '智能体' }
-    },
-    {
-      id: 'end-1',
-      type: 'end',
-      position: { x: 500, y: 200 },
-      data: { label: '结束' }
-    }
-  ]
+  const route = router.currentRoute.value
+  const agentId = route.query.agent_id
   
-  // 默认添加连线
-  edges.value = [
-    {
-      id: 'edge-1',
-      source: 'start-1',
-      target: 'agent-1'
-    },
-    {
-      id: 'edge-2',
-      source: 'agent-1',
-      target: 'end-1'
+  if (agentId) {
+    currentAgentId.value = parseInt(agentId)
+    
+    try {
+      // 加载智能体信息
+      const agentRes = await getAgent(agentId)
+      if (agentRes.data && agentRes.data.config) {
+        // 从智能体配置中加载流程图数据
+        const flowData = agentRes.data.config?.flow_data
+        if (flowData) {
+          nodes.value = flowData.nodes || []
+          edges.value = flowData.edges || []
+        }
+      }
+    } catch (error) {
+      console.error('加载智能体流程图失败:', error)
     }
-  ]
+  }
+  
+  if (nodes.value.length === 0) {
+    nodes.value = [
+      {
+        id: 'start-1',
+        type: 'start',
+        position: { x: 100, y: 200 },
+        data: { label: '开始' }
+      },
+      {
+        id: 'agent-1',
+        type: 'agent',
+        position: { x: 300, y: 200 },
+        data: { label: '智能体' }
+      },
+      {
+        id: 'end-1',
+        type: 'end',
+        position: { x: 500, y: 200 },
+        data: { label: '结束' }
+      }
+    ]
+    
+    edges.value = [
+      {
+        id: 'edge-1',
+        source: 'start-1',
+        target: 'agent-1'
+      },
+      {
+        id: 'edge-2',
+        source: 'agent-1',
+        target: 'end-1'
+      }
+    ]
+  }
 })
 </script>
 
@@ -1161,9 +1391,10 @@ onMounted(() => {
 
 .canvas {
   position: relative;
+  min-width: 2000px;
+  min-height: 1500px;
   width: 100%;
   height: 100%;
-  min-height: 600px;
   background: #fafafa;
   background-image: 
     linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
@@ -1334,6 +1565,12 @@ onMounted(() => {
   gap: 8px;
 }
 
+.node-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .node-icon {
   font-size: 16px;
 }
@@ -1341,6 +1578,11 @@ onMounted(() => {
 .node-label {
   font-size: 14px;
   font-weight: 500;
+}
+
+.node-subtitle {
+  font-size: 11px;
+  opacity: 0.8;
 }
 
 .connection-point {
@@ -1419,5 +1661,38 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.execute-result {
+  margin-top: 16px;
+}
+
+.execute-result h4 {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.execute-result h5 {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.result-content {
+  margin-bottom: 16px;
+}
+
+.audio-output {
+  margin-top: 16px;
+}
+
+.audio-output audio {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
 }
 </style>
