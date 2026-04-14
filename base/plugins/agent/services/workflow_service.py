@@ -56,11 +56,13 @@ class WorkflowService:
         return workflow
 
     @staticmethod
-    async def get_workflows(skip: int = 0, limit: int = 100, name: str = "") -> List[Workflow]:
+    async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status: str = "") -> List[Workflow]:
         """Get workflow list"""
         query = Workflow.all()
         if name:
             query = query.filter(name__icontains=name)
+        if status:
+            query = query.filter(status=status)
         workflows = await query.offset(skip).limit(limit).prefetch_related('nodes', 'edges', 'agents')
         return workflows
 

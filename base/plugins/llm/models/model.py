@@ -16,6 +16,7 @@ class LLMModel(BaseModel, TimestampMixin):
     )
     model_id = fields.CharField(max_length=100, description="模型标识")
     model_name = fields.CharField(max_length=100, description="模型名称")
+    endpoint_url = fields.CharField(max_length=255, null=True, description="模型访问地址")
     context_length = fields.IntField(default=4096, description="上下文长度")
     input_price = fields.DecimalField(max_digits=10, decimal_places=4, default=0, description="输入价格 (元/1K tokens)")
     output_price = fields.DecimalField(max_digits=10, decimal_places=4, default=0, description="输出价格 (元/1K tokens)")

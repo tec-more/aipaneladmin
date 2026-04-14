@@ -76,10 +76,16 @@ class AgentFlowService:
             nodes = flow_data.get("nodes", [])
             edges = flow_data.get("edges", [])
             
-            if not nodes or not edges:
+            # 添加调试日志
+            import logging
+            logging.info(f"流程图数据 - 节点数: {len(nodes)}, 边数: {len(edges)}")
+            logging.info(f"流程图数据内容: {flow_data}")
+            
+            # 只需要有节点即可，边可以为空（单节点执行）
+            if not nodes:
                 return {
                     "success": False, 
-                    "message": "流程图配置不完整"
+                    "message": f"流程图配置不完整: 没有找到节点 (当前节点数: {len(nodes)}, 边数: {len(edges)})"
                 }
             
             # 构建流程图执行上下文
@@ -144,9 +150,14 @@ class AgentFlowService:
         Returns:
             执行结果
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         node_id = current_node.get("id")
         node_type = current_node.get("type")
         node_data = current_node.get("data", {})
+        
+        logger.info(f"[流程执行] 开始执行节点: {node_id}, 类型: {node_type}")
         
         try:
             # 执行当前节点
@@ -175,7 +186,8 @@ class AgentFlowService:
             next_nodes = AgentFlowService._get_next_nodes(
                 current_node,
                 all_nodes,
-                edges
+                edges,
+                node_result
             )
             
             if not next_nodes:
@@ -186,13 +198,31 @@ class AgentFlowService:
                     "node_results": context["node_results"]
                 }
             
-            # 执行下一个节点（目前只支持单分支，后续可扩展多分支）
-            return await AgentFlowService._execute_flow_nodes(
-                next_nodes[0],
-                all_nodes,
-                edges,
-                context
-            )
+            # 条件分支节点：根据条件选择下一个节点
+            if node_type == "decision":
+                # 条件分支已经在 _get_next_nodes 中处理了
+                next_node = next_nodes[0] if next_nodes else None
+                if next_node:
+                    return await AgentFlowService._execute_flow_nodes(
+                        next_node,
+                        all_nodes,
+                        edges,
+                        context
+                    )
+                else:
+                    return {
+                        "success": False,
+                        "message": "条件分支没有匹配的出口",
+                        "node_results": context["node_results"]
+                    }
+            else:
+                # 其他节点：执行第一个下一个节点
+                return await AgentFlowService._execute_flow_nodes(
+                    next_nodes[0],
+                    all_nodes,
+                    edges,
+                    context
+                )
             
         except Exception as e:
             import traceback
@@ -247,6 +277,22 @@ class AgentFlowService:
             return await AgentFlowService._execute_http_node(node, context)
         elif node_type == "knowledge_retrieval":
             return await AgentFlowService._execute_knowledge_retrieval_node(node, context)
+        elif node_type == "decision":
+            return await AgentFlowService._execute_decision_node(node, context)
+        elif node_type == "loop":
+            return await AgentFlowService._execute_loop_node(node, context)
+        elif node_type == "iteration":
+            return await AgentFlowService._execute_iteration_node(node, context)
+        elif node_type == "variable_aggregator":
+            return await AgentFlowService._execute_variable_aggregator_node(node, context)
+        elif node_type == "document_extractor":
+            return await AgentFlowService._execute_document_extractor_node(node, context)
+        elif node_type == "variable_assigner":
+            return await AgentFlowService._execute_variable_assigner_node(node, context)
+        elif node_type == "parameter_extractor":
+            return await AgentFlowService._execute_parameter_extractor_node(node, context)
+        elif node_type == "list_operation":
+            return await AgentFlowService._execute_list_operation_node(node, context)
         else:
             return {
                 "success": False,
@@ -294,11 +340,19 @@ class AgentFlowService:
         context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行输出节点"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"[输出节点] 开始执行，所有节点结果: {context.get('node_results', {})}")
+        
         # 获取最后一个节点的结果作为输出
         last_result = ""
         for node_id, result in context.get("node_results", {}).items():
             if result.get("success"):
                 last_result = result.get("result", "")
+                logger.info(f"[输出节点] 找到成功节点: {node_id}, 结果: {last_result}")
+        
+        logger.info(f"[输出节点] 最终输出: {last_result}")
         
         return {
             "success": True,
@@ -455,17 +509,33 @@ class AgentFlowService:
         context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行大模型节点"""
-        agent_id = context.get("agent_id")
-        agent = await Agent.get_or_none(id=agent_id)
+        import logging
+        logger = logging.getLogger(__name__)
         
-        if not agent or not agent.llm_model:
+        node_data = node.get("data", {})
+        llm_id = node_data.get("llm_id")
+        
+        logger.info(f"[LLM节点] 开始执行，llm_id: {llm_id}")
+        
+        if not llm_id:
+            logger.error(f"[LLM节点] 节点未配置大模型")
             return {
                 "success": False,
-                "message": "智能体未配置大模型"
+                "message": "节点未配置大模型"
             }
         
-        llm_model = await agent.llm_model
+        from base.plugins.llm.models.model import LLMModel
+        llm_model = await LLMModel.get_or_none(id=llm_id)
+        
+        if not llm_model:
+            logger.error(f"[LLM节点] 找不到指定的大模型，llm_id: {llm_id}")
+            return {
+                "success": False,
+                "message": f"找不到指定的大模型 (ID: {llm_id})"
+            }
+        
         provider = await llm_model.provider
+        logger.info(f"[LLM节点] 模型信息: {llm_model.model_id}, 提供商: {provider.name_en}")
         
         # 获取 API Key
         from base.plugins.llm.models.api_key import LLMApiKey
@@ -475,6 +545,7 @@ class AgentFlowService:
         ).first()
         
         if not api_key:
+            logger.error(f"[LLM节点] 未找到有效的API密钥，provider_id: {provider.id}")
             return {
                 "success": False,
                 "message": "未找到有效的API密钥"
@@ -485,52 +556,71 @@ class AgentFlowService:
         if not input_text:
             input_text = context.get("input", {}).get("text", "")
         
-        # 构建消息
+        logger.info(f"[LLM节点] 输入文本: {input_text}")
+        
+        # 构建消息 - 从智能体获取系统提示词
+        agent_id = context.get("agent_id")
+        agent = await Agent.get_or_none(id=agent_id)
+        
         messages = []
-        if agent.system_prompt:
+        if agent and agent.system_prompt:
             messages.append({"role": "system", "content": agent.system_prompt})
         messages.append({"role": "user", "content": input_text})
+        
+        logger.info(f"[LLM节点] 构建的消息: {messages}")
         
         # 获取参数
         temperature = context.get("input", {}).get("parameters", {}).get("temperature", 0.7)
         max_tokens = context.get("input", {}).get("parameters", {}).get("max_tokens", 2048)
         
+        logger.info(f"[LLM节点] 调用参数: temperature={temperature}, max_tokens={max_tokens}")
+        
         # 调用 LLM
         try:
             service = await ChatService.get_provider_service(
                 provider.name_en,
-                api_key.api_key,
-                api_key.endpoint_url or provider.endpoint_url,
+                api_key.app_key,
+                llm_model.endpoint_url or api_key.endpoint_url or provider.official_url,
                 api_key.api_secret
             )
             
+            logger.info(f"[LLM节点] 开始调用LLM API...")
             response = await service.chat(
-                messages,
-                llm_model.model_id,
-                temperature,
-                max_tokens
+                model=llm_model.model_id,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
             )
             
-            if response and response.get("success"):
+            logger.info(f"[LLM节点] LLM响应: {response}")
+            
+            if response and "choices" in response:
+                result_text = response["choices"][0]["message"]["content"]
+                logger.info(f"[LLM节点] 调用成功，结果: {result_text}")
                 result = {
                     "success": True,
-                    "result": response.get("text", ""),
+                    "result": result_text,
                     "usage": response.get("usage", {})
                 }
                 
                 # 保存结果到变量
-                context["variables"]["llm_result"] = response.get("text", "")
+                context["variables"]["llm_result"] = result_text
                 
                 return result
             else:
+                error_msg = "LLM调用失败"
+                logger.error(f"[LLM节点] 调用失败: {error_msg}")
                 return {
                     "success": False,
-                    "message": response.get("error", "LLM调用失败")
+                    "message": error_msg
                 }
         except Exception as e:
+            logger.exception(f"[LLM节点] 调用异常: {str(e)}")
+            import traceback
             return {
                 "success": False,
-                "message": f"调用大模型失败: {str(e)}"
+                "message": f"调用大模型失败: {str(e)}",
+                "traceback": traceback.format_exc()
             }
     
     @staticmethod
@@ -705,7 +795,8 @@ class AgentFlowService:
     def _get_next_nodes(
         current_node: Dict[str, Any],
         all_nodes: List[Dict[str, Any]],
-        edges: List[Dict[str, Any]]
+        edges: List[Dict[str, Any]],
+        node_result: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         获取下一个节点
@@ -714,17 +805,43 @@ class AgentFlowService:
             current_node: 当前节点
             all_nodes: 所有节点
             edges: 所有边
+            node_result: 当前节点的执行结果（用于条件分支）
             
         Returns:
             下一个节点列表
         """
         current_node_id = current_node.get("id")
+        current_node_type = current_node.get("type")
+        current_node_data = current_node.get("data", {})
         
         # 查找从当前节点出发的边
         outgoing_edges = [
             edge for edge in edges 
             if edge.get("source") == current_node_id
         ]
+        
+        # 如果是条件分支节点，根据条件筛选边
+        if current_node_type == "decision" and node_result:
+            condition_result = node_result.get("result", False)
+            filtered_edges = []
+            
+            for edge in outgoing_edges:
+                edge_data = edge.get("data", {})
+                edge_condition = edge_data.get("condition", "")
+                
+                # 根据条件判断
+                if condition_result:
+                    # 条件为真，找 true 分支或无条件的边
+                    if edge_condition in ["true", ""]:
+                        filtered_edges.append(edge)
+                else:
+                    # 条件为假，找 false 分支或无条件的边
+                    if edge_condition in ["false", ""]:
+                        filtered_edges.append(edge)
+            
+            # 如果没有匹配的边，使用所有边
+            if filtered_edges:
+                outgoing_edges = filtered_edges
         
         # 获取目标节点ID
         target_node_ids = [edge.get("target") for edge in outgoing_edges]
@@ -736,4 +853,338 @@ class AgentFlowService:
         ]
         
         return next_nodes
+
+    @staticmethod
+    async def _execute_decision_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行条件分支节点"""
+        node_data = node.get("data", {})
+        condition = node_data.get("condition", "")
+        
+        try:
+            # 简单的条件表达式评估
+            # 支持变量替换，例如 ${variable_name} > 10
+            evaluated_condition = condition
+            
+            # 替换变量
+            variables = context.get("variables", {})
+            for key, value in variables.items():
+                evaluated_condition = evaluated_condition.replace(f"${{{key}}}", str(value))
+            
+            # 尝试评估条件
+            result = False
+            try:
+                # 安全评估条件（只支持简单的表达式）
+                # 注意：实际生产环境应该使用更安全的评估方式
+                safe_locals = {}
+                safe_globals = {"__builtins__": {}}
+                result = eval(evaluated_condition, safe_globals, safe_locals)
+            except:
+                # 如果评估失败，尝试简单的字符串匹配
+                if evaluated_condition.lower() in ["true", "yes", "1", "y"]:
+                    result = True
+                elif evaluated_condition.lower() in ["false", "no", "0", "n"]:
+                    result = False
+            
+            return {
+                "success": True,
+                "result": result,
+                "condition": condition,
+                "evaluated_condition": evaluated_condition
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"条件分支评估失败: {str(e)}",
+                "result": False
+            }
+
+    @staticmethod
+    async def _execute_loop_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行循环节点"""
+        node_data = node.get("data", {})
+        condition = node_data.get("condition", "")
+        max_iterations = node_data.get("max_iterations", 10)
+        
+        try:
+            iteration_count = 0
+            results = []
+            
+            while iteration_count < max_iterations:
+                # 评估条件
+                evaluated_condition = condition
+                variables = context.get("variables", {})
+                for key, value in variables.items():
+                    evaluated_condition = evaluated_condition.replace(f"${{{key}}}", str(value))
+                
+                # 尝试评估条件
+                should_continue = False
+                try:
+                    safe_locals = {}
+                    safe_globals = {"__builtins__": {}}
+                    should_continue = eval(evaluated_condition, safe_globals, safe_locals)
+                except:
+                    break
+                
+                if not should_continue:
+                    break
+                
+                # 执行循环体（这里简化处理，实际应该递归执行循环体节点）
+                iteration_count += 1
+                results.append(f"Iteration {iteration_count}")
+            
+            return {
+                "success": True,
+                "result": results,
+                "iteration_count": iteration_count
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"循环执行失败: {str(e)}"
+            }
+
+    @staticmethod
+    async def _execute_iteration_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行迭代节点"""
+        node_data = node.get("data", {})
+        collection_var = node_data.get("collection_var", "items")
+        item_var = node_data.get("item_var", "item")
+        
+        try:
+            collection = context.get("variables", {}).get(collection_var, [])
+            results = []
+            
+            for item in collection:
+                # 设置当前项到变量
+                context["variables"][item_var] = item
+                # 执行迭代体（这里简化处理，实际应该递归执行迭代体节点）
+                results.append(item)
+            
+            return {
+                "success": True,
+                "result": results,
+                "item_count": len(collection)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"迭代执行失败: {str(e)}"
+            }
+
+    @staticmethod
+    async def _execute_variable_aggregator_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行变量聚合器节点"""
+        node_data = node.get("data", {})
+        variables = node_data.get("variables", [])
+        result_var = node_data.get("result_var", "aggregated_result")
+        
+        try:
+            aggregated = {}
+            for var_name in variables:
+                if var_name in context.get("variables", {}):
+                    aggregated[var_name] = context["variables"][var_name]
+            
+            # 保存聚合结果到变量
+            context["variables"][result_var] = aggregated
+            
+            return {
+                "success": True,
+                "result": aggregated,
+                "variables": variables
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"变量聚合失败: {str(e)}"
+            }
+
+    @staticmethod
+    async def _execute_document_extractor_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行文档提取器节点"""
+        node_data = node.get("data", {})
+        source_var = node_data.get("source_var", "input_text")
+        extract_var = node_data.get("extract_var", "extracted_content")
+        
+        try:
+            source_content = context.get("variables", {}).get(source_var, "")
+            if not source_content:
+                source_content = context.get("input", {}).get("text", "")
+            
+            # 简单的文档提取（实际应该使用更复杂的提取逻辑）
+            extracted = {
+                "content": source_content,
+                "length": len(source_content),
+                "words": len(source_content.split())
+            }
+            
+            # 保存提取结果到变量
+            context["variables"][extract_var] = extracted
+            
+            return {
+                "success": True,
+                "result": extracted
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"文档提取失败: {str(e)}"
+            }
+
+    @staticmethod
+    async def _execute_variable_assigner_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行变量赋值节点"""
+        node_data = node.get("data", {})
+        variable_name = node_data.get("variable_name", "")
+        variable_value = node_data.get("variable_value", "")
+        
+        try:
+            if not variable_name:
+                return {
+                    "success": False,
+                    "message": "变量名不能为空"
+                }
+            
+            # 替换变量
+            variables = context.get("variables", {})
+            value = variable_value
+            for key, val in variables.items():
+                value = value.replace(f"${{{key}}}", str(val))
+            
+            # 保存到变量
+            context["variables"][variable_name] = value
+            
+            return {
+                "success": True,
+                "result": value,
+                "variable_name": variable_name
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"变量赋值失败: {str(e)}"
+            }
+
+    @staticmethod
+    async def _execute_parameter_extractor_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行参数提取器节点"""
+        node_data = node.get("data", {})
+        parameters = node_data.get("parameters", [])
+        
+        try:
+            extracted_params = {}
+            input_data = context.get("input", {})
+            variables = context.get("variables", {})
+            
+            for param in parameters:
+                param_name = param.get("name", "")
+                param_source = param.get("source", "input")
+                param_key = param.get("key", "")
+                
+                if param_name and param_key:
+                    if param_source == "input":
+                        if param_key in input_data:
+                            extracted_params[param_name] = input_data[param_key]
+                    elif param_source == "variables":
+                        if param_key in variables:
+                            extracted_params[param_name] = variables[param_key]
+            
+            # 保存提取的参数到变量
+            context["variables"]["extracted_parameters"] = extracted_params
+            
+            return {
+                "success": True,
+                "result": extracted_params,
+                "parameters": parameters
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"参数提取失败: {str(e)}"
+            }
+
+    @staticmethod
+    async def _execute_list_operation_node(
+        node: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行列表操作节点"""
+        node_data = node.get("data", {})
+        operation = node_data.get("operation", "")
+        list_var = node_data.get("list_var", "items")
+        result_var = node_data.get("result_var", "list_result")
+        
+        try:
+            target_list = context.get("variables", {}).get(list_var, [])
+            result = []
+            
+            if operation == "filter":
+                # 过滤操作
+                filter_expr = node_data.get("filter_expr", "")
+                for item in target_list:
+                    try:
+                        if eval(filter_expr, {}, {"item": item}):
+                            result.append(item)
+                    except:
+                        pass
+            elif operation == "map":
+                # 映射操作
+                map_expr = node_data.get("map_expr", "item")
+                for item in target_list:
+                    try:
+                        mapped = eval(map_expr, {}, {"item": item})
+                        result.append(mapped)
+                    except:
+                        result.append(item)
+            elif operation == "sort":
+                # 排序操作
+                sort_key = node_data.get("sort_key", "")
+                if sort_key:
+                    result = sorted(target_list, key=lambda x: eval(sort_key, {}, {"item": x}))
+                else:
+                    result = sorted(target_list)
+            elif operation == "limit":
+                # 限制操作
+                limit = node_data.get("limit", 10)
+                result = target_list[:limit]
+            elif operation == "reverse":
+                # 反转操作
+                result = target_list[::-1]
+            else:
+                # 默认为复制
+                result = target_list.copy()
+            
+            # 保存结果到变量
+            context["variables"][result_var] = result
+            
+            return {
+                "success": True,
+                "result": result,
+                "operation": operation
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"列表操作失败: {str(e)}"
+            }
 

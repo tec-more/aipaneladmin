@@ -28,6 +28,18 @@
           <span>{{ nodeType.label }}</span>
         </div>
         
+        <div class="panel-title" style="margin-top: 15px">控制流节点</div>
+        <div 
+          v-for="nodeType in nodeTypes.filter(n => n.category === 'control')" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
         <div class="panel-title" style="margin-top: 15px">智能体节点</div>
         <div 
           v-for="nodeType in nodeTypes.filter(n => n.category === 'agent')" 
@@ -264,9 +276,12 @@
             <el-form label-width="80px" size="small">
               <el-form-item label="选择模型">
                 <el-select v-model="selectedNode.data.llm_id" placeholder="请选择大模型" @change="onLLMChange" style="width: 100%">
-                  <el-option v-for="llm in llms" :key="llm.id" :value="llm.id">
-                    <span>{{ llm.provider_name }} - {{ llm.model_name }}</span>
-                  </el-option>
+                  <el-option 
+                    v-for="llm in llms" 
+                    :key="llm.id" 
+                    :label="`${llm.provider_name} - ${llm.model_name}`"
+                    :value="llm.id"
+                  />
                 </el-select>
               </el-form-item>
               <el-form-item label="节点名称">
@@ -508,6 +523,117 @@
             </el-form>
           </template>
           
+          <!-- 控制流节点 - 条件分支 -->
+          <template v-if="selectedNode.type === 'decision'">
+            <div class="panel-title">条件分支配置</div>
+            <el-form label-width="80px" size="small">
+              <el-form-item label="节点名称">
+                <el-input v-model="selectedNode.data.label" @change="updateNodeLabel" />
+              </el-form-item>
+              <el-form-item label="条件表达式">
+                <el-input v-model="selectedNode.data.condition" type="textarea" :rows="2" placeholder="例如: {{variable}} > 10" />
+              </el-form-item>
+              <el-form-item label="真分支目标">
+                <el-select v-model="selectedNode.data.true_branch" style="width: 100%">
+                  <el-option 
+                    v-for="node in nodes" 
+                    :key="node.id" 
+                    :label="node.data.label" 
+                    :value="node.id" 
+                    v-if="node.id !== selectedNode.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="假分支目标">
+                <el-select v-model="selectedNode.data.false_branch" style="width: 100%">
+                  <el-option 
+                    v-for="node in nodes" 
+                    :key="node.id" 
+                    :label="node.data.label" 
+                    :value="node.id" 
+                    v-if="node.id !== selectedNode.id"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-form>
+          </template>
+          
+          <!-- 控制流节点 - 循环 -->
+          <template v-if="selectedNode.type === 'loop'">
+            <div class="panel-title">循环配置</div>
+            <el-form label-width="80px" size="small">
+              <el-form-item label="节点名称">
+                <el-input v-model="selectedNode.data.label" @change="updateNodeLabel" />
+              </el-form-item>
+              <el-form-item label="循环条件">
+                <el-input v-model="selectedNode.data.condition" type="textarea" :rows="2" placeholder="例如: {{count}} < 10" />
+              </el-form-item>
+              <el-form-item label="循环体目标">
+                <el-select v-model="selectedNode.data.loop_body" style="width: 100%">
+                  <el-option 
+                    v-for="node in nodes" 
+                    :key="node.id" 
+                    :label="node.data.label" 
+                    :value="node.id" 
+                    v-if="node.id !== selectedNode.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="循环结束目标">
+                <el-select v-model="selectedNode.data.loop_end" style="width: 100%">
+                  <el-option 
+                    v-for="node in nodes" 
+                    :key="node.id" 
+                    :label="node.data.label" 
+                    :value="node.id" 
+                    v-if="node.id !== selectedNode.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="最大循环次数">
+                <el-input-number v-model="selectedNode.data.max_iterations" :min="1" :max="100" />
+              </el-form-item>
+            </el-form>
+          </template>
+          
+          <!-- 控制流节点 - 迭代 -->
+          <template v-if="selectedNode.type === 'iteration'">
+            <div class="panel-title">迭代配置</div>
+            <el-form label-width="80px" size="small">
+              <el-form-item label="节点名称">
+                <el-input v-model="selectedNode.data.label" @change="updateNodeLabel" />
+              </el-form-item>
+              <el-form-item label="迭代列表">
+                <el-input v-model="selectedNode.data.iterable" placeholder="变量名或列表" />
+              </el-form-item>
+              <el-form-item label="当前项变量">
+                <el-input v-model="selectedNode.data.item_var" placeholder="存储当前项的变量名" />
+              </el-form-item>
+              <el-form-item label="迭代体目标">
+                <el-select v-model="selectedNode.data.iteration_body" style="width: 100%">
+                  <el-option 
+                    v-for="node in nodes" 
+                    :key="node.id" 
+                    :label="node.data.label" 
+                    :value="node.id" 
+                    v-if="node.id !== selectedNode.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="迭代结束目标">
+                <el-select v-model="selectedNode.data.iteration_end" style="width: 100%">
+                  <el-option 
+                    v-for="node in nodes" 
+                    :key="node.id" 
+                    :label="node.data.label" 
+                    :value="node.id" 
+                    v-if="node.id !== selectedNode.id"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-form>
+          </template>
+          
           <el-button type="danger" size="small" @click="deleteSelectedNode" style="width: 100%; margin-top: 10px">
             删除节点
           </el-button>
@@ -531,6 +657,7 @@
       <el-form label-width="100px">
         <el-form-item label="执行类型">
           <el-radio-group v-model="executeType">
+            <el-radio label="flow">流程图</el-radio>
             <el-radio label="agent">智能体</el-radio>
             <el-radio label="workflow">工作流</el-radio>
             <el-radio label="dialog_flow">对话流</el-radio>
@@ -577,16 +704,40 @@
         </template>
         
         <el-form-item label="输入文本">
-          <el-input v-model="executeText" type="textarea" :rows="4" placeholder="请输入要发送的文本" />
+          <el-input v-model="executeText" type="textarea" :rows="4" placeholder="请输入要发送的文本">
+            <template #append>
+              <el-button 
+                :type="isRecording ? 'danger' : 'primary'" 
+                @click="toggleRecording"
+                :loading="isProcessingAudio"
+              >
+                <el-icon><Microphone /></el-icon>
+                {{ isRecording ? '停止录音' : '录音' }}
+              </el-button>
+              <el-upload
+                :show-file-list="false"
+                :before-upload="handleFileUpload"
+                :auto-upload="false"
+                accept=".wav,.mp3,.m4a"
+              >
+                <el-button :loading="isProcessingAudio">
+                  <el-icon><Upload /></el-icon>
+                  上传文件
+                </el-button>
+              </el-upload>
+            </template>
+          </el-input>
+          <div v-if="isRecording" class="recording-indicator">
+            <span class="pulse-dot"></span>
+            正在录音中...
+          </div>
         </el-form-item>
         
         <el-form-item label="启用语音输出">
           <el-switch v-model="executeEnableTTS" />
         </el-form-item>
         
-        <el-form-item label="温度" v-if="executeEnableTTS">
-          <el-input-number v-model="executeTemperature" :min="0" :max="2" :step="0.1" />
-        </el-form-item>
+
       </el-form>
       
       <el-divider v-if="executeResult" />
@@ -626,15 +777,15 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
-  ArrowLeft, Check, User, Share, Message, VideoPlay as Play, CircleCheck,
+  ArrowLeft, Check, User, Share, Message, VideoPlay as Play, CircleCheck, Microphone, Upload,
   // Dify 风格节点图标
   Document, Collection, DocumentChecked, EditPen, Filter, Link, List, Monitor, Cpu
 } from '@element-plus/icons-vue'
 import { ElMessage, ElEmpty, ElCard, ElTag, ElDialog, ElForm, ElFormItem, ElInput } from 'element-plus'
-import { getAgents, getAgent, executeWorkflow, executeAgent, executeDialogFlow } from '@/api/agent'
+import { getAgents, getAgent, executeWorkflow, executeAgent, executeDialogFlow, executeAgentFlow } from '@/api/agent'
 import { getWorkflows, getWorkflow, createWorkflow, updateWorkflow } from '@/api/agent'
 import { getDialogFlows, getDialogFlow } from '@/api/agent'
-import { getModelList, getModelDetail } from '@/api/llm'
+import { getModelList, getModelDetail, fileASR } from '@/api/llm'
 
 const router = useRouter()
 
@@ -644,11 +795,16 @@ const executeDialogVisible = ref(false)
 const executeType = ref('agent')
 const executeText = ref('')
 const executeEnableTTS = ref(false)
-const executeTemperature = ref(0.7)
 const executeResult = ref(null)
 const selectedExecuteAgentId = ref(null)
 const selectedExecuteWorkflowId = ref(null)
 const selectedExecuteDialogFlowId = ref(null)
+
+const isRecording = ref(false)
+const isProcessingAudio = ref(false)
+let mediaRecorder = null
+let audioChunks = []
+let audioStream = null
 
 const agents = ref([])
 const workflows = ref([])
@@ -682,29 +838,34 @@ const selectedLLM = ref(null)
 
 const nodeTypes = [
   // 基础节点
-  { type: 'start', label: '开始', icon: Play, category: 'basic', next: ['input', 'agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'start', label: '开始', icon: Play, category: 'basic', next: ['input', 'agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'decision', 'loop', 'iteration'] },
   { type: 'end', label: '结束', icon: CircleCheck, category: 'basic', next: [] },
-  { type: 'input', label: '输入', icon: Document, category: 'basic', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'input', label: '输入', icon: Document, category: 'basic', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'decision', 'loop', 'iteration'] },
   { type: 'output', label: '输出', icon: CircleCheck, category: 'basic', next: ['end'] },
   
+  // 控制流节点
+  { type: 'decision', label: '条件分支', icon: Filter, category: 'control', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'loop', label: '循环', icon: Share, category: 'control', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'iteration', label: '迭代', icon: List, category: 'control', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  
   // 智能体相关
-  { type: 'agent', label: '智能体', icon: User, category: 'agent', next: ['workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'workflow', label: '工作流', icon: Share, category: 'agent', next: ['agent', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'dialog_flow', label: '对话流', icon: Message, category: 'agent', next: ['agent', 'workflow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'llm', label: '大模型', icon: Monitor, category: 'agent', next: ['agent', 'workflow', 'dialog_flow', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'agent', label: '智能体', icon: User, category: 'agent', next: ['workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'workflow', label: '工作流', icon: Share, category: 'agent', next: ['agent', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'dialog_flow', label: '对话流', icon: Message, category: 'agent', next: ['agent', 'workflow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'llm', label: '大模型', icon: Monitor, category: 'agent', next: ['agent', 'workflow', 'dialog_flow', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
   
   // Dify 风格节点 - 转换类
-  { type: 'code', label: '代码执行', icon: Cpu, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'template', label: '模板转换', icon: Document, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'variable_aggregator', label: '变量聚合器', icon: Collection, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'document_extractor', label: '文档提取器', icon: DocumentChecked, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'variable_assigner', label: '变量赋值', icon: EditPen, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'parameter_extractor', label: '参数提取器', icon: Filter, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'code', label: '代码执行', icon: Cpu, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'template', label: '模板转换', icon: Document, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'variable_aggregator', label: '变量聚合器', icon: Collection, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'document_extractor', label: '文档提取器', icon: DocumentChecked, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'variable_assigner', label: '变量赋值', icon: EditPen, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'parameter_extractor', label: '参数提取器', icon: Filter, category: 'transform', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
   
   // Dify 风格节点 - 工具类
-  { type: 'http', label: 'HTTP 请求', icon: Link, category: 'tool', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'knowledge_retrieval', 'output'] },
-  { type: 'list_operation', label: '列表操作', icon: List, category: 'tool', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'knowledge_retrieval', label: '知识检索', icon: Document, category: 'tool', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'output'] }
+  { type: 'http', label: 'HTTP 请求', icon: Link, category: 'tool', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'list_operation', label: '列表操作', icon: List, category: 'tool', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'knowledge_retrieval', label: '知识检索', icon: Document, category: 'tool', next: ['agent', 'workflow', 'dialog_flow', 'llm', 'code', 'template', 'http', 'output', 'decision', 'loop', 'iteration'] }
 ]
 
 const drawingEdge = ref(false)
@@ -732,6 +893,10 @@ const getNodeIcon = (type) => {
     // 基础节点
     start: '▶️',
     end: '⏹️',
+    // 控制流节点
+    decision: '🔀',
+    loop: '🔄',
+    iteration: '🔁',
     // 智能体相关
     agent: '🤖',
     workflow: '🔄',
@@ -827,6 +992,9 @@ const saveFlow = async () => {
       edges: edges.value
     }
     
+    console.log('准备保存流程图:', flowData)
+    console.log('节点数:', flowData.nodes.length, '边数:', flowData.edges.length)
+    
     if (currentAgentId.value) {
       // 保存到智能体配置中
       const response = await fetch(`/api/v1/agent/agents/${currentAgentId.value}/flow`, {
@@ -860,10 +1028,9 @@ const saveFlow = async () => {
 
 const executeFlow = () => {
   executeDialogVisible.value = true
-  executeType.value = 'agent'
+  executeType.value = 'flow'
   executeText.value = ''
   executeEnableTTS.value = false
-  executeTemperature.value = 0.7
   executeResult.value = null
   selectedExecuteAgentId.value = currentAgentId.value || null
   selectedExecuteWorkflowId.value = null
@@ -892,7 +1059,14 @@ const doExecute = async () => {
   
   let targetId = null
   
-  if (executeType.value === 'agent') {
+  if (executeType.value === 'flow') {
+    // 流程图模式，使用当前智能体
+    if (!currentAgentId.value) {
+      ElMessage.warning('请先选择或创建智能体')
+      return
+    }
+    targetId = currentAgentId.value
+  } else if (executeType.value === 'agent') {
     if (!selectedExecuteAgentId.value) {
       ElMessage.warning('请选择智能体')
       return
@@ -918,29 +1092,29 @@ const doExecute = async () => {
   try {
     let res = null
     
-    if (executeType.value === 'agent') {
+    if (executeType.value === 'flow') {
+      res = await executeAgentFlow(targetId, {
+        text: executeText.value,
+        user_id: null,
+        parameters: {}
+      })
+    } else if (executeType.value === 'agent') {
       res = await executeAgent(targetId, {
         text: executeText.value,
         enable_tts: executeEnableTTS.value,
-        parameters: {
-          temperature: executeTemperature.value
-        }
+        parameters: {}
       })
     } else if (executeType.value === 'workflow') {
       res = await executeWorkflow(targetId, {
         text: executeText.value,
         input_text: executeText.value,
-        parameters: {
-          temperature: executeTemperature.value
-        }
+        parameters: {}
       })
     } else if (executeType.value === 'dialog_flow') {
       res = await executeDialogFlow(targetId, {
         text: executeText.value,
         input_text: executeText.value,
-        parameters: {
-          temperature: executeTemperature.value
-        }
+        parameters: {}
       })
     }
     
@@ -1305,6 +1479,85 @@ onMounted(async () => {
     ]
   }
 })
+
+const toggleRecording = async () => {
+  if (isRecording.value) {
+    stopRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+const startRecording = async () => {
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaRecorder = new MediaRecorder(audioStream)
+    audioChunks = []
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data)
+      }
+    }
+
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' })
+      processAudioFile(audioBlob)
+    }
+
+    mediaRecorder.start()
+    isRecording.value = true
+    ElMessage.success('开始录音')
+  } catch (error) {
+    console.error('录音失败:', error)
+    ElMessage.error('无法访问麦克风，请检查权限设置')
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  if (audioStream) {
+    audioStream.getTracks().forEach(track => track.stop())
+  }
+  isRecording.value = false
+}
+
+const handleFileUpload = (file) => {
+  processAudioFile(file)
+  return false
+}
+
+const processAudioFile = async (audioBlob) => {
+  isProcessingAudio.value = true
+  try {
+    const formData = new FormData()
+    formData.append('audio', audioBlob, 'audio.wav')
+    formData.append('provider_id', '1')
+    formData.append('format', 'wav')
+    formData.append('sample_rate', '16000')
+    formData.append('language', 'zh')
+
+    const response = await fileASR(formData)
+    
+    if (response.data && response.data.results && response.data.results.length > 0) {
+      const lastResult = response.data.results[response.data.results.length - 1]
+      if (lastResult.text) {
+        executeText.value = lastResult.text
+        ElMessage.success('语音识别成功')
+      }
+    } else {
+      ElMessage.warning('未能识别语音内容')
+    }
+  } catch (error) {
+    console.error('语音识别失败:', error)
+    ElMessage.error('语音识别失败，请重试')
+  } finally {
+    isProcessingAudio.value = false
+  }
+}
+
 </script>
 
 <style scoped>
@@ -1694,5 +1947,37 @@ onMounted(async () => {
 
 .mb-4 {
   margin-bottom: 16px;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fef0f0;
+  border: 1px solid #fde2e2;
+  border-radius: 4px;
+  color: #f56c6c;
+  font-size: 14px;
+}
+
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  background: #f56c6c;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
 }
 </style>

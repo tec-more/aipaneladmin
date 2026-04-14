@@ -251,6 +251,10 @@ async def execute_agent(agent_id: int, input_data: dict):
 async def update_agent_flow(agent_id: int, flow_data: dict):
     """Update agent flow diagram"""
     try:
+        import logging
+        logging.info(f"保存流程图 - agent_id: {agent_id}, 数据: {flow_data}")
+        logging.info(f"流程图节点数: {len(flow_data.get('nodes', []))}, 边数: {len(flow_data.get('edges', []))}")
+        
         agent = await AgentService.get_agent_by_id(agent_id)
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
@@ -261,8 +265,13 @@ async def update_agent_flow(agent_id: int, flow_data: dict):
         agent.config["flow_data"] = flow_data
         await agent.save()
         
+        logging.info(f"流程图保存成功 - agent_id: {agent_id}")
         return success_response(msg="智能体流程图更新成功")
     except Exception as e:
+        import logging
+        logging.error(f"保存流程图失败: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
         return fail_response(msg=str(e))
 
 

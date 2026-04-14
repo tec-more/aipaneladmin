@@ -8,6 +8,14 @@
           <el-icon><Check /></el-icon>
           保存
         </el-button>
+        <el-button 
+          type="warning" 
+          @click="publishDialogFlow" 
+          v-if="dialogFlow?.status !== 'active'"
+        >
+          <el-icon><Check /></el-icon>
+          发布
+        </el-button>
         <el-button type="success" @click="executeDialog">
           <el-icon><VideoPlay /></el-icon>
           执行
@@ -476,6 +484,23 @@ const saveDialogFlow = async () => {
     ElMessage.success('保存成功')
   } catch (error) {
     ElMessage.error('保存失败')
+    console.error(error)
+  } finally {
+    saving.value = false
+  }
+}
+
+const publishDialogFlow = async () => {
+  saving.value = true
+  try {
+    await updateDialogFlow(flowId, {
+      status: 'active',
+      flow_data: { nodes: nodes.value, edges: edges.value }
+    })
+    dialogFlow.value.status = 'active'
+    ElMessage.success('发布成功')
+  } catch (error) {
+    ElMessage.error('发布失败')
     console.error(error)
   } finally {
     saving.value = false

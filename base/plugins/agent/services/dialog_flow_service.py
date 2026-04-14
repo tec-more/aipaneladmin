@@ -27,11 +27,15 @@ class DialogFlowService:
         return DialogFlowResponse.from_orm(dialog_flow)
     
     @staticmethod
-    async def list_dialog_flows(agent_id: Optional[int] = None, skip: int = 0, limit: int = 100) -> List[DialogFlowResponse]:
+    async def list_dialog_flows(agent_id: Optional[int] = None, skip: int = 0, limit: int = 100, name: str = "", status: str = "") -> List[DialogFlowResponse]:
         """列出对话流"""
         query = DialogFlow.all()
         if agent_id:
             query = query.filter(agent__id=agent_id)
+        if name:
+            query = query.filter(name__icontains=name)
+        if status:
+            query = query.filter(status=status)
         dialog_flows = await query.offset(skip).limit(limit).all()
         return [DialogFlowResponse.from_orm(df) for df in dialog_flows]
     

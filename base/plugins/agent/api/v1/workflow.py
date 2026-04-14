@@ -41,9 +41,9 @@ async def create_workflow(workflow: WorkflowCreate):
 
 
 @workflow_router.get("/")
-async def get_workflows(skip: int = 0, limit: int = 100, name: str = ""):
+async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status: str = ""):
     """Get all workflows"""
-    workflows = await WorkflowService.get_workflows(skip=skip, limit=limit, name=name)
+    workflows = await WorkflowService.get_workflows(skip=skip, limit=limit, name=name, status=status)
     response = []
     for workflow in workflows:
         agents = await workflow.agents.all()

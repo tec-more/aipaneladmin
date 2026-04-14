@@ -70,6 +70,7 @@
         <el-table-column prop="provider_name" label="厂商" width="120" />
         <el-table-column prop="model_id" label="模型标识" min-width="150" />
         <el-table-column prop="model_name" label="模型名称" min-width="150" />
+        <el-table-column prop="endpoint_url" label="访问地址" min-width="200" show-overflow-tooltip />
         <el-table-column label="价格(元/1K)" width="150" align="center">
           <template #default="{ row }">
             <div>输入: ¥{{ row.input_price }}</div>
@@ -162,6 +163,9 @@
         </el-form-item>
         <el-form-item label="模型名称" prop="model_name">
           <el-input v-model="modelForm.model_name" placeholder="如：GPT-4" />
+        </el-form-item>
+        <el-form-item label="访问地址">
+          <el-input v-model="modelForm.endpoint_url" placeholder="模型专用访问地址，留空则使用API密钥或厂商默认地址" />
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -257,6 +261,7 @@ const modelForm = reactive({
   provider_id: null,
   model_id: '',
   model_name: '',
+  endpoint_url: '',
   context_length: 4096,
   input_price: 0,
   output_price: 0,
@@ -361,6 +366,7 @@ const handleAddModel = () => {
     provider_id: null,
     model_id: '',
     model_name: '',
+    endpoint_url: '',
     context_length: 4096,
     input_price: 0,
     output_price: 0,

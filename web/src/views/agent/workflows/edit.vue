@@ -8,6 +8,14 @@
           <el-icon><Check /></el-icon>
           保存
         </el-button>
+        <el-button 
+          type="warning" 
+          @click="publishWorkflow" 
+          v-if="workflow?.status !== 'active'"
+        >
+          <el-icon><Check /></el-icon>
+          发布
+        </el-button>
         <el-button type="success" @click="executeWorkflowDialog">
           <el-icon><VideoPlay /></el-icon>
           执行
@@ -189,7 +197,12 @@
               <el-divider content-position="left">大模型配置</el-divider>
               <el-form-item label="选择模型">
                 <el-select v-model="nodeConfig.model_id" placeholder="请选择" @change="updateNodeData">
-                  <el-option v-for="model in models" :key="model.id" :label="model.name" :value="model.id" />
+                  <el-option 
+                    v-for="model in models" 
+                    :key="model.id" 
+                    :label="`${model.provider_name} - ${model.model_name}`" 
+                    :value="model.id" 
+                  />
                 </el-select>
               </el-form-item>
               <el-form-item label="提示词">
@@ -661,6 +674,23 @@ const saveWorkflow = async () => {
     ElMessage.success('保存成功')
   } catch (error) {
     ElMessage.error('保存失败')
+    console.error(error)
+  } finally {
+    saving.value = false
+  }
+}
+
+const publishWorkflow = async () => {
+  saving.value = true
+  try {
+    await updateWorkflow(workflowId, {
+      status: 'active',
+      definition: { nodes: nodes.value, edges: edges.value }
+    })
+    workflow.value.status = 'active'
+    ElMessage.success('发布成功')
+  } catch (error) {
+    ElMessage.error('发布失败')
     console.error(error)
   } finally {
     saving.value = false

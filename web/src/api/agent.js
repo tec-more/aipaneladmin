@@ -26,6 +26,10 @@ export function executeAgent(id, params) {
   return request.post(`/v1/agent/agents/${id}/execute`, params)
 }
 
+export function executeAgentFlow(id, params) {
+  return request.post(`/v1/agent/agents/${id}/flow/execute`, params)
+}
+
 export function getAgentSkills(agentId) {
   return request.get(`/v1/agent/agents/${agentId}/skills`)
 }

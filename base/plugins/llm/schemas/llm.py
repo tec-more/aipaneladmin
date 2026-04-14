@@ -52,6 +52,7 @@ class ModelBase(BaseModel):
     provider_id: int = Field(..., description="厂商ID")
     model_id: str = Field(..., min_length=1, max_length=100, description="模型标识")
     model_name: str = Field(..., min_length=1, max_length=100, description="模型名称")
+    endpoint_url: Optional[str] = Field(None, max_length=255, description="模型访问地址")
     context_length: int = Field(4096, description="上下文长度")
     input_price: Decimal = Field(0, ge=0, description="输入价格 (元/1K tokens)")
     output_price: Decimal = Field(0, ge=0, description="输出价格 (元/1K tokens)")
@@ -72,6 +73,7 @@ class ModelUpdate(BaseModel):
     provider_id: Optional[int] = None
     model_id: Optional[str] = None
     model_name: Optional[str] = None
+    endpoint_url: Optional[str] = None
     context_length: Optional[int] = None
     input_price: Optional[Decimal] = None
     output_price: Optional[Decimal] = None

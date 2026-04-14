@@ -10,6 +10,14 @@
               <span v-if="isEdit">保存</span>
               <span v-else>创建</span>
             </el-button>
+            <el-button 
+              type="warning" 
+              @click="publishSkill" 
+              v-if="isEdit && formData.status !== 'active'"
+            >
+              <el-icon><Check /></el-icon>
+              发布
+            </el-button>
             <el-button type="success" @click="handleTest" v-if="isEdit" :loading="testing">
               <el-icon><VideoPlay /></el-icon>
               测试
@@ -163,6 +171,23 @@ const handleTest = () => {
   testForm.input = JSON.stringify(formData.parameters, null, 2)
   testResult.value = ''
   testDialogVisible.value = true
+}
+
+const publishSkill = async () => {
+  saving.value = true
+  try {
+    await updateSkill(skillId, {
+      ...formData,
+      status: 'active'
+    })
+    formData.status = 'active'
+    ElMessage.success('发布成功')
+  } catch (error) {
+    ElMessage.error('发布失败')
+    console.error(error)
+  } finally {
+    saving.value = false
+  }
 }
 
 const executeTest = async () => {

@@ -34,11 +34,13 @@ async def get_dialog_flow(dialog_flow_id: int):
 @dialog_flow_router.get("/dialog-flows")
 async def list_dialog_flows(
     agent_id: Optional[int] = Query(None, description="智能体ID"),
+    name: str = Query("", description="对话流名称"),
+    status: str = Query("", description="状态"),
     skip: int = Query(0, ge=0, description="跳过的记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回的记录数")
 ):
-    """列出对话流，可按智能体ID过滤"""
-    dialog_flows = await DialogFlowService.list_dialog_flows(agent_id, skip, limit)
+    """列出对话流，可按智能体ID、名称或状态过滤"""
+    dialog_flows = await DialogFlowService.list_dialog_flows(agent_id, skip, limit, name, status)
     return success_response(data={"items": dialog_flows, "total": len(dialog_flows)})
 
 
