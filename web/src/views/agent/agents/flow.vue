@@ -148,11 +148,14 @@
                 </div>
                 <div v-else class="target-nodes-list">
                   <div v-for="(node, index) in targetNodes" :key="node.id" class="target-node-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #fff; border-radius: 4px; border: 1px solid #e0e0e0;">
-                    <el-icon :size="16" style="color: #409eff; margin-right: 8px;">
-                      <component :is="nodeTypes.find(n => n.type === node.type)?.icon || Document" />
+                    <el-icon :size="16" style="color: #409eff; margin-right: 8px;" v-if="node.type && node.type !== 'unknown'">
+                      <component :is="(nodeTypes.find(n => n.type === node.type) || {}).icon || Document" />
                     </el-icon>
-                    <span style="flex: 1; color: #303133;">{{ node.data.label }}</span>
-                    <el-tag size="small" type="info" style="margin-left: 10px;">
+                    <el-icon :size="16" style="color: #409eff; margin-right: 8px;" v-else>
+                      <Document />
+                    </el-icon>
+                    <span style="flex: 1; color: #303133;">{{ (node.data && node.data.label) || '未知节点' }}</span>
+                    <el-tag size="small" type="info" style="margin-left: 10px;" v-if="node.type">
                       {{ node.type }}
                     </el-tag>
                   </div>
@@ -161,7 +164,7 @@
             </el-form-item>
           </el-form>
           
-          <template v-if="selectedNode.type === 'agent'">
+          <template v-if="selectedNode && selectedNode.type === 'agent'">
             <el-card v-if="selectedAgent" shadow="hover">
               <template #header>
                 <div class="card-header">
@@ -190,7 +193,7 @@
             </el-card>
             <el-empty v-else description="未选择智能体" />
           </template>
-          <template v-if="selectedNode.type === 'workflow'">
+          <template v-if="selectedNode && selectedNode.type === 'workflow'">
             <div class="panel-title">工作流配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -229,7 +232,7 @@
               </el-button>
             </el-card>
           </template>
-          <template v-if="selectedNode.type === 'dialog_flow'">
+          <template v-if="selectedNode && selectedNode.type === 'dialog_flow'">
             <div class="panel-title">对话流配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -268,7 +271,7 @@
               </el-button>
             </el-card>
           </template>
-          <template v-if="selectedNode.type === 'llm'">
+          <template v-if="selectedNode && selectedNode.type === 'llm'">
             <div class="panel-title">大模型配置</div>
             <div style="margin-bottom: 10px; font-size: 12px; color: #999;">
               大模型数量: {{ llms.length }}
@@ -308,7 +311,7 @@
           </template>
           
           <!-- Dify 风格节点 - 代码执行 -->
-          <template v-if="selectedNode.type === 'code'">
+          <template v-if="selectedNode && selectedNode.type === 'code'">
             <div class="panel-title">代码执行配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -327,7 +330,7 @@
           </template>
           
           <!-- Dify 风格节点 - 模板转换 -->
-          <template v-if="selectedNode.type === 'template'">
+          <template v-if="selectedNode && selectedNode.type === 'template'">
             <div class="panel-title">模板转换配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -340,7 +343,7 @@
           </template>
           
           <!-- Dify 风格节点 - 变量聚合器 -->
-          <template v-if="selectedNode.type === 'variable_aggregator'">
+          <template v-if="selectedNode && selectedNode.type === 'variable_aggregator'">
             <div class="panel-title">变量聚合器配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -356,7 +359,7 @@
           </template>
           
           <!-- Dify 风格节点 - HTTP 请求 -->
-          <template v-if="selectedNode.type === 'http'">
+          <template v-if="selectedNode && selectedNode.type === 'http'">
             <div class="panel-title">HTTP 请求配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -383,7 +386,7 @@
           </template>
           
           <!-- Dify 风格节点 - 列表操作 -->
-          <template v-if="selectedNode.type === 'list_operation'">
+          <template v-if="selectedNode && selectedNode.type === 'list_operation'">
             <div class="panel-title">列表操作配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -404,7 +407,7 @@
           </template>
           
           <!-- Dify 风格节点 - 文档提取器 -->
-          <template v-if="selectedNode.type === 'document_extractor'">
+          <template v-if="selectedNode && selectedNode.type === 'document_extractor'">
             <div class="panel-title">文档提取器配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -420,7 +423,7 @@
           </template>
           
           <!-- Dify 风格节点 - 变量赋值 -->
-          <template v-if="selectedNode.type === 'variable_assigner'">
+          <template v-if="selectedNode && selectedNode.type === 'variable_assigner'">
             <div class="panel-title">变量赋值配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -436,7 +439,7 @@
           </template>
           
           <!-- Dify 风格节点 - 参数提取器 -->
-          <template v-if="selectedNode.type === 'parameter_extractor'">
+          <template v-if="selectedNode && selectedNode.type === 'parameter_extractor'">
             <div class="panel-title">参数提取器配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -452,7 +455,7 @@
           </template>
           
           <!-- 输入节点配置 -->
-          <template v-if="selectedNode.type === 'input'">
+          <template v-if="selectedNode && selectedNode.type === 'input'">
             <div class="panel-title">输入配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -473,7 +476,7 @@
           </template>
           
           <!-- 输出节点配置 -->
-          <template v-if="selectedNode.type === 'output'">
+          <template v-if="selectedNode && selectedNode.type === 'output'">
             <div class="panel-title">输出配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -496,7 +499,7 @@
           </template>
           
           <!-- 知识检索节点配置 -->
-          <template v-if="selectedNode.type === 'knowledge_retrieval'">
+          <template v-if="selectedNode && selectedNode.type === 'knowledge_retrieval'">
             <div class="panel-title">知识检索配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -524,7 +527,7 @@
           </template>
           
           <!-- 控制流节点 - 条件分支 -->
-          <template v-if="selectedNode.type === 'decision'">
+          <template v-if="selectedNode && selectedNode.type === 'decision'">
             <div class="panel-title">条件分支配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -534,24 +537,22 @@
                 <el-input v-model="selectedNode.data.condition" type="textarea" :rows="2" placeholder="例如: {{variable}} > 10" />
               </el-form-item>
               <el-form-item label="真分支目标">
-                <el-select v-model="selectedNode.data.true_branch" style="width: 100%">
+                <el-select v-model="selectedNode.data.true_branch" placeholder="请选择" style="width: 100%" clearable>
                   <el-option 
                     v-for="node in nodes" 
                     :key="node.id" 
-                    :label="node.data.label" 
+                    :label="node.data && node.data.label || node.type" 
                     :value="node.id" 
-                    v-if="node.id !== selectedNode.id"
                   />
                 </el-select>
               </el-form-item>
               <el-form-item label="假分支目标">
-                <el-select v-model="selectedNode.data.false_branch" style="width: 100%">
+                <el-select v-model="selectedNode.data.false_branch" placeholder="请选择" style="width: 100%" clearable>
                   <el-option 
                     v-for="node in nodes" 
                     :key="node.id" 
-                    :label="node.data.label" 
+                    :label="node.data && node.data.label || node.type" 
                     :value="node.id" 
-                    v-if="node.id !== selectedNode.id"
                   />
                 </el-select>
               </el-form-item>
@@ -559,7 +560,7 @@
           </template>
           
           <!-- 控制流节点 - 循环 -->
-          <template v-if="selectedNode.type === 'loop'">
+          <template v-if="selectedNode && selectedNode.type === 'loop'">
             <div class="panel-title">循环配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -569,24 +570,22 @@
                 <el-input v-model="selectedNode.data.condition" type="textarea" :rows="2" placeholder="例如: {{count}} < 10" />
               </el-form-item>
               <el-form-item label="循环体目标">
-                <el-select v-model="selectedNode.data.loop_body" style="width: 100%">
+                <el-select v-model="selectedNode.data.loop_body" placeholder="请选择" style="width: 100%" clearable>
                   <el-option 
                     v-for="node in nodes" 
                     :key="node.id" 
-                    :label="node.data.label" 
+                    :label="node.data && node.data.label || node.type" 
                     :value="node.id" 
-                    v-if="node.id !== selectedNode.id"
                   />
                 </el-select>
               </el-form-item>
               <el-form-item label="循环结束目标">
-                <el-select v-model="selectedNode.data.loop_end" style="width: 100%">
+                <el-select v-model="selectedNode.data.loop_end" placeholder="请选择" style="width: 100%" clearable>
                   <el-option 
                     v-for="node in nodes" 
                     :key="node.id" 
-                    :label="node.data.label" 
+                    :label="node.data && node.data.label || node.type" 
                     :value="node.id" 
-                    v-if="node.id !== selectedNode.id"
                   />
                 </el-select>
               </el-form-item>
@@ -597,7 +596,7 @@
           </template>
           
           <!-- 控制流节点 - 迭代 -->
-          <template v-if="selectedNode.type === 'iteration'">
+          <template v-if="selectedNode && selectedNode.type === 'iteration'">
             <div class="panel-title">迭代配置</div>
             <el-form label-width="80px" size="small">
               <el-form-item label="节点名称">
@@ -610,24 +609,22 @@
                 <el-input v-model="selectedNode.data.item_var" placeholder="存储当前项的变量名" />
               </el-form-item>
               <el-form-item label="迭代体目标">
-                <el-select v-model="selectedNode.data.iteration_body" style="width: 100%">
+                <el-select v-model="selectedNode.data.iteration_body" placeholder="请选择" style="width: 100%" clearable>
                   <el-option 
                     v-for="node in nodes" 
                     :key="node.id" 
-                    :label="node.data.label" 
+                    :label="node.data && node.data.label || node.type" 
                     :value="node.id" 
-                    v-if="node.id !== selectedNode.id"
                   />
                 </el-select>
               </el-form-item>
               <el-form-item label="迭代结束目标">
-                <el-select v-model="selectedNode.data.iteration_end" style="width: 100%">
+                <el-select v-model="selectedNode.data.iteration_end" placeholder="请选择" style="width: 100%" clearable>
                   <el-option 
                     v-for="node in nodes" 
                     :key="node.id" 
-                    :label="node.data.label" 
+                    :label="node.data && node.data.label || node.type" 
                     :value="node.id" 
-                    v-if="node.id !== selectedNode.id"
                   />
                 </el-select>
               </el-form-item>
@@ -827,7 +824,7 @@ const targetNodes = computed(() => {
   // 对于每条边，找到对应的目标节点
   return nodeEdges.map(edge => {
     const targetNode = getNodeById(edge.target)
-    return targetNode || { id: edge.target, data: { label: '未知节点' } }
+    return targetNode || { id: edge.target, type: 'unknown', data: { label: '未知节点' } }
   })
 })
 
@@ -1161,19 +1158,90 @@ const onDrop = (event) => {
     y: event.clientY - rect.top
   }
   
+  const nodeData = {
+    label: nodeTypes.find(n => n.type === type)?.label || type
+  }
+  
+  // 根据节点类型初始化相应的字段
+  if (type === 'decision') {
+    nodeData.condition = ''
+    nodeData.true_branch = null
+    nodeData.false_branch = null
+  } else if (type === 'loop') {
+    nodeData.condition = ''
+    nodeData.loop_body = null
+    nodeData.loop_end = null
+    nodeData.max_iterations = 100
+  } else if (type === 'iteration') {
+    nodeData.iterable = ''
+    nodeData.item_var = 'item'
+    nodeData.iteration_body = null
+    nodeData.iteration_end = null
+  } else if (type === 'input') {
+    nodeData.input_type = 'text'
+    nodeData.input_placeholder = ''
+  } else if (type === 'output') {
+    nodeData.output_type = 'text'
+    nodeData.output_content = ''
+    nodeData.output_var = ''
+  } else if (type === 'code') {
+    nodeData.language = 'python'
+    nodeData.code = ''
+  } else if (type === 'template') {
+    nodeData.template = ''
+  } else if (type === 'variable_aggregator') {
+    nodeData.input_vars = ''
+    nodeData.output_var = ''
+  } else if (type === 'document_extractor') {
+    nodeData.document_var = ''
+    nodeData.extract_rules = ''
+  } else if (type === 'variable_assigner') {
+    nodeData.var_name = ''
+    nodeData.var_value = ''
+  } else if (type === 'parameter_extractor') {
+    nodeData.input_text = ''
+    nodeData.parameters = ''
+  } else if (type === 'http') {
+    nodeData.method = 'GET'
+    nodeData.url = ''
+    nodeData.headers = ''
+    nodeData.body = ''
+  } else if (type === 'list_operation') {
+    nodeData.operation = 'filter'
+    nodeData.input_list = ''
+  } else if (type === 'knowledge_retrieval') {
+    nodeData.knowledge_base = 'default'
+    nodeData.query = ''
+    nodeData.top_k = 5
+    nodeData.similarity_threshold = 0.7
+    nodeData.output_var = ''
+  }
+  
   const newNode = {
     id: `${type}-${Date.now()}`,
     type,
     position,
-    data: {
-      label: nodeTypes.find(n => n.type === type)?.label || type
-    }
+    data: nodeData
   }
   nodes.value.push(newNode)
 }
 
 const onNodeClick = async (node) => {
   selectedEdge.value = null
+  
+  if (!node || !node.type) return
+  
+  // 确保节点数据完整
+  if (!node.data) {
+    node.data = {
+      label: nodeTypes.find(n => n.type === node.type)?.label || node.type
+    }
+  }
+  
+  if (!node.data.label) {
+    node.data.label = nodeTypes.find(n => n.type === node.type)?.label || node.type
+  }
+  
   selectedNode.value = node
   
   // 重置选中的实体
