@@ -15,6 +15,14 @@ class LLMApiKey(BaseModel, TimestampMixin):
         related_name="api_keys",
         on_delete=fields.CASCADE
     )
+    
+    model = fields.ForeignKeyField(
+        "models.LLMModel",
+        related_name="api_keys",
+        on_delete=fields.CASCADE,
+        null=True,
+        description="关联的模型"
+    )
 
     # ========== 服务类型 ==========
     model_service_type = fields.CharField(

@@ -40,6 +40,7 @@ def mask_secret(secret: str) -> str:
 @api_key_router.get("", summary="获取API密钥列表")
 async def get_api_keys(
     provider_id: Optional[int] = Query(None, description="厂商ID筛选"),
+    model_id: Optional[int] = Query(None, description="模型ID筛选"),
     model_service_type: Optional[str] = Query(None, description="服务类型筛选"),
     status: Optional[str] = Query(None, description="状态筛选"),
     page: int = Query(1, ge=1, description="页码"),
@@ -50,23 +51,36 @@ async def get_api_keys(
     
     if provider_id:
         query = query.filter(provider_id=provider_id)
+    if model_id:
+        query = query.filter(model_id=model_id)
     if model_service_type:
         query = query.filter(model_service_type=model_service_type)
     if status:
         query = query.filter(status=status)
 
     total = await query.count()
-    api_keys = await query.offset((page - 1) * page_size).limit(page_size).prefetch_related('provider')
+    api_keys = await query.offset((page - 1) * page_size).limit(page_size).prefetch_related('provider', 'model')
 
     from base.plugins.llm.models.enums import ModelServiceType
     
     result = []
     for key in api_keys:
         service_type_display = ModelServiceType.display_name(key.model_service_type)
+        
+        model_info = None
+        if key.model:
+            model_info = {
+                "id": key.model.id,
+                "model_id": key.model.model_id,
+                "model_name": key.model.model_name
+            }
+        
         record = {
             "id": key.id,
             "provider_id": key.provider_id,
             "provider_name": key.provider.name if key.provider else None,
+            "model_id": key.model_id,
+            "model": model_info,
             "model_service_type": key.model_service_type,
             "model_service_type_display": service_type_display,
             "api_id": key.api_id,
@@ -99,12 +113,26 @@ async def get_api_keys(
 @api_key_router.get("/{key_id}", summary="获取API密钥详情")
 async def get_api_key(key_id: int):
     """获取API密钥详情"""
-    key = await LLMApiKey.get_or_none(id=key_id).prefetch_related('provider')
+    key = await LLMApiKey.get_or_none(id=key_id).prefetch_related('provider', 'model')
     if not key:
         raise HTTPException(status_code=404, detail="API密钥不存在")
 
     from base.plugins.llm.models.enums import ModelServiceType
     service_type_display = ModelServiceType.display_name(key.model_service_type)
+    
+    model_info = None
+    if key.model:
+        model_info = {
+            "id": key.model.id,
+            "model_id": key.model.model_id,
+            "model_name": key.model.model_name,
+            "provider": {
+                "id": key.model.provider.id,
+                "name": key.model.provider.name,
+                "name_en": key.model.provider.name_en,
+                "logo_url": key.model.provider.logo_url
+            } if key.model.provider else None
+        }
 
     return SuccessResponse(data={
         "id": key.id,
@@ -115,6 +143,8 @@ async def get_api_key(key_id: int):
             "name_en": key.provider.name_en,
             "logo_url": key.provider.logo_url
         } if key.provider else None,
+        "model_id": key.model_id,
+        "model": model_info,
         "model_service_type": key.model_service_type,
         "model_service_type_display": service_type_display,
         "api_id": key.api_id,
@@ -149,6 +179,7 @@ async def create_api_key(
 
     api_key = await LLMApiKey.create(
         provider_id=data.provider_id,
+        model_id=data.model_id,
         model_service_type=data.model_service_type,
         api_id=data.api_id,
         api_key=data.api_key,

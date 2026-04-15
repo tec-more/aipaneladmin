@@ -15,6 +15,11 @@
             <el-option v-for="provider in providerList" :key="provider.id" :label="provider.name" :value="provider.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="模型">
+          <el-select v-model="searchForm.model_id" placeholder="请选择" clearable style="width: 150px">
+            <el-option v-for="model in modelList" :key="model.id" :label="model.name" :value="model.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="服务类型">
           <el-select v-model="searchForm.model_service_type" placeholder="请选择" clearable style="width: 150px">
             <el-option label="大语言模型" value="llm" />
@@ -42,6 +47,11 @@
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
         <el-table-column prop="provider_name" label="厂商" width="120" />
+        <el-table-column label="关联模型" width="150">
+          <template #default="{ row }">
+            {{ row.model?.model_name || '未关联' }}
+          </template>
+        </el-table-column>
         <el-table-column label="服务类型" width="130" align="center">
           <template #default="{ row }">
             <el-tag :type="getServiceTypeColor(row.model_service_type)" size="small">
@@ -116,6 +126,13 @@
           <el-select v-model="form.provider_id" placeholder="请选择厂商" style="width: 100%">
             <el-option v-for="provider in providerList" :key="provider.id" :label="provider.name" :value="provider.id" />
           </el-select>
+        </el-form-item>
+
+        <el-form-item label="关联模型">
+          <el-select v-model="form.model_id" placeholder="请选择模型（可选）" style="width: 100%">
+            <el-option v-for="model in modelList" :key="model.id" :label="model.model_name" :value="model.id" />
+          </el-select>
+          <div class="text-gray text-xs mt-1">选择此API密钥关联的模型，用于模型级别的API密钥管理</div>
         </el-form-item>
 
         <el-form-item label="服务类型" prop="model_service_type">
@@ -245,6 +262,7 @@ import { Plus, Edit, Delete, Search, Refresh, RefreshRight, Connection, Lock, Se
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getProviderList,
+  getModelList,
   getApiKeyList,
   createApiKey,
   updateApiKey,
@@ -256,6 +274,7 @@ import {
 const loading = ref(false)
 const tableData = ref([])
 const providerList = ref([])
+const modelList = ref([])
 const dialogVisible = ref(false)
 const testDialogVisible = ref(false)
 const formRef = ref()
@@ -263,6 +282,7 @@ const isEdit = ref(false)
 
 const searchForm = reactive({
   provider_id: null,
+  model_id: null,
   model_service_type: null,
   status: ''
 })
@@ -276,6 +296,7 @@ const pagination = reactive({
 const form = reactive({
   id: null,
   provider_id: null,
+  model_id: null,
   model_service_type: 'llm',
   // 统一的认证字段
   api_id: '',
@@ -327,10 +348,20 @@ const fetchProviders = async () => {
   }
 }
 
+const fetchModels = async () => {
+  try {
+    const { data } = await getModelList({ page: 1, page_size: 100 })
+    modelList.value = data.items || []
+  } catch (error) {
+    ElMessage.error('获取模型列表失败')
+  }
+}
+
 const handleAdd = () => {
   // 重置所有字段为默认值
   form.id = null
   form.provider_id = null
+  form.model_id = null
   form.model_service_type = 'llm'
   // 统一的认证字段
   form.api_id = ''
@@ -352,6 +383,7 @@ const handleEdit = (row) => {
 
   form.id = row.id
   form.provider_id = row.provider_id
+  form.model_id = row.model_id ?? null
   form.model_service_type = row.model_service_type || 'llm'
   // 统一的认证字段
   form.api_id = row.api_id ?? ''
@@ -376,7 +408,7 @@ const submit = async () => {
       const updateData = { ...form }
 
       // 处理空字符串：转换为null
-      const fields = ['api_id', 'api_key', 'api_secret', 'access_token', 'endpoint_url']
+      const fields = ['api_id', 'api_key', 'api_secret', 'access_token', 'endpoint_url', 'model_id']
       fields.forEach(field => {
         if (updateData[field] === '') {
           updateData[field] = null
@@ -450,6 +482,7 @@ const handleTest = async (row) => {
 
 const handleReset = () => {
   searchForm.provider_id = null
+  searchForm.model_id = null
   searchForm.model_service_type = null
   searchForm.status = ''
   fetchData()
@@ -484,6 +517,7 @@ const getQuotaColor = (row) => {
 
 onMounted(() => {
   fetchProviders()
+  fetchModels()
   fetchData()
 })
 </script>

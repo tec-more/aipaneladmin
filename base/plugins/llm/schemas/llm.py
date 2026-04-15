@@ -100,6 +100,7 @@ class ModelResponse(ModelBase):
 class ApiKeyBase(BaseModel):
     """API密钥基础模型"""
     provider_id: int = Field(..., description="厂商ID")
+    model_id: Optional[int] = Field(None, description="关联的模型ID")
 
     # 服务类型
     model_service_type: str = Field(
@@ -127,6 +128,7 @@ class ApiKeyCreate(ApiKeyBase):
 class ApiKeyUpdate(BaseModel):
     """更新API密钥"""
     provider_id: Optional[int] = None
+    model_id: Optional[int] = None
     model_service_type: Optional[str] = None
 
     # 认证字段
@@ -145,6 +147,7 @@ class ApiKeyResponse(ApiKeyBase):
     """API密钥响应"""
     id: int
     provider: ProviderResponse
+    model: Optional[ModelResponse] = None
     remaining_quota: int
     is_available: bool
     is_voice_service: bool

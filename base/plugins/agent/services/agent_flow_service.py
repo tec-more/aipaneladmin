@@ -525,7 +525,7 @@ class AgentFlowService:
             }
         
         from base.plugins.llm.models.model import LLMModel
-        llm_model = await LLMModel.get_or_none(id=llm_id)
+        llm_model = await LLMModel.get_or_none(id=llm_id).prefetch_related('provider')
         
         if not llm_model:
             logger.error(f"[LLM节点] 找不到指定的大模型，llm_id: {llm_id}")
@@ -534,18 +534,24 @@ class AgentFlowService:
                 "message": f"找不到指定的大模型 (ID: {llm_id})"
             }
         
-        provider = await llm_model.provider
-        logger.info(f"[LLM节点] 模型信息: {llm_model.model_id}, 提供商: {provider.name_en}")
+        logger.info(f"[LLM节点] 模型信息: {llm_model.model_id}, 提供商: {llm_model.provider.name_en}")
         
         # 获取 API Key
         from base.plugins.llm.models.api_key import LLMApiKey
         api_key = await LLMApiKey.filter(
-            provider_id=provider.id,
+            model_id=llm_model.id,
             status="active"
         ).first()
         
+        # 如果没有找到模型关联的API密钥，回退到使用provider
         if not api_key:
-            logger.error(f"[LLM节点] 未找到有效的API密钥，provider_id: {provider.id}")
+            api_key = await LLMApiKey.filter(
+                provider_id=llm_model.provider.id,
+                status="active"
+            ).first()
+        
+        if not api_key:
+            logger.error(f"[LLM节点] 未找到有效的API密钥，provider_id: {llm_model.provider.id}")
             return {
                 "success": False,
                 "message": "未找到有效的API密钥"
@@ -577,7 +583,7 @@ class AgentFlowService:
         
         # 调用 LLM
         try:
-            endpoint_url = llm_model.endpoint_url or api_key.endpoint_url or provider.official_url
+            endpoint_url = llm_model.endpoint_url or api_key.endpoint_url or llm_model.provider.official_url
             if endpoint_url:
                 endpoint_url = endpoint_url.rstrip('/')
                 if endpoint_url.endswith('/chat/completions'):
@@ -586,13 +592,13 @@ class AgentFlowService:
             credentials = api_key.get_credentials()
             
             logger.info(f"[LLM节点] 获取到的 credentials:")
-            logger.info(f"  provider.name_en: {provider.name_en}")
+            logger.info(f"  provider.name_en: {llm_model.provider.name_en}")
             logger.info(f"  endpoint_url: {endpoint_url}")
             logger.info(f"  api_key: {credentials.get('api_key', '')[:8] if credentials.get('api_key') else 'None'}...")
             logger.info(f"  api_secret provided: {credentials.get('api_secret') is not None}")
             
             service = await ChatService.get_provider_service(
-                provider.name_en,
+                llm_model.provider.name_en,
                 credentials.get("api_key", ""),
                 endpoint_url,
                 credentials.get("api_secret", "")
