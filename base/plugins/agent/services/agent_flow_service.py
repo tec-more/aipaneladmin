@@ -584,6 +584,13 @@ class AgentFlowService:
                     endpoint_url = endpoint_url[:-len('/chat/completions')]
             
             credentials = api_key.get_credentials()
+            
+            logger.info(f"[LLM节点] 获取到的 credentials:")
+            logger.info(f"  provider.name_en: {provider.name_en}")
+            logger.info(f"  endpoint_url: {endpoint_url}")
+            logger.info(f"  api_key: {credentials.get('api_key', '')[:8] if credentials.get('api_key') else 'None'}...")
+            logger.info(f"  api_secret provided: {credentials.get('api_secret') is not None}")
+            
             service = await ChatService.get_provider_service(
                 provider.name_en,
                 credentials.get("api_key", ""),

@@ -16,28 +16,20 @@ class LLMApiKey(BaseModel, TimestampMixin):
         on_delete=fields.CASCADE
     )
 
-    # ========== 服务类型（新增） ==========
+    # ========== 服务类型 ==========
     model_service_type = fields.CharField(
         max_length=50,
         default=ModelServiceType.LLM.value,
         description="模型服务类型"
     )
 
-    # ========== 统一的认证字段 ==========
+    # ========== 认证字段 ==========
     api_id = fields.CharField(max_length=255, null=True, description="API ID")
     api_key = fields.CharField(max_length=512, null=True, description="API Key")
     api_secret = fields.CharField(max_length=512, null=True, description="API Secret")
     access_token = fields.CharField(max_length=512, null=True, description="Access Token")
     endpoint_url = fields.CharField(max_length=512, null=True, description="自定义端点URL")
-
-    # ========== 旧字段（保留用于向后兼容，标记为deprecated） ==========
-    # TODO: 数据迁移完成后删除这些字段
-    app_key = fields.CharField(max_length=512, null=True, description="[Deprecated] App Key (LLM) - 请使用api_key")
-    api_id_voice = fields.CharField(max_length=100, null=True, description="[Deprecated] API ID (语音服务) - 已被model_service_type替代")
-    app_key_voice = fields.CharField(max_length=255, null=True, description="[Deprecated] App Key (语音服务) - 已被model_service_type替代")
-    api_secret_voice = fields.CharField(max_length=255, null=True, description="[Deprecated] API密钥-语音服务 - 已被model_service_type替代")
-    endpoint_url_voice = fields.CharField(max_length=255, null=True, description="[Deprecated] 自定义端点URL (语音服务) - 已被model_service_type替代")
-
+    
     # ========== 配额管理 ==========
     max_quota = fields.IntField(default=100000, description="每日配额限制(tokens/天)")
     used_quota = fields.IntField(default=0, description="已使用配额")
@@ -89,68 +81,15 @@ class LLMApiKey(BaseModel, TimestampMixin):
 
     @property
     def is_voice_service(self) -> bool:
-        """
-        是否为语音服务类型
-
-        根据model_service_type判断，替代旧的has_voice_credentials
-        """
+        """是否为语音服务类型"""
         return self.model_service_type in [t.value for t in ModelServiceType.voice_services()]
 
-    @property
-    def has_voice_credentials(self) -> bool:
-        """
-        [Deprecated] 是否有语音服务密钥
-
-        保留用于向后兼容，新代码请使用is_voice_service
-        """
-        # 如果已设置model_service_type，使用新逻辑
-        if self.model_service_type != ModelServiceType.LLM.value:
-            return True
-        # 否则使用旧逻辑（检查是否有语音字段）
-        return bool(
-            self.api_id_voice or
-            self.app_key_voice or
-            self.api_secret_voice or
-            self.endpoint_url_voice
-        )
-
     def get_credentials(self) -> dict:
-        """
-        获取服务凭据（根据服务类型返回对应的字段）
-
-        统一的凭据获取方法，替代get_llm_credentials和get_voice_credentials
-        """
-        # 优先使用新字段，如果为空则回退到旧字段（向后兼容）
-        return {
-            "api_id": self.api_id or self.api_id_voice,
-            "api_key": self.api_key or self.app_key or self.app_key_voice,
-            "api_secret": self.api_secret or self.api_secret_voice,
-            "access_token": self.access_token,
-            "endpoint_url": self.endpoint_url or self.endpoint_url_voice
-        }
-
-    def get_llm_credentials(self) -> dict:
-        """
-        [Deprecated] 获取LLM服务凭据
-
-        保留用于向后兼容，新代码请使用get_credentials
-        """
+        """获取服务凭据"""
         return {
             "api_id": self.api_id,
-            "app_key": self.app_key,
+            "api_key": self.api_key,
             "api_secret": self.api_secret,
+            "access_token": self.access_token,
             "endpoint_url": self.endpoint_url
-        }
-
-    def get_voice_credentials(self) -> dict:
-        """
-        [Deprecated] 获取语音服务凭据（智能回退到LLM密钥）
-
-        保留用于向后兼容，新代码请使用get_credentials
-        """
-        return {
-            "api_id": self.api_id_voice or self.api_id,
-            "app_key": self.app_key_voice or self.app_key,
-            "api_secret": self.api_secret_voice or self.api_secret,
-            "endpoint_url": self.endpoint_url_voice or self.endpoint_url
         }
