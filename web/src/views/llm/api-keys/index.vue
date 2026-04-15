@@ -17,7 +17,7 @@
         </el-form-item>
         <el-form-item label="模型">
           <el-select v-model="searchForm.model_id" placeholder="请选择" clearable style="width: 150px">
-            <el-option v-for="model in modelList" :key="model.id" :label="model.name" :value="model.id" />
+            <el-option v-for="model in modelList" :key="model.id" :label="model.model_name" :value="model.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="服务类型">
