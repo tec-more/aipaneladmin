@@ -15,39 +15,30 @@ async def create_agent(agent: AgentCreate):
     """Create a new agent"""
     try:
         created_agent = await AgentService.create_agent(agent)
-        skill_count = await created_agent.skills.all().count()
-        memory_count = await created_agent.memories.all().count()
         
-        # Get workflow and dialog flow counts
-        from base.plugins.agent.models.workflow import Workflow
-        from base.plugins.agent.models.dialog_flow import DialogFlow
-        workflow_count = len(await Workflow.filter(agents__id=created_agent.id).all())
-        dialog_flow_count = len(await DialogFlow.filter(agent=created_agent).all())
-        
-        # Get LLM model name
-        llm_model_name = None
-        if created_agent.llm_model:
-            llm_model_name = f"{created_agent.llm_model.provider.name} - {created_agent.llm_model.model_name}"
+        skill_count = 0
+        memory_count = 0
+        workflow_count = 0
+        dialog_flow_count = 0
         
         data = AgentResponse(
             id=created_agent.id,
             name=created_agent.name,
             description=created_agent.description,
             status=created_agent.status,
-            config=created_agent.config,
             memory_capacity=created_agent.memory_capacity,
             system_prompt=created_agent.system_prompt,
             reasoning_strategy=created_agent.reasoning_strategy,
-            llm_model_id=created_agent.llm_model.id if created_agent.llm_model else None,
+            llm_model_id=None,
             created_at=created_agent.created_at,
             updated_at=created_agent.updated_at,
             skill_count=skill_count,
             memory_count=memory_count,
             workflow_count=workflow_count,
-            dialog_flow_count=dialog_flow_count,
-            llm_model_name=llm_model_name
+            dialog_flow_count=dialog_flow_count
         )
-        return success_response(data=data.model_dump(), msg="智能体创建成功")
+        
+        return success_response(data=data, msg="智能体创建成功")
     except Exception as e:
         return fail_response(msg=str(e))
 
@@ -58,38 +49,22 @@ async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: st
     agents = await AgentService.get_agents(skip=skip, limit=limit, name=name, status=status)
     response = []
     for agent in agents:
-        skill_count = await agent.skills.all().count()
-        memory_count = await agent.memories.all().count()
+        skill_count = 0
+        memory_count = 0
         
-        # Get workflow and dialog flow counts
-        from base.plugins.agent.models.workflow import Workflow
-        from base.plugins.agent.models.dialog_flow import DialogFlow
-        workflow_count = len(await Workflow.filter(agents__id=agent.id).all())
-        dialog_flow_count = len(await DialogFlow.filter(agent=agent).all())
-        
-        # Get LLM model name
-        llm_model_name = None
-        if agent.llm_model:
-            llm_model_name = f"{agent.llm_model.provider.name} - {agent.llm_model.model_name}"
-        
-        response.append(AgentResponse(
-            id=agent.id,
-            name=agent.name,
-            description=agent.description,
-            status=agent.status,
-            config=agent.config,
-            memory_capacity=agent.memory_capacity,
-            system_prompt=agent.system_prompt,
-            reasoning_strategy=agent.reasoning_strategy,
-            llm_model_id=agent.llm_model.id if agent.llm_model else None,
-            created_at=agent.created_at,
-            updated_at=agent.updated_at,
-            skill_count=skill_count,
-            memory_count=memory_count,
-            workflow_count=workflow_count,
-            dialog_flow_count=dialog_flow_count,
-            llm_model_name=llm_model_name
-        ).model_dump())
+        response.append({
+            "id": agent.id,
+            "name": agent.name,
+            "description": agent.description,
+            "status": agent.status,
+            "memory_capacity": agent.memory_capacity,
+            "system_prompt": agent.system_prompt,
+            "reasoning_strategy": agent.reasoning_strategy,
+            "created_at": agent.created_at.isoformat() if agent.created_at else None,
+            "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
+            "skill_count": skill_count,
+            "memory_count": memory_count
+        })
     return success_response(data={"items": response, "total": len(response)})
 
 
@@ -100,43 +75,21 @@ async def get_agent(agent_id: int):
     if not agent:
         return fail_response(msg="智能体不存在", code=404)
     
-    skill_count = await agent.skills.all().count()
-    memory_count = await agent.memories.all().count()
-    
-    # Get LLM model name
-    llm_model_name = None
-    if agent.llm_model:
-        llm_model_name = f"{agent.llm_model.provider.name} - {agent.llm_model.model_name}"
-    
-    # Get workflow and dialog flow counts and IDs
-    from base.plugins.agent.models.workflow import Workflow
-    from base.plugins.agent.models.dialog_flow import DialogFlow
-    workflows = await Workflow.filter(agents__id=agent.id).all()
-    dialog_flows = await DialogFlow.filter(agent=agent).all()
-    workflow_count = len(workflows)
-    dialog_flow_count = len(dialog_flows)
-    workflow_ids = [workflow.id for workflow in workflows]
-    dialog_flow_ids = [dialog_flow.id for dialog_flow in dialog_flows]
+    skill_count = 0
+    memory_count = 0
     
     data = {
         "id": agent.id,
         "name": agent.name,
         "description": agent.description,
         "status": agent.status,
-        "config": agent.config,
         "memory_capacity": agent.memory_capacity,
         "system_prompt": agent.system_prompt,
         "reasoning_strategy": agent.reasoning_strategy,
-        "llm_model_id": agent.llm_model.id if agent.llm_model else None,
-        "created_at": agent.created_at,
-        "updated_at": agent.updated_at,
+        "created_at": agent.created_at.isoformat() if agent.created_at else None,
+        "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
         "skill_count": skill_count,
-        "memory_count": memory_count,
-        "workflow_count": workflow_count,
-        "dialog_flow_count": dialog_flow_count,
-        "workflow_ids": workflow_ids,
-        "dialog_flow_ids": dialog_flow_ids,
-        "llm_model_name": llm_model_name
+        "memory_count": memory_count
     }
     return success_response(data=data)
 
@@ -148,43 +101,21 @@ async def update_agent(agent_id: int, agent: AgentUpdate):
     if not updated_agent:
         return fail_response(msg="智能体不存在", code=404)
     
-    skill_count = await updated_agent.skills.all().count()
-    memory_count = await updated_agent.memories.all().count()
-    
-    # Get LLM model name
-    llm_model_name = None
-    if updated_agent.llm_model:
-        llm_model_name = f"{updated_agent.llm_model.provider.name} - {updated_agent.llm_model.model_name}"
-    
-    # Get workflow and dialog flow counts and IDs
-    from base.plugins.agent.models.workflow import Workflow
-    from base.plugins.agent.models.dialog_flow import DialogFlow
-    workflows = await Workflow.filter(agents__id=updated_agent.id).all()
-    dialog_flows = await DialogFlow.filter(agent=updated_agent).all()
-    workflow_count = len(workflows)
-    dialog_flow_count = len(dialog_flows)
-    workflow_ids = [workflow.id for workflow in workflows]
-    dialog_flow_ids = [dialog_flow.id for dialog_flow in dialog_flows]
+    skill_count = 0
+    memory_count = 0
     
     data = {
         "id": updated_agent.id,
         "name": updated_agent.name,
         "description": updated_agent.description,
         "status": updated_agent.status,
-        "config": updated_agent.config,
         "memory_capacity": updated_agent.memory_capacity,
         "system_prompt": updated_agent.system_prompt,
         "reasoning_strategy": updated_agent.reasoning_strategy,
-        "llm_model_id": updated_agent.llm_model.id if updated_agent.llm_model else None,
-        "created_at": updated_agent.created_at,
-        "updated_at": updated_agent.updated_at,
+        "created_at": updated_agent.created_at.isoformat() if updated_agent.created_at else None,
+        "updated_at": updated_agent.updated_at.isoformat() if updated_agent.updated_at else None,
         "skill_count": skill_count,
-        "memory_count": memory_count,
-        "workflow_count": workflow_count,
-        "dialog_flow_count": dialog_flow_count,
-        "workflow_ids": workflow_ids,
-        "dialog_flow_ids": dialog_flow_ids,
-        "llm_model_name": llm_model_name
+        "memory_count": memory_count
     }
     return success_response(data=data, msg="智能体更新成功")
 
@@ -198,45 +129,6 @@ async def delete_agent(agent_id: int):
     return success_response(msg="智能体删除成功")
 
 
-@agent_router.get("/{agent_id}/skills")
-async def get_agent_skills(agent_id: int):
-    """Get agent skills"""
-    agent_data = await AgentService.get_agent_with_skills(agent_id)
-    if not agent_data:
-        return fail_response(msg="智能体不存在", code=404)
-    
-    skill_ids = [skill.id for skill in agent_data["skills"]]
-    return success_response(data=skill_ids)
-
-
-@agent_router.put("/{agent_id}/skills")
-async def set_agent_skills(agent_id: int, data: dict):
-    """Set agent skills"""
-    skill_ids = data.get("skill_ids", [])
-    success = await AgentService.set_agent_skills(agent_id, skill_ids)
-    if not success:
-        return fail_response(msg="设置技能失败", code=400)
-    return success_response(msg="技能设置成功")
-
-
-@agent_router.post("/{agent_id}/skills/{skill_id}")
-async def add_skill_to_agent(agent_id: int, skill_id: int):
-    """Add skill to agent"""
-    success = await AgentService.add_skill_to_agent(agent_id, skill_id)
-    if not success:
-        return fail_response(msg="智能体或技能不存在", code=404)
-    return success_response(msg="技能添加成功")
-
-
-@agent_router.delete("/{agent_id}/skills/{skill_id}")
-async def remove_skill_from_agent(agent_id: int, skill_id: int):
-    """Remove skill from agent"""
-    success = await AgentService.remove_skill_from_agent(agent_id, skill_id)
-    if not success:
-        return fail_response(msg="智能体或技能不存在", code=404)
-    return success_response(msg="技能移除成功")
-
-
 @agent_router.post("/{agent_id}/execute")
 async def execute_agent(agent_id: int, input_data: dict):
     """Execute agent"""
@@ -247,54 +139,84 @@ async def execute_agent(agent_id: int, input_data: dict):
         return fail_response(msg=result.get("message", "执行失败"))
 
 
-@agent_router.put("/{agent_id}/flow")
-async def update_agent_flow(agent_id: int, flow_data: dict):
-    """Update agent flow diagram"""
+@agent_router.post("/{agent_id}/graph/execute")
+async def execute_agent_graph(agent_id: int, input_data: dict):
+    """Execute agent graph diagram using LangGraph"""
     try:
-        import logging
-        logging.info(f"保存流程图 - agent_id: {agent_id}, 数据: {flow_data}")
-        logging.info(f"流程图节点数: {len(flow_data.get('nodes', []))}, 边数: {len(flow_data.get('edges', []))}")
+        from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
         
         agent = await AgentService.get_agent_by_id(agent_id)
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
         
-        # 更新智能体配置中的流程图数据
-        if not agent.config:
-            agent.config = {}
-        agent.config["flow_data"] = flow_data
-        await agent.save()
+        result = await LangGraphExecutor.execute_agent(agent, input_data)
         
-        logging.info(f"流程图保存成功 - agent_id: {agent_id}")
-        return success_response(msg="智能体流程图更新成功")
+        if result.get("success"):
+            return success_response(data=result, msg="结构图执行成功")
+        else:
+            return fail_response(msg=result.get("message", "结构图执行失败"))
+    except Exception as e:
+        import traceback
+        return fail_response(msg=f"结构图执行失败: {str(e)}", data={"traceback": traceback.format_exc()})
+
+
+@agent_router.get("/{agent_id}/graph")
+async def get_agent_graph(agent_id: int):
+    """Get agent graph definition"""
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"=== 获取智能体结构图: agent_id={agent_id} ===")
+        
+        agent = await AgentService.get_agent_by_id(agent_id)
+        if not agent:
+            logger.error(f"智能体不存在: agent_id={agent_id}")
+            return fail_response(msg="智能体不存在", code=404)
+        
+        logger.info(f"agent.graph_definition: {agent.graph_definition}")
+        logger.info(f"agent.graph_definition 类型: {type(agent.graph_definition)}")
+        
+        return success_response(data={
+            "graph_definition": agent.graph_definition
+        })
     except Exception as e:
         import logging
-        logging.error(f"保存流程图失败: {str(e)}")
-        import traceback
-        logging.error(traceback.format_exc())
+        logger = logging.getLogger(__name__)
+        logger.exception(f"获取智能体结构图失败: {e}")
         return fail_response(msg=str(e))
 
 
-@agent_router.post("/{agent_id}/flow/execute")
-async def execute_agent_flow(agent_id: int, input_data: dict):
-    """Execute agent flow diagram"""
+@agent_router.put("/{agent_id}/graph")
+async def update_agent_graph(agent_id: int, graph_data: dict):
+    """Update agent graph definition"""
     try:
-        from base.plugins.agent.services.agent_flow_service import AgentFlowService
+        import logging
+        logger = logging.getLogger(__name__)
         
-        user_id = input_data.get("user_id", None)
-        result = await AgentFlowService.execute_agent_flow(
-            agent_id=agent_id,
-            input_data=input_data,
-            user_id=user_id
-        )
+        logger.info(f"=== 保存智能体结构图: agent_id={agent_id} ===")
+        logger.info(f"接收到的 graph_data: {graph_data}")
+        logger.info(f"graph_data 类型: {type(graph_data)}")
         
-        if result.get("success"):
-            return success_response(data=result, msg="流程图执行成功")
-        else:
-            return fail_response(msg=result.get("message", "流程图执行失败"))
+        agent = await AgentService.get_agent_by_id(agent_id)
+        if not agent:
+            logger.error(f"智能体不存在: agent_id={agent_id}")
+            return fail_response(msg="智能体不存在", code=404)
+        
+        logger.info(f"保存前 agent.graph_definition: {agent.graph_definition}")
+        
+        agent.graph_definition = graph_data
+        await agent.save()
+        
+        logger.info(f"保存后 agent.graph_definition: {agent.graph_definition}")
+        logger.info(f"保存后 agent.graph_definition 类型: {type(agent.graph_definition)}")
+        
+        return success_response(data={"graph_definition": agent.graph_definition}, msg="智能体结构图保存成功")
     except Exception as e:
-        import traceback
-        return fail_response(msg=f"流程图执行失败: {str(e)}", data={"traceback": traceback.format_exc()})
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f"保存智能体结构图失败: {e}")
+        return fail_response(msg=str(e))
 
 
 @agent_router.post("/process-documents")
@@ -336,3 +258,88 @@ async def process_documents(
         )
     except Exception as e:
         return fail_response(msg=str(e), code=500)
+
+
+@agent_router.get("/{agent_id}/skills")
+async def get_agent_skills(agent_id: int):
+    """Get agent skills"""
+    try:
+        agent = await AgentService.get_agent_by_id(agent_id)
+        if not agent:
+            return fail_response(msg="智能体不存在", code=404)
+        
+        config = agent.config or {}
+        skill_ids = config.get("skills", [])
+        
+        from base.plugins.agent.models.skill import Skill
+        skills = []
+        if skill_ids:
+            skills = await Skill.filter(id__in=skill_ids).all()
+        
+        return success_response(data={"skills": skills})
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@agent_router.post("/{agent_id}/skills/{skill_id}")
+async def add_skill_to_agent(agent_id: int, skill_id: int):
+    """Add skill to agent"""
+    try:
+        agent = await AgentService.get_agent_by_id(agent_id)
+        if not agent:
+            return fail_response(msg="智能体不存在", code=404)
+        
+        if not agent.config:
+            agent.config = {}
+        
+        skills = agent.config.get("skills", [])
+        if skill_id not in skills:
+            skills.append(skill_id)
+            agent.config["skills"] = skills
+            await agent.save()
+        
+        return success_response(msg="技能添加成功")
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@agent_router.delete("/{agent_id}/skills/{skill_id}")
+async def remove_skill_from_agent(agent_id: int, skill_id: int):
+    """Remove skill from agent"""
+    try:
+        agent = await AgentService.get_agent_by_id(agent_id)
+        if not agent:
+            return fail_response(msg="智能体不存在", code=404)
+        
+        if not agent.config:
+            agent.config = {}
+        
+        skills = agent.config.get("skills", [])
+        if skill_id in skills:
+            skills.remove(skill_id)
+            agent.config["skills"] = skills
+            await agent.save()
+        
+        return success_response(msg="技能移除成功")
+    except Exception as e:
+        return fail_response(msg=str(e))
+
+
+@agent_router.put("/{agent_id}/skills")
+async def set_agent_skills(agent_id: int, data: dict):
+    """Set agent skills"""
+    try:
+        agent = await AgentService.get_agent_by_id(agent_id)
+        if not agent:
+            return fail_response(msg="智能体不存在", code=404)
+        
+        if not agent.config:
+            agent.config = {}
+        
+        skill_ids = data.get("skill_ids", [])
+        agent.config["skills"] = skill_ids
+        await agent.save()
+        
+        return success_response(msg="技能设置成功")
+    except Exception as e:
+        return fail_response(msg=str(e))

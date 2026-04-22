@@ -10,6 +10,7 @@ from base.plugins.agent.schemas.workflow import (
     WorkflowExecutionCreate, WorkflowExecutionResponse
 )
 from base.plugins.agent.services.workflow_service import WorkflowService
+from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
 from base.common.response import success_response, fail_response
 
 workflow_router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -21,7 +22,6 @@ async def create_workflow(workflow: WorkflowCreate):
     """Create a new workflow"""
     try:
         created_workflow = await WorkflowService.create_workflow(workflow)
-        agents = await created_workflow.agents.all()
         
         data = {
             "id": created_workflow.id,
@@ -29,7 +29,7 @@ async def create_workflow(workflow: WorkflowCreate):
             "description": created_workflow.description,
             "status": created_workflow.status,
             "definition": created_workflow.definition,
-            "agent_ids": [agent.id for agent in agents],
+            "agent_ids": [],
             "created_at": created_workflow.created_at.isoformat() if created_workflow.created_at else None,
             "updated_at": created_workflow.updated_at.isoformat() if created_workflow.updated_at else None,
             "node_count": 0,
@@ -46,14 +46,13 @@ async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status:
     workflows = await WorkflowService.get_workflows(skip=skip, limit=limit, name=name, status=status)
     response = []
     for workflow in workflows:
-        agents = await workflow.agents.all()
         response.append({
             "id": workflow.id,
             "name": workflow.name,
             "description": workflow.description,
             "status": workflow.status,
             "definition": workflow.definition,
-            "agent_ids": [agent.id for agent in agents],
+            "agent_ids": [],
             "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
             "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
             "node_count": 0,
@@ -69,15 +68,13 @@ async def get_workflow(workflow_id: int):
     if not workflow:
         return fail_response(msg="工作流不存在", code=404)
     
-    agents = await workflow.agents.all()
-    
     data = {
         "id": workflow.id,
         "name": workflow.name,
         "description": workflow.description,
         "status": workflow.status,
         "definition": workflow.definition,
-        "agent_ids": [agent.id for agent in agents],
+        "agent_ids": [],
         "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
         "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
         "node_count": 0,
@@ -93,15 +90,13 @@ async def update_workflow(workflow_id: int, workflow: WorkflowUpdate):
     if not updated_workflow:
         return fail_response(msg="工作流不存在", code=404)
     
-    agents = await updated_workflow.agents.all()
-    
     data = {
         "id": updated_workflow.id,
         "name": updated_workflow.name,
         "description": updated_workflow.description,
         "status": updated_workflow.status,
         "definition": updated_workflow.definition,
-        "agent_ids": [agent.id for agent in agents],
+        "agent_ids": [],
         "created_at": updated_workflow.created_at.isoformat() if updated_workflow.created_at else None,
         "updated_at": updated_workflow.updated_at.isoformat() if updated_workflow.updated_at else None,
         "node_count": 0,
@@ -169,25 +164,35 @@ async def create_workflow_edge(workflow_id: int, edge: WorkflowEdgeCreate):
 
 @workflow_router.post("/{workflow_id}/execute")
 async def execute_workflow(workflow_id: int, input_data: Dict[str, Any]):
-    """Execute workflow"""
+    """Execute workflow using LangGraph"""
     try:
-        executed_workflow = await WorkflowService.execute_workflow(
-            workflow_id=workflow_id,
-            input_data=input_data
-        )
-        data = {
-            "id": executed_workflow.id,
-            "workflow_id": executed_workflow.workflow_id,
-            "input_data": executed_workflow.input_data,
-            "status": executed_workflow.status,
-            "output_data": executed_workflow.output_data,
-            "error_message": executed_workflow.error_message,
-            "started_at": executed_workflow.started_at.isoformat() if executed_workflow.started_at else None,
-            "completed_at": executed_workflow.completed_at.isoformat() if executed_workflow.completed_at else None,
-            "created_at": executed_workflow.created_at.isoformat() if executed_workflow.created_at else None,
-            "updated_at": executed_workflow.updated_at.isoformat() if executed_workflow.updated_at else None
-        }
-        return success_response(data=data, msg="工作流执行成功")
+        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
+        if not workflow:
+            return fail_response(msg="工作流不存在", code=404)
+        
+        flow_data = workflow.definition or {}
+        
+        # 使用 LangGraph 执行工作流
+        # 创建一个临时的 agent 对象（或者扩展 LangGraphExecutor 支持 workflow）
+        # 这里我们直接调用 LangGraphExecutor 的核心逻辑
+        # 或者创建一个通用的执行函数
+        
+        # 临时方案：直接使用 LangGraphExecutor 的内部方法
+        from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
+        
+        # 创建一个 mock agent
+        class MockAgent:
+            def __init__(self, definition):
+                self.graph_definition = definition
+                self.id = workflow_id
+                self.name = workflow.name
+        
+        mock_agent = MockAgent(flow_data)
+        
+        # 执行
+        result = await LangGraphExecutor.execute_agent(mock_agent, input_data)
+        
+        return success_response(data=result, msg="工作流执行成功")
     except ValueError as e:
         return fail_response(msg=str(e), code=404)
     except Exception as e:

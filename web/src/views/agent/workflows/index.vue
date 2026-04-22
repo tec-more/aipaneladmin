@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>工作流管理</span>
+          <span>工作流</span>
           <el-button type="primary" @click="handleCreate">
             <el-icon><Plus /></el-icon>
             新建工作流

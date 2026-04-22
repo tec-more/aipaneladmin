@@ -34,7 +34,7 @@ async def get_models(
     provider_id: Optional[int] = Query(None, description="厂商ID筛选"),
     status: Optional[str] = Query(None, description="状态筛选"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量")
+    page_size: int = Query(1000, ge=1, le=10000, description="每页数量")
 ):
     """获取大模型列表"""
     query = LLMModel.all()
@@ -45,7 +45,12 @@ async def get_models(
         query = query.filter(status=status)
 
     total = await query.count()
-    models = await query.offset((page - 1) * page_size).limit(page_size).prefetch_related('provider')
+    
+    # 如果 page_size >= 1000，返回所有记录（不分页）
+    if page_size >= 1000:
+        models = await query.prefetch_related('provider')
+    else:
+        models = await query.offset((page - 1) * page_size).limit(page_size).prefetch_related('provider')
 
     # 转换为响应格式
     result = []

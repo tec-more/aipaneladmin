@@ -7,13 +7,6 @@ class DialogFlow(Model):
     id = fields.IntField(pk=True, description="对话流ID")
     name = fields.CharField(max_length=100, description="对话流名称")
     description = fields.TextField(null=True, description="对话流描述")
-    agent = fields.ForeignKeyField(
-        "models.Agent",
-        related_name="dialog_flows",
-        null=True,
-        on_delete=fields.SET_NULL,
-        description="关联的智能体"
-    )
     
     # 对话流结构，JSON格式
     flow_data = fields.JSONField(default=dict, description="对话流结构")
@@ -70,7 +63,6 @@ class DialogFlowExecution(Model):
     """对话流执行记录模型"""
     id = fields.IntField(pk=True, description="执行记录ID")
     dialog_flow_id = fields.IntField(description="对话流ID")
-    agent_id = fields.IntField(null=True, description="智能体ID")
     user_id = fields.IntField(null=True, description="用户ID")
     
     # 执行状态

@@ -11,7 +11,7 @@ class Agent(BaseModel, TimestampMixin):
     name = fields.CharField(max_length=100, description="Agent name")
     description = fields.TextField(null=True, description="Agent description")
     status = fields.CharField(max_length=20, default="active", description="Status: active/inactive")
-    config = fields.JSONField(null=True, description="Agent configuration")
+    graph_definition = fields.JSONField(null=True, description="Agent graph definition (nodes and edges)")
     memory_capacity = fields.IntField(default=100, description="Memory capacity")
     system_prompt = fields.TextField(null=True, description="System prompt")
     reasoning_strategy = fields.CharField(
@@ -19,14 +19,6 @@ class Agent(BaseModel, TimestampMixin):
         default="function_call",
         description="Reasoning strategy: function_call/react"
     )
-    llm_model = fields.ForeignKeyField(
-        "models.LLMModel",
-        related_name="agents",
-        null=True,
-        on_delete=fields.SET_NULL,
-        description="Associated LLM model"
-    )
-    skills = fields.ManyToManyField("models.Skill", related_name="agents", description="Associated skills")
     
     class Meta:
         table = "agent"

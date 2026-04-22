@@ -386,23 +386,23 @@ class PluginManager:
                 )
                 
                 if existing_menu:
-                    # 更新菜单
+                    # 更新菜单 - 保留现有 sort 值
                     update_data = MenuUpdate(
                         name=menu_config["name"],
                         path=menu_config["path"],
                         icon=menu_config.get("icon"),
                         component=menu_config.get("component"),
                         parent_id=parent_id,
-                        sort=menu_config.get("sort", 0),
+                        sort=existing_menu.sort,  # 保留数据库中的排序值，不覆盖
                         is_hidden=menu_config.get("is_hidden", False),
                         menu_type=menu_config.get("menu_type", "menu"),
                         permission_code=menu_config.get("permission_code"),
                         is_active=True
                     )
                     menu = await MenuService.update_menu(existing_menu.id, update_data)
-                    log.debug(f"更新菜单: {menu_config['name']} ({menu_config['path']})")
+                    log.debug(f"更新菜单: {menu_config['name']} ({menu_config['path']}) - 保留排序值: {existing_menu.sort}")
                 else:
-                    # 创建菜单
+                    # 创建菜单 - 使用配置中的 sort 值
                     create_data = MenuCreate(
                         name=menu_config["name"],
                         path=menu_config["path"],
@@ -415,7 +415,7 @@ class PluginManager:
                         permission_code=menu_config.get("permission_code")
                     )
                     menu = await MenuService.create_menu(create_data)
-                    log.debug(f"创建菜单: {menu_config['name']} ({menu_config['path']})")
+                    log.debug(f"创建菜单: {menu_config['name']} ({menu_config['path']}) - 初始排序值: {menu_config.get('sort', 0)}")
                 
                 # 处理子菜单
                 for child_config in menu_config.get("children", []):

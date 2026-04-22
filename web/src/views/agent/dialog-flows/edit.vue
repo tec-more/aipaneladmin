@@ -25,9 +25,9 @@
     
     <div class="editor-container">
       <div class="node-panel">
-        <div class="panel-title">节点类型</div>
+        <div class="panel-title">流程控制</div>
         <div 
-          v-for="nodeType in nodeTypes" 
+          v-for="nodeType in nodeCategories.flowControl" 
           :key="nodeType.type"
           class="node-item"
           draggable="true"
@@ -36,6 +36,43 @@
           <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
           <span>{{ nodeType.label }}</span>
         </div>
+        
+        <div class="panel-title" style="margin-top: 20px">输入输出</div>
+        <div 
+          v-for="nodeType in nodeCategories.inputOutput" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
+        <div class="panel-title" style="margin-top: 20px">内容展示</div>
+        <div 
+          v-for="nodeType in nodeCategories.content" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
+        <div class="panel-title" style="margin-top: 20px">功能调用</div>
+        <div 
+          v-for="nodeType in nodeCategories.functions" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
         <div class="panel-title" style="margin-top: 20px">操作提示</div>
         <div class="help-text">
           <p>• 拖拽节点到画布创建</p>
@@ -110,7 +147,7 @@
                 <div v-else class="target-nodes-list">
                   <div v-for="(node, index) in targetNodes" :key="node.id" class="target-node-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #fff; border-radius: 4px; border: 1px solid #e0e0e0;">
                     <el-icon :size="16" style="color: #409eff; margin-right: 8px;">
-                      <component :is="nodeTypes.find(n => n.type === node.type)?.icon || Document" />
+                      <component :is="allNodeTypes.find(n => n.type === node.type)?.icon || Document" />
                     </el-icon>
                     <span style="flex: 1; color: #303133;">{{ node.data.label }}</span>
                     <el-tag size="small" type="info" style="margin-left: 10px;">
@@ -360,19 +397,34 @@ const nodeConfig = reactive({
   output_var: ''
 })
 
-const nodeTypes = [
-  { type: 'start', label: '开始', icon: Play, next: ['input', 'message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
-  { type: 'end', label: '结束', icon: CircleCheck, next: [] },
-  { type: 'input', label: '输入', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
-  { type: 'output', label: '输出', icon: CircleCheck, next: ['end'] },
-  { type: 'message', label: '消息', icon: ChatDotRound, next: ['text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-  { type: 'text', label: '文本', icon: Document, next: ['message', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-  { type: 'voice', label: '语音', icon: Mic, next: ['message', 'text', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-  { type: 'question', label: '问题', icon: QuestionFilled, next: ['message', 'text', 'voice', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-  { type: 'condition', label: '条件判断', icon: Share, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-  { type: 'agent', label: '智能体', icon: User, next: ['message', 'text', 'voice', 'question', 'api', 'knowledge_retrieval', 'output'] },
-  { type: 'api', label: 'API调用', icon: Connection, next: ['message', 'text', 'voice', 'question', 'agent', 'knowledge_retrieval', 'output'] },
-  { type: 'knowledge_retrieval', label: '知识检索', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'output'] }
+const nodeCategories = {
+  flowControl: [
+    { type: 'start', label: '开始', icon: Play, next: ['input', 'message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
+    { type: 'end', label: '结束', icon: CircleCheck, next: [] },
+    { type: 'condition', label: '条件判断', icon: Share, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] }
+  ],
+  inputOutput: [
+    { type: 'input', label: '输入', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
+    { type: 'output', label: '输出', icon: CircleCheck, next: ['end'] }
+  ],
+  content: [
+    { type: 'message', label: '消息', icon: ChatDotRound, next: ['text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'text', label: '文本', icon: Document, next: ['message', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'voice', label: '语音', icon: Mic, next: ['message', 'text', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'question', label: '问题', icon: QuestionFilled, next: ['message', 'text', 'voice', 'agent', 'api', 'knowledge_retrieval', 'output'] }
+  ],
+  functions: [
+    { type: 'agent', label: '智能体', icon: User, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'api', label: 'API调用', icon: Connection, next: ['message', 'text', 'voice', 'question', 'agent', 'knowledge_retrieval', 'output'] },
+    { type: 'knowledge_retrieval', label: '知识检索', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'output'] }
+  ]
+}
+
+const allNodeTypes = [
+  ...nodeCategories.flowControl,
+  ...nodeCategories.inputOutput,
+  ...nodeCategories.content,
+  ...nodeCategories.functions
 ]
 
 const executeDialogVisible = ref(false)
@@ -532,7 +584,7 @@ const onDrop = (event) => {
     id: `${type}-${Date.now()}`,
     type,
     position,
-    data: { label: nodeTypes.find(n => n.type === type)?.label || type }
+    data: { label: allNodeTypes.find(n => n.type === type)?.label || type }
   }
   nodes.value.push(newNode)
 }
@@ -779,6 +831,8 @@ onMounted(() => {
   background: #fff;
   border-right: 1px solid #e4e7ed;
   padding: 10px;
+  overflow-y: auto;
+  max-height: 100%;
 }
 
 .panel-title {

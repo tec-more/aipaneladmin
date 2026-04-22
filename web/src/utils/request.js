@@ -7,6 +7,59 @@ const request = axios.create({
   timeout: 15000
 })
 
+export function createRequestWithTimeout(timeout) {
+  const instance = axios.create({
+    baseURL: '/api',
+    timeout
+  })
+
+  instance.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('token')
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`
+      }
+      return config
+    },
+    (error) => {
+      return Promise.reject(error)
+    }
+  )
+
+  instance.interceptors.response.use(
+    (response) => {
+      const res = response.data
+      if (res.code === 0 || res.code === 200 || res.success === true) {
+        return res
+      } else {
+        ElMessage.error(res.msg || res.message || '请求失败')
+        return Promise.reject(new Error(res.msg || res.message || '请求失败'))
+      }
+    },
+    (error) => {
+      console.error('[Request Error]', error)
+      if (error.response) {
+        const { status, data } = error.response
+        if (status === 401) {
+          localStorage.removeItem('token')
+          localStorage.removeItem('userInfo')
+          ElMessage.error('登录已过期，请重新登录')
+          router.push('/panel')
+        } else {
+          ElMessage.error(data?.msg || data?.message || error.message || `请求失败 (${status})`)
+        }
+      } else if (error.request) {
+        ElMessage.error('网络错误，请检查网络连接')
+      } else {
+        ElMessage.error(error.message || '请求失败')
+      }
+      return Promise.reject(error)
+    }
+  )
+
+  return instance
+}
+
 // 请求拦截器 - 直接从 localStorage 读取 token
 request.interceptors.request.use(
   (config) => {

@@ -12,7 +12,6 @@ class Workflow(BaseModel, TimestampMixin):
     description = fields.TextField(null=True, description="Workflow description")
     status = fields.CharField(max_length=20, default="draft", description="Status: draft/active/inactive")
     definition = fields.JSONField(description="Workflow definition")
-    agents = fields.ManyToManyField("models.Agent", related_name="workflows", description="Associated agents")
     
     class Meta:
         table = "workflow"
@@ -29,9 +28,6 @@ class WorkflowNode(BaseModel, TimestampMixin):
     type = fields.CharField(max_length=50, description="Node type: agent/skill/llm/decision/fork/join/iteration/code/template/variable_aggregator/document_extractor/variable_assigner/parameter_extractor/http/list_operation")
     config = fields.JSONField(description="Node configuration")
     position = fields.JSONField(description="Node position in UI")
-    agent = fields.ForeignKeyField("models.Agent", null=True, related_name="workflow_nodes", description="Associated agent")
-    skill = fields.ForeignKeyField("models.Skill", null=True, related_name="workflow_nodes", description="Associated skill")
-    llm = fields.ForeignKeyField("models.LLMModel", null=True, related_name="workflow_nodes", description="Associated LLM model")
     
     class Meta:
         table = "workflow_node"

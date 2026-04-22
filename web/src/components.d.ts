@@ -56,6 +56,7 @@ declare module 'vue' {
     ElTransfer: typeof import('element-plus/es')['ElTransfer']
     ElTreeSelect: typeof import('element-plus/es')['ElTreeSelect']
     ElUpload: typeof import('element-plus/es')['ElUpload']
+    LangGraphEditor: typeof import('./components/LangGraphEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }

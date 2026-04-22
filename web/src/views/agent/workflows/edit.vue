@@ -408,6 +408,84 @@
               </el-form-item>
             </template>
             
+            <!-- LangChain Agent 节点配置 -->
+            <template v-if="selectedNode.type === 'langchain_agent'">
+              <el-divider content-position="left">LangChain Agent 配置</el-divider>
+              <el-form-item label="Agent类型">
+                <el-select v-model="nodeConfig.agent_type" @change="updateNodeData" style="width: 100%">
+                  <el-option label="Zero Shot ReAct" value="zero_shot_react_description" />
+                  <el-option label="OpenAI Functions" value="openai_functions" />
+                  <el-option label="Conversational ReAct" value="conversational_react" />
+                  <el-option label="Chat Zero Shot" value="chat_zero_shot_react" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="记忆类型">
+                <el-select v-model="nodeConfig.memory_type" @change="updateNodeData" style="width: 100%">
+                  <el-option label="Conversation Buffer" value="buffer" />
+                  <el-option label="Conversation Summary" value="summary" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="选择技能">
+                <el-select v-model="nodeConfig.skill_ids" multiple @change="updateNodeData" style="width: 100%" placeholder="选择技能作为Tools">
+                  <el-option v-for="skill in skills" :key="skill.id" :label="skill.name" :value="skill.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="大模型">
+                <el-select v-model="nodeConfig.llm_id" @change="updateNodeData" style="width: 100%" placeholder="请选择">
+                  <el-option v-for="model in llms" :key="model.id" :label="model.name" :value="model.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输入文本">
+                <el-input v-model="nodeConfig.input_text" type="textarea" :rows="2" @change="updateNodeData" placeholder="可使用 {{变量}} 引用" />
+              </el-form-item>
+              <el-form-item label="详细日志">
+                <el-switch v-model="nodeConfig.verbose" @change="updateNodeData" />
+              </el-form-item>
+            </template>
+            
+            <!-- LangChain Chain 节点配置 -->
+            <template v-if="selectedNode.type === 'langchain_chain'">
+              <el-divider content-position="left">LangChain Chain 配置</el-divider>
+              <el-form-item label="提示词模板">
+                <el-input v-model="nodeConfig.prompt_template" type="textarea" :rows="4" @change="updateNodeData" placeholder="例如: 请将以下文本翻译成法语: {input}" />
+              </el-form-item>
+              <el-form-item label="输入变量">
+                <el-input v-model="nodeConfig.input_variables" @change="updateNodeData" placeholder="用逗号分隔，例如: input, context" />
+              </el-form-item>
+              <el-form-item label="大模型">
+                <el-select v-model="nodeConfig.llm_id" @change="updateNodeData" style="width: 100%" placeholder="请选择">
+                  <el-option v-for="model in llms" :key="model.id" :label="model.name" :value="model.id" />
+                </el-select>
+              </el-form-item>
+            </template>
+            
+            <!-- LangChain RAG 节点配置 -->
+            <template v-if="selectedNode.type === 'langchain_rag'">
+              <el-divider content-position="left">LangChain RAG 配置</el-divider>
+              <el-form-item label="查询问题">
+                <el-input v-model="nodeConfig.query" type="textarea" :rows="2" @change="updateNodeData" placeholder="可使用 {{变量}} 引用" />
+              </el-form-item>
+              <el-form-item label="Chain类型">
+                <el-select v-model="nodeConfig.chain_type" @change="updateNodeData" style="width: 100%">
+                  <el-option label="Stuff" value="stuff" />
+                  <el-option label="Map Reduce" value="map_reduce" />
+                  <el-option label="Refine" value="refine" />
+                  <el-option label="Map Rerank" value="map_rerank" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="向量库路径">
+                <el-input v-model="nodeConfig.vector_store_path" @change="updateNodeData" placeholder="./vector_stores/xxx" />
+              </el-form-item>
+              <el-form-item label="大模型">
+                <el-select v-model="nodeConfig.llm_id" @change="updateNodeData" style="width: 100%" placeholder="请选择">
+                  <el-option v-for="model in llms" :key="model.id" :label="model.name" :value="model.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="返回源文档">
+                <el-switch v-model="nodeConfig.return_source_documents" @change="updateNodeData" />
+              </el-form-item>
+            </template>
+            
             <!-- 输出节点配置 -->
             <template v-if="selectedNode.type === 'output'">
               <el-divider content-position="left">输出配置</el-divider>
@@ -534,31 +612,31 @@ const nodeConfig = reactive({
 
 const nodeTypes = [
   // 基础节点
-  { type: 'start', label: '开始', icon: Play, category: 'basic', next: ['input', 'agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'start', label: '开始', icon: Play, category: 'basic', next: ['input', 'agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'decision', 'loop', 'iteration'] },
   { type: 'end', label: '结束', icon: CircleCheck, category: 'basic', next: [] },
-  { type: 'input', label: '输入', icon: EditPen, category: 'basic', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'input', label: '输入', icon: EditPen, category: 'basic', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'decision', 'loop', 'iteration'] },
   { type: 'output', label: '输出', icon: Monitor, category: 'basic', next: ['end'] },
   
   // 智能体相关
-  { type: 'agent', label: '智能体', icon: User, category: 'agent', next: ['skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'skill', label: '技能', icon: Tools, category: 'agent', next: ['agent', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'llm', label: '大模型', icon: Monitor, category: 'agent', next: ['skill', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'decision', label: '条件判断', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'loop', label: '循环', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
-  { type: 'iteration', label: '迭代', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval'] },
+  { type: 'agent', label: '智能体', icon: User, category: 'agent', next: ['skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'skill', label: '技能', icon: Tools, category: 'agent', next: ['agent', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'llm', label: '大模型', icon: Monitor, category: 'agent', next: ['skill', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'decision', label: '条件判断', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'loop', label: '循环', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'decision', 'loop', 'iteration'] },
+  { type: 'iteration', label: '迭代', icon: Share, category: 'agent', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'decision', 'loop', 'iteration'] },
   
   // Dify 风格节点 - 转换类
-  { type: 'code', label: '代码执行', icon: Cpu, category: 'transform', next: ['agent', 'skill', 'llm', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'template', label: '模板转换', icon: Document, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'variable_aggregator', label: '变量聚合器', icon: Collection, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'document_extractor', label: '文档提取器', icon: DocumentChecked, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'variable_assigner', label: '变量赋值', icon: EditPen, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'parameter_extractor', label: '参数提取器', icon: Filter, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
+  { type: 'code', label: '代码执行', icon: Cpu, category: 'transform', next: ['agent', 'skill', 'llm', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'template', label: '模板转换', icon: Document, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'variable_aggregator', label: '变量聚合器', icon: Collection, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'document_extractor', label: '文档提取器', icon: DocumentChecked, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'variable_assigner', label: '变量赋值', icon: EditPen, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'parameter_extractor', label: '参数提取器', icon: Filter, category: 'transform', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
   
   // Dify 风格节点 - 工具类
-  { type: 'http', label: 'HTTP 请求', icon: Link, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'knowledge_retrieval', 'output'] },
-  { type: 'list_operation', label: '列表操作', icon: List, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output'] },
-  { type: 'knowledge_retrieval', label: '知识检索', icon: Document, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'output'] }
+  { type: 'http', label: 'HTTP 请求', icon: Link, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'list_operation', label: '列表操作', icon: List, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'knowledge_retrieval', 'output', 'decision', 'loop', 'iteration'] },
+  { type: 'knowledge_retrieval', label: '知识检索', icon: Document, category: 'tool', next: ['agent', 'skill', 'llm', 'code', 'template', 'http', 'output', 'decision', 'loop', 'iteration'] }
 ]
 
 const executeDialogVisible = ref(false)

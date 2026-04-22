@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>对话流管理</span>
+          <span>对话流</span>
           <el-button type="primary" @click="handleCreate">
             <el-icon><Plus /></el-icon>
             新建对话流

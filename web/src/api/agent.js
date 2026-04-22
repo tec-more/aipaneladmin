@@ -1,4 +1,6 @@
-import request from '@/utils/request'
+import request, { createRequestWithTimeout } from '@/utils/request'
+
+const longRequest = createRequestWithTimeout(300000)
 
 // ==================== 智能体管理 ====================
 
@@ -23,11 +25,19 @@ export function deleteAgent(id) {
 }
 
 export function executeAgent(id, params) {
-  return request.post(`/v1/agent/agents/${id}/execute`, params)
+  return longRequest.post(`/v1/agent/agents/${id}/execute`, params)
 }
 
-export function executeAgentFlow(id, params) {
-  return request.post(`/v1/agent/agents/${id}/flow/execute`, params)
+export function executeAgentGraph(id, params) {
+  return longRequest.post(`/v1/agent/agents/${id}/graph/execute`, params)
+}
+
+export function getAgentGraph(agentId) {
+  return request.get(`/v1/agent/agents/${agentId}/graph`)
+}
+
+export function updateAgentGraph(agentId, graphData) {
+  return request.put(`/v1/agent/agents/${agentId}/graph`, graphData)
 }
 
 export function getAgentSkills(agentId) {
@@ -53,6 +63,9 @@ export function getSkills(params) {
 }
 
 export function getSkill(id) {
+  if (!id || id === null || id === undefined || id <= 0) {
+    return Promise.reject(new Error('无效的技能ID'))
+  }
   return request.get(`/v1/agent/skills/${id}`)
 }
 
@@ -165,7 +178,7 @@ export function createWorkflowEdge(workflowId, data) {
 }
 
 export function executeWorkflow(id, params) {
-  return request.post(`/v1/agent/workflows/${id}/execute`, params)
+  return longRequest.post(`/v1/agent/workflows/${id}/execute`, params)
 }
 
 export function getWorkflowExecutions(params) {
@@ -239,7 +252,7 @@ export function deleteDialogFlowEdge(edgeId) {
 }
 
 export function executeDialogFlow(id, params) {
-  return request.post(`/v1/agent/dialog-flows/${id}/execute`, params)
+  return longRequest.post(`/v1/agent/dialog-flows/${id}/execute`, params)
 }
 
 export function getDialogFlowExecution(executionId) {

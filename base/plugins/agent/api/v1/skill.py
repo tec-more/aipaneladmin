@@ -103,6 +103,10 @@ async def get_skills(skip: int = 0, limit: int = 100, name: str = "", type: str 
 @skill_router.get("/{skill_id}")
 async def get_skill(skill_id: int):
     """Get skill by ID"""
+    # Validate skill_id is a positive integer
+    if skill_id is None or skill_id <= 0:
+        return fail_response(msg="无效的技能ID", code=422)
+    
     skill = await SkillService.get_skill_by_id(skill_id)
     if not skill:
         return fail_response(msg="技能不存在", code=404)

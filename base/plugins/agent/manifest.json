@@ -35,9 +35,19 @@
             "sort": 10,
             "children": [
                 {
-                    "name": "智能体列表",
+                    "name": "智能体",
                     "path": "/agent/list",
                     "component": "agent/agents"
+                },
+                {
+                    "name": "工作流",
+                    "path": "/agent/workflows",
+                    "component": "agent/workflows"
+                },
+                {
+                    "name": "对话流",
+                    "path": "/agent/dialog-flows",
+                    "component": "agent/dialog-flows"
                 },
                 {
                     "name": "技能管理",
@@ -50,24 +60,9 @@
                     "component": "agent/memory"
                 },
                 {
-                    "name": "工作流管理",
-                    "path": "/agent/workflows",
-                    "component": "agent/workflows"
-                },
-                {
-                    "name": "工作流执行记录",
-                    "path": "/agent/workflow-executions",
-                    "component": "agent/workflow-executions"
-                },
-                {
-                    "name": "对话流管理",
-                    "path": "/agent/dialog-flows",
-                    "component": "agent/dialog-flows"
-                },
-                {
-                    "name": "对话流执行记录",
-                    "path": "/agent/dialog-flow-executions",
-                    "component": "agent/dialog-flow-executions"
+                    "name": "执行记录",
+                    "path": "/agent/executions",
+                    "component": "agent/executions"
                 }
             ]
         }

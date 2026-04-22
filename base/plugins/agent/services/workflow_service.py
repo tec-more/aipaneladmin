@@ -47,12 +47,6 @@ class WorkflowService:
             status=workflow_data.status,
             definition=workflow_data.definition
         )
-        
-        # Associate agents
-        if workflow_data.agent_ids:
-            agents = await Agent.filter(id__in=workflow_data.agent_ids).all()
-            await workflow.agents.add(*agents)
-        
         return workflow
 
     @staticmethod
@@ -63,14 +57,14 @@ class WorkflowService:
             query = query.filter(name__icontains=name)
         if status:
             query = query.filter(status=status)
-        workflows = await query.offset(skip).limit(limit).prefetch_related('nodes', 'edges', 'agents')
+        workflows = await query.offset(skip).limit(limit).prefetch_related('nodes', 'edges')
         return workflows
 
     @staticmethod
     async def get_workflow_by_id(workflow_id: int) -> Optional[Workflow]:
         """Get workflow by ID"""
         try:
-            workflow = await Workflow.get(id=workflow_id).prefetch_related('nodes', 'edges', 'agents')
+            workflow = await Workflow.get(id=workflow_id).prefetch_related('nodes', 'edges')
             return workflow
         except DoesNotExist:
             return None
@@ -83,17 +77,9 @@ class WorkflowService:
             return None
 
         update_data = workflow_data.model_dump(exclude_unset=True)
-        agent_ids = update_data.pop('agent_ids', None)
         
         await workflow.update_from_dict(update_data)
         await workflow.save()
-        
-        # Update agents
-        if agent_ids is not None:
-            await workflow.agents.clear()
-            if agent_ids:
-                agents = await Agent.filter(id__in=agent_ids).all()
-                await workflow.agents.add(*agents)
         
         return workflow
 
@@ -389,9 +375,9 @@ class WorkflowService:
             
             # Evaluate condition if provided
             if iteration_condition:
+                from base.plugins.agent.utils.safe_eval import safe_eval_condition
                 try:
-                    # Simple condition evaluation
-                    condition_result = eval(iteration_condition, {}, state)
+                    condition_result = safe_eval_condition(iteration_condition, state)
                     if not condition_result:
                         continue
                 except Exception as e:

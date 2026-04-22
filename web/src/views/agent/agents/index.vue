@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>智能体管理</span>
+          <span>智能体</span>
           <el-button type="primary" @click="handleAdd">
             <el-icon><Plus /></el-icon>
             新增智能体
@@ -45,11 +45,8 @@
           </template>
         </el-table-column>
         <el-table-column prop="skill_count" label="关联技能" width="100" />
-        <el-table-column prop="workflow_count" label="关联工作流" width="100" />
-        <el-table-column prop="dialog_flow_count" label="关联对话流" width="100" />
         <el-table-column prop="memory_count" label="记忆数量" width="100" />
         <el-table-column prop="memory_capacity" label="记忆容量" width="100" />
-        <el-table-column prop="llm_model_name" label="关联大模型" min-width="150" show-overflow-tooltip />
         <el-table-column prop="created_at" label="创建时间" width="180">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
@@ -66,13 +63,9 @@
                 <el-icon><Connection /></el-icon>
                 技能
               </el-button>
-              <el-button type="primary" size="small" @click="handleFlow(row)">
+              <el-button type="success" size="small" @click="handleGraph(row)">
                 <el-icon><Share /></el-icon>
-                工作流
-              </el-button>
-              <el-button type="primary" size="small" @click="handleDialogFlows(row)">
-                <el-icon><DataLine /></el-icon>
-                对话流
+                结构图
               </el-button>
               <el-button type="warning" size="small" @click="handleMemory(row)">
                 <el-icon><Memo /></el-icon>
@@ -120,11 +113,6 @@
         <el-form-item label="配置">
           <el-input v-model="configJson" type="textarea" :rows="4" placeholder="JSON格式配置" />
         </el-form-item>
-        <el-form-item label="关联技能">
-          <el-select v-model="formData.skill_ids" multiple placeholder="请选择技能" style="width: 100%">
-            <el-option v-for="skill in allSkills" :key="skill.id" :label="skill.name" :value="skill.id" />
-          </el-select>
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -151,7 +139,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share, Setting, DataLine } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAgents, createAgent, updateAgent, deleteAgent, getAgentSkills, setAgentSkills } from '@/api/agent'
 import { getSkills } from '@/api/agent'
@@ -181,8 +169,7 @@ const formData = reactive({
   description: '',
   status: 'active',
   memory_capacity: 100,
-  config: {},
-  skill_ids: []
+  config: {}
 })
 
 const configJson = computed({
@@ -311,7 +298,8 @@ const handleSkills = async (row) => {
   currentAgentId.value = row.id
   try {
     const res = await getAgentSkills(row.id)
-    selectedSkillIds.value = res.data || []
+    const data = res.data?.skills || []
+    selectedSkillIds.value = Array.isArray(data) ? data : []
     skillsDialogVisible.value = true
   } catch (error) {
     ElMessage.error('获取技能关联失败')
@@ -332,18 +320,11 @@ const handleSaveSkills = async () => {
 }
 
 const handleMemory = (row) => {
-  // 跳转到记忆管理页面，带上智能体ID
   window.location.href = `/panel/agent/memory?agent_id=${row.id}`
 }
 
-const handleFlow = (row) => {
-  // 跳转到智能体流程图页面，带上智能体ID
-  router.push(`/panel/agent/flow?agent_id=${row.id}`)
-}
-
-const handleDialogFlows = (row) => {
-  // 跳转到对话流管理页面，带上智能体ID
-  router.push(`/panel/agent/dialog-flows?agent_id=${row.id}`)
+const handleGraph = (row) => {
+  router.push(`/panel/agent/graph/${row.id}`)
 }
 
 onMounted(() => {
