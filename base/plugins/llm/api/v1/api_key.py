@@ -8,6 +8,7 @@ from datetime import datetime
 from base.common.response import SuccessResponse, ErrorResponse
 from base.common.security import get_current_user_id
 from base.plugins.llm.models.api_key import LLMApiKey
+from base.plugins.llm.models.enums import CallMode
 
 # 导入管理员权限验证
 try:
@@ -66,6 +67,7 @@ async def get_api_keys(
     result = []
     for key in api_keys:
         service_type_display = ModelServiceType.display_name(key.model_service_type)
+        call_mode_display = CallMode.display_name(key.call_mode)
         
         model_info = None
         if key.model:
@@ -83,12 +85,15 @@ async def get_api_keys(
             "model": model_info,
             "model_service_type": key.model_service_type,
             "model_service_type_display": service_type_display,
+            "call_mode": key.call_mode,
+            "call_mode_display": call_mode_display,
             "api_id": key.api_id,
             "api_key": mask_secret(key.api_key) if key.api_key else None,
             "api_secret": mask_secret(key.api_secret) if key.api_secret else None,
             "access_token": key.access_token,
             "endpoint_url": key.endpoint_url,
             "is_voice_service": key.is_voice_service,
+            "is_openapi_mode": hasattr(key, 'is_openapi_mode') and key.is_openapi_mode,
             "max_quota": key.max_quota,
             "used_quota": key.used_quota,
             "remaining_quota": key.remaining_quota,
@@ -119,6 +124,7 @@ async def get_api_key(key_id: int):
 
     from base.plugins.llm.models.enums import ModelServiceType
     service_type_display = ModelServiceType.display_name(key.model_service_type)
+    call_mode_display = CallMode.display_name(key.call_mode)
     
     model_info = None
     if key.model:
@@ -147,12 +153,15 @@ async def get_api_key(key_id: int):
         "model": model_info,
         "model_service_type": key.model_service_type,
         "model_service_type_display": service_type_display,
+        "call_mode": key.call_mode,
+        "call_mode_display": call_mode_display,
         "api_id": key.api_id,
         "api_key": mask_secret(key.api_key) if key.api_key else None,
         "api_secret": mask_secret(key.api_secret) if key.api_secret else None,
         "access_token": key.access_token,
         "endpoint_url": key.endpoint_url,
         "is_voice_service": key.is_voice_service,
+        "is_openapi_mode": key.is_openapi_mode,
         "max_quota": key.max_quota,
         "used_quota": key.used_quota,
         "remaining_quota": key.remaining_quota,
@@ -181,6 +190,7 @@ async def create_api_key(
         provider_id=data.provider_id,
         model_id=data.model_id,
         model_service_type=data.model_service_type,
+        call_mode=data.call_mode,
         api_id=data.api_id,
         api_key=data.api_key,
         api_secret=data.api_secret,
@@ -192,11 +202,14 @@ async def create_api_key(
 
     from base.plugins.llm.models.enums import ModelServiceType
     service_type_display = ModelServiceType.display_name(api_key.model_service_type)
+    call_mode_display = CallMode.display_name(api_key.call_mode)
 
     return SuccessResponse(data={
         "id": api_key.id,
         "model_service_type": api_key.model_service_type,
         "model_service_type_display": service_type_display,
+        "call_mode": api_key.call_mode,
+        "call_mode_display": call_mode_display,
         "api_id": api_key.api_id,
         "api_key": mask_secret(api_key.api_key) if api_key.api_key else None,
         "api_secret": mask_secret(api_key.api_secret) if api_key.api_secret else None,
@@ -236,11 +249,14 @@ async def update_api_key(
 
     from base.plugins.llm.models.enums import ModelServiceType
     service_type_display = ModelServiceType.display_name(key.model_service_type)
+    call_mode_display = CallMode.display_name(key.call_mode)
 
     return SuccessResponse(data={
         "id": key.id,
         "model_service_type": key.model_service_type,
         "model_service_type_display": service_type_display,
+        "call_mode": key.call_mode,
+        "call_mode_display": call_mode_display,
         "api_id": key.api_id,
         "api_key": mask_secret(key.api_key) if key.api_key else None,
         "api_secret": mask_secret(key.api_secret) if key.api_secret else None,

@@ -153,7 +153,8 @@ async def create_chat(
             provider_name_en=model.provider.name_en,
             api_key=credentials.get("api_key", ""),
             endpoint_url=endpoint_url,
-            api_secret=credentials.get("api_secret", "")
+            api_secret=credentials.get("api_secret", ""),
+            call_mode=credentials.get("call_mode", "vendor_sdk")
         )
 
         # 4. 如果是流式请求

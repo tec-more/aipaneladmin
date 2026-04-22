@@ -4,6 +4,24 @@
 from enum import Enum
 
 
+class CallMode(str, Enum):
+    """大模型调用方式枚举
+
+    用于标识API Key使用哪种方式调用大模型
+    """
+    OPENAPI = "openapi"  # OpenAPI 格式，使用 openai 库
+    VENDOR_SDK = "vendor_sdk"  # 厂商SDK模式，使用厂商提供的SDK
+
+    @classmethod
+    def display_name(cls, value: str) -> str:
+        """获取调用方式的显示名称"""
+        names = {
+            cls.OPENAPI.value: "OpenAPI 格式",
+            cls.VENDOR_SDK.value: "厂商 SDK 模式",
+        }
+        return names.get(value, value)
+
+
 class ModelServiceType(str, Enum):
     """模型服务类型枚举
 
@@ -50,4 +68,4 @@ class ModelServiceType(str, Enum):
         return self.value in [t.value for t in self.voice_services()]
 
 
-__all__ = ['ModelServiceType']
+__all__ = ['ModelServiceType', 'CallMode']

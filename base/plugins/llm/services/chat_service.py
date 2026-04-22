@@ -90,7 +90,7 @@ class ChatService:
         return available_keys[0]
 
     @staticmethod
-    async def get_provider_service(provider_name_en: str, api_key: str, endpoint_url: str, api_secret: str = None):
+    async def get_provider_service(provider_name_en: str, api_key: str, endpoint_url: str, api_secret: str = None, call_mode: str = "vendor_sdk"):
         """
         根据厂商获取对应的服务实例
 
@@ -99,10 +99,18 @@ class ChatService:
             api_key: API密钥
             endpoint_url: API端点
             api_secret: API密钥（部分厂商需要）
+            call_mode: 调用方式，openapi或vendor_sdk
 
         Returns:
             厂商服务实例
         """
+        # 如果是OpenAPI模式，直接使用OpenAIService
+        if call_mode == "openapi":
+            if not OpenAIService:
+                raise HTTPException(status_code=500, detail="OpenAPI服务未配置")
+            return OpenAIService(api_key=api_key, endpoint_url=endpoint_url)
+
+        # 否则使用厂商SDK模式
         if provider_name_en == "doubao":
             if not DoubaoService:
                 raise HTTPException(status_code=500, detail="豆包服务未配置")

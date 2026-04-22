@@ -4,7 +4,7 @@ API密钥模型
 from tortoise import fields
 from datetime import datetime, timedelta
 from base.common.model import BaseModel, TimestampMixin
-from base.plugins.llm.models.enums import ModelServiceType
+from base.plugins.llm.models.enums import ModelServiceType, CallMode
 
 
 class LLMApiKey(BaseModel, TimestampMixin):
@@ -29,6 +29,13 @@ class LLMApiKey(BaseModel, TimestampMixin):
         max_length=50,
         default=ModelServiceType.LLM.value,
         description="模型服务类型"
+    )
+    
+    # ========== 调用方式 ==========
+    call_mode = fields.CharField(
+        max_length=50,
+        default=CallMode.VENDOR_SDK.value,
+        description="调用方式：openapi 使用openai库，vendor_sdk 使用厂商SDK"
     )
 
     # ========== 认证字段 ==========
@@ -99,5 +106,11 @@ class LLMApiKey(BaseModel, TimestampMixin):
             "api_key": self.api_key,
             "api_secret": self.api_secret,
             "access_token": self.access_token,
-            "endpoint_url": self.endpoint_url
+            "endpoint_url": self.endpoint_url,
+            "call_mode": self.call_mode
         }
+    
+    @property
+    def is_openapi_mode(self) -> bool:
+        """是否为OpenAPI模式"""
+        return self.call_mode == CallMode.OPENAPI.value

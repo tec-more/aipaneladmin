@@ -59,6 +59,13 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="调用方式" width="150" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.call_mode === 'openapi' ? 'primary' : 'info'" size="small">
+              {{ row.call_mode_display || row.call_mode }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="api_id" label="API ID" min-width="150" show-overflow-tooltip />
         <el-table-column prop="api_key" label="API Key" min-width="200">
           <template #default="{ row }">
@@ -163,6 +170,18 @@
             </el-option>
           </el-select>
           <div class="text-gray text-xs mt-1">选择此API密钥提供的服务类型</div>
+        </el-form-item>
+        
+        <el-form-item label="调用方式" prop="call_mode">
+          <el-select v-model="form.call_mode" placeholder="请选择调用方式" style="width: 100%">
+            <el-option label="OpenAPI 格式" value="openapi">
+              <div>OpenAPI 格式 - 使用 openai 库进行访问</div>
+            </el-option>
+            <el-option label="厂商 SDK 模式" value="vendor_sdk">
+              <div>厂商 SDK 模式 - 使用厂商提供的 SDK 进行访问</div>
+            </el-option>
+          </el-select>
+          <div class="text-gray text-xs mt-1">选择调用大模型的方式</div>
         </el-form-item>
 
         <!-- 认证字段 -->
@@ -298,6 +317,7 @@ const form = reactive({
   provider_id: null,
   model_id: null,
   model_service_type: 'llm',
+  call_mode: 'vendor_sdk',
   // 统一的认证字段
   api_id: '',
   api_key: '',
@@ -363,6 +383,7 @@ const handleAdd = () => {
   form.provider_id = null
   form.model_id = null
   form.model_service_type = 'llm'
+  form.call_mode = 'vendor_sdk'
   // 统一的认证字段
   form.api_id = ''
   form.api_key = ''
@@ -385,6 +406,7 @@ const handleEdit = (row) => {
   form.provider_id = row.provider_id
   form.model_id = row.model_id ?? null
   form.model_service_type = row.model_service_type || 'llm'
+  form.call_mode = row.call_mode || 'vendor_sdk'
   // 统一的认证字段
   form.api_id = row.api_id ?? ''
   form.api_key = row.api_key ?? row.app_key ?? ''

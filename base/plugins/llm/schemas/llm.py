@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
-from base.plugins.llm.models.enums import ModelServiceType
+from base.plugins.llm.models.enums import ModelServiceType, CallMode
 
 
 # ============ 厂商相关 ============
@@ -107,6 +107,12 @@ class ApiKeyBase(BaseModel):
         ModelServiceType.LLM.value,
         description="模型服务类型"
     )
+    
+    # 调用方式
+    call_mode: str = Field(
+        CallMode.VENDOR_SDK.value,
+        description="调用方式：openapi 使用openai库，vendor_sdk 使用厂商SDK"
+    )
 
     # 认证字段（至少需要一个）
     api_id: Optional[str] = Field(None, max_length=255, description="API ID")
@@ -130,6 +136,7 @@ class ApiKeyUpdate(BaseModel):
     provider_id: Optional[int] = None
     model_id: Optional[int] = None
     model_service_type: Optional[str] = None
+    call_mode: Optional[str] = None
 
     # 认证字段
     api_id: Optional[str] = None
@@ -151,6 +158,7 @@ class ApiKeyResponse(ApiKeyBase):
     remaining_quota: int
     is_available: bool
     is_voice_service: bool
+    is_openapi_mode: bool
     last_used_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
