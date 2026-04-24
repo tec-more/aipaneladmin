@@ -48,8 +48,8 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="type" label="类型" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.type === 'workflow' ? 'primary' : 'success'">
-              {{ row.type === 'workflow' ? '工作流' : '对话流' }}
+            <el-tag :type="getTypeTagType(row.type)">
+              {{ getTypeName(row.type) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -99,8 +99,8 @@
     <el-dialog v-model="detailDialogVisible" title="执行详情" width="700px">
       <el-descriptions :column="2" border v-if="currentExecution">
         <el-descriptions-item label="类型">
-          <el-tag :type="currentExecution.type === 'workflow' ? 'primary' : 'success'">
-            {{ currentExecution.type === 'workflow' ? '工作流' : '对话流' }}
+          <el-tag :type="getTypeTagType(currentExecution.type)">
+            {{ getTypeName(currentExecution.type) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="名称">{{ currentExecution.name }}</el-descriptions-item>
@@ -169,6 +169,24 @@ const getStatusType = (status) => {
   return map[status] || ''
 }
 
+const getTypeName = (type) => {
+  const typeMap = {
+    workflow: '工作流',
+    dialog_flow: '对话流',
+    agent_graph: '智能体图'
+  }
+  return typeMap[type] || type
+}
+
+const getTypeTagType = (type) => {
+  const typeTagMap = {
+    workflow: 'primary',
+    dialog_flow: 'success',
+    agent_graph: 'warning'
+  }
+  return typeTagMap[type] || ''
+}
+
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -225,13 +243,17 @@ const fetchExecutions = async () => {
     }
     
     if (!searchForm.type || searchForm.type === 'dialog_flow') {
-      const res = await getDialogFlowExecutions({
+      const params = {
         skip: 0,
         limit: 1000
-      })
+      }
+      if (searchForm.dialog_flow_id) {
+        params.dialog_flow_id = searchForm.dialog_flow_id
+      }
+      const res = await getDialogFlowExecutions(params)
       const dialogFlowExecutions = (res.data?.items || res.data || []).map(item => ({
         ...item,
-        type: 'dialog_flow',
+        type: item.dialog_flow_id === 0 ? 'agent_graph' : 'dialog_flow',
         name: getDialogFlowName(item.dialog_flow_id)
       })).filter(item => {
         if (searchForm.status === 'success_completed') {
@@ -269,6 +291,9 @@ const getWorkflowName = (workflowId) => {
 }
 
 const getDialogFlowName = (dialogFlowId) => {
+  if (dialogFlowId === 0) {
+    return '智能体图'
+  }
   const df = dialogFlows.value.find(d => d.id === dialogFlowId)
   return df ? df.name : '-'
 }

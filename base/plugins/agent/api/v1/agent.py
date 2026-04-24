@@ -136,27 +136,96 @@ async def execute_agent(agent_id: int, input_data: dict):
     if result.get("success"):
         return success_response(data=result, msg="智能体执行成功")
     else:
-        return fail_response(msg=result.get("message", "执行失败"))
+        return fail_response(msg=result.get("message", "执行失败1"))
 
 
 @agent_router.post("/{agent_id}/graph/execute")
 async def execute_agent_graph(agent_id: int, input_data: dict):
     """Execute agent graph diagram using LangGraph"""
+    print(f"=== 执行智能体结构图: agent_id={agent_id}, input_data={input_data} ===")
     try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"执行智能体结构图: agent_id={agent_id}, input_data={input_data}")
+        
+        print(f"1. 导入LangGraphExecutor")
         from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
         
+        print(f"2. 获取智能体: agent_id={agent_id}")
         agent = await AgentService.get_agent_by_id(agent_id)
         if not agent:
+            print(f"智能体不存在: agent_id={agent_id}")
+            logger.error(f"智能体不存在: agent_id={agent_id}")
             return fail_response(msg="智能体不存在", code=404)
         
+        print(f"3. 智能体信息: id={agent.id}, name={agent.name}")
+        print(f"4. graph_definition类型: {type(agent.graph_definition)}")
+        print(f"5. graph_definition值: {agent.graph_definition}")
+        logger.info(f"智能体信息: id={agent.id}, name={agent.name}")
+        logger.info(f"graph_definition类型: {type(agent.graph_definition)}")
+        logger.info(f"graph_definition值: {agent.graph_definition}")
+        
+        print(f"6. 创建执行记录")
+        from base.plugins.agent.models.dialog_flow import DialogFlowExecution
+        execution_record = await DialogFlowExecution.create(
+            dialog_flow_id=0,  # 用0表示是智能体图执行
+            user_id=None,
+            input_data=input_data,
+            status="running",
+            execution_path=[]
+        )
+        logger.info(f"创建执行记录: id={execution_record.id}")
+        
+        print(f"7. 执行智能体")
         result = await LangGraphExecutor.execute_agent(agent, input_data)
         
-        if result.get("success"):
+        print(f"8. 执行结果: {result}")
+        logger.info(f"执行结果类型: {type(result)}")
+        logger.info(f"执行结果: {result}")
+        
+        print(f"9. 更新执行记录")
+        execution_record.output_data = result
+        
+        # 提取执行路径 - 从结果的多个位置尝试获取
+        execution_path = []
+        if isinstance(result, dict):
+            if result.get('variables') and result['variables'].get('execution_path'):
+                execution_path = result['variables']['execution_path']
+            elif result.get('execution_path'):
+                execution_path = result['execution_path']
+            elif result.get('trace'):
+                execution_path = result['trace']
+            elif result.get('execution_trace'):
+                execution_path = result['execution_trace']
+        
+        execution_record.execution_path = execution_path
+        logger.info(f"提取到的执行路径: {execution_path}")
+        
+        from datetime import datetime
+        execution_record.completed_at = datetime.now()
+        execution_record.status = "completed" if (isinstance(result, dict) and result.get("success")) else "failed"
+        
+        # 显式保存并检查
+        await execution_record.save()
+        
+        # 重新获取以确认保存成功
+        saved_record = await DialogFlowExecution.get(id=execution_record.id)
+        logger.info(f"保存后的执行记录: id={saved_record.id}, status={saved_record.status}")
+        logger.info(f"保存后的输出数据: {saved_record.output_data}")
+        logger.info(f"保存后的执行路径: {saved_record.execution_path}")
+        
+        if isinstance(result, dict) and result.get("success"):
+            print(f"10. 执行成功")
             return success_response(data=result, msg="结构图执行成功")
         else:
-            return fail_response(msg=result.get("message", "结构图执行失败"))
+            error_msg = result.get("message", "结构图执行失败") if isinstance(result, dict) else str(result)
+            print(f"10. 执行失败: {error_msg}")
+            return fail_response(msg=error_msg)
     except Exception as e:
         import traceback
+        print(f"=== 异常: {e} ===")
+        print(traceback.format_exc())
+        logger.exception(f"执行智能体结构图失败: {e}")
         return fail_response(msg=f"结构图执行失败: {str(e)}", data={"traceback": traceback.format_exc()})
 
 
@@ -217,6 +286,13 @@ async def update_agent_graph(agent_id: int, graph_data: dict):
         logger = logging.getLogger(__name__)
         logger.exception(f"保存智能体结构图失败: {e}")
         return fail_response(msg=str(e))
+
+
+@agent_router.get("/test")
+async def test_endpoint():
+    """测试端点"""
+    print("=== 测试端点被调用 ===")
+    return success_response(data={"message": "测试成功"}, msg="测试端点响应成功")
 
 
 @agent_router.post("/process-documents")

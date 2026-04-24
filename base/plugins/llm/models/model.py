@@ -30,7 +30,10 @@ class LLMModel(BaseModel, TimestampMixin):
         table = "llm_model"
 
     def __str__(self):
-        return f"{self.provider.name} - {self.model_name}"
+        try:
+            return f"{self.provider.name} - {self.model_name}"
+        except Exception:
+            return f"Model: {self.model_name}"
 
     @property
     def is_free(self) -> bool:

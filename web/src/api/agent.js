@@ -256,9 +256,9 @@ export function executeDialogFlow(id, params) {
 }
 
 export function getDialogFlowExecution(executionId) {
-  return request.get(`/v1/agent/dialog-flow-executions/${executionId}`)
+  return request.get(`/v1/agent/dialog-flows/executions/${executionId}`)
 }
 
 export function getDialogFlowExecutions(params) {
-  return request.get('/v1/agent/dialog-flow-executions', { params })
+  return request.get('/v1/agent/dialog-flows/executions', { params })
 }

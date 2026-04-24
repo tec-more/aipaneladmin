@@ -3,7 +3,7 @@
 使用 simpleeval 替代危险的 eval()
 """
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 

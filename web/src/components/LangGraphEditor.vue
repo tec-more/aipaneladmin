@@ -126,8 +126,14 @@
               <el-form-item label="温度">
                 <el-slider v-model="selectedNode.data.temperature" :min="0" :max="2" :step="0.1" />
               </el-form-item>
+              <el-form-item label="最大Token">
+                <el-input-number v-model="selectedNode.data.max_tokens" :min="1" :max="4096" />
+              </el-form-item>
               <el-form-item label="提示词">
                 <el-input v-model="selectedNode.data.prompt" type="textarea" :rows="4" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="selectedNode.data.output_var" placeholder="例如: llm_output" />
               </el-form-item>
             </template>
 
@@ -158,6 +164,16 @@
               </el-form-item>
               <el-form-item label="当前项变量">
                 <el-input v-model="selectedNode.data.iteration_variable" placeholder="例如: item" />
+              </el-form-item>
+            </template>
+            
+            <template v-if="selectedNode.type === 'output'">
+              <el-divider content-position="left">输出配置</el-divider>
+              <el-form-item label="输出变量">
+                <el-input v-model="selectedNode.data.output_var" placeholder="例如: final_output" />
+              </el-form-item>
+              <el-form-item label="输出内容">
+                <el-input v-model="selectedNode.data.output_content" type="textarea" :rows="3" placeholder="可选，输出内容模板（支持 {{变量名}}）" />
               </el-form-item>
             </template>
 
@@ -270,13 +286,50 @@
       </div>
     </div>
 
-    <el-dialog v-model="executeDialog" title="执行工作流" width="500px">
+    <el-dialog v-model="executeDialog" title="执行工作流" width="800px">
       <el-form label-width="100px">
         <el-form-item label="输入数据">
-          <el-input v-model="executeInput" type="textarea" :rows="4" placeholder='{"text": "hello"}' />
+          <el-input v-model="executeInput" type="textarea" :rows="4" placeholder="请输入执行文本" />
         </el-form-item>
         <el-form-item label="执行结果" v-if="executeResult">
-          <el-input :model-value="JSON.stringify(executeResult, null, 2)" type="textarea" :rows="6" readonly />
+          <el-tabs v-model="activeTab">
+            <el-tab-pane label="完整结果" name="full">
+              <el-input :model-value="JSON.stringify(executeResult, null, 2)" type="textarea" :rows="10" readonly />
+            </el-tab-pane>
+            <el-tab-pane label="思考过程" name="thinking">
+              <div v-if="executeResult.variables?.thinking_process">
+                <el-input 
+                  :model-value="executeResult.variables.thinking_process" 
+                  type="textarea" 
+                  :rows="12" 
+                  readonly 
+                />
+              </div>
+              <div v-else-if="executeResult.variables?.llm_responses?.length">
+                <div v-for="(resp, index) in executeResult.variables.llm_responses" :key="index" class="llm-response">
+                  <el-divider>{{ resp.node_label || `LLM节点${index+1}` }}</el-divider>
+                  <div class="response-meta">
+                    <el-tag size="small">{{ resp.model }}</el-tag>
+                  </div>
+                  <el-input :model-value="resp.response" type="textarea" :rows="6" readonly />
+                </div>
+              </div>
+              <div v-else>
+                <el-empty description="没有思考过程数据" />
+              </div>
+            </el-tab-pane>
+            <el-tab-pane label="执行轨迹" name="trace">
+              <div v-if="executeResult.trace?.length">
+                <div v-for="(step, index) in executeResult.trace" :key="index" class="trace-step">
+                  <el-tag :type="getTraceStepType(step.node_type)" size="small">{{ step.label || step.node_type }}</el-tag>
+                  <span style="margin-left: 10px; color: #999">{{ step.timestamp }}</span>
+                </div>
+              </div>
+              <div v-else>
+                <el-empty description="没有执行轨迹" />
+              </div>
+            </el-tab-pane>
+          </el-tabs>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -299,11 +352,12 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow } from '@/api/agent'
+import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 
 const props = defineProps({
   workflowId: { type: [String, Number], default: null },
+  agentId: { type: [String, Number], default: null },
   title: { type: String, default: '' },
   initialNodes: { type: Array, default: () => [] },
   initialEdges: { type: Array, default: () => [] }
@@ -319,6 +373,7 @@ const executing = ref(false)
 const executeDialog = ref(false)
 const executeInput = ref('{}')
 const executeResult = ref(null)
+const activeTab = ref('full')
 
 const agents = ref([])
 const skills = ref([])
@@ -338,7 +393,22 @@ const dragOffset = ref({ x: 0, y: 0 })
 
 const tempEdgePath = computed(() => {
   if (!drawingEdge.value) return ''
-  return `M ${edgeStartPoint.value.x} ${edgeStartPoint.value.y} L ${currentMousePos.value.x} ${currentMousePos.value.y}`
+  
+  const startX = edgeStartPoint.value.x
+  const startY = edgeStartPoint.value.y
+  const endX = currentMousePos.value.x
+  const endY = currentMousePos.value.y
+  
+  // 使用平滑的曲线绘制临时连线
+  const dx = endX - startX
+  const curvature = Math.min(Math.abs(dx) * 0.3, 80)
+  
+  const cp1x = startX + curvature
+  const cp1y = startY
+  const cp2x = endX - curvature
+  const cp2y = endY
+  
+  return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`
 })
 
 const nodeCategories = [
@@ -411,6 +481,20 @@ const getNodeIcon = (type) => {
   return icons[type] || '📦'
 }
 
+const getTraceStepType = (type) => {
+  const types = {
+    start: 'success',
+    end: 'success',
+    llm: 'primary',
+    agent: 'info',
+    skill: 'warning',
+    condition: 'danger',
+    loop: 'info',
+    default: ''
+  }
+  return types[type] || ''
+}
+
 const getNodeById = (id) => nodes.value.find(n => n.id === id)
 
 const getEdgePath = (edge) => {
@@ -424,9 +508,36 @@ const getEdgePath = (edge) => {
   const targetX = targetNode.position.x
   const targetY = targetNode.position.y + 30
   
-  const midX = (sourceX + targetX) / 2
+  // 计算同一源节点的连线索引，用于偏移
+  const sourceEdges = edges.value.filter(e => e.source === edge.source)
+  const edgeIndex = sourceEdges.findIndex(e => e.id === edge.id)
+  const totalEdgesFromSource = sourceEdges.length
   
-  return `M ${sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${targetY}, ${targetX} ${targetY}`
+  // 计算垂直偏移量，避免重叠
+  let yOffset = 0
+  if (totalEdgesFromSource > 1) {
+    // 计算每条连线的偏移位置
+    const spacing = 25 // 连线之间的间距
+    const totalHeight = (totalEdgesFromSource - 1) * spacing
+    const startOffset = -totalHeight / 2
+    yOffset = startOffset + edgeIndex * spacing
+  }
+  
+  // 计算控制点
+  const dx = targetX - sourceX
+  const dy = targetY - sourceY
+  const distance = Math.sqrt(dx * dx + dy * dy)
+  
+  // 根据距离调整控制点，使曲线更自然
+  const curvature = Math.min(distance * 0.3, 100)
+  
+  // 计算控制点，考虑垂直偏移
+  const cp1x = sourceX + curvature
+  const cp1y = sourceY + yOffset
+  const cp2x = targetX - curvature
+  const cp2y = targetY + yOffset
+  
+  return `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX} ${targetY}`
 }
 
 const onDragStart = (event, nodeType) => {
@@ -626,20 +737,58 @@ const executeWorkflowDialog = () => {
 }
 
 const doExecute = async () => {
-  if (!props.workflowId) {
-    ElMessage.warning('请先创建工作流')
+  console.log('=== doExecute 函数被调用 ===')
+  console.log('props.workflowId:', props.workflowId)
+  console.log('props.agentId:', props.agentId)
+  
+  if (!props.workflowId && !props.agentId) {
+    ElMessage.warning('请先创建工作流或智能体')
     return
   }
-
+  
+  if (!executeInput.value.trim()) {
+    ElMessage.warning('请输入执行文本')
+    return
+  }
+  
   executing.value = true
   try {
-    const input = JSON.parse(executeInput.value)
-    const res = await apiExecuteWorkflow(props.workflowId, input)
+    console.log('开始执行，executeInput.value:', executeInput.value)
+    
+    // 将普通文本转换为JSON格式
+    const input = {
+      text: executeInput.value.trim()
+    }
+    console.log('转换后的input:', input)
+    
+    let res
+    
+    if (props.agentId) {
+      console.log('执行智能体结构图:', props.agentId, input)
+      console.log('调用 executeAgentGraph 函数')
+      res = await executeAgentGraph(props.agentId, input)
+      console.log('执行结果:', res)
+      console.log('执行结果类型:', typeof res)
+      console.log('执行结果结构:', Object.keys(res))
+    } else {
+      console.log('执行工作流:', props.workflowId, input)
+      console.log('调用 apiExecuteWorkflow 函数')
+      res = await apiExecuteWorkflow(props.workflowId, input)
+      console.log('执行结果:', res)
+      console.log('执行结果类型:', typeof res)
+      console.log('执行结果结构:', Object.keys(res))
+    }
+    
+    console.log('设置executeResult.value:', res.data)
     executeResult.value = res.data
     ElMessage.success('执行成功')
     emit('execute', res.data)
   } catch (error) {
-    ElMessage.error('执行失败')
+    console.error('执行失败:', error)
+    console.error('错误堆栈:', error.stack)
+    console.error('错误类型:', typeof error)
+    console.error('错误对象结构:', error)
+    ElMessage.error('执行失败2: ' + (error.message || '未知错误'))
   } finally {
     executing.value = false
   }

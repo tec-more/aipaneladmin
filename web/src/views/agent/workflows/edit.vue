@@ -214,6 +214,9 @@
               <el-form-item label="最大Token">
                 <el-input-number v-model="nodeConfig.max_tokens" :min="1" :max="4096" @change="updateNodeData" />
               </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" placeholder="例如: llm_output" @change="updateNodeData" />
+              </el-form-item>
             </template>
             
             <!-- 条件判断节点配置 -->

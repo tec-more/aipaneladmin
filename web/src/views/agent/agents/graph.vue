@@ -2,9 +2,11 @@
   <div class="agent-graph-editor">
     <LangGraphEditor 
       :title="`${agentName} - 结构图`"
+      :agentId="agentId"
       :initialNodes="initialNodes"
       :initialEdges="initialEdges"
       @save="handleSave"
+      @execute="handleExecute"
     />
   </div>
 </template>
@@ -14,7 +16,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import LangGraphEditor from '@/components/LangGraphEditor.vue'
-import { getAgent, getAgentGraph, updateAgentGraph } from '@/api/agent'
+import { getAgent, getAgentGraph, updateAgentGraph, executeAgentGraph } from '@/api/agent'
 
 const route = useRoute()
 const agentId = computed(() => route.params.id)
@@ -79,6 +81,11 @@ const handleSave = async ({ nodes, edges }) => {
     ElMessage.error('结构图保存失败: ' + (error.message || error))
     console.error('保存失败详情:', error)
   }
+}
+
+const handleExecute = async (result) => {
+  console.log('执行结果:', result)
+  // 注意：不要在这里显示成功消息，LangGraphEditor 组件内部已经显示了
 }
 
 onMounted(() => {

@@ -58,27 +58,6 @@ class SkillRegistry:
         return skill_type in cls._skills
     
     @classmethod
-    def auto_register_from_code(cls) -> None:
-        """
-        从代码自动注册技能
-        扫描skills目录下的所有模块，自动注册技能
-        """
-        # 获取当前目录
-        current_dir = os.path.dirname(__file__)
-        
-        # 扫描当前目录下的所有模块
-        for _, module_name, _ in pkgutil.iter_modules([current_dir]):
-            if module_name in ['base', 'registry']:
-                continue
-            
-            try:
-                # 导入模块
-                module = importlib.import_module(f'base.plugins.agent.skills.{module_name}')
-                # 模块会在导入时自动注册技能
-            except Exception as e:
-                print(f"Error importing skill module {module_name}: {e}")
-    
-    @classmethod
     async def auto_register_from_database(cls) -> None:
         """
         从数据库自动注册技能
@@ -120,5 +99,19 @@ class SkillRegistry:
         自动注册所有技能
         包括从代码和数据库注册
         """
-        cls.auto_register_from_code()
+        # 延迟导入避免循环导入
+        import importlib
+        import os
+        import pkgutil
+        
+        # 从代码自动注册技能
+        current_dir = os.path.dirname(__file__)
+        for _, module_name, _ in pkgutil.iter_modules([current_dir]):
+            if module_name in ['base', 'registry']:
+                continue
+            try:
+                module = importlib.import_module(f'base.plugins.agent.skills.{module_name}')
+            except Exception as e:
+                print(f"Error importing skill module {module_name}: {e}")
+        
         await cls.auto_register_from_database()
