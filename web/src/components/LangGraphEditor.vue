@@ -333,22 +333,6 @@
           </div>
         </div>
 
-        <!-- 实时执行步骤 -->
-        <div class="realtime-steps" v-if="executing || realtimeSteps.length > 0">
-          <div class="steps-header">执行步骤</div>
-          <div
-            v-for="(step, index) in realtimeSteps"
-            :key="index"
-            :class="['step-item', step.type]"
-          >
-            <div class="step-icon">{{ getStepIcon(step.type) }}</div>
-            <div class="step-content">
-              <div class="step-label">{{ step.title }}</div>
-              <div class="step-description">{{ step.content }}</div>
-            </div>
-          </div>
-        </div>
-
         <!-- 输入区 -->
         <div class="chat-input-area">
           <el-input
