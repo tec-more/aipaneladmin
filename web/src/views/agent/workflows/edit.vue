@@ -1396,16 +1396,39 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding:20px;
+  padding: 20px;
+  overflow: hidden;
 }
 
 /* 聊天消息 */
 .chat-messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
-  min-height:300px;
+  min-height: 300px;
+  max-height: 400px;
   background: #f5f7fa;
+  scrollbar-width: thin;
+  scrollbar-color: #c0c4cc #f5f7fa;
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: #f5f7fa;
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #909399;
 }
 
 .message {
