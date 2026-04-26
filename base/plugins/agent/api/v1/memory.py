@@ -21,6 +21,9 @@ async def create_memory(memory: MemoryCreate):
             content=created_memory.content,
             type=created_memory.type,
             importance=created_memory.importance,
+            memory_mode=created_memory.memory_mode,
+            customer_id=created_memory.customer_id,
+            user_id=created_memory.user_id,
             created_at=created_memory.created_at,
             updated_at=created_memory.updated_at,
             recall_count=created_memory.recall_count,
@@ -34,10 +37,22 @@ async def create_memory(memory: MemoryCreate):
 
 
 @memory_router.get("/")
-async def get_memories(skip: int = 0, limit: int = 100, agent_id: int = None):
+async def get_memories(
+    skip: int = 0,
+    limit: int = 100,
+    agent_id: int = None,
+    memory_mode: str = None,
+    customer_id: int = None,
+    user_id: int = None
+):
     """Get all memories"""
     if agent_id:
-        memories = await MemoryService.get_memories_by_agent(agent_id)
+        memories = await MemoryService.get_memories_by_agent(
+            agent_id,
+            memory_mode=memory_mode,
+            customer_id=customer_id,
+            user_id=user_id
+        )
     else:
         memories = await MemoryService.get_memories(skip=skip, limit=limit)
     response = []
@@ -48,6 +63,9 @@ async def get_memories(skip: int = 0, limit: int = 100, agent_id: int = None):
             content=memory.content,
             type=memory.type,
             importance=memory.importance,
+            memory_mode=memory.memory_mode,
+            customer_id=memory.customer_id,
+            user_id=memory.user_id,
             created_at=memory.created_at,
             updated_at=memory.updated_at,
             recall_count=memory.recall_count,
@@ -69,6 +87,9 @@ async def get_memory(memory_id: int):
         content=memory.content,
         type=memory.type,
         importance=memory.importance,
+        memory_mode=memory.memory_mode,
+        customer_id=memory.customer_id,
+        user_id=memory.user_id,
         created_at=memory.created_at,
         updated_at=memory.updated_at,
         recall_count=memory.recall_count,
@@ -90,6 +111,9 @@ async def update_memory(memory_id: int, memory: MemoryUpdate):
         content=updated_memory.content,
         type=updated_memory.type,
         importance=updated_memory.importance,
+        memory_mode=updated_memory.memory_mode,
+        customer_id=updated_memory.customer_id,
+        user_id=updated_memory.user_id,
         created_at=updated_memory.created_at,
         updated_at=updated_memory.updated_at,
         recall_count=updated_memory.recall_count,
@@ -108,15 +132,28 @@ async def delete_memory(memory_id: int):
 
 
 @memory_router.get("/agent/{agent_id}")
-async def get_memories_by_agent(agent_id: int):
+async def get_memories_by_agent(
+    agent_id: int,
+    memory_mode: str = None,
+    customer_id: int = None,
+    user_id: int = None
+):
     """Get memories by agent"""
-    memories = await MemoryService.get_memories_by_agent(agent_id)
+    memories = await MemoryService.get_memories_by_agent(
+        agent_id,
+        memory_mode=memory_mode,
+        customer_id=customer_id,
+        user_id=user_id
+    )
     response = [MemoryResponse(
         id=m.id,
         agent_id=m.agent_id,
         content=m.content,
         type=m.type,
         importance=m.importance,
+        memory_mode=m.memory_mode,
+        customer_id=m.customer_id,
+        user_id=m.user_id,
         created_at=m.created_at,
         updated_at=m.updated_at,
         recall_count=m.recall_count,
@@ -126,9 +163,21 @@ async def get_memories_by_agent(agent_id: int):
 
 
 @memory_router.get("/agent/{agent_id}/type/{memory_type}")
-async def get_memories_by_type(agent_id: int, memory_type: str):
+async def get_memories_by_type(
+    agent_id: int,
+    memory_type: str,
+    memory_mode: str = None,
+    customer_id: int = None,
+    user_id: int = None
+):
     """Get memories by type"""
-    memories = await MemoryService.get_memories_by_type(agent_id, memory_type)
+    memories = await MemoryService.get_memories_by_type(
+        agent_id,
+        memory_type,
+        memory_mode=memory_mode,
+        customer_id=customer_id,
+        user_id=user_id
+    )
     return success_response(data=memories)
 
 
@@ -142,28 +191,66 @@ async def recall_memory(memory_id: int):
 
 
 @memory_router.get("/agent/{agent_id}/recent")
-async def get_recent_memories(agent_id: int, limit: int = 10):
+async def get_recent_memories(
+    agent_id: int,
+    limit: int = 10,
+    customer_id: int = None,
+    user_id: int = None
+):
     """Get recent memories"""
-    memories = await MemoryService.get_recent_memories(agent_id, limit)
+    memories = await MemoryService.get_recent_memories(
+        agent_id,
+        limit,
+        customer_id=customer_id,
+        user_id=user_id
+    )
     return success_response(data=memories)
 
 
 @memory_router.get("/agent/{agent_id}/important")
-async def get_important_memories(agent_id: int, limit: int = 10):
+async def get_important_memories(
+    agent_id: int,
+    limit: int = 10,
+    customer_id: int = None,
+    user_id: int = None
+):
     """Get important memories"""
-    memories = await MemoryService.get_important_memories(agent_id, limit)
+    memories = await MemoryService.get_important_memories(
+        agent_id,
+        limit,
+        customer_id=customer_id,
+        user_id=user_id
+    )
     return success_response(data=memories)
 
 
 @memory_router.get("/agent/{agent_id}/search")
-async def search_memories(agent_id: int, query: str):
+async def search_memories(
+    agent_id: int,
+    query: str,
+    customer_id: int = None,
+    user_id: int = None
+):
     """Search memories"""
-    memories = await MemoryService.search_memories(agent_id, query)
+    memories = await MemoryService.search_memories(
+        agent_id,
+        query,
+        customer_id=customer_id,
+        user_id=user_id
+    )
     return success_response(data=memories)
 
 
 @memory_router.get("/agent/{agent_id}/stats")
-async def get_memory_stats(agent_id: int):
+async def get_memory_stats(
+    agent_id: int,
+    customer_id: int = None,
+    user_id: int = None
+):
     """Get memory statistics"""
-    stats = await MemoryService.get_memory_stats(agent_id)
+    stats = await MemoryService.get_memory_stats(
+        agent_id,
+        customer_id=customer_id,
+        user_id=user_id
+    )
     return success_response(data=stats)

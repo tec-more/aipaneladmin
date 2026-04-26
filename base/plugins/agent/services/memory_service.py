@@ -34,13 +34,51 @@ class MemoryService:
         except DoesNotExist:
             raise ValueError("Agent not found")
         
-        # Check memory capacity
-        memory_count = await Memory.filter(agent_id=memory_data.agent_id).count()
+        # Check memory capacity - 对于私有记忆，只检查该用户的记忆数量
+        if memory_data.memory_mode == "private":
+            if memory_data.customer_id:
+                memory_count = await Memory.filter(
+                    agent_id=memory_data.agent_id,
+                    memory_mode="private",
+                    customer_id=memory_data.customer_id
+                ).count()
+            elif memory_data.user_id:
+                memory_count = await Memory.filter(
+                    agent_id=memory_data.agent_id,
+                    memory_mode="private",
+                    user_id=memory_data.user_id
+                ).count()
+            else:
+                memory_count = 0
+        else:
+            memory_count = await Memory.filter(
+                agent_id=memory_data.agent_id,
+                memory_mode="public"
+            ).count()
+        
         if memory_count >= agent.memory_capacity:
             # Remove oldest memories if capacity exceeded
-            oldest_memories = await Memory.filter(agent_id=memory_data.agent_id)\
-                .order_by("created_at")\
-                .limit(memory_count - agent.memory_capacity + 1)
+            if memory_data.memory_mode == "private":
+                if memory_data.customer_id:
+                    oldest_memories = await Memory.filter(
+                        agent_id=memory_data.agent_id,
+                        memory_mode="private",
+                        customer_id=memory_data.customer_id
+                    ).order_by("created_at").limit(memory_count - agent.memory_capacity + 1)
+                elif memory_data.user_id:
+                    oldest_memories = await Memory.filter(
+                        agent_id=memory_data.agent_id,
+                        memory_mode="private",
+                        user_id=memory_data.user_id
+                    ).order_by("created_at").limit(memory_count - agent.memory_capacity + 1)
+                else:
+                    oldest_memories = []
+            else:
+                oldest_memories = await Memory.filter(
+                    agent_id=memory_data.agent_id,
+                    memory_mode="public"
+                ).order_by("created_at").limit(memory_count - agent.memory_capacity + 1)
+            
             for old_memory in oldest_memories:
                 await old_memory.delete()
         
@@ -48,7 +86,10 @@ class MemoryService:
             agent_id=memory_data.agent_id,
             content=memory_data.content,
             type=memory_data.type,
-            importance=memory_data.importance
+            importance=memory_data.importance,
+            memory_mode=memory_data.memory_mode,
+            customer_id=memory_data.customer_id,
+            user_id=memory_data.user_id
         )
         
         # 将记忆添加到向量存储
@@ -98,15 +139,74 @@ class MemoryService:
         return True
 
     @staticmethod
-    async def get_memories_by_agent(agent_id: int) -> List[Memory]:
-        """Get memories by agent"""
-        memories = await Memory.filter(agent_id=agent_id).order_by("-created_at").all()
+    async def get_memories_by_agent(
+        agent_id: int,
+        memory_mode: Optional[str] = None,
+        customer_id: Optional[int] = None,
+        user_id: Optional[int] = None
+    ) -> List[Memory]:
+        """Get memories by agent with optional filters"""
+        query = Memory.filter(agent_id=agent_id)
+        
+        if memory_mode:
+            query = query.filter(memory_mode=memory_mode)
+        
+        # 如果是私有记忆模式，需要过滤用户
+        if memory_mode == "private":
+            if customer_id:
+                query = query.filter(customer_id=customer_id)
+            elif user_id:
+                query = query.filter(user_id=user_id)
+            # 如果私有记忆但没有用户ID，则只返回公共记忆
+            else:
+                query = query.filter(memory_mode="public")
+        # 如果是公共记忆或没有指定模式，则返回公共记忆加上该用户的私有记忆
+        else:
+            from tortoise.expressions import Q
+            q_filter = Q(memory_mode="public")
+            if customer_id:
+                q_filter |= Q(memory_mode="private", customer_id=customer_id)
+            elif user_id:
+                q_filter |= Q(memory_mode="private", user_id=user_id)
+            query = query.filter(q_filter)
+        
+        memories = await query.order_by("-created_at").all()
         return memories
 
     @staticmethod
-    async def get_memories_by_type(agent_id: int, memory_type: str) -> List[Memory]:
-        """Get memories by type"""
-        memories = await Memory.filter(agent_id=agent_id, type=memory_type).order_by("-created_at").all()
+    async def get_memories_by_type(
+        agent_id: int,
+        memory_type: str,
+        memory_mode: Optional[str] = None,
+        customer_id: Optional[int] = None,
+        user_id: Optional[int] = None
+    ) -> List[Memory]:
+        """Get memories by type with optional filters"""
+        query = Memory.filter(agent_id=agent_id, type=memory_type)
+        
+        if memory_mode:
+            query = query.filter(memory_mode=memory_mode)
+        
+        # 如果是私有记忆模式，需要过滤用户
+        if memory_mode == "private":
+            if customer_id:
+                query = query.filter(customer_id=customer_id)
+            elif user_id:
+                query = query.filter(user_id=user_id)
+            # 如果私有记忆但没有用户ID，则只返回公共记忆
+            else:
+                query = query.filter(memory_mode="public")
+        # 如果是公共记忆或没有指定模式，则返回公共记忆加上该用户的私有记忆
+        else:
+            from tortoise.expressions import Q
+            q_filter = Q(memory_mode="public")
+            if customer_id:
+                q_filter |= Q(memory_mode="private", customer_id=customer_id)
+            elif user_id:
+                q_filter |= Q(memory_mode="private", user_id=user_id)
+            query = query.filter(q_filter)
+        
+        memories = await query.order_by("-created_at").all()
         return memories
 
     @staticmethod
@@ -122,29 +222,65 @@ class MemoryService:
         return memory
 
     @staticmethod
-    async def get_recent_memories(agent_id: int, limit: int = 10) -> List[Memory]:
-        """Get recent memories"""
+    async def get_recent_memories(
+        agent_id: int,
+        limit: int = 10,
+        customer_id: Optional[int] = None,
+        user_id: Optional[int] = None
+    ) -> List[Memory]:
+        """Get recent memories with user filtering"""
+        from tortoise.expressions import Q
+        q_filter = Q(memory_mode="public")
+        if customer_id:
+            q_filter |= Q(memory_mode="private", customer_id=customer_id)
+        elif user_id:
+            q_filter |= Q(memory_mode="private", user_id=user_id)
+        
         memories = await Memory.filter(agent_id=agent_id)\
+            .filter(q_filter)\
             .order_by("-created_at")\
             .limit(limit)\
             .all()
         return memories
 
     @staticmethod
-    async def get_important_memories(agent_id: int, limit: int = 10) -> List[Memory]:
-        """Get important memories"""
+    async def get_important_memories(
+        agent_id: int,
+        limit: int = 10,
+        customer_id: Optional[int] = None,
+        user_id: Optional[int] = None
+    ) -> List[Memory]:
+        """Get important memories with user filtering"""
+        from tortoise.expressions import Q
+        q_filter = Q(memory_mode="public")
+        if customer_id:
+            q_filter |= Q(memory_mode="private", customer_id=customer_id)
+        elif user_id:
+            q_filter |= Q(memory_mode="private", user_id=user_id)
+        
         memories = await Memory.filter(agent_id=agent_id)\
+            .filter(q_filter)\
             .order_by("-importance", "-created_at")\
             .limit(limit)\
             .all()
         return memories
 
     @staticmethod
-    async def search_memories(agent_id: int, query: str) -> List[Memory]:
-        """Search memories by content"""
-        # This is a simple search implementation
-        # In a real system, you might want to use more sophisticated search techniques
-        memories = await Memory.filter(agent_id=agent_id).all()
+    async def search_memories(
+        agent_id: int,
+        query: str,
+        customer_id: Optional[int] = None,
+        user_id: Optional[int] = None
+    ) -> List[Memory]:
+        """Search memories by content with user filtering"""
+        from tortoise.expressions import Q
+        q_filter = Q(memory_mode="public")
+        if customer_id:
+            q_filter |= Q(memory_mode="private", customer_id=customer_id)
+        elif user_id:
+            q_filter |= Q(memory_mode="private", user_id=user_id)
+        
+        memories = await Memory.filter(agent_id=agent_id).filter(q_filter).all()
         filtered_memories = [
             memory for memory in memories 
             if query.lower() in memory.content.lower()
@@ -152,16 +288,41 @@ class MemoryService:
         return filtered_memories
 
     @staticmethod
-    async def get_memory_stats(agent_id: int) -> dict:
-        """Get memory statistics"""
-        total_memories = await Memory.filter(agent_id=agent_id).count()
-        short_term_memories = await Memory.filter(agent_id=agent_id, type="short_term").count()
-        long_term_memories = await Memory.filter(agent_id=agent_id, type="long_term").count()
+    async def get_memory_stats(
+        agent_id: int,
+        customer_id: Optional[int] = None,
+        user_id: Optional[int] = None
+    ) -> dict:
+        """Get memory statistics with user filtering"""
+        from tortoise.expressions import Q
+        
+        # 统计公共记忆
+        total_public = await Memory.filter(agent_id=agent_id, memory_mode="public").count()
+        short_term_public = await Memory.filter(agent_id=agent_id, memory_mode="public", type="short_term").count()
+        long_term_public = await Memory.filter(agent_id=agent_id, memory_mode="public", type="long_term").count()
+        
+        # 统计私有记忆
+        total_private = 0
+        short_term_private = 0
+        long_term_private = 0
+        
+        if customer_id:
+            total_private = await Memory.filter(agent_id=agent_id, memory_mode="private", customer_id=customer_id).count()
+            short_term_private = await Memory.filter(agent_id=agent_id, memory_mode="private", customer_id=customer_id, type="short_term").count()
+            long_term_private = await Memory.filter(agent_id=agent_id, memory_mode="private", customer_id=customer_id, type="long_term").count()
+        elif user_id:
+            total_private = await Memory.filter(agent_id=agent_id, memory_mode="private", user_id=user_id).count()
+            short_term_private = await Memory.filter(agent_id=agent_id, memory_mode="private", user_id=user_id, type="short_term").count()
+            long_term_private = await Memory.filter(agent_id=agent_id, memory_mode="private", user_id=user_id, type="long_term").count()
         
         return {
-            "total_memories": total_memories,
-            "short_term_memories": short_term_memories,
-            "long_term_memories": long_term_memories,
+            "total_public": total_public,
+            "total_private": total_private,
+            "total_memories": total_public + total_private,
+            "short_term_public": short_term_public,
+            "long_term_public": long_term_public,
+            "short_term_private": short_term_private,
+            "long_term_private": long_term_private,
             "memory_capacity": (await Agent.get(id=agent_id)).memory_capacity
         }
 

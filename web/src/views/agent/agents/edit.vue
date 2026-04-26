@@ -44,6 +44,12 @@
             <el-option label="ReAct 模式" value="react" />
           </el-select>
         </el-form-item>
+        <el-form-item label="默认记忆模式">
+          <el-select v-model="formData.default_memory_mode" placeholder="请选择记忆模式" style="width: 100%">
+            <el-option label="公共记忆（所有用户共享）" value="public" />
+            <el-option label="私有记忆（每个用户独立）" value="private" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="系统提示词">
           <el-input v-model="formData.system_prompt" type="textarea" :rows="6" placeholder="请输入系统提示词" />
         </el-form-item>
@@ -74,7 +80,8 @@ const formData = reactive({
   status: 'active',
   memory_capacity: 100,
   system_prompt: '',
-  reasoning_strategy: 'function_call'
+  reasoning_strategy: 'function_call',
+  default_memory_mode: 'public'
 })
 
 const rules = {
@@ -110,6 +117,7 @@ const handleSubmit = async () => {
           memory_capacity: formData.memory_capacity,
           system_prompt: formData.system_prompt,
           reasoning_strategy: formData.reasoning_strategy,
+          default_memory_mode: formData.default_memory_mode,
           config: formData.config
         }
         

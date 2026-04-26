@@ -17,6 +17,12 @@
             <el-option v-for="agent in agents" :key="agent.id" :label="agent.name" :value="agent.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="记忆模式">
+          <el-select v-model="searchForm.memory_mode" placeholder="请选择模式" clearable>
+            <el-option label="公共记忆" value="public" />
+            <el-option label="私有记忆" value="private" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="记忆类型">
           <el-select v-model="searchForm.type" placeholder="请选择类型" clearable>
             <el-option label="短期记忆" value="short_term" />
@@ -53,6 +59,15 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="memory_mode" label="记忆模式" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.memory_mode === 'public' ? 'success' : 'warning'">
+              {{ row.memory_mode === 'public' ? '公共记忆' : '私有记忆' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="customer_id" label="客户ID" width="100" />
+        <el-table-column prop="user_id" label="用户ID" width="100" />
         <el-table-column prop="importance" label="重要性" width="120">
           <template #default="{ row }">
             <el-progress :percentage="row.importance * 100" :stroke-width="10" />
@@ -107,6 +122,18 @@
             <el-option label="长期记忆" value="long_term" />
           </el-select>
         </el-form-item>
+        <el-form-item label="记忆模式" prop="memory_mode">
+          <el-select v-model="formData.memory_mode" placeholder="请选择模式">
+            <el-option label="公共记忆" value="public" />
+            <el-option label="私有记忆" value="private" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="客户ID" v-if="formData.memory_mode === 'private'">
+          <el-input-number v-model="formData.customer_id" :min="1" placeholder="请输入客户ID" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="用户ID" v-if="formData.memory_mode === 'private'">
+          <el-input-number v-model="formData.user_id" :min="1" placeholder="请输入用户ID" style="width: 100%" />
+        </el-form-item>
         <el-form-item label="重要性">
           <el-slider v-model="formData.importance" :min="0" :max="1" :step="0.1" show-input />
         </el-form-item>
@@ -134,6 +161,7 @@ const agents = ref([])
 
 const searchForm = reactive({
   agent_id: route.query.agent_id ? parseInt(route.query.agent_id) : null,
+  memory_mode: '',
   type: '',
   keyword: ''
 })
@@ -152,6 +180,9 @@ const formData = reactive({
   agent_id: null,
   content: '',
   type: 'short_term',
+  memory_mode: 'public',
+  customer_id: null,
+  user_id: null,
   importance: 0.5
 })
 
@@ -213,6 +244,7 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchForm.agent_id = null
+  searchForm.memory_mode = ''
   searchForm.type = ''
   searchForm.keyword = ''
   handleSearch()
@@ -235,6 +267,9 @@ const handleAdd = () => {
     agent_id: searchForm.agent_id || null,
     content: '',
     type: 'short_term',
+    memory_mode: 'public',
+    customer_id: null,
+    user_id: null,
     importance: 0.5
   })
   dialogVisible.value = true

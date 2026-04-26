@@ -1,0 +1,277 @@
+{
+  "说明": "这是完整的 ReAct 模式任务分解智能体配置，包含思考-行动-观察循环",
+  "nodes": [
+    {
+      "id": "start-1",
+      "type": "start",
+      "data": {
+        "label": "开始"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "init-var",
+      "type": "variable_assigner",
+      "data": {
+        "label": "初始化循环变量",
+        "var_name": "i",
+        "var_value": 0
+      },
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": "think-1",
+      "type": "llm",
+      "data": {
+        "label": "Reasoning - 分析需求",
+        "system_prompt": "你是一个资深的软件项目经理。",
+        "prompt": "请分析以下软件开发需求：\n\n用户需求：{{input.text}}\n\n请用JSON格式输出：\n{\n  \"project_type\": \"项目类型\",\n  \"core_features\": [\"核心功能列表\"],\n  \"constraints\": [\"约束条件\"],\n  \"initial_thoughts\": \"初步思考\"\n}",
+        "output_variable": "analysis"
+      },
+      "position": {
+        "x": 100,
+        "y": 350
+      }
+    },
+    {
+      "id": "extract-1",
+      "type": "json_extractor",
+      "data": {
+        "label": "提取分析结果",
+        "input_variable": "analysis",
+        "output_variable": "analysis_result"
+      },
+      "position": {
+        "x": 100,
+        "y": 500
+      }
+    },
+    {
+      "id": "act-1",
+      "type": "llm",
+      "data": {
+        "label": "Acting - 任务分解",
+        "system_prompt": "你是一个专业的任务拆解专家。",
+        "prompt": "基于以下分析进行任务分解：\n\n分析结果：{{analysis_result}}\n\n请用JSON格式输出完整的任务分解：\n{\n  \"project_type\": \"{{analysis_result.project_type}}\",\n  \"subtasks\": [\n    {\n      \"id\": \"1\",\n      \"name\": \"任务名称\",\n      \"description\": \"详细描述\",\n      \"priority\": \"high/medium/low\",\n      \"estimated_hours\": 8,\n      \"dependencies\": []\n    }\n  ],\n  \"total_estimated_hours\": 0,\n  \"critical_path\": []\n}",
+        "output_variable": "task_decomposition"
+      },
+      "position": {
+        "x": 100,
+        "y": 650
+      }
+    },
+    {
+      "id": "extract-2",
+      "type": "json_extractor",
+      "data": {
+        "label": "提取任务分解",
+        "input_variable": "task_decomposition",
+        "output_variable": "task_plan"
+      },
+      "position": {
+        "x": 100,
+        "y": 800
+      }
+    },
+    {
+      "id": "observe-1",
+      "type": "llm",
+      "data": {
+        "label": "Observation - 评估结果",
+        "system_prompt": "你是一个质量检查专家。",
+        "prompt": "请评估以下任务分解结果：\n\n任务分解：{{task_plan}}\n\n请评估：\n1. 是否遗漏了重要任务？\n2. 任务粒度是否合适？\n3. 优先级是否合理？\n\n请用JSON格式输出：\n{\n  \"is_complete\": true/false,\n  \"needs_revision\": true/false,\n  \"feedback\": \"反馈意见\"\n}",
+        "output_variable": "observation"
+      },
+      "position": {
+        "x": 100,
+        "y": 950
+      }
+    },
+    {
+      "id": "extract-3",
+      "type": "json_extractor",
+      "data": {
+        "label": "提取评估结果",
+        "input_variable": "observation",
+        "output_variable": "observation_result"
+      },
+      "position": {
+        "x": 100,
+        "y": 1100
+      }
+    },
+    {
+      "id": "condition-1",
+      "type": "condition",
+      "data": {
+        "label": "判断 - 是否继续优化",
+        "condition": "i < 2"
+      },
+      "position": {
+        "x": 100,
+        "y": 1250
+      }
+    },
+    {
+      "id": "loop-1",
+      "type": "loop",
+      "data": {
+        "label": "循环计数+1",
+        "loop_variable": "i",
+        "loop_max": 2
+      },
+      "position": {
+        "x": 100,
+        "y": 1400
+      }
+    },
+    {
+      "id": "revise-1",
+      "type": "llm",
+      "data": {
+        "label": "Revise - 优化任务分解",
+        "system_prompt": "你是一个任务优化专家。",
+        "prompt": "请根据以下反馈优化任务分解：\n\n当前任务分解：{{task_plan}}\n\n反馈意见：{{observation_result.feedback}}\n\n请输出优化后的完整JSON格式。",
+        "output_variable": "revised_plan"
+      },
+      "position": {
+        "x": 100,
+        "y": 1550
+      }
+    },
+    {
+      "id": "update-1",
+      "type": "json_extractor",
+      "data": {
+        "label": "更新任务计划",
+        "input_variable": "revised_plan",
+        "output_variable": "task_plan"
+      },
+      "position": {
+        "x": 100,
+        "y": 1700
+      }
+    },
+    {
+      "id": "final-1",
+      "type": "llm",
+      "data": {
+        "label": "生成最终报告",
+        "system_prompt": "你是一个报告生成专家。",
+        "prompt": "请基于最终任务分解生成一份完整的WBS报告：\n\n最终任务分解：{{task_plan}}\n\n请生成Markdown格式的报告，包含项目概述、任务列表、时间估算汇总等。",
+        "output_variable": "final_report"
+      },
+      "position": {
+        "x": 400,
+        "y": 1250
+      }
+    },
+    {
+      "id": "output-1",
+      "type": "output",
+      "data": {
+        "label": "输出结果",
+        "output_variable": "result",
+        "output_content": "{{final_report.response}}"
+      },
+      "position": {
+        "x": 400,
+        "y": 1400
+      }
+    },
+    {
+      "id": "end-1",
+      "type": "end",
+      "data": {
+        "label": "结束"
+      },
+      "position": {
+        "x": 400,
+        "y": 1550
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "start-1",
+      "target": "init-var"
+    },
+    {
+      "id": "edge-2",
+      "source": "init-var",
+      "target": "think-1"
+    },
+    {
+      "id": "edge-3",
+      "source": "think-1",
+      "target": "extract-1"
+    },
+    {
+      "id": "edge-4",
+      "source": "extract-1",
+      "target": "act-1"
+    },
+    {
+      "id": "edge-5",
+      "source": "act-1",
+      "target": "extract-2"
+    },
+    {
+      "id": "edge-6",
+      "source": "extract-2",
+      "target": "observe-1"
+    },
+    {
+      "id": "edge-7",
+      "source": "observe-1",
+      "target": "extract-3"
+    },
+    {
+      "id": "edge-8",
+      "source": "extract-3",
+      "target": "condition-1"
+    },
+    {
+      "id": "edge-9",
+      "source": "condition-1",
+      "target": "loop-1"
+    },
+    {
+      "id": "edge-10",
+      "source": "loop-1",
+      "target": "revise-1"
+    },
+    {
+      "id": "edge-11",
+      "source": "revise-1",
+      "target": "update-1"
+    },
+    {
+      "id": "edge-12",
+      "source": "update-1",
+      "target": "observe-1"
+    },
+    {
+      "id": "edge-13",
+      "source": "condition-1",
+      "target": "final-1"
+    },
+    {
+      "id": "edge-14",
+      "source": "final-1",
+      "target": "output-1"
+    },
+    {
+      "id": "edge-15",
+      "source": "output-1",
+      "target": "end-1"
+    }
+  ]
+}

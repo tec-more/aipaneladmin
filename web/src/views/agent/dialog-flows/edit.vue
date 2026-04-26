@@ -310,21 +310,54 @@
       </div>
     </div>
 
-    <el-dialog v-model="executeDialogVisible" title="执行对话流" width="600px">
+    <el-dialog v-model="executeDialogVisible" title="执行对话流" width="800px">
       <el-form label-width="100px">
         <el-form-item label="对话流名称">
           <el-input :value="dialogFlow?.name" disabled />
         </el-form-item>
-        <el-form-item label="输入数据">
-          <el-input v-model="executeInput" type="textarea" :rows="4" placeholder="JSON格式输入数据" />
+        
+        <!-- 对话历史显示区域 -->
+        <el-form-item label="对话历史" v-if="dialogHistory.length > 0">
+          <div class="dialog-history-container">
+            <div v-for="(turn, index) in dialogHistory" :key="index" class="dialog-turn">
+              <div class="turn-header">
+                <el-tag :type="turn.role === 'user' ? 'primary' : 'success'" size="small">
+                  {{ turn.role === 'user' ? '👤 用户' : '🤖 助手' }}
+                </el-tag>
+                <span class="turn-time">{{ turn.time }}</span>
+              </div>
+              <div class="turn-content">
+                {{ turn.content }}
+              </div>
+            </div>
+          </div>
         </el-form-item>
-        <el-form-item label="执行结果">
-          <el-input v-model="executeResult" type="textarea" :rows="6" readonly placeholder="执行结果" />
+        
+        <!-- 输入区域 -->
+        <el-form-item label="输入数据">
+          <el-input 
+            v-model="currentInput" 
+            type="textarea" 
+            :rows="4" 
+            placeholder="请输入你要说的话..." 
+            @keyup.enter="doExecute"
+          />
+        </el-form-item>
+        
+        <!-- 当前执行结果显示 -->
+        <el-form-item label="最新回复" v-if="latestResponse">
+          <div class="latest-response-container">
+            <el-tag type="success" size="small" style="margin-bottom: 8px;">🤖 助手回复</el-tag>
+            <div class="response-content">
+              {{ latestResponse }}
+            </div>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
+        <el-button @click="clearDialogHistory" :disabled="dialogHistory.length === 0">清空历史</el-button>
         <el-button @click="executeDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="doExecute" :loading="executing">执行</el-button>
+        <el-button type="primary" @click="doExecute" :loading="executing">发送</el-button>
       </template>
     </el-dialog>
   </div>
@@ -431,6 +464,9 @@ const executeDialogVisible = ref(false)
 const executing = ref(false)
 const executeInput = ref('{}')
 const executeResult = ref('')
+const dialogHistory = ref([])
+const currentInput = ref('')
+const latestResponse = ref('')
 
 const drawingEdge = ref(false)
 const edgeStartNode = ref(null)
@@ -768,17 +804,84 @@ const deleteSelectedEdge = () => {
 const executeDialog = () => {
   executeInput.value = '{}'
   executeResult.value = ''
+  // 清空之前的输入和回复，但保留对话历史
+  currentInput.value = ''
+  latestResponse.value = ''
   executeDialogVisible.value = true
 }
 
+const clearDialogHistory = () => {
+  dialogHistory.value = []
+  currentInput.value = ''
+  latestResponse.value = ''
+  ElMessage.success('对话历史已清空')
+}
+
 const doExecute = async () => {
+  if (!currentInput.value.trim()) {
+    ElMessage.warning('请输入内容')
+    return
+  }
+  
   executing.value = true
   try {
-    const input = JSON.parse(executeInput.value)
+    // 添加用户输入到历史
+    const userMessage = {
+      role: 'user',
+      content: currentInput.value,
+      time: new Date().toLocaleTimeString('zh-CN')
+    }
+    dialogHistory.value.push(userMessage)
+    
+    // 准备输入数据 - 包含对话历史
+    const input = {
+      text: currentInput.value,
+      history: [...dialogHistory.value]
+    }
+    
     const res = await executeDialogFlow(flowId, input)
+    
+    // 解析执行结果
+    let assistantResponse = ''
+    if (typeof res.data === 'string') {
+      assistantResponse = res.data
+    } else if (res.data.output || res.data.result || res.data.text || res.data.response) {
+      assistantResponse = res.data.output || res.data.result || res.data.text || res.data.response
+    } else if (res.data.variables) {
+      // 尝试从变量中获取结果
+      const vars = res.data.variables
+      assistantResponse = vars.final_report || vars.response || vars.text || vars.output || JSON.stringify(vars, null, 2)
+    } else {
+      assistantResponse = JSON.stringify(res.data, null, 2)
+    }
+    
+    // 添加助手回复到历史
+    const assistantMessage = {
+      role: 'assistant',
+      content: assistantResponse,
+      time: new Date().toLocaleTimeString('zh-CN')
+    }
+    dialogHistory.value.push(assistantMessage)
+    
+    // 更新最新回复
+    latestResponse.value = assistantResponse
+    
+    // 清空输入框
+    currentInput.value = ''
+    
+    // 保存原始执行结果
     executeResult.value = JSON.stringify(res.data, null, 2)
-    ElMessage.success('执行成功')
+    
+    ElMessage.success('发送成功')
   } catch (error) {
+    // 即使出错也要显示错误
+    const errorMessage = {
+      role: 'assistant',
+      content: '执行失败: ' + (error.message || '未知错误'),
+      time: new Date().toLocaleTimeString('zh-CN')
+    }
+    dialogHistory.value.push(errorMessage)
+    latestResponse.value = errorMessage.content
     executeResult.value = error.message || '执行失败'
     ElMessage.error('执行失败')
   } finally {
@@ -798,6 +901,61 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   background: #f5f5f5;
+}
+
+/* 对话历史样式 */
+.dialog-history-container {
+  max-height: 300px;
+  overflow-y: auto;
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.dialog-turn {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.dialog-turn:last-child {
+  margin-bottom: 0;
+}
+
+.turn-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.turn-time {
+  font-size: 12px;
+  color: #909399;
+}
+
+.turn-content {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.latest-response-container {
+  background: #f0f9ff;
+  border: 1px solid #b3d8ff;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.response-content {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .toolbar {

@@ -11,6 +11,9 @@ class MemoryBase(BaseModel):
     content: str = Field(..., description="Memory content")
     type: str = Field(default="short_term", description="Memory type: short_term/long_term")
     importance: float = Field(default=0.5, description="Memory importance (0-1)")
+    memory_mode: str = Field(default="public", description="Memory mode: public/private")
+    customer_id: Optional[int] = Field(None, description="Customer ID for private memory")
+    user_id: Optional[int] = Field(None, description="User ID for private memory")
 
 
 class MemoryCreate(MemoryBase):
@@ -23,6 +26,9 @@ class MemoryUpdate(BaseModel):
     content: Optional[str] = Field(None, description="Memory content")
     type: Optional[str] = Field(None, description="Memory type: short_term/long_term")
     importance: Optional[float] = Field(None, description="Memory importance (0-1)")
+    memory_mode: Optional[str] = Field(None, description="Memory mode: public/private")
+    customer_id: Optional[int] = Field(None, description="Customer ID for private memory")
+    user_id: Optional[int] = Field(None, description="User ID for private memory")
 
 
 class MemoryResponse(MemoryBase):

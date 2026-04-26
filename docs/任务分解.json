@@ -1,0 +1,81 @@
+{
+  "nodes": [
+    { 
+      "id": "start", 
+      "type": "start", 
+      "data": { "label": "开始" },
+      "position": { "x": 100, "y": 100 }
+    },
+    {
+      "id": "think",
+      "type": "llm",
+      "data": {
+        "label": "思考",
+        "system_prompt": "你是一个问题解决专家。请思考如何解决用户的问题。",
+        "prompt": "用户问题：{{input.text}}\n\n请输出你的思考过程。"
+      },
+      "position": { "x": 100, "y": 250 }
+    },
+    {
+      "id": "act",
+      "type": "llm",
+      "data": {
+        "label": "行动",
+        "system_prompt": "根据思考，直接给出解决方案或回答。",
+        "prompt": "思考结果：{{llm_output_think.response}}\n\n请给出具体的回答。"
+      },
+      "position": { "x": 100, "y": 400 }
+    },
+    {
+      "id": "observe",
+      "type": "llm",
+      "data": {
+        "label": "观察",
+        "system_prompt": "观察回答结果，判断是否满意，是否需要继续。",
+        "prompt": "回答：{{llm_output_act.response}}\n\n这个回答是否完整？是否需要继续补充？"
+      },
+      "position": { "x": 100, "y": 550 }
+    },
+    {
+      "id": "check",
+      "type": "condition",
+      "data": {
+        "label": "判断",
+        "condition": "i < 2"
+      },
+      "position": { "x": 100, "y": 700 }
+    },
+    {
+      "id": "loop",
+      "type": "loop",
+      "data": {
+        "label": "循环",
+        "loop_variable": "i",
+        "loop_max": 2
+      },
+      "position": { "x": 400, "y": 700 }
+    },
+    { 
+      "id": "output", 
+      "type": "output", 
+      "data": { "label": "输出" },
+      "position": { "x": 400, "y": 550 }
+    },
+    { 
+      "id": "end", 
+      "type": "end", 
+      "data": { "label": "结束" },
+      "position": { "x": 400, "y": 400 }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "start", "target": "think" },
+    { "id": "edge-2", "source": "think", "target": "act" },
+    { "id": "edge-3", "source": "act", "target": "observe" },
+    { "id": "edge-4", "source": "observe", "target": "check" },
+    { "id": "edge-5", "source": "check", "target": "loop" },
+    { "id": "edge-6", "source": "loop", "target": "think" },
+    { "id": "edge-7", "source": "check", "target": "output" },
+    { "id": "edge-8", "source": "output", "target": "end" }
+  ]
+}

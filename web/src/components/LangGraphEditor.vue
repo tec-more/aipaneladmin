@@ -256,14 +256,27 @@
             
             <template v-if="selectedNode.type === 'parameter_extractor'">
               <el-divider content-position="left">参数提取配置</el-divider>
-              <el-form-item label="输入文本变量">
-                <el-input v-model="selectedNode.data.input_text" placeholder="存储输入文本的变量名" />
+              <el-form-item label="输入变量">
+                <el-input v-model="selectedNode.data.input_variable" placeholder="要提取的变量名" />
               </el-form-item>
               <el-form-item label="要提取的参数">
                 <el-input v-model="selectedNode.data.parameters" type="textarea" :rows="3" placeholder="每行一个参数名" />
               </el-form-item>
               <el-form-item label="输出变量">
                 <el-input v-model="selectedNode.data.output_var" placeholder="例如: extracted_params" />
+              </el-form-item>
+            </template>
+            
+            <template v-if="selectedNode.type === 'json_extractor'">
+              <el-divider content-position="left">JSON提取配置</el-divider>
+              <el-form-item label="输入变量">
+                <el-input v-model="selectedNode.data.input_variable" placeholder="包含JSON的变量名（如: llm_output, thinking_process）" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="selectedNode.data.output_variable" placeholder="例如: task_plan, structured_output" />
+              </el-form-item>
+              <el-form-item label="描述">
+                <el-input v-model="selectedNode.data.description" type="textarea" :rows="2" placeholder="节点描述（可选）" />
               </el-form-item>
             </template>
           </el-form>
@@ -286,24 +299,142 @@
       </div>
     </div>
 
-    <el-dialog v-model="executeDialog" title="执行工作流" width="800px">
+    <el-dialog v-model="executeDialog" title="执行工作流" width="900px">
       <el-form label-width="100px">
-        <el-form-item label="输入数据">
-          <el-input v-model="executeInput" type="textarea" :rows="4" placeholder="请输入执行文本" />
+        <!-- 对话历史显示区域 -->
+        <el-form-item label="对话历史" v-if="dialogHistory.length > 0">
+          <div class="dialog-history-container">
+            <div v-for="(turn, index) in dialogHistory" :key="index" class="dialog-turn">
+              <div class="turn-header">
+                <el-tag :type="turn.role === 'user' ? 'primary' : 'success'" size="small">
+                  {{ turn.role === 'user' ? '👤 用户' : '🤖 助手' }}
+                </el-tag>
+                <span class="turn-time">{{ turn.time }}</span>
+              </div>
+              <div class="turn-content">
+                {{ turn.content }}
+              </div>
+            </div>
+          </div>
         </el-form-item>
-        <el-form-item label="执行结果" v-if="executeResult">
+        
+        <el-form-item label="输入数据">
+          <el-input 
+            v-model="currentInput" 
+            type="textarea" 
+            :rows="3" 
+            placeholder="请输入你要说的话..." 
+            @keyup.enter="doExecute"
+          />
+        </el-form-item>
+        
+        <!-- 实时执行过程显示 -->
+        <el-form-item label="执行过程" v-if="executing || realtimeSteps.length > 0">
+          <div class="realtime-execution-container">
+            <div v-for="(step, index) in realtimeSteps" :key="index" class="realtime-step">
+              <el-tag :type="getStepType(step.type)" class="step-type-tag">{{ getStepLabel(step.type) }}</el-tag>
+              <div class="step-content">
+                <div class="step-title">{{ step.title }}</div>
+                <div class="step-description" v-html="formatContent(step.content)"></div>
+              </div>
+              <el-icon class="step-check-icon" v-if="step.completed"><Check /></el-icon>
+            </div>
+            <div v-if="executing" class="executing-indicator">
+              <el-icon class="loading-icon"><Refresh /></el-icon>
+              <span>正在执行中...</span>
+            </div>
+          </div>
+        </el-form-item>
+        
+        <!-- 当前执行结果显示 -->
+        <el-form-item label="最新回复" v-if="latestResponse">
+          <div class="latest-response-container">
+            <el-tag type="success" size="small" style="margin-bottom: 8px;">🤖 助手回复</el-tag>
+            <div class="response-content">
+              {{ latestResponse }}
+            </div>
+          </div>
+        </el-form-item>
+        
+        <el-form-item label="详细结果" v-if="executeResult">
           <el-tabs v-model="activeTab">
+            <el-tab-pane label="任务分解" name="task_plan" v-if="hasTaskPlan">
+              <div class="task-plan-view">
+                <el-card class="task-plan-card" v-if="executeResult.variables?.original_task">
+                  <template #header>
+                    <div class="card-header">
+                      <span>📋 原始任务</span>
+                    </div>
+                  </template>
+                  <p>{{ executeResult.variables.original_task }}</p>
+                </el-card>
+                
+                <el-card class="task-plan-card" v-if="executeResult.variables?.subtasks">
+                  <template #header>
+                    <div class="card-header">
+                      <span>✅ 子任务列表</span>
+                    </div>
+                  </template>
+                  <div class="subtask-list">
+                    <div 
+                      v-for="(subtask, index) in executeResult.variables.subtasks" 
+                      :key="subtask.id || index" 
+                      class="subtask-item"
+                    >
+                      <div class="subtask-header">
+                        <el-tag :type="getSubtaskColor(index)" size="small" class="subtask-index">
+                          {{ subtask.id || index + 1 }}
+                        </el-tag>
+                        <span class="subtask-name">{{ subtask.name || '子任务' }}</span>
+                      </div>
+                      <div class="subtask-description">
+                        {{ subtask.description }}
+                      </div>
+                      <div class="subtask-meta" v-if="subtask.dependencies?.length">
+                        <el-tag size="small" type="info">
+                          依赖: {{ subtask.dependencies.join(', ') }}
+                        </el-tag>
+                      </div>
+                    </div>
+                  </div>
+                </el-card>
+                
+                <el-card class="task-plan-card" v-if="executeResult.variables?.reasoning">
+                  <template #header>
+                    <div class="card-header">
+                      <span>💡 拆解理由</span>
+                    </div>
+                  </template>
+                  <p>{{ executeResult.variables.reasoning }}</p>
+                </el-card>
+                
+                <el-card class="task-plan-card" v-if="executeResult.variables?.task_plan">
+                  <template #header>
+                    <div class="card-header">
+                      <span>📄 完整计划</span>
+                    </div>
+                  </template>
+                  <el-input 
+                    :model-value="JSON.stringify(executeResult.variables.task_plan, null, 2)" 
+                    type="textarea" 
+                    :rows="10" 
+                    readonly 
+                  />
+                </el-card>
+              </div>
+            </el-tab-pane>
             <el-tab-pane label="完整结果" name="full">
               <el-input :model-value="JSON.stringify(executeResult, null, 2)" type="textarea" :rows="10" readonly />
             </el-tab-pane>
             <el-tab-pane label="思考过程" name="thinking">
               <div v-if="executeResult.variables?.thinking_process">
-                <el-input 
-                  :model-value="executeResult.variables.thinking_process" 
-                  type="textarea" 
-                  :rows="12" 
-                  readonly 
-                />
+                <el-card class="thinking-content-card">
+                  <template #header>
+                    <span>🧠 思考过程</span>
+                  </template>，
+                  <div class="thinking-content" v-html="formatContent(executeResult.variables.thinking_process)">
+                  </div>
+                </el-card>
               </div>
               <div v-else-if="executeResult.variables?.llm_responses?.length">
                 <div v-for="(resp, index) in executeResult.variables.llm_responses" :key="index" class="llm-response">
@@ -311,7 +442,10 @@
                   <div class="response-meta">
                     <el-tag size="small">{{ resp.model }}</el-tag>
                   </div>
-                  <el-input :model-value="resp.response" type="textarea" :rows="6" readonly />
+                  <el-card class="response-content-card" shadow="never">
+                    <div class="response-content" v-html="formatContent(resp.response)">
+                    </div>
+                  </el-card>
                 </div>
               </div>
               <div v-else>
@@ -333,8 +467,9 @@
         </el-form-item>
       </el-form>
       <template #footer>
+        <el-button @click="clearDialogHistory" :disabled="dialogHistory.length === 0">清空历史</el-button>
         <el-button @click="executeDialog = false">关闭</el-button>
-        <el-button type="primary" @click="doExecute" :loading="executing">执行</el-button>
+        <el-button type="primary" @click="doExecute" :loading="executing">发送</el-button>
       </template>
     </el-dialog>
 
@@ -374,6 +509,10 @@ const executeDialog = ref(false)
 const executeInput = ref('{}')
 const executeResult = ref(null)
 const activeTab = ref('full')
+const realtimeSteps = ref([]) // 实时执行步骤
+const dialogHistory = ref([]) // 对话历史
+const currentInput = ref('') // 当前输入
+const latestResponse = ref('') // 最新回复
 
 const agents = ref([])
 const skills = ref([])
@@ -452,7 +591,8 @@ const nodeCategories = [
       { type: 'variable_aggregator', label: '变量聚合器', icon: Collection },
       { type: 'document_extractor', label: '文档提取', icon: Document },
       { type: 'variable_assigner', label: '变量赋值', icon: Edit },
-      { type: 'parameter_extractor', label: '参数提取', icon: Filter }
+      { type: 'parameter_extractor', label: '参数提取', icon: Filter },
+      { type: 'json_extractor', label: 'JSON提取', icon: Collection }
     ]
   }
 ]
@@ -476,7 +616,8 @@ const getNodeIcon = (type) => {
     variable_aggregator: '📊',
     document_extractor: '📄',
     variable_assigner: '📝',
-    parameter_extractor: '🔍'
+    parameter_extractor: '🔍',
+    json_extractor: '📋'
   }
   return icons[type] || '📦'
 }
@@ -495,7 +636,73 @@ const getTraceStepType = (type) => {
   return types[type] || ''
 }
 
+const hasTaskPlan = computed(() => {
+  const vars = executeResult.value?.variables
+  return vars && (vars.original_task || vars.subtasks || vars.task_plan || vars.plan)
+})
+
+const getSubtaskColor = (index) => {
+  const colors = ['', 'primary', 'success', 'warning', 'info', 'danger']
+  return colors[index % colors.length]
+}
+
+const formatContent = (content) => {
+  if (!content) return ''
+  
+  // 如果内容包含HTML标签，直接返回以使用v-html渲染
+  if (content.includes('<') && content.includes('>')) {
+    return content
+  }
+  
+  // 否则，处理换行等格式
+  return content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>')
+    .replace(/\s{4}/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
+}
+
 const getNodeById = (id) => nodes.value.find(n => n.id === id)
+
+// 实时执行步骤相关函数
+const getStepType = (type) => {
+  const typeMap = {
+    think: 'primary',
+    act: 'success',
+    observe: 'warning',
+    info: 'info',
+    error: 'danger'
+  }
+  return typeMap[type] || ''
+}
+
+const getStepLabel = (type) => {
+  const labelMap = {
+    think: '🧠 思考',
+    act: '⚡ 行动',
+    observe: '👁️ 观察',
+    info: '📋 信息',
+    error: '❌ 错误'
+  }
+  return labelMap[type] || type
+}
+
+const addRealtimeStep = (type, title, content) => {
+  realtimeSteps.value.push({
+    type,
+    title,
+    content,
+    completed: false,
+    timestamp: new Date().toLocaleTimeString('zh-CN')
+  })
+}
+
+const markLastStepCompleted = () => {
+  if (realtimeSteps.value.length > 0) {
+    realtimeSteps.value[realtimeSteps.value.length - 1].completed = true
+  }
+}
 
 const getEdgePath = (edge) => {
   const sourceNode = getNodeById(edge.source)
@@ -736,6 +943,25 @@ const executeWorkflowDialog = () => {
   executeResult.value = null
 }
 
+// 监听对话框打开，清空步骤
+watch(() => executeDialog.value, (newVal) => {
+  if (newVal) {
+    realtimeSteps.value = [] // 打开时清空之前的步骤
+    executeResult.value = null
+    currentInput.value = ''
+    latestResponse.value = ''
+  }
+})
+
+const clearDialogHistory = () => {
+  dialogHistory.value = []
+  currentInput.value = ''
+  latestResponse.value = ''
+  realtimeSteps.value = []
+  executeResult.value = null
+  ElMessage.success('对话历史已清空')
+}
+
 const doExecute = async () => {
   console.log('=== doExecute 函数被调用 ===')
   console.log('props.workflowId:', props.workflowId)
@@ -746,18 +972,32 @@ const doExecute = async () => {
     return
   }
   
-  if (!executeInput.value.trim()) {
-    ElMessage.warning('请输入执行文本')
+  if (!currentInput.value.trim()) {
+    ElMessage.warning('请输入内容')
     return
   }
   
+  realtimeSteps.value = [] // 清空旧步骤
   executing.value = true
+  
   try {
-    console.log('开始执行，executeInput.value:', executeInput.value)
+    console.log('开始执行，currentInput.value:', currentInput.value)
     
-    // 将普通文本转换为JSON格式
+    // 添加用户输入到历史
+    const userMessage = {
+      role: 'user',
+      content: currentInput.value,
+      time: new Date().toLocaleTimeString('zh-CN')
+    }
+    dialogHistory.value.push(userMessage)
+    
+    addRealtimeStep('info', '开始执行', `输入文本: ${currentInput.value.trim().substring(0, 100)}...`)
+    markLastStepCompleted()
+    
+    // 将普通文本转换为JSON格式，包含对话历史
     const input = {
-      text: executeInput.value.trim()
+      text: currentInput.value.trim(),
+      history: [...dialogHistory.value]
     }
     console.log('转换后的input:', input)
     
@@ -766,6 +1006,14 @@ const doExecute = async () => {
     if (props.agentId) {
       console.log('执行智能体结构图:', props.agentId, input)
       console.log('调用 executeAgentGraph 函数')
+      
+      addRealtimeStep('info', '准备执行', '正在调用智能体执行接口...')
+      
+      // 模拟实时步骤（实际项目中可以用WebSocket或SSE）
+      addRealtimeStep('think', '分析问题', '正在分析用户需求...')
+      await new Promise(resolve => setTimeout(resolve, 500))
+      markLastStepCompleted()
+      
       res = await executeAgentGraph(props.agentId, input)
       console.log('执行结果:', res)
       console.log('执行结果类型:', typeof res)
@@ -779,16 +1027,108 @@ const doExecute = async () => {
       console.log('执行结果结构:', Object.keys(res))
     }
     
+    // 从执行结果中提取步骤并显示
+    if (res.data) {
+      const result = res.data
+      
+      // 处理思考过程
+      if (result.variables) {
+        // 处理推理
+        if (result.variables.analysis_raw || result.variables.analysis_result) {
+          addRealtimeStep('think', '推理 - 分析需求', 
+            result.variables.analysis_raw?.response || JSON.stringify(result.variables.analysis_result, null, 2) || '需求分析完成')
+          markLastStepCompleted()
+        }
+        
+        // 处理行动
+        if (result.variables.decompose_raw || result.variables.task_plan) {
+          addRealtimeStep('act', '行动 - 任务分解', 
+            result.variables.decompose_raw?.response || JSON.stringify(result.variables.task_plan, null, 2) || '任务分解完成')
+          markLastStepCompleted()
+        }
+        
+        // 处理观察
+        if (result.variables.observe_raw || result.variables.observation_result) {
+          addRealtimeStep('observe', '观察 - 评估结果', 
+            result.variables.observe_raw?.response || JSON.stringify(result.variables.observation_result, null, 2) || '评估完成')
+          markLastStepCompleted()
+        }
+        
+        // 处理最终报告
+        if (result.variables.final_report) {
+          addRealtimeStep('info', '生成报告', '正在生成最终报告...')
+          markLastStepCompleted()
+        }
+      }
+      
+      // 处理执行轨迹
+      if (result.trace) {
+        for (const step of result.trace) {
+          if (step.node_type === 'llm') {
+            const stepType = step.label?.includes('思考') || step.label?.includes('推理') ? 'think' : 
+                            step.label?.includes('观察') || step.label?.includes('评估') ? 'observe' : 'act'
+            addRealtimeStep(stepType, step.label || `执行节点: ${step.node_type}`, JSON.stringify(step, null, 2))
+            markLastStepCompleted()
+          }
+        }
+      }
+    }
+    
+    // 解析执行结果
+    let assistantResponse = ''
+    if (typeof res.data === 'string') {
+      assistantResponse = res.data
+    } else if (res.data.output || res.data.result || res.data.text || res.data.response) {
+      assistantResponse = res.data.output || res.data.result || res.data.text || res.data.response
+    } else if (res.data.variables) {
+      // 尝试从变量中获取结果
+      const vars = res.data.variables
+      assistantResponse = vars.final_report || vars.response || vars.text || vars.output || JSON.stringify(vars, null, 2)
+    } else {
+      assistantResponse = JSON.stringify(res.data, null, 2)
+    }
+    
+    // 添加助手回复到历史
+    const assistantMessage = {
+      role: 'assistant',
+      content: assistantResponse,
+      time: new Date().toLocaleTimeString('zh-CN')
+    }
+    dialogHistory.value.push(assistantMessage)
+    
+    // 更新最新回复
+    latestResponse.value = assistantResponse
+    
+    // 清空输入框
+    currentInput.value = ''
+    
     console.log('设置executeResult.value:', res.data)
     executeResult.value = res.data
-    ElMessage.success('执行成功')
+    
+    addRealtimeStep('info', '执行完成', '工作流执行完成，结果已生成')
+    markLastStepCompleted()
+    
+    ElMessage.success('发送成功')
     emit('execute', res.data)
   } catch (error) {
     console.error('执行失败:', error)
     console.error('错误堆栈:', error.stack)
     console.error('错误类型:', typeof error)
     console.error('错误对象结构:', error)
-    ElMessage.error('执行失败2: ' + (error.message || '未知错误'))
+    
+    // 即使出错也要显示错误
+    const errorMessage = {
+      role: 'assistant',
+      content: '执行失败: ' + (error.message || '未知错误'),
+      time: new Date().toLocaleTimeString('zh-CN')
+    }
+    dialogHistory.value.push(errorMessage)
+    latestResponse.value = errorMessage.content
+    
+    addRealtimeStep('error', '执行失败', error.message || '未知错误')
+    markLastStepCompleted()
+    
+    ElMessage.error('执行失败: ' + (error.message || '未知错误'))
   } finally {
     executing.value = false
   }
@@ -1198,5 +1538,337 @@ watch(() => props.initialEdges, (newEdges) => {
 .edge-info p {
   margin: 6px 0;
   font-size: 13px;
+}
+
+.task-plan-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.task-plan-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subtask-item {
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border-left: 3px solid #409EFF;
+}
+
+.subtask-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.subtask-index {
+  min-width: 50px;
+  text-align: center;
+}
+
+.subtask-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+}
+
+.subtask-description {
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.subtask-meta {
+  margin-top: 8px;
+}
+
+.llm-response {
+  margin-bottom: 16px;
+}
+
+.response-meta {
+  margin-bottom: 8px;
+}
+
+.trace-step {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.thinking-content-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+}
+
+.thinking-content {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-content :deep(p) {
+  margin: 8px 0;
+  line-height: 1.8;
+}
+
+.thinking-content :deep(br) {
+  line-height: 2;
+}
+
+.thinking-content :deep(ul),
+.thinking-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.thinking-content :deep(li) {
+  margin: 4px 0;
+  line-height: 1.8;
+}
+
+.thinking-content :deep(code) {
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #409EFF;
+}
+
+.thinking-content :deep(pre) {
+  background: #f5f7fa;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.thinking-content :deep(h1),
+.thinking-content :deep(h2),
+.thinking-content :deep(h3),
+.thinking-content :deep(h4) {
+  margin: 12px 0 8px 0;
+  color: #303133;
+}
+
+.thinking-content :deep(blockquote) {
+  border-left: 4px solid #409EFF;
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #606266;
+}
+
+.response-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.response-content :deep(p) {
+  margin: 8px 0;
+  line-height: 1.8;
+}
+
+.response-content :deep(br) {
+  line-height: 2;
+}
+
+.response-content :deep(ul),
+.response-content :deep(ol) {
+  margin: 8px 0;
+}
+
+/* 实时执行样式 */
+.realtime-execution-container {
+  max-height: 500px;
+  overflow-y: auto;
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.realtime-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s;
+}
+
+.realtime-step:hover {
+  border-color: #409EFF;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.step-type-tag {
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+  margin-bottom: 6px;
+}
+
+.step-description {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+  word-wrap: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.step-check-icon {
+  flex-shrink: 0;
+  color: #67C23A;
+  font-size: 18px;
+  margin-top: 2px;
+}
+
+.executing-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  color: #909399;
+  font-size: 14px;
+}
+
+.loading-icon {
+  animation: rotate 1s linear infinite;
+  color: #409EFF;
+  font-size: 20px;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 对话历史样式 */
+.dialog-history-container {
+  max-height: 300px;
+  overflow-y: auto;
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.dialog-turn {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.dialog-turn:last-child {
+  margin-bottom: 0;
+}
+
+.turn-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.turn-time {
+  font-size: 12px;
+  color: #909399;
+}
+
+.turn-content {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.latest-response-container {
+  background: #f0f9ff;
+  border: 1px solid #b3d8ff;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.response-content :deep(li) {
+  margin: 4px 0;
+  line-height: 1.8;
+}
+
+.response-content :deep(code) {
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #409EFF;
+}
+
+.response-content :deep(pre) {
+  background: #f5f7fa;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.response-content :deep(h1),
+.response-content :deep(h2),
+.response-content :deep(h3),
+.response-content :deep(h4) {
+  margin: 12px 0 8px 0;
+  color: #303133;
+}
+
+.response-content :deep(blockquote) {
+  border-left: 4px solid #409EFF;
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #606266;
+}
+
+.response-content-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.response-content-card pre {
+  margin: 0;
+  padding: 0;
+  font-family: 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 </style>

@@ -1,0 +1,88 @@
+{
+  "说明": "这是任务分解智能体的完整工作流配置示例，你可以在智能体的结构图编辑页面导入使用",
+  "nodes": [
+    {
+      "id": "start-1",
+      "type": "start",
+      "data": {
+        "label": "开始"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "input-1",
+      "type": "input",
+      "data": {
+        "label": "输入任务"
+      },
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": "llm-1",
+      "type": "llm",
+      "data": {
+        "label": "思考 - 任务分解",
+        "prompt": "你是一个专业的任务拆解专家。\n\n请分析用户的任务，将其拆解成可执行的子任务，并以JSON格式输出：\n\n{\n  \"original_task\": \"原始任务描述\",\n  \"subtasks\": [\n    {\n      \"id\": \"1\",\n      \"name\": \"子任务名称\",\n      \"description\": \"子任务描述\",\n      \"dependencies\": [],\n      \"tool\": \"none\"\n    }\n  ],\n  \"reasoning\": \"拆解理由\"\n}\n\n用户任务：{{input.text}}\n\n只输出JSON，不要其他文字。",
+        "model_id": 2,
+        "output_variable": "thinking_output"
+      },
+      "position": {
+        "x": 100,
+        "y": 350
+      }
+    },
+    {
+      "id": "json-extractor-1",
+      "type": "json_extractor",
+      "data": {
+        "label": "提取结构化任务",
+        "input_variable": "thinking_output",
+        "output_variable": "task_plan",
+        "description": "从思考节点的输出中提取JSON格式的任务计划"
+      },
+      "position": {
+        "x": 100,
+        "y": 520
+      }
+    },
+    {
+      "id": "end-1",
+      "type": "end",
+      "data": {
+        "label": "结束"
+      },
+      "position": {
+        "x": 100,
+        "y": 680
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "start-1",
+      "target": "input-1"
+    },
+    {
+      "id": "edge-2",
+      "source": "input-1",
+      "target": "llm-1"
+    },
+    {
+      "id": "edge-3",
+      "source": "llm-1",
+      "target": "json-extractor-1"
+    },
+    {
+      "id": "edge-4",
+      "source": "json-extractor-1",
+      "target": "end-1"
+    }
+  ]
+}

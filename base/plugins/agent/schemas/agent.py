@@ -15,6 +15,7 @@ class AgentBase(BaseModel):
     memory_capacity: int = Field(default=100, description="Memory capacity")
     system_prompt: Optional[str] = Field(None, description="System prompt")
     reasoning_strategy: str = Field(default="function_call", description="Reasoning strategy: function_call/react")
+    default_memory_mode: str = Field(default="public", description="Default memory mode: public/private")
 
 
 class AgentCreate(AgentBase):
@@ -31,6 +32,7 @@ class AgentUpdate(BaseModel):
     memory_capacity: Optional[int] = Field(None, description="Memory capacity")
     system_prompt: Optional[str] = Field(None, description="System prompt")
     reasoning_strategy: Optional[str] = Field(None, description="Reasoning strategy: function_call/react")
+    default_memory_mode: Optional[str] = Field(None, description="Default memory mode: public/private")
 
 
 class AgentResponse(AgentBase):
