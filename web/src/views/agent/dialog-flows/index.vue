@@ -4,10 +4,12 @@
       <template #header>
         <div class="card-header">
           <span>对话流</span>
-          <el-button type="primary" @click="handleCreate">
-            <el-icon><Plus /></el-icon>
-            新建对话流
-          </el-button>
+          <div class="header-actions">
+            <el-button type="primary" @click="handleCreate">
+              <el-icon><Plus /></el-icon>
+              新建对话流
+            </el-button>
+          </div>
         </div>
       </template>
       
@@ -48,16 +50,12 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="300" fixed="right">
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button type="primary" size="small" @click="handleEdit(row)">
                 <el-icon><Edit /></el-icon>
                 编辑
-              </el-button>
-              <el-button type="success" size="small" @click="handleExecute(row)">
-                <el-icon><VideoPlay /></el-icon>
-                执行
               </el-button>
               <el-button type="danger" size="small" @click="handleDelete(row.id)">
                 <el-icon><Delete /></el-icon>
@@ -119,7 +117,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, VideoPlay } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, VideoPlay, Upload, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDialogFlows, createDialogFlow, deleteDialogFlow, executeDialogFlow } from '@/api/agent'
 
@@ -297,6 +295,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 .mb-4 {
   margin-bottom: 16px;

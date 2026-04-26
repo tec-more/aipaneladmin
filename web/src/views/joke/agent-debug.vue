@@ -361,6 +361,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
+  min-height:300px;
   background: #f5f7fa;
   border-radius: 4px;
   margin-bottom: 15px;

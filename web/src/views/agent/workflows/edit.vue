@@ -4,6 +4,14 @@
       <span class="workflow-name">{{ workflow?.name || '工作流编辑' }}</span>
       <el-tag :type="getStatusType(workflow?.status)" size="small">{{ getStatusName(workflow?.status) }}</el-tag>
       <div class="toolbar-right">
+        <el-button @click="handleImportGraph">
+          <el-icon><Upload /></el-icon>
+          导入
+        </el-button>
+        <el-button @click="handleExportGraph">
+          <el-icon><Download /></el-icon>
+          导出
+        </el-button>
         <el-button type="primary" @click="saveWorkflow" :loading="saving">
           <el-icon><Check /></el-icon>
           保存
@@ -534,19 +542,56 @@
       </div>
     </div>
 
-    <el-dialog v-model="executeDialogVisible" title="执行工作流" width="500px">
-      <el-form label-width="100px">
-        <el-form-item label="输入数据">
-          <el-input v-model="executeInput" type="textarea" :rows="4" placeholder="JSON格式" />
-        </el-form-item>
-        <el-form-item label="执行结果">
-          <el-input v-model="executeResult" type="textarea" :rows="4" readonly />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="executeDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="doExecute" :loading="executing">执行</el-button>
-      </template>
+    <el-dialog v-model="executeDialogVisible" title="执行工作流" width="900px" class="wechat-style-dialog">
+      <div class="chat-container">
+        <!-- 聊天历史 -->
+        <div class="chat-messages">
+          <div
+            v-for="(msg, index) in dialogHistory"
+            :key="index"
+            :class="['message', msg.role]"
+          >
+            <div class="message-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
+            <div class="message-content-wrapper">
+              <div class="message-role">{{ msg.role === 'user' ? '用户' : 'AI' }}</div>
+              <div class="message-content">{{ msg.content }}</div>
+              <div class="message-time">{{ msg.time }}</div>
+              
+              <!-- AI的思考、行动、观察、结果 - 可折叠 -->
+              <div v-if="msg.role === 'assistant' && msg.process && msg.process.length > 0" class="message-process">
+                <div
+                  v-for="(process, pIndex) in msg.process"
+                  :key="pIndex"
+                  :class="['process-item', process.type, { collapsed: process.collapsed }]"
+                >
+                  <div class="process-header" @click="process.collapsed = !process.collapsed">
+                    <span class="process-label">{{ process.label }}</span>
+                    <span class="process-time">{{ process.time }}</span>
+                    <span class="collapse-icon">{{ process.collapsed ? '▶' : '▼' }}</span>
+                  </div>
+                  <div class="process-content" v-show="!process.collapsed">{{ process.content }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 输入区 -->
+        <div class="chat-input-area">
+          <el-input
+            v-model="executeInput"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入..."
+            class="input-textarea"
+          />
+          <div class="input-actions">
+            <el-button @click="clearDialogHistory" :disabled="dialogHistory.length === 0">清空历史</el-button>
+            <el-button @click="executeDialogVisible = false">关闭</el-button>
+            <el-button type="primary" @click="doExecute" :loading="executing">执行</el-button>
+          </div>
+        </div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -555,7 +600,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { 
-  ArrowLeft, Check, VideoPlay, User, Tools, Share, VideoPlay as Play, CircleCheck, Monitor,
+  ArrowLeft, Check, VideoPlay, User, Tools, Share, VideoPlay as Play, CircleCheck, Monitor, Upload, Download,
   // Dify 风格节点图标
   Document, Collection, DocumentChecked, EditPen, Filter, Link, List, Cpu
 } from '@element-plus/icons-vue'
@@ -644,8 +689,11 @@ const nodeTypes = [
 
 const executeDialogVisible = ref(false)
 const executing = ref(false)
-const executeInput = ref('{}')
+const executeInput = ref('')
 const executeResult = ref('')
+const dialogHistory = ref([])
+const currentInput = ref('')
+const latestResponse = ref('')
 
 const drawingEdge = ref(false)
 const edgeStartNode = ref(null)
@@ -968,8 +1016,15 @@ const deleteSelectedEdge = () => {
   }
 }
 
+const clearDialogHistory = () => {
+  dialogHistory.value = []
+  currentInput.value = ''
+  latestResponse.value = ''
+  ElMessage.success('对话历史已清空')
+}
+
 const executeWorkflowDialog = () => {
-  executeInput.value = '{}'
+  executeInput.value = ''
   executeResult.value = ''
   executeDialogVisible.value = true
 }
@@ -987,6 +1042,52 @@ const doExecute = async () => {
   } finally {
     executing.value = false
   }
+}
+
+const handleExportGraph = () => {
+  const graphData = {
+    nodes: nodes.value,
+    edges: edges.value,
+    name: workflow.value?.name || 'workflow',
+    description: workflow.value?.description || ''
+  }
+  const blob = new Blob([JSON.stringify(graphData, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${workflow.value?.name || 'workflow'}-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('图结构导出成功')
+}
+
+const handleImportGraph = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result)
+          if (data.nodes && data.edges) {
+            nodes.value = data.nodes
+            edges.value = data.edges
+            ElMessage.success('图结构导入成功')
+          } else {
+            ElMessage.error('文件格式错误，缺少nodes或edges字段')
+          }
+        } catch (error) {
+          ElMessage.error('导入失败：文件格式错误')
+          console.error(error)
+        }
+      }
+      reader.readAsText(file)
+    }
+  }
+  input.click()
 }
 
 onMounted(() => {
@@ -1282,5 +1383,192 @@ onMounted(() => {
 .edge-info p {
   margin: 5px 0;
   font-size: 13px;
+}
+
+/* 微信风格对话框 */
+.wechat-style-dialog .el-dialog__body {
+  padding: 0;
+  height: 600px;
+  overflow: hidden;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding:20px;
+}
+
+/* 聊天消息 */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  min-height:300px;
+  background: #f5f7fa;
+}
+
+.message {
+  display: flex;
+  margin-bottom: 20px;
+  animation: messageFadeIn 0.3s ease;
+}
+
+.message.user {
+  flex-direction: row-reverse;
+}
+
+.message-avatar {
+  font-size: 32px;
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+
+.message-content-wrapper {
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+}
+
+.message-role {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #909399;
+}
+
+.message-content {
+  padding: 12px 16px;
+  border-radius: 18px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.message.user .message-content {
+  background: #91d5ff;
+  color: #303133;
+  border-bottom-right-radius: 4px;
+}
+
+.message.assistant .message-content {
+  background: #fff;
+  color: #303133;
+  border-bottom-left-radius: 4px;
+  border: 1px solid #e4e7ed;
+}
+
+.message-time {
+  font-size: 11px;
+  color: #c0c4cc;
+  margin-top: 4px;
+  align-self: flex-end;
+}
+
+/* 处理过程 */
+.message-process {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f0f2f5;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.process-item {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
+  transition: all 0.3s ease;
+}
+
+.process-item.collapsed {
+  background: #f5f7fa;
+}
+
+.process-item.thinking {
+  border-left-color: #e6a23c;
+}
+
+.process-item.action {
+  border-left-color: #409eff;
+}
+
+.process-item.result {
+  border-left-color: #67c23a;
+}
+
+.process-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.process-header:hover {
+  background: #f0f2f5;
+  margin: -4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.process-label {
+  font-weight: 600;
+  font-size: 12px;
+  color: #303133;
+}
+
+.process-time {
+  font-size: 11px;
+  color: #c0c4cc;
+  margin-left: 8px;
+}
+
+.collapse-icon {
+  font-size: 10px;
+  color: #909399;
+  margin-left: 8px;
+  transition: transform 0.3s ease;
+}
+
+.process-content {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.4;
+  word-wrap: break-word;
+  padding-top: 4px;
+}
+
+/* 输入区 */
+.chat-input-area {
+  padding-top: 20px;
+  background: #fff;
+  border-top: 1px solid #e4e7ed;
+}
+
+.input-textarea {
+  margin-bottom: 10px;
+  border-radius: 8px;
+  resize: none;
+}
+
+.input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* 动画 */
+@keyframes messageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
