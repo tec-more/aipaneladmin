@@ -20,8 +20,24 @@ async def list_dialog_flows(
     limit: int = Query(100, ge=1, le=1000, description="返回的记录数")
 ):
     """列出对话流，可按名称或状态过滤"""
+    from base.plugins.agent.models.dialog_flow import DialogFlow
+    
+    # 构建查询条件
+    query = DialogFlow.all()
+    
+    if name:
+        query = query.filter(name__icontains=name)
+    
+    if status:
+        query = query.filter(status=status)
+    
+    # 获取总数
+    total = await query.count()
+    
+    # 获取分页数据
     dialog_flows = await DialogFlowService.list_dialog_flows(None, skip, limit, name, status)
-    return success_response(data={"items": dialog_flows, "total": len(dialog_flows)})
+    
+    return success_response(data={"items": dialog_flows, "total": total})
 
 
 @dialog_flow_router.post("/")
@@ -105,12 +121,21 @@ async def list_dialog_flow_executions(
     limit: int = Query(100, ge=1, le=1000, description="返回的记录数")
 ):
     """列出对话流执行记录，可按对话流ID过滤"""
+    from base.plugins.agent.models.dialog_flow import DialogFlowExecution
+    
     # 处理空值情况
     if dialog_flow_id is not None and not isinstance(dialog_flow_id, int):
         dialog_flow_id = None
     
+    # 先获取总数
+    query = DialogFlowExecution.all()
+    if dialog_flow_id:
+        query = query.filter(dialog_flow_id=dialog_flow_id)
+    total = await query.count()
+    
+    # 获取分页数据
     executions = await DialogFlowService.list_executions(dialog_flow_id, None, skip, limit)
-    return success_response(data={"items": executions, "total": len(executions)})
+    return success_response(data={"items": executions, "total": total})
 
 
 @dialog_flow_router.get("/executions/{execution_id}")

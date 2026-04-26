@@ -37,6 +37,18 @@ async def create_skill(skill: SkillCreate):
 @skill_router.get("/")
 async def get_skills(skip: int = 0, limit: int = 100, name: str = "", type: str = "", status: str = ""):
     """Get all skills"""
+    from base.plugins.agent.models.skill import Skill
+    
+    # 先获取数据库中符合条件的总数
+    query = Skill.all()
+    if name:
+        query = query.filter(name__icontains=name)
+    if type:
+        query = query.filter(type=type)
+    if status:
+        query = query.filter(status=status)
+    db_total = await query.count()
+    
     # 获取数据库中的技能
     db_skills = await SkillService.get_skills(skip=skip, limit=limit, name=name, type=type, status=status)
     
@@ -44,12 +56,17 @@ async def get_skills(skip: int = 0, limit: int = 100, name: str = "", type: str 
     from base.plugins.agent.skills.registry import SkillRegistry
     
     code_skill_types = SkillRegistry.get_skill_types()
-    code_skills = []
     
+    # 获取所有数据库技能的type，用于检查代码技能是否已存在
+    all_db_skill_types = set()
+    all_db_skills = await query.all()  # 获取所有符合条件的数据库技能
+    for skill in all_db_skills:
+        all_db_skill_types.add(skill.type)
+    
+    code_skills = []
     for skill_type in code_skill_types:
         # 检查该技能是否已在数据库中存在
-        existing_db_skill = next((s for s in db_skills if s.type == skill_type), None)
-        if not existing_db_skill:
+        if skill_type not in all_db_skill_types:
             # 创建一个代码技能的字典对象
             skill_class = SkillRegistry.get_skill(skill_type)
             if skill_class:
@@ -68,12 +85,18 @@ async def get_skills(skip: int = 0, limit: int = 100, name: str = "", type: str 
                 }
                 code_skills.append(code_skill)
     
+    # 计算代码技能总数
+    code_total = len(code_skills)
+    
+    # 对代码技能进行分页
+    paged_code_skills = code_skills[skip:skip+limit]
+    
     # 为数据库技能添加来源标识
     for skill in db_skills:
         skill.source = "database"
     
     # 合并数据库技能和代码技能
-    all_skills = db_skills + code_skills
+    all_skills = db_skills + paged_code_skills
     
     # 构建响应
     response = []
@@ -97,7 +120,7 @@ async def get_skills(skip: int = 0, limit: int = 100, name: str = "", type: str 
             source=skill.source if hasattr(skill, 'source') else skill.get('source')
         ).model_dump())
     
-    return success_response(data={"items": response, "total": len(response)})
+    return success_response(data={"items": response, "total": db_total + code_total})
 
 
 @skill_router.get("/{skill_id}")

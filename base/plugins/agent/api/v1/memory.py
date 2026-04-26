@@ -43,18 +43,48 @@ async def get_memories(
     agent_id: int = None,
     memory_mode: str = None,
     customer_id: int = None,
-    user_id: int = None
+    user_id: int = None,
+    type: str = None
 ):
     """Get all memories"""
+    from base.plugins.agent.models.memory import Memory
+    from tortoise.expressions import Q
+    
+    # 构建查询条件
+    query = Memory.all()
+    
     if agent_id:
-        memories = await MemoryService.get_memories_by_agent(
-            agent_id,
-            memory_mode=memory_mode,
-            customer_id=customer_id,
-            user_id=user_id
-        )
-    else:
-        memories = await MemoryService.get_memories(skip=skip, limit=limit)
+        query = query.filter(agent_id=agent_id)
+    
+    if memory_mode:
+        query = query.filter(memory_mode=memory_mode)
+    
+    if type:
+        query = query.filter(type=type)
+    
+    # 处理私有记忆的过滤
+    if memory_mode == "private":
+        if customer_id:
+            query = query.filter(customer_id=customer_id)
+        elif user_id:
+            query = query.filter(user_id=user_id)
+        else:
+            query = query.filter(memory_mode="public")
+    elif agent_id and not memory_mode:
+        # 如果没有指定记忆模式，返回公共记忆加上该用户的私有记忆
+        q_filter = Q(memory_mode="public")
+        if customer_id:
+            q_filter |= Q(memory_mode="private", customer_id=customer_id)
+        elif user_id:
+            q_filter |= Q(memory_mode="private", user_id=user_id)
+        query = query.filter(q_filter)
+    
+    # 获取总数
+    total = await query.count()
+    
+    # 获取分页数据
+    memories = await query.offset(skip).limit(limit).order_by("-created_at").all()
+    
     response = []
     for memory in memories:
         response.append(MemoryResponse(
@@ -71,7 +101,7 @@ async def get_memories(
             recall_count=memory.recall_count,
             last_recalled_at=memory.last_recalled_at
         ).model_dump())
-    return success_response(data={"items": response, "total": len(response)})
+    return success_response(data={"items": response, "total": total})
 
 
 @memory_router.get("/{memory_id}")

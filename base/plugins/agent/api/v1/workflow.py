@@ -43,7 +43,23 @@ async def create_workflow(workflow: WorkflowCreate):
 @workflow_router.get("/")
 async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status: str = ""):
     """Get all workflows"""
-    workflows = await WorkflowService.get_workflows(skip=skip, limit=limit, name=name, status=status)
+    from base.plugins.agent.models.workflow import Workflow
+    
+    # 构建查询条件
+    query = Workflow.all()
+    
+    if name:
+        query = query.filter(name__icontains=name)
+    
+    if status:
+        query = query.filter(status=status)
+    
+    # 获取总数
+    total = await query.count()
+    
+    # 获取分页数据
+    workflows = await query.offset(skip).limit(limit).order_by("-created_at").all()
+    
     response = []
     for workflow in workflows:
         response.append({
@@ -58,7 +74,7 @@ async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status:
             "node_count": 0,
             "edge_count": 0
         })
-    return success_response(data={"items": response, "total": len(response)})
+    return success_response(data={"items": response, "total": total})
 
 
 @workflow_router.get("/{workflow_id}")
@@ -203,6 +219,15 @@ async def execute_workflow(workflow_id: int, input_data: Dict[str, Any]):
 async def get_all_workflow_executions(skip: int = 0, limit: int = 100, status: str = ""):
     """Get all workflow executions"""
     try:
+        from base.plugins.agent.models.workflow import WorkflowExecution
+        
+        # 先获取总数
+        query = WorkflowExecution.all()
+        if status:
+            query = query.filter(status=status)
+        total = await query.count()
+        
+        # 获取分页数据
         executions = await WorkflowService.get_all_workflow_executions(skip=skip, limit=limit, status=status)
         response = []
         for execution in executions:
@@ -218,7 +243,7 @@ async def get_all_workflow_executions(skip: int = 0, limit: int = 100, status: s
                 "created_at": execution.created_at.isoformat() if execution.created_at else None,
                 "updated_at": execution.updated_at.isoformat() if execution.updated_at else None
             })
-        return success_response(data={"items": response, "total": len(response)})
+        return success_response(data={"items": response, "total": total})
     except Exception as e:
         return fail_response(msg=str(e))
 

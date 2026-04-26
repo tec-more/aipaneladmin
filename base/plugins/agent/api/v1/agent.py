@@ -46,7 +46,23 @@ async def create_agent(agent: AgentCreate):
 @agent_router.get("/")
 async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: str = ""):
     """Get all agents"""
-    agents = await AgentService.get_agents(skip=skip, limit=limit, name=name, status=status)
+    from base.plugins.agent.models.agent import Agent
+    
+    # 构建查询条件
+    query = Agent.all()
+    
+    if name:
+        query = query.filter(name__icontains=name)
+    
+    if status:
+        query = query.filter(status=status)
+    
+    # 获取总数
+    total = await query.count()
+    
+    # 获取分页数据
+    agents = await query.offset(skip).limit(limit).order_by("-created_at").all()
+    
     response = []
     for agent in agents:
         skill_count = 0
@@ -65,7 +81,7 @@ async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: st
             "skill_count": skill_count,
             "memory_count": memory_count
         })
-    return success_response(data={"items": response, "total": len(response)})
+    return success_response(data={"items": response, "total": total})
 
 
 @agent_router.get("/{agent_id}")
