@@ -1,8 +1,9 @@
 """
 Agent API routes
 """
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator
 from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import StreamingResponse
 from base.plugins.agent.schemas.agent import AgentCreate, AgentUpdate, AgentResponse
 from base.plugins.agent.services.agent_service import AgentService
 from base.common.response import success_response, fail_response
@@ -152,7 +153,7 @@ async def execute_agent(agent_id: int, input_data: dict):
     if result.get("success"):
         return success_response(data=result, msg="智能体执行成功")
     else:
-        return fail_response(msg=result.get("message", "执行失败1"))
+        return fail_response(msg=result.get("message", "执行失败"))
 
 
 @agent_router.post("/{agent_id}/graph/execute")
@@ -243,6 +244,438 @@ async def execute_agent_graph(agent_id: int, input_data: dict):
         print(traceback.format_exc())
         logger.exception(f"执行智能体结构图失败: {e}")
         return fail_response(msg=f"结构图执行失败: {str(e)}", data={"traceback": traceback.format_exc()})
+
+
+async def sse_execution_generator(agent, input_data) -> AsyncGenerator[str, None]:
+    """SSE事件生成器 - 实时推送执行过程（支持边思考边输出）"""
+    import json
+    from datetime import datetime
+    from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
+    
+    # 创建SSE推送函数
+    async def sse_yield(event_data):
+        """SSE数据推送helper"""
+        yield f"data: {json.dumps({
+            **event_data,
+            'timestamp': datetime.now().isoformat()
+        }, ensure_ascii=False)}\n\n"
+    
+    # 推送开始
+    async for data in sse_yield({
+        'type': 'start',
+        'message': '开始执行智能体'
+    }):
+        yield data
+    
+    try:
+        import asyncio
+        
+        # 检查是否有结构图配置
+        flow_data = None
+        if agent.graph_definition:
+            if isinstance(agent.graph_definition, str):
+                try:
+                    flow_data = json.loads(agent.graph_definition)
+                except json.JSONDecodeError:
+                    flow_data = None
+            else:
+                flow_data = agent.graph_definition
+        
+        if flow_data and isinstance(flow_data, dict) and flow_data.get("nodes"):
+            # 使用结构图执行
+            nodes = flow_data.get("nodes", [])
+            edges = flow_data.get("edges", [])
+            
+            # 查找开始节点
+            start_node = None
+            for node in nodes:
+                if node.get("type") == "start":
+                    start_node = node
+                    break
+            if not start_node and nodes:
+                start_node = nodes[0]
+            
+            if start_node:
+                # 推送初始化信息
+                async for data in sse_yield({
+                    'type': 'info',
+                    'label': '初始化',
+                    'message': '初始化执行环境'
+                }):
+                    yield data
+                
+                # 构建节点映射
+                node_map = {node.get("id"): node for node in nodes}
+                current_node_id = start_node.get("id")
+                
+                # 初始化状态
+                state = {
+                    "input": input_data,
+                    "output": {},
+                    "variables": {},
+                    "execution_trace": [],
+                    "current_node": None,
+                    "error": None,
+                    "agent": agent
+                }
+                
+                step_count = 0
+                max_steps = 100
+                
+                while current_node_id and step_count < max_steps:
+                    step_count += 1
+                    
+                    current_node = node_map.get(current_node_id)
+                    if not current_node:
+                        break
+                    
+                    node_type = current_node.get("type")
+                    node_data = current_node.get("data", {})
+                    node_label = node_data.get("label", node_type)
+                    
+                    # 推送节点开始
+                    async for data in sse_yield({
+                        'type': 'node_start',
+                        'node_id': current_node_id,
+                        'node_type': node_type,
+                        'node_label': node_label,
+                        'step': step_count
+                    }):
+                        yield data
+                    
+                    try:
+                        if node_type == "start":
+                            async for data in sse_yield({
+                                'type': 'info',
+                                'label': '开始节点',
+                                'message': '开始执行...'
+                            }):
+                                yield data
+                            state["variables"]["start_time"] = datetime.now().isoformat()
+                        
+                        elif node_type == "end":
+                            async for data in sse_yield({
+                                'type': 'info',
+                                'label': '结束节点',
+                                'message': '执行结束'
+                            }):
+                                yield data
+                            state["output"]["end_time"] = datetime.now().isoformat()
+                            break
+                        
+                        elif node_type == "llm":
+                            # LLM节点 - 根据配置决定流式或非流式
+                            async for data in sse_yield({
+                                'type': 'thinking',
+                                'label': node_label,
+                                'message': f'正在调用大模型...'
+                            }):
+                                yield data
+                            
+                            # 检查是否启用流式输出
+                            is_streaming = node_data.get("stream", False)
+                            
+                            if is_streaming:
+                                # 流式执行 - 边思考边输出
+                                async def llm_stream_callback(chunk_data):
+                                    """LLM流式回调 - 实时推送每个片段"""
+                                    async for data in sse_yield({
+                                        'type': 'thinking_stream',
+                                        'content': chunk_data.get('content', ''),
+                                        'full_content': chunk_data.get('full_content', ''),
+                                        'label': node_label
+                                    }):
+                                        yield data
+                                
+                                # 执行LLM节点（流式版本）
+                                state = await LangGraphExecutor._execute_llm_node_streaming(
+                                    current_node, 
+                                    state,
+                                    sse_yield_func=llm_stream_callback
+                                )
+                                
+                                # 获取完整响应
+                                llm_output = state["variables"].get("llm_output", {})
+                                full_response = llm_output.get("response", "")
+                            else:
+                                # 非流式执行 - 一次性返回
+                                state = await LangGraphExecutor._execute_llm_node(current_node, state)
+                                
+                                # 获取完整响应
+                                llm_output = state["variables"].get("llm_output", {})
+                                full_response = llm_output.get("response", "")
+                            
+                            async for data in sse_yield({
+                                'type': 'thinking_result',
+                                'label': node_label,
+                                'content': full_response[:200] + ('...' if len(full_response) > 200 else ''),
+                                'full_content': full_response
+                            }):
+                                yield data
+                        
+                        elif node_type == "skill":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': f'执行技能: {node_data.get("skill_id", "unknown")}'
+                            }):
+                                yield data
+                            
+                            state = await LangGraphExecutor._execute_skill_node(node_data, state)
+                            
+                            skill_result = state["variables"].get("skill_output", {})
+                            async for data in sse_yield({
+                                'type': 'observation',
+                                'label': '技能执行结果',
+                                'content': str(skill_result)[:500]
+                            }):
+                                yield data
+                        
+                        elif node_type == "agent":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '执行智能体...'
+                            }):
+                                yield data
+                            
+                            state = await LangGraphExecutor._execute_agent_node(node_data, state)
+                        
+                        elif node_type == "condition":
+                            async for data in sse_yield({
+                                'type': 'thinking',
+                                'label': node_label,
+                                'message': '条件判断中...'
+                            }):
+                                yield data
+                            
+                            state = await LangGraphExecutor._execute_condition_node(node_data, state)
+                            
+                            condition_result = state["variables"].get("condition_result", {}).get("result", False)
+                            async for data in sse_yield({
+                                'type': 'observation',
+                                'label': '条件判断结果',
+                                'content': f'结果: {condition_result}'
+                            }):
+                                yield data
+                        
+                        elif node_type == "loop":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '循环节点'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_loop_node(node_data, state)
+                        
+                        elif node_type == "output":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '生成输出'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_output_node(node_data, state)
+                        
+                        elif node_type == "input":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '处理输入'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_input_node(node_data, state)
+                        
+                        elif node_type == "iteration":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '执行迭代'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_iteration_node(node_data, state)
+                        
+                        elif node_type == "http":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '发送HTTP请求'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_http_node(node_data, state)
+                        
+                        elif node_type == "code":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '执行代码'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_code_node(node_data, state)
+                        
+                        elif node_type == "template":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '处理模板'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_template_node(node_data, state)
+                        
+                        elif node_type == "variable_aggregator":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '聚合变量'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_variable_aggregator_node(node_data, state)
+                        
+                        elif node_type == "document_extractor":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '提取文档'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_document_extractor_node(node_data, state)
+                        
+                        elif node_type == "variable_assigner":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '赋值变量'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_variable_assigner_node(node_data, state)
+                        
+                        elif node_type == "parameter_extractor":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '提取参数'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_parameter_extractor_node(node_data, state)
+                        
+                        elif node_type == "json_extractor":
+                            async for data in sse_yield({
+                                'type': 'action',
+                                'label': node_label,
+                                'message': '提取JSON'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_json_extractor_node(node_data, state)
+                        
+                        else:
+                            async for data in sse_yield({
+                                'type': 'info',
+                                'label': node_label,
+                                'message': f'执行节点: {node_type}'
+                            }):
+                                yield data
+                            state = await LangGraphExecutor._execute_default_node(node_data, state)
+                        
+                        # 推送节点完成
+                        async for data in sse_yield({
+                            'type': 'node_complete',
+                            'node_id': current_node_id,
+                            'node_type': node_type,
+                            'node_label': node_label
+                        }):
+                            yield data
+                        
+                    except Exception as e:
+                        async for data in sse_yield({
+                            'type': 'error',
+                            'node_id': current_node_id,
+                            'message': str(e)
+                        }):
+                            yield data
+                        state["error"] = str(e)
+                        break
+                    
+                    # 确定下一个节点
+                    if node_type == "condition":
+                        condition_result = state.get("variables", {}).get("condition_result", {}).get("result", False)
+                        outgoing_edges = [e for e in edges if e.get("source") == current_node_id]
+                        if len(outgoing_edges) >= 2:
+                            target_idx = 0 if condition_result else 1
+                            current_node_id = outgoing_edges[target_idx].get("target") if target_idx < len(outgoing_edges) else None
+                        elif outgoing_edges:
+                            current_node_id = outgoing_edges[0].get("target")
+                        else:
+                            current_node_id = None
+                    else:
+                        outgoing_edges = [e for e in edges if e.get("source") == current_node_id]
+                        current_node_id = outgoing_edges[0].get("target") if outgoing_edges else None
+                
+                # 执行完成
+                async for data in sse_yield({
+                    'type': 'complete',
+                    'result': state.get("output", {}),
+                    'variables': state.get("variables", {})
+                }):
+                    yield data
+            else:
+                # 没有开始节点
+                async for data in sse_yield({
+                    'type': 'error',
+                    'message': '结构图没有开始节点'
+                }):
+                    yield data
+        else:
+            # 没有结构图，使用简化执行
+            async for data in sse_yield({
+                'type': 'thinking',
+                'label': '智能体执行',
+                'message': '执行中...'
+            }):
+                yield data
+            
+            result = await LangGraphExecutor.execute_agent(agent, input_data)
+            
+            async for data in sse_yield({
+                'type': 'complete',
+                'result': result.get('output', {}) if isinstance(result, dict) else {},
+                'variables': result.get('variables', {}) if isinstance(result, dict) else result
+            }):
+                yield data
+            
+    except Exception as e:
+        import traceback
+        async for data in sse_yield({
+            'type': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }):
+            yield data
+
+
+@agent_router.post("/{agent_id}/graph/execute/sse")
+async def execute_agent_graph_sse(agent_id: int, input_data: dict):
+    """使用SSE实时执行智能体结构图"""
+    try:
+        from base.plugins.agent.models.agent import Agent
+        
+        agent = await Agent.get_or_none(id=agent_id)
+        if not agent:
+            return fail_response(msg="智能体不存在", code=404)
+        
+        return StreamingResponse(
+            sse_execution_generator(agent, input_data),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+            }
+        )
+    except Exception as e:
+        import traceback
+        print(f"SSE执行错误: {e}")
+        print(traceback.format_exc())
+        return fail_response(msg=str(e), code=500)
 
 
 @agent_router.get("/{agent_id}/graph")
@@ -435,3 +868,6 @@ async def set_agent_skills(agent_id: int, data: dict):
         return success_response(msg="技能设置成功")
     except Exception as e:
         return fail_response(msg=str(e))
+
+
+

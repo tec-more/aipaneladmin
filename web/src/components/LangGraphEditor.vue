@@ -129,6 +129,9 @@
               <el-form-item label="最大Token">
                 <el-input-number v-model="selectedNode.data.max_tokens" :min="1" :max="4096" />
               </el-form-item>
+              <el-form-item label="流式输出">
+                <el-switch v-model="selectedNode.data.stream" active-text="开" inactive-text="关" />
+              </el-form-item>
               <el-form-item label="提示词">
                 <el-input v-model="selectedNode.data.prompt" type="textarea" :rows="4" />
               </el-form-item>
@@ -366,7 +369,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph } from '@/api/agent'
+import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 
 const props = defineProps({
@@ -392,6 +395,9 @@ const realtimeSteps = ref([]) // 实时执行步骤
 const dialogHistory = ref([]) // 对话历史
 const currentInput = ref('') // 当前输入
 const latestResponse = ref('') // 最新回复
+const currentProcess = ref([]) // 当前执行过程（思考/行动/观察）
+const assistantMessage = ref(null) // 当前助手消息引用
+const currentAbortController = ref(null) // 当前中断控制器
 
 const agents = ref([])
 const skills = ref([])
@@ -874,6 +880,7 @@ const doExecute = async () => {
   }
   
   realtimeSteps.value = [] // 清空旧步骤
+  currentProcess.value = [] // 清空执行过程
   executing.value = true
   
   try {
@@ -887,185 +894,81 @@ const doExecute = async () => {
     }
     dialogHistory.value.push(userMessage)
     
+    // 创建并添加助手消息占位符
+    assistantMessage.value = {
+      role: 'assistant',
+      content: '',
+      time: new Date().toLocaleTimeString('zh-CN'),
+      process: []
+    }
+    dialogHistory.value.push(assistantMessage.value)
+    
     addRealtimeStep('info', '开始执行', `输入文本: ${currentInput.value.trim().substring(0, 100)}...`)
     markLastStepCompleted()
     
     // 将普通文本转换为JSON格式，包含对话历史
     const input = {
       text: currentInput.value.trim(),
-      history: [...dialogHistory.value]
+      history: [...dialogHistory.value.slice(0, -1)] // 排除刚添加的助手占位符
     }
     console.log('转换后的input:', input)
-    
-    let res
-    
-    if (props.agentId) {
-      console.log('执行智能体结构图:', props.agentId, input)
-      console.log('调用 executeAgentGraph 函数')
-      
-      addRealtimeStep('info', '准备执行', '正在调用智能体执行接口...')
-      
-      // 模拟实时步骤（实际项目中可以用WebSocket或SSE）
-      addRealtimeStep('think', '分析问题', '正在分析用户需求...')
-      await new Promise(resolve => setTimeout(resolve, 500))
-      markLastStepCompleted()
-      
-      res = await executeAgentGraph(props.agentId, input)
-      console.log('执行结果:', res)
-      console.log('执行结果类型:', typeof res)
-      console.log('执行结果结构:', Object.keys(res))
-    } else {
-      console.log('执行工程图:', props.workflowId, input)
-      console.log('调用 apiExecuteWorkflow 函数')
-      res = await apiExecuteWorkflow(props.workflowId, input)
-      console.log('执行结果:', res)
-      console.log('执行结果类型:', typeof res)
-      console.log('执行结果结构:', Object.keys(res))
-    }
-    
-    // 从执行结果中提取步骤并显示
-    if (res.data) {
-      const result = res.data
-      
-      // 处理思考过程
-      if (result.variables) {
-        // 处理推理
-        if (result.variables.analysis_raw || result.variables.analysis_result) {
-          addRealtimeStep('think', '推理 - 分析需求', 
-            result.variables.analysis_raw?.response || JSON.stringify(result.variables.analysis_result, null, 2) || '需求分析完成')
-          markLastStepCompleted()
-        }
-        
-        // 处理行动
-        if (result.variables.decompose_raw || result.variables.task_plan) {
-          addRealtimeStep('act', '行动 - 任务分解', 
-            result.variables.decompose_raw?.response || JSON.stringify(result.variables.task_plan, null, 2) || '任务分解完成')
-          markLastStepCompleted()
-        }
-        
-        // 处理观察
-        if (result.variables.observe_raw || result.variables.observation_result) {
-          addRealtimeStep('observe', '观察 - 评估结果', 
-            result.variables.observe_raw?.response || JSON.stringify(result.variables.observation_result, null, 2) || '评估完成')
-          markLastStepCompleted()
-        }
-        
-        // 处理最终报告
-        if (result.variables.final_report) {
-          addRealtimeStep('info', '生成报告', '正在生成最终报告...')
-          markLastStepCompleted()
-        }
-      }
-      
-      // 处理执行轨迹
-      if (result.trace) {
-        for (const step of result.trace) {
-          if (step.node_type === 'llm') {
-            const stepType = step.label?.includes('思考') || step.label?.includes('推理') ? 'think' : 
-                            step.label?.includes('观察') || step.label?.includes('评估') ? 'observe' : 'act'
-            addRealtimeStep(stepType, step.label || `执行节点: ${step.node_type}`, JSON.stringify(step, null, 2))
-            markLastStepCompleted()
-          }
-        }
-      }
-    }
-    
-    // 解析执行结果
-    let assistantResponse = ''
-    if (typeof res.data === 'string') {
-      assistantResponse = res.data
-    } else if (res.data.output || res.data.result || res.data.text || res.data.response) {
-      assistantResponse = res.data.output || res.data.result || res.data.text || res.data.response
-    } else if (res.data.variables) {
-      // 尝试从变量中获取结果
-      const vars = res.data.variables
-      assistantResponse = vars.final_report || vars.response || vars.text || vars.output || JSON.stringify(vars, null, 2)
-    } else {
-      assistantResponse = JSON.stringify(res.data, null, 2)
-    }
-    
-    // 构建process数组
-    const process = []
-    
-    // 添加思考过程
-    if (res.data.variables?.analysis_raw || res.data.variables?.analysis_result) {
-      process.push({
-        type: 'thinking',
-        label: '思考',
-        content: res.data.variables.analysis_raw?.response || JSON.stringify(res.data.variables.analysis_result, null, 2) || '需求分析完成',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      })
-    }
-    
-    // 添加行动过程
-    if (res.data.variables?.decompose_raw || res.data.variables?.task_plan) {
-      process.push({
-        type: 'action',
-        label: '行动',
-        content: res.data.variables.decompose_raw?.response || JSON.stringify(res.data.variables.task_plan, null, 2) || '任务分解完成',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      })
-    }
-    
-    // 添加观察过程
-    if (res.data.variables?.observe_raw || res.data.variables?.observation_result) {
-      process.push({
-        type: 'action',
-        label: '观察',
-        content: res.data.variables.observe_raw?.response || JSON.stringify(res.data.variables.observation_result, null, 2) || '评估完成',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      })
-    }
-    
-    // 添加结果
-    process.push({
-      type: 'result',
-      label: '结果',
-      content: assistantResponse,
-      time: new Date().toLocaleTimeString('zh-CN'),
-      collapsed: false
-    })
-    
-    // 添加助手回复到历史
-    const assistantMessage = {
-      role: 'assistant',
-      content: assistantResponse,
-      time: new Date().toLocaleTimeString('zh-CN'),
-      process: process
-    }
-    dialogHistory.value.push(assistantMessage)
-    
-    // 更新最新回复
-    latestResponse.value = assistantResponse
     
     // 清空输入框
     currentInput.value = ''
     
-    console.log('设置executeResult.value:', res.data)
-    executeResult.value = res.data
+    if (props.agentId) {
+      console.log('自动选择执行方式执行智能体结构图:', props.agentId)
+      
+      const controller = await executeAgentGraphAuto(props.agentId, input, {
+        onStart: () => {
+          console.log('SSE连接已开始')
+          addRealtimeStep('info', '准备执行', '正在建立SSE连接...')
+          markLastStepCompleted()
+        },
+        onData: (data) => {
+          console.log('收到SSE数据:', data)
+          handleSSEData(data)
+        },
+        onComplete: () => {
+          console.log('SSE执行完成')
+          addRealtimeStep('info', '执行完成', '智能体执行完成')
+          markLastStepCompleted()
+          ElMessage.success('执行完成')
+        },
+        onError: (error) => {
+          console.error('SSE执行错误:', error)
+          addRealtimeStep('error', '执行失败', error.message || '未知错误')
+          markLastStepCompleted()
+          ElMessage.error('执行失败: ' + (error.message || '未知错误'))
+        }
+      })
+      currentAbortController.value = controller
+    } else {
+      console.log('执行工程图:', props.workflowId, input)
+      const res = await apiExecuteWorkflow(props.workflowId, input)
+      console.log('执行结果:', res)
+      
+      // 处理非SSE的结果
+      handleNonSSEResult(res)
+    }
     
-    addRealtimeStep('info', '执行完成', '工程图执行完成，结果已生成')
-    markLastStepCompleted()
-    
-    ElMessage.success('发送成功')
-    emit('execute', res.data)
+    emit('execute', executeResult.value)
   } catch (error) {
     console.error('执行失败:', error)
     console.error('错误堆栈:', error.stack)
-    console.error('错误类型:', typeof error)
-    console.error('错误对象结构:', error)
     
     // 即使出错也要显示错误
-    const errorMessage = {
-      role: 'assistant',
-      content: '执行失败: ' + (error.message || '未知错误'),
-      time: new Date().toLocaleTimeString('zh-CN')
+    if (assistantMessage.value) {
+      assistantMessage.value.content = '执行失败: ' + (error.message || '未知错误')
+    } else {
+      const errorMessage = {
+        role: 'assistant',
+        content: '执行失败: ' + (error.message || '未知错误'),
+        time: new Date().toLocaleTimeString('zh-CN')
+      }
+      dialogHistory.value.push(errorMessage)
     }
-    dialogHistory.value.push(errorMessage)
-    latestResponse.value = errorMessage.content
+    latestResponse.value = '执行失败: ' + (error.message || '未知错误')
     
     addRealtimeStep('error', '执行失败', error.message || '未知错误')
     markLastStepCompleted()
@@ -1073,7 +976,274 @@ const doExecute = async () => {
     ElMessage.error('执行失败: ' + (error.message || '未知错误'))
   } finally {
     executing.value = false
+    currentAbortController.value = null
   }
+}
+
+// 中断执行
+const abortExecution = () => {
+  if (currentAbortController.value) {
+    console.log('中断执行')
+    currentAbortController.value.abort()
+    currentAbortController.value = null
+    executing.value = false
+    
+    // 添加中断提示
+    addRealtimeStep('warning', '执行中断', '用户手动中断执行')
+    markLastStepCompleted()
+    
+    if (assistantMessage.value) {
+      assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]'
+    }
+    
+    ElMessage.info('执行已中断')
+  }
+}
+
+// 处理SSE数据
+const handleSSEData = (data) => {
+  console.log('handleSSEData called with:', data)
+  
+  switch (data.type) {
+    case 'start':
+      addRealtimeStep('info', data.label || '开始', data.message || '执行开始')
+      markLastStepCompleted()
+      break
+    
+    case 'info':
+      addRealtimeStep('info', data.label || '信息', data.message || '')
+      markLastStepCompleted()
+      break
+    
+    case 'thinking':
+    case 'thinking_stream':
+      // 思考过程 - 添加到process
+      const thinkingStep = {
+        type: 'thinking',
+        label: data.label || '思考',
+        content: data.message || data.content || '',
+        time: new Date().toLocaleTimeString('zh-CN'),
+        collapsed: false
+      }
+      currentProcess.value.push(thinkingStep)
+      updateAssistantMessage()
+      
+      addRealtimeStep('think', data.label || '思考', data.message || data.content || '')
+      markLastStepCompleted()
+      break
+    
+    case 'thinking_result':
+      // 思考结果 - 更新之前的思考内容
+      if (currentProcess.value.length > 0) {
+        const lastProcess = currentProcess.value[currentProcess.value.length - 1]
+        if (lastProcess.type === 'thinking') {
+          lastProcess.content = data.full_content || data.content || lastProcess.content
+        }
+      } else {
+        currentProcess.value.push({
+          type: 'thinking',
+          label: '思考结果',
+          content: data.full_content || data.content || '',
+          time: new Date().toLocaleTimeString('zh-CN'),
+          collapsed: false
+        })
+      }
+      updateAssistantMessage()
+      
+      addRealtimeStep('think', '思考完成', data.content || '')
+      markLastStepCompleted()
+      break
+    
+    case 'action':
+      // 行动过程
+      const actionStep = {
+        type: 'action',
+        label: data.label || '行动',
+        content: data.message || data.content || '',
+        time: new Date().toLocaleTimeString('zh-CN'),
+        collapsed: false
+      }
+      currentProcess.value.push(actionStep)
+      updateAssistantMessage()
+      
+      addRealtimeStep('act', data.label || '行动', data.message || data.content || '')
+      markLastStepCompleted()
+      break
+    
+    case 'observation':
+      // 观察结果
+      const observeStep = {
+        type: 'action', // 使用action类型
+        label: data.label || '观察',
+        content: data.content || '',
+        time: new Date().toLocaleTimeString('zh-CN'),
+        collapsed: false
+      }
+      currentProcess.value.push(observeStep)
+      updateAssistantMessage()
+      
+      addRealtimeStep('observe', data.label || '观察', data.content || '')
+      markLastStepCompleted()
+      break
+    
+    case 'node_start':
+      addRealtimeStep('info', `执行节点: ${data.node_label || data.node_type}`, `步骤 ${data.step}`)
+      break
+    
+    case 'node_complete':
+      addRealtimeStep('success', `节点完成: ${data.node_label || data.node_type}`, '')
+      markLastStepCompleted()
+      break
+    
+    case 'complete':
+      // 执行完成 - 添加结果
+      console.log('Complete data:', data)
+      executeResult.value = {
+        result: data.result,
+        variables: data.variables
+      }
+      
+      // 从结果中提取最终回复
+      let finalContent = ''
+      if (data.variables) {
+        finalContent = data.variables.final_report || 
+                      data.variables.response || 
+                      data.variables.text || 
+                      data.variables.output || 
+                      JSON.stringify(data.variables, null, 2)
+      } else if (data.result) {
+        finalContent = data.result.output || data.result.text || JSON.stringify(data.result, null, 2)
+      }
+      
+      if (!finalContent) {
+        finalContent = '执行完成'
+      }
+      
+      // 添加结果到process
+      currentProcess.value.push({
+        type: 'result',
+        label: '结果',
+        content: finalContent,
+        time: new Date().toLocaleTimeString('zh-CN'),
+        collapsed: false
+      })
+      
+      // 更新助手消息
+      if (assistantMessage.value) {
+        assistantMessage.value.content = finalContent
+        assistantMessage.value.process = [...currentProcess.value]
+      }
+      
+      latestResponse.value = finalContent
+      break
+    
+    case 'error':
+      addRealtimeStep('error', data.label || '错误', data.message || '')
+      markLastStepCompleted()
+      
+      if (assistantMessage.value) {
+        assistantMessage.value.content = '执行错误: ' + (data.message || '')
+      }
+      latestResponse.value = '执行错误: ' + (data.message || '')
+      break
+  }
+}
+
+// 更新助手消息
+const updateAssistantMessage = () => {
+  console.log('updateAssistantMessage called', {
+    hasAssistantMessage: !!assistantMessage.value,
+    processLength: currentProcess.value.length,
+    dialogHistoryLength: dialogHistory.value.length
+  })
+  
+  if (assistantMessage.value) {
+    assistantMessage.value.process = [...currentProcess.value]
+    // 如果已经有内容就保持，否则显示等待
+    if (!assistantMessage.value.content) {
+      assistantMessage.value.content = '思考中...'
+    }
+    // 强制触发响应式更新
+    const lastIndex = dialogHistory.value.length - 1
+    console.log('Last dialogHistory item:', dialogHistory.value[lastIndex])
+    if (lastIndex >= 0 && dialogHistory.value[lastIndex] === assistantMessage.value) {
+      console.log('Triggering force update')
+      // 手动触发更新
+      dialogHistory.value = [...dialogHistory.value]
+    } else {
+      console.log('Warning: last dialogHistory item is not assistantMessage')
+    }
+  }
+}
+
+// 处理非SSE结果（兼容性）
+const handleNonSSEResult = (res) => {
+  if (!res.data) return
+  
+  const result = res.data
+  
+  // 处理思考过程
+  if (result.variables) {
+    if (result.variables.analysis_raw || result.variables.analysis_result) {
+      currentProcess.value.push({
+        type: 'thinking',
+        label: '思考',
+        content: result.variables.analysis_raw?.response || JSON.stringify(result.variables.analysis_result, null, 2) || '需求分析完成',
+        time: new Date().toLocaleTimeString('zh-CN'),
+        collapsed: false
+      })
+    }
+    
+    if (result.variables.decompose_raw || result.variables.task_plan) {
+      currentProcess.value.push({
+        type: 'action',
+        label: '行动',
+        content: result.variables.decompose_raw?.response || JSON.stringify(result.variables.task_plan, null, 2) || '任务分解完成',
+        time: new Date().toLocaleTimeString('zh-CN'),
+        collapsed: false
+      })
+    }
+    
+    if (result.variables.observe_raw || result.variables.observation_result) {
+      currentProcess.value.push({
+        type: 'action',
+        label: '观察',
+        content: result.variables.observe_raw?.response || JSON.stringify(result.variables.observation_result, null, 2) || '评估完成',
+        time: new Date().toLocaleTimeString('zh-CN'),
+        collapsed: false
+      })
+    }
+  }
+  
+  // 解析执行结果
+  let assistantResponse = ''
+  if (typeof res.data === 'string') {
+    assistantResponse = res.data
+  } else if (res.data.output || res.data.result || res.data.text || res.data.response) {
+    assistantResponse = res.data.output || res.data.result || res.data.text || res.data.response
+  } else if (res.data.variables) {
+    const vars = res.data.variables
+    assistantResponse = vars.final_report || vars.response || vars.text || vars.output || JSON.stringify(vars, null, 2)
+  } else {
+    assistantResponse = JSON.stringify(res.data, null, 2)
+  }
+  
+  currentProcess.value.push({
+    type: 'result',
+    label: '结果',
+    content: assistantResponse,
+    time: new Date().toLocaleTimeString('zh-CN'),
+    collapsed: false
+  })
+  
+  // 更新助手消息
+  if (assistantMessage.value) {
+    assistantMessage.value.content = assistantResponse
+    assistantMessage.value.process = [...currentProcess.value]
+  }
+  
+  latestResponse.value = assistantResponse
+  executeResult.value = res.data
 }
 
 const exportWorkflow = () => {

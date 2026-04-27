@@ -1,7 +1,7 @@
 """
 大模型聊天服务 - 统一调用入口
 """
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, AsyncIterator
 import logging
 from fastapi import HTTPException
 
@@ -262,3 +262,104 @@ class ChatService:
         api_key.used_quota += tokens
         api_key.last_used_at = datetime.now()
         await api_key.save()
+
+    @staticmethod
+    async def chat_stream(
+        model_id: int,
+        messages: List[Dict],
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+        stream_callback=None
+    ) -> AsyncIterator[str]:
+        """
+        流式聊天（支持边思考边输出）
+
+        Args:
+            model_id: 模型ID
+            messages: 消息列表
+            temperature: 温度参数
+            max_tokens: 最大token数
+            stream_callback: 流式回调函数，用于实时推送内容
+
+        Yields:
+            流式内容片段
+        """
+        from base.plugins.llm.services.openai_service import OpenAIService
+        
+        logger.info(f"[ChatService] 开始流式聊天, model_id={model_id}")
+        
+        # 获取模型信息
+        target_model = await LLMModel.get_or_none(id=model_id, status="active")
+        if not target_model:
+            raise HTTPException(status_code=404, detail=f"未找到model_id={model_id}的活跃模型")
+        logger.info(f"[ChatService] 开始流式聊天，模型标识, id={target_model.id}, model_id={target_model.model_id}")
+        # 获取厂商
+        provider = await LLMProvider.get_or_none(id=target_model.provider_id)
+        if not provider:
+            logger.error(f"[ChatService] 未找到对应的厂商, model_id={model_id}")
+            raise HTTPException(status_code=404, detail=f"未找到对应的厂商")
+        
+        # 获取API密钥 - 先尝试根据模型查找，再尝试根据厂商查找
+        api_key_obj = None
+        
+        # 1. 先尝试根据模型查找（优先级更高）
+        try:
+            from base.plugins.llm.models.api_key import LLMApiKey
+            api_key_obj = await LLMApiKey.filter(
+                model_id=target_model.id
+            ).first()
+            
+            logger.info(f"[ChatService] 找到模型专用API密钥: {api_key_obj.api_id or api_key_obj.description}")
+        except Exception as e:
+            logger.warning(f"[ChatService] 根据模型查找API密钥失败: {e}")
+    
+    
+        api_key_str = api_key_obj.api_key
+        api_secret = getattr(api_key_obj, 'api_secret', None)
+        
+        # 优先使用API密钥的call_mode，否则使用模型的call_mode
+        call_mode = api_key_obj.call_mode or target_model.call_mode or "vendor_sdk"
+        
+        # 构建端点URL - 优先使用API密钥的endpoint，其次使用模型的endpoint，最后使用默认值
+        endpoint_url = api_key_obj.endpoint_url or target_model.endpoint_url or "https://api.openai.com/v1"
+        
+        service = await ChatService.get_provider_service(
+            provider.name_en,
+            api_key_str,
+            endpoint_url,
+            api_secret,
+            call_mode
+        )
+        
+        # 调用流式chat - 优先使用model_id（API标识），否则使用model_name
+        model_for_call = target_model.model_id if target_model.model_id else target_model.model_name
+        
+        if hasattr(service, 'chat_stream'):
+            async for chunk in service.chat_stream(
+                model=model_for_call,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            ):
+                # 提取content
+                if 'choices' in chunk and len(chunk['choices']) > 0:
+                    delta = chunk['choices'][0].get('delta', {})
+                    content = delta.get('content', '')
+                    if content:
+                        # 如果有回调，立即调用
+                        if stream_callback:
+                            await stream_callback(content)
+                        yield content
+        else:
+            # 如果服务不支持流式，回退到非流式
+            logger.warning(f"[ChatService] {provider.name_en}服务不支持流式，回退到非流式")
+            response = await service.chat(
+                model=model_for_call,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            if stream_callback:
+                await stream_callback(content)
+            yield content

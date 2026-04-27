@@ -32,6 +32,105 @@ export function executeAgentGraph(id, params) {
   return longRequest.post(`/v1/agent/agents/${id}/graph/execute`, params)
 }
 
+export async function executeAgentGraphSSE(id, params, callbacks = {}) {
+  const { onStart, onData, onComplete, onError } = callbacks
+  const abortController = new AbortController()
+  
+  try {
+    const response = await fetch(`/api/v1/agent/agents/${id}/graph/execute/sse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+      signal: abortController.signal,
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    
+    if (onStart) {
+      onStart()
+    }
+    
+    let buffer = ''
+    
+    while (true) {
+      if (abortController.signal.aborted) {
+        break
+      }
+      
+      const { done, value } = await reader.read()
+      if (done) break
+      
+      buffer += decoder.decode(value, { stream: true })
+      
+      const lines = buffer.split('\n')
+      buffer = lines.pop()
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.slice(6).trim()
+          if (dataStr) {
+            try {
+              const data = JSON.parse(dataStr)
+              if (onData) {
+                onData(data)
+              }
+            } catch (e) {
+              console.warn('Failed to parse SSE data:', e)
+            }
+          }
+        }
+      }
+    }
+    
+    if (!abortController.signal.aborted && onComplete) {
+      onComplete()
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError' && onError) {
+      onError(error)
+    }
+    if (error.name !== 'AbortError') {
+      throw error
+    }
+  }
+  
+  return {
+    abort: () => abortController.abort()
+  }
+}
+
+// 根据结构图自动选择执行方式
+export async function executeAgentGraphAuto(id, params, callbacks = {}, graphDefinition = null) {
+  // 如果没有传入graphDefinition，自动获取
+  if (!graphDefinition) {
+    const graphResponse = await getAgentGraph(id)
+    if (graphResponse && graphResponse.data && graphResponse.data.graph_definition) {
+      graphDefinition = graphResponse.data.graph_definition
+    }
+  }
+  
+  const hasStreamingNode = hasStreamingLLMNode(graphDefinition)
+  
+  if (hasStreamingNode) {
+    // 如果包含流式节点，使用SSE接口
+    return executeAgentGraphSSE(id, params, callbacks)
+  } else {
+    // 否则使用普通接口
+    const result = await executeAgentGraph(id, params)
+    return {
+      abort: () => {},
+      result
+    }
+  }
+}
+
 export function getAgentGraph(agentId) {
   return request.get(`/v1/agent/agents/${agentId}/graph`)
 }
@@ -52,10 +151,6 @@ export function removeSkillFromAgent(agentId, skillId) {
   return request.delete(`/v1/agent/agents/${agentId}/skills/${skillId}`)
 }
 
-export function setAgentSkills(agentId, skillIds) {
-  return request.put(`/v1/agent/agents/${agentId}/skills`, { skill_ids: skillIds })
-}
-
 // ==================== 技能管理 ====================
 
 export function getSkills(params) {
@@ -63,9 +158,6 @@ export function getSkills(params) {
 }
 
 export function getSkill(id) {
-  if (!id || id === null || id === undefined || id <= 0) {
-    return Promise.reject(new Error('无效的技能ID'))
-  }
   return request.get(`/v1/agent/skills/${id}`)
 }
 
@@ -79,10 +171,6 @@ export function updateSkill(id, data) {
 
 export function deleteSkill(id) {
   return request.delete(`/v1/agent/skills/${id}`)
-}
-
-export function getSkillsByType(skillType) {
-  return request.get(`/v1/agent/skills/type/${skillType}`)
 }
 
 export function getActiveSkills() {
@@ -119,10 +207,6 @@ export function deleteMemory(id) {
   return request.delete(`/v1/agent/memories/${id}`)
 }
 
-export function getMemoriesByAgent(agentId) {
-  return request.get(`/v1/agent/memories/agent/${agentId}`)
-}
-
 export function getMemoriesByAgentAndType(agentId, memoryType) {
   return request.get(`/v1/agent/memories/agent/${agentId}/type/${memoryType}`)
 }
@@ -133,18 +217,6 @@ export function recallMemory(id, params) {
 
 export function getRecentMemories(agentId) {
   return request.get(`/v1/agent/memories/agent/${agentId}/recent`)
-}
-
-export function getImportantMemories(agentId) {
-  return request.get(`/v1/agent/memories/agent/${agentId}/important`)
-}
-
-export function searchMemories(agentId, params) {
-  return request.get(`/v1/agent/memories/agent/${agentId}/search`, { params })
-}
-
-export function getMemoryStats(agentId) {
-  return request.get(`/v1/agent/memories/agent/${agentId}/stats`)
 }
 
 // ==================== 工作流管理 ====================
@@ -181,18 +253,10 @@ export function executeWorkflow(id, params) {
   return longRequest.post(`/v1/agent/workflows/${id}/execute`, params)
 }
 
-export function getWorkflowExecutions(params) {
-  return request.get('/v1/agent/workflow-executions', { params })
-}
-
-export function getWorkflowExecution(id) {
-  return request.get(`/v1/agent/workflow-executions/${id}`)
-}
-
 // ==================== 对话流管理 ====================
 
 export function getDialogFlows(params) {
-  return request.get('/v1/agent/dialog-flows', { params })
+  return request.get('/v1/agent/dialog-flows/', { params })
 }
 
 export function getDialogFlow(id) {
@@ -211,54 +275,30 @@ export function deleteDialogFlow(id) {
   return request.delete(`/v1/agent/dialog-flows/${id}`)
 }
 
-export function getDialogFlowNodes(dialogFlowId) {
-  return request.get(`/v1/agent/dialog-flows/${dialogFlowId}/nodes`)
-}
-
 export function createDialogFlowNode(dialogFlowId, data) {
   return request.post(`/v1/agent/dialog-flows/${dialogFlowId}/nodes`, data)
-}
-
-export function getDialogFlowNode(nodeId) {
-  return request.get(`/v1/agent/dialog-flow-nodes/${nodeId}`)
-}
-
-export function updateDialogFlowNode(nodeId, data) {
-  return request.put(`/v1/agent/dialog-flow-nodes/${nodeId}`, data)
-}
-
-export function deleteDialogFlowNode(nodeId) {
-  return request.delete(`/v1/agent/dialog-flow-nodes/${nodeId}`)
-}
-
-export function getDialogFlowEdges(dialogFlowId) {
-  return request.get(`/v1/agent/dialog-flows/${dialogFlowId}/edges`)
 }
 
 export function createDialogFlowEdge(dialogFlowId, data) {
   return request.post(`/v1/agent/dialog-flows/${dialogFlowId}/edges`, data)
 }
 
-export function getDialogFlowEdge(edgeId) {
-  return request.get(`/v1/agent/dialog-flow-edges/${edgeId}`)
-}
-
-export function updateDialogFlowEdge(edgeId, data) {
-  return request.put(`/v1/agent/dialog-flow-edges/${edgeId}`, data)
-}
-
-export function deleteDialogFlowEdge(edgeId) {
-  return request.delete(`/v1/agent/dialog-flow-edges/${edgeId}`)
-}
-
 export function executeDialogFlow(id, params) {
   return longRequest.post(`/v1/agent/dialog-flows/${id}/execute`, params)
 }
 
-export function getDialogFlowExecution(executionId) {
-  return request.get(`/v1/agent/dialog-flows/executions/${executionId}`)
-}
+// ==================== 工具函数 ====================
 
-export function getDialogFlowExecutions(params) {
-  return request.get('/v1/agent/dialog-flows/executions', { params })
+// 检查结构图中是否包含开启流式调用的LLM节点
+export function hasStreamingLLMNode(graphDefinition) {
+  if (!graphDefinition || !graphDefinition.nodes) {
+    return false
+  }
+  
+  return graphDefinition.nodes.some(node => {
+    if (node.type === 'llm' && node.data) {
+      return node.data.stream === true
+    }
+    return false
+  })
 }

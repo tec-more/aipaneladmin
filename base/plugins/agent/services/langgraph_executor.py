@@ -270,7 +270,14 @@ class LangGraphExecutor:
                     elif node_type == "agent":
                         state = await LangGraphExecutor._execute_agent_node(node_data, state)
                     elif node_type == "llm":
-                        state = await LangGraphExecutor._execute_llm_node(current_node, state)
+                        node_data = current_node.get("data", {})
+                        is_streaming = node_data.get("stream", False)
+                        if is_streaming:
+                            # 流式执行
+                            state = await LangGraphExecutor._execute_llm_node_streaming(current_node, state)
+                        else:
+                            # 非流式执行
+                            state = await LangGraphExecutor._execute_llm_node(current_node, state)
                     elif node_type == "skill":
                         state = await LangGraphExecutor._execute_skill_node(node_data, state)
                     elif node_type == "condition":
@@ -680,7 +687,7 @@ class LangGraphExecutor:
                 logger.info(f"[LLM节点] 开始调用真实大模型...")
                 from base.plugins.llm.services.chat_service import ChatService
                 from base.plugins.llm.models.provider import LLMProvider
-                
+                from base.plugins.llm.models.api_key import LLMApiKey
                 # 获取厂商信息
                 logger.info(f"[LLM节点] 查找厂商: provider_id={target_model.provider_id}")
                 provider = await LLMProvider.get_or_none(id=target_model.provider_id)
@@ -690,7 +697,8 @@ class LangGraphExecutor:
                     # 获取API密钥
                     try:
                         logger.info(f"[LLM节点] 获取可用API密钥...")
-                        api_key = await ChatService.get_available_api_key(target_model.provider_id)
+                        # 应该根据model_id 从 api_key 表中获取对应的密钥
+                        api_key = await LLMApiKey.filter(model_id=target_model.id).first()
                         if api_key:
                             logger.info(f"[LLM节点] ✓ 找到API密钥: {api_key.api_id or api_key.description}")
                             
@@ -773,6 +781,220 @@ class LangGraphExecutor:
             "prompt": prompt,
             "model": actual_model_for_call,
             "response": llm_response
+        }
+        
+        return state
+    
+    @staticmethod
+    async def _execute_llm_node_streaming(
+        current_node: Dict, 
+        state: AgentState,
+        sse_yield_func=None
+    ) -> AgentState:
+        """
+        执行LLM节点（流式版本 - 支持边思考边输出）
+        
+        Args:
+            current_node: 节点数据
+            state: 智能体状态
+            sse_yield_func: SSE推送回调函数，用于实时推送思考内容
+        """
+        node_id = current_node.get("id", "")
+        node_data = current_node.get("data", {})
+        prompt = node_data.get("prompt", "")
+        model_id = node_data.get("model_id")
+        model_name = node_data.get("model", "gpt-3.5-turbo")
+        node_label = node_data.get("label", "")
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[LLM节点-流式] 开始执行: {node_id} - {node_label}")
+        
+        # 替换变量
+        variables = state.get("variables", {})
+        for key, value in variables.items():
+            prompt = prompt.replace(f"{{{{{key}}}}}", str(value))
+        
+        # 获取输入文本
+        input_text = variables.get("input", {}).get("text", "")
+        system_prompt = node_data.get("system_prompt", "You are a helpful assistant.")
+        
+        # 构建消息列表
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # 添加记忆上下文
+        recent_memories = variables.get("recent_memories", [])
+        important_memories = variables.get("important_memories", [])
+        
+        if recent_memories or important_memories:
+            memory_context = "\n"
+            
+            if important_memories:
+                memory_context += "【重要历史记忆】:\n"
+                for idx, m in enumerate(important_memories):
+                    memory_content = m.get("content", m) if isinstance(m, dict) else str(m)
+                    memory_context += f"{idx+1}. {memory_content}\n"
+                memory_context += "\n"
+            
+            if recent_memories:
+                memory_context += "【最近记忆】:\n"
+                for idx, m in enumerate(recent_memories):
+                    memory_content = m.get("content", m) if isinstance(m, dict) else str(m)
+                    memory_context += f"{idx+1}. {memory_content}\n"
+            
+            if memory_context.strip():
+                messages.append({"role": "user", "content": f"历史记忆和上下文信息：\n{memory_context}\n"})
+        
+        messages.append({"role": "user", "content": input_text or prompt})
+        
+        # 获取模型
+        target_model = None
+        actual_model = model_name
+        
+        try:
+            from base.plugins.llm.models.model import LLMModel
+            
+            if model_id:
+                target_model = await LLMModel.filter(id=model_id, status="active").first()
+                if target_model:
+                    actual_model = target_model.model_name
+            
+            if not target_model and model_name != "gpt-3.5-turbo":
+                target_model = await LLMModel.filter(model_name=model_name, status="active").first()
+                if target_model:
+                    actual_model = target_model.model_name
+            
+            if not target_model:
+                target_model = await LLMModel.filter(status="active").first()
+                if target_model:
+                    actual_model = target_model.model_name
+            
+        except Exception as e:
+            logger.exception(f"[LLM节点-流式] 获取模型信息失败: {e}")
+        
+        # 流式调用大模型
+        full_response = ""
+        try:
+            if target_model and sse_yield_func:
+                logger.info(f"[LLM节点-流式] 开始流式调用大模型...")
+                
+                # 创建流式回调
+                async def stream_callback(content):
+                    nonlocal full_response
+                    full_response += content
+                    # 实时推送每个片段
+                    async for _ in sse_yield_func({
+                        'type': 'thinking_stream',
+                        'content': content,
+                        'full_content': full_response
+                    }):
+                        pass
+                
+                # 使用流式chat
+                from base.plugins.llm.services.chat_service import ChatService
+                try:
+                    async for chunk in ChatService.chat_stream(
+                        model_id=target_model.id,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=2000,
+                        stream_callback=stream_callback
+                    ):
+                        # chunk已经在callback中处理了
+                        pass
+                    
+                    logger.info(f"[LLM节点-流式] 流式响应完成, 长度={len(full_response)}")
+                except Exception as e:
+                    logger.exception(f"[LLM节点-流式] 流式调用失败: {e}")
+                    # 流式调用失败，使用普通调用
+                    full_response = ""
+            
+            # 如果流式调用失败或不支持流式，使用普通调用
+            if not full_response and target_model:
+                # 如果不支持流式或没有回调，使用普通调用
+                logger.info(f"[LLM节点-流式] 使用普通调用（无流式）")
+                from base.plugins.llm.services.chat_service import ChatService
+                from base.plugins.llm.models.provider import LLMProvider
+                from base.plugins.llm.models.api_key import LLMApiKey
+                
+                try:
+                    provider = await LLMProvider.get_or_none(id=target_model.provider_id)
+                    if provider:
+                        # api_key = await ChatService.get_available_api_key(target_model.provider_id)
+                        api_key = await LLMApiKey.filter(model_id=target_model.id).first()
+                        if api_key:
+                            service = await ChatService.get_provider_service(
+                                provider_name_en=provider.name_en,
+                                api_key=api_key.api_key,
+                                endpoint_url=target_model.endpoint_url or provider.api_endpoint,
+                                api_secret=api_key.api_secret
+                            )
+                            
+                            actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
+                            response = await service.chat(
+                                model=actual_model_for_call,
+                                messages=messages,
+                                temperature=0.7,
+                                max_tokens=2000
+                            )
+                            
+                            if isinstance(response, dict) and response.get("choices"):
+                                full_response = response["choices"][0].get("message", {}).get("content", "")
+                            else:
+                                full_response = str(response)
+                            
+                            # 推送完整响应
+                            if sse_yield_func:
+                                async for _ in sse_yield_func({
+                                    'type': 'thinking_result',
+                                    'content': full_response[:200] + ('...' if len(full_response) > 200 else ''),
+                                    'full_content': full_response
+                                }):
+                                    pass
+                except Exception as e:
+                    logger.exception(f"[LLM节点-流式] 普通调用失败: {e}")
+                    full_response = f"调用大模型失败: {str(e)}"
+
+        except Exception as e:
+            logger.exception(f"[LLM节点-流式] 调用大模型失败: {e}")
+            full_response = f"调用大模型失败: {str(e)}"
+        
+        # 如果没有响应，使用模拟
+        if not full_response:
+            logger.warning(f"[LLM节点-流式] 使用模拟响应")
+            full_response = await LangGraphExecutor._generate_mock_response(input_text, prompt, node_label)
+        
+        # 保存输出到state
+        output_variable = node_data.get("output_variable", "llm_output")
+        llm_output_key = f"llm_output_{node_id}" if node_id else output_variable
+        
+        state["variables"][llm_output_key] = {
+            "node_id": node_id,
+            "node_label": node_label,
+            "prompt": prompt,
+            "model": actual_model,
+            "response": full_response
+        }
+        
+        if "llm_responses" not in state["variables"]:
+            state["variables"]["llm_responses"] = []
+        
+        state["variables"]["llm_responses"].append({
+            "node_id": node_id,
+            "node_label": node_label,
+            "prompt": prompt,
+            "model": actual_model,
+            "response": full_response
+        })
+        
+        # 对于思考节点，保存思考过程
+        if node_label and ("思考" in node_label or "thinking" in node_label.lower()):
+            state["variables"]["thinking_process"] = full_response
+        
+        state["variables"][output_variable] = {
+            "prompt": prompt,
+            "model": actual_model,
+            "response": full_response
         }
         
         return state
