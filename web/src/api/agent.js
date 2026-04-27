@@ -108,7 +108,6 @@ export async function executeAgentGraphSSE(id, params, callbacks = {}) {
 
 // 根据结构图自动选择执行方式
 export async function executeAgentGraphAuto(id, params, callbacks = {}, graphDefinition = null) {
-  // 如果没有传入graphDefinition，自动获取
   if (!graphDefinition) {
     const graphResponse = await getAgentGraph(id)
     if (graphResponse && graphResponse.data && graphResponse.data.graph_definition) {
@@ -119,10 +118,8 @@ export async function executeAgentGraphAuto(id, params, callbacks = {}, graphDef
   const hasStreamingNode = hasStreamingLLMNode(graphDefinition)
   
   if (hasStreamingNode) {
-    // 如果包含流式节点，使用SSE接口
     return executeAgentGraphSSE(id, params, callbacks)
   } else {
-    // 否则使用普通接口
     const result = await executeAgentGraph(id, params)
     return {
       abort: () => {},
@@ -149,6 +146,10 @@ export function addSkillToAgent(agentId, skillId) {
 
 export function removeSkillFromAgent(agentId, skillId) {
   return request.delete(`/v1/agent/agents/${agentId}/skills/${skillId}`)
+}
+
+export function setAgentSkills(agentId, skillIds) {
+  return request.put(`/v1/agent/agents/${agentId}/skills`, { skill_ids: skillIds })
 }
 
 // ==================== 技能管理 ====================
@@ -253,6 +254,14 @@ export function executeWorkflow(id, params) {
   return longRequest.post(`/v1/agent/workflows/${id}/execute`, params)
 }
 
+export function getWorkflowExecutions(params) {
+  return request.get('/v1/agent/workflow-executions/', { params })
+}
+
+export function getWorkflowExecution(id) {
+  return request.get(`/v1/agent/workflow-executions/${id}`)
+}
+
 // ==================== 对话流管理 ====================
 
 export function getDialogFlows(params) {
@@ -287,9 +296,16 @@ export function executeDialogFlow(id, params) {
   return longRequest.post(`/v1/agent/dialog-flows/${id}/execute`, params)
 }
 
+export function getDialogFlowExecutions(params) {
+  return request.get('/v1/agent/dialog-flows/executions', { params })
+}
+
+export function getDialogFlowExecution(id) {
+  return request.get(`/v1/agent/dialog-flows/executions/${id}`)
+}
+
 // ==================== 工具函数 ====================
 
-// 检查结构图中是否包含开启流式调用的LLM节点
 export function hasStreamingLLMNode(graphDefinition) {
   if (!graphDefinition || !graphDefinition.nodes) {
     return false
