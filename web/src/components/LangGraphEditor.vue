@@ -372,6 +372,29 @@ import { ElMessage } from 'element-plus'
 import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 
+// 安全的 console 包装器
+const safeConsole = {
+  log: function() {},
+  error: function() {},
+  warn: function() {}
+}
+
+try {
+  if (typeof console !== 'undefined') {
+    if (typeof console.log === 'function') {
+      safeConsole.log = console.log.bind(console)
+    }
+    if (typeof console.error === 'function') {
+      safeConsole.error = console.error.bind(console)
+    }
+    if (typeof console.warn === 'function') {
+      safeConsole.warn = console.warn.bind(console)
+    }
+  }
+} catch (e) {
+  // 静默忽略
+}
+
 const props = defineProps({
   workflowId: { type: [String, Number], default: null },
   agentId: { type: [String, Number], default: null },
@@ -790,11 +813,6 @@ const deleteSelectedEdge = () => {
 }
 
 const saveWorkflow = async () => {
-  console.log('=== saveWorkflow 函数被调用 ===')
-  console.log('props.workflowId:', props.workflowId)
-  console.log('当前节点数:', nodes.value.length)
-  console.log('当前边数:', edges.value.length)
-  
   if (props.workflowId) {
     saving.value = true
     try {
@@ -803,19 +821,17 @@ const saveWorkflow = async () => {
         edges: JSON.parse(JSON.stringify(edges.value))
       }
       
-      console.log('准备保存工程图，definition:', definition)
       await updateWorkflow(props.workflowId, {
         definition
       })
       ElMessage.success('保存成功')
     } catch (error) {
-      console.error('保存工程图失败:', error)
+      safeConsole.error('保存工程图失败:', error)
       ElMessage.error('保存失败: ' + (error.message || error))
     } finally {
       saving.value = false
     }
   }
-  console.log('LangGraphEditor 发出 save 事件:', { nodes: nodes.value, edges: edges.value })
   emit('save', { 
     nodes: JSON.parse(JSON.stringify(nodes.value)), 
     edges: JSON.parse(JSON.stringify(edges.value)) 
@@ -865,10 +881,6 @@ const getStepIcon = (type) => {
 }
 
 const doExecute = async () => {
-  console.log('=== doExecute 函数被调用 ===')
-  console.log('props.workflowId:', props.workflowId)
-  console.log('props.agentId:', props.agentId)
-  
   if (!props.workflowId && !props.agentId) {
     ElMessage.warning('请先创建工程图或智能体')
     return
@@ -884,8 +896,6 @@ const doExecute = async () => {
   executing.value = true
   
   try {
-    console.log('开始执行，currentInput.value:', currentInput.value)
-    
     // 添加用户输入到历史
     const userMessage = {
       role: 'user',
@@ -911,32 +921,26 @@ const doExecute = async () => {
       text: currentInput.value.trim(),
       history: [...dialogHistory.value.slice(0, -1)] // 排除刚添加的助手占位符
     }
-    console.log('转换后的input:', input)
     
     // 清空输入框
     currentInput.value = ''
     
     if (props.agentId) {
-      console.log('自动选择执行方式执行智能体结构图:', props.agentId)
-      
+      // 立即获取并保存 controller（不要 await）
       const controller = await executeAgentGraphAuto(props.agentId, input, {
         onStart: () => {
-          console.log('SSE连接已开始')
           addRealtimeStep('info', '准备执行', '正在建立SSE连接...')
           markLastStepCompleted()
         },
         onData: (data) => {
-          console.log('收到SSE数据:', data)
           handleSSEData(data)
         },
         onComplete: () => {
-          console.log('SSE执行完成')
           addRealtimeStep('info', '执行完成', '智能体执行完成')
           markLastStepCompleted()
           ElMessage.success('执行完成')
         },
         onError: (error) => {
-          console.error('SSE执行错误:', error)
           addRealtimeStep('error', '执行失败', error.message || '未知错误')
           markLastStepCompleted()
           ElMessage.error('执行失败: ' + (error.message || '未知错误'))
@@ -944,9 +948,7 @@ const doExecute = async () => {
       })
       currentAbortController.value = controller
     } else {
-      console.log('执行工程图:', props.workflowId, input)
       const res = await apiExecuteWorkflow(props.workflowId, input)
-      console.log('执行结果:', res)
       
       // 处理非SSE的结果
       handleNonSSEResult(res)
@@ -954,8 +956,7 @@ const doExecute = async () => {
     
     emit('execute', executeResult.value)
   } catch (error) {
-    console.error('执行失败:', error)
-    console.error('错误堆栈:', error.stack)
+    safeConsole.error('执行失败:', error)
     
     // 即使出错也要显示错误
     if (assistantMessage.value) {
@@ -983,7 +984,6 @@ const doExecute = async () => {
 // 中断执行
 const abortExecution = () => {
   if (currentAbortController.value) {
-    console.log('中断执行')
     currentAbortController.value.abort()
     currentAbortController.value = null
     executing.value = false
@@ -1002,8 +1002,6 @@ const abortExecution = () => {
 
 // 处理SSE数据
 const handleSSEData = (data) => {
-  console.log('handleSSEData called with:', data)
-  
   switch (data.type) {
     case 'start':
       addRealtimeStep('info', data.label || '开始', data.message || '执行开始')
@@ -1095,9 +1093,18 @@ const handleSSEData = (data) => {
       markLastStepCompleted()
       break
     
+    case 'cancelled':
+      addRealtimeStep('warning', '执行中断', data.message || '执行被用户中断')
+      markLastStepCompleted()
+      
+      // 显示中断信息
+      if (assistantMessage.value) {
+        assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]'
+      }
+      break
+    
     case 'complete':
       // 执行完成 - 添加结果
-      console.log('Complete data:', data)
       executeResult.value = {
         result: data.result,
         variables: data.variables
@@ -1151,12 +1158,6 @@ const handleSSEData = (data) => {
 
 // 更新助手消息
 const updateAssistantMessage = () => {
-  console.log('updateAssistantMessage called', {
-    hasAssistantMessage: !!assistantMessage.value,
-    processLength: currentProcess.value.length,
-    dialogHistoryLength: dialogHistory.value.length
-  })
-  
   if (assistantMessage.value) {
     assistantMessage.value.process = [...currentProcess.value]
     // 如果已经有内容就保持，否则显示等待
@@ -1165,13 +1166,9 @@ const updateAssistantMessage = () => {
     }
     // 强制触发响应式更新
     const lastIndex = dialogHistory.value.length - 1
-    console.log('Last dialogHistory item:', dialogHistory.value[lastIndex])
     if (lastIndex >= 0 && dialogHistory.value[lastIndex] === assistantMessage.value) {
-      console.log('Triggering force update')
       // 手动触发更新
       dialogHistory.value = [...dialogHistory.value]
-    } else {
-      console.log('Warning: last dialogHistory item is not assistantMessage')
     }
   }
 }
@@ -1289,7 +1286,7 @@ const fetchAgents = async () => {
     const res = await getAgents({ limit: 1000 })
     agents.value = res.data?.items || res.data || []
   } catch (error) {
-    console.error(error)
+    safeConsole.error(error)
   }
 }
 
@@ -1298,7 +1295,7 @@ const fetchSkills = async () => {
     const res = await getSkills({ limit: 1000 })
     skills.value = res.data?.items || res.data || []
   } catch (error) {
-    console.error(error)
+    safeConsole.error(error)
   }
 }
 
@@ -1307,7 +1304,7 @@ const fetchModels = async () => {
     const res = await getModelList({ limit: 1000 })
     models.value = res.data?.items || res.data || []
   } catch (error) {
-    console.error(error)
+    safeConsole.error(error)
   }
 }
 
@@ -1316,41 +1313,25 @@ onMounted(() => {
   fetchSkills()
   fetchModels()
   
-  console.log('=== LangGraphEditor onMounted ===')
-  console.log('props.initialNodes:', props.initialNodes)
-  console.log('props.initialEdges:', props.initialEdges)
-  
   if (props.initialNodes.length > 0) {
-    console.log('初始化 nodes.value:', props.initialNodes)
     nodes.value = props.initialNodes
   }
   if (props.initialEdges.length > 0) {
-    console.log('初始化 edges.value:', props.initialEdges)
     edges.value = props.initialEdges
   }
 })
 
 // 监听 initialNodes 变化
 watch(() => props.initialNodes, (newNodes) => {
-  console.log('=== watch initialNodes 变化 ===')
-  console.log('newNodes:', newNodes)
-  console.log('newNodes.length:', newNodes.length)
-  
   if (newNodes.length > 0) {
     nodes.value = JSON.parse(JSON.stringify(newNodes))
-    console.log('已更新 nodes.value:', nodes.value)
   }
 }, { immediate: true, deep: true })
 
 // 监听 initialEdges 变化
 watch(() => props.initialEdges, (newEdges) => {
-  console.log('=== watch initialEdges 变化 ===')
-  console.log('newEdges:', newEdges)
-  console.log('newEdges.length:', newEdges.length)
-  
   if (newEdges.length > 0) {
     edges.value = JSON.parse(JSON.stringify(newEdges))
-    console.log('已更新 edges.value:', edges.value)
   }
 }, { immediate: true, deep: true })
 </script>

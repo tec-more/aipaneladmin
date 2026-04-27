@@ -2,11 +2,22 @@
 Agent API routes
 """
 from typing import List, Optional, AsyncGenerator
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from base.plugins.agent.schemas.agent import AgentCreate, AgentUpdate, AgentResponse
 from base.plugins.agent.services.agent_service import AgentService
 from base.common.response import success_response, fail_response
+import uuid
+import asyncio
+
+# 执行管理器 - 跟踪所有执行的任务
+execution_manager = {
+    # execution_id: {
+    #     'task': asyncio.Task,
+    #     'agent_id': int,
+    #     'is_cancelled': bool
+    # }
+}
 
 agent_router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -246,26 +257,26 @@ async def execute_agent_graph(agent_id: int, input_data: dict):
         return fail_response(msg=f"结构图执行失败: {str(e)}", data={"traceback": traceback.format_exc()})
 
 
-async def sse_execution_generator(agent, input_data) -> AsyncGenerator[str, None]:
+async def sse_execution_generator(agent, input_data, execution_id: str) -> AsyncGenerator[str, None]:
     """SSE事件生成器 - 实时推送执行过程（支持边思考边输出）"""
     import json
     from datetime import datetime
     from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
     
-    # 创建SSE推送函数
-    async def sse_yield(event_data):
+    print(f"[Execution] 开始执行，execution_id: {execution_id}")
+    
+    # 创建SSE推送函数 - 直接return字符串，yield是主函数调用
+    def send_event(event_data):
         """SSE数据推送helper"""
-        yield f"data: {json.dumps({
-            **event_data,
-            'timestamp': datetime.now().isoformat()
-        }, ensure_ascii=False)}\n\n"
+        return f"data: {json.dumps({**event_data, 'timestamp': datetime.now().isoformat()}, ensure_ascii=False)}\n\n"
+    
+    # 检查是否被取消的辅助函数
+    async def check_cancelled():
+        exec_info = execution_manager.get(execution_id)
+        return exec_info and exec_info.get('is_cancelled', False)
     
     # 推送开始
-    async for data in sse_yield({
-        'type': 'start',
-        'message': '开始执行智能体'
-    }):
-        yield data
+    yield send_event({'type': 'start', 'execution_id': execution_id, 'message': '开始执行智能体'})
     
     try:
         import asyncio
@@ -297,32 +308,25 @@ async def sse_execution_generator(agent, input_data) -> AsyncGenerator[str, None
             
             if start_node:
                 # 推送初始化信息
-                async for data in sse_yield({
-                    'type': 'info',
-                    'label': '初始化',
-                    'message': '初始化执行环境'
-                }):
-                    yield data
+                yield send_event({'type': 'info', 'label': '初始化', 'message': '初始化执行环境'})
                 
                 # 构建节点映射
                 node_map = {node.get("id"): node for node in nodes}
                 current_node_id = start_node.get("id")
                 
                 # 初始化状态
-                state = {
-                    "input": input_data,
-                    "output": {},
-                    "variables": {},
-                    "execution_trace": [],
-                    "current_node": None,
-                    "error": None,
-                    "agent": agent
-                }
+                state = {"input": input_data, "output": {}, "variables": {}, "execution_trace": [], "current_node": None, "error": None, "agent": agent}
                 
                 step_count = 0
                 max_steps = 100
                 
                 while current_node_id and step_count < max_steps:
+                    # 检查是否被取消
+                    if await check_cancelled():
+                        print(f"[Execution] 检测到取消信号，停止执行")
+                        yield send_event({'type': 'cancelled', 'message': '执行被用户中断'})
+                        break
+                    
                     step_count += 1
                     
                     current_node = node_map.get(current_node_id)
@@ -333,265 +337,121 @@ async def sse_execution_generator(agent, input_data) -> AsyncGenerator[str, None
                     node_data = current_node.get("data", {})
                     node_label = node_data.get("label", node_type)
                     
+                    # 再次检查是否被取消
+                    if await check_cancelled():
+                        print(f"[Execution] 检测到取消信号，停止执行")
+                        yield send_event({'type': 'cancelled', 'message': '执行被用户中断'})
+                        break
+                    
                     # 推送节点开始
-                    async for data in sse_yield({
-                        'type': 'node_start',
-                        'node_id': current_node_id,
-                        'node_type': node_type,
-                        'node_label': node_label,
-                        'step': step_count
-                    }):
-                        yield data
+                    yield send_event({'type': 'node_start', 'node_id': current_node_id, 'node_type': node_type, 'node_label': node_label, 'step': step_count})
                     
                     try:
                         if node_type == "start":
-                            async for data in sse_yield({
-                                'type': 'info',
-                                'label': '开始节点',
-                                'message': '开始执行...'
-                            }):
-                                yield data
+                            yield send_event({'type': 'info', 'label': '开始节点', 'message': '开始执行...'})
                             state["variables"]["start_time"] = datetime.now().isoformat()
                         
                         elif node_type == "end":
-                            async for data in sse_yield({
-                                'type': 'info',
-                                'label': '结束节点',
-                                'message': '执行结束'
-                            }):
-                                yield data
+                            yield send_event({'type': 'info', 'label': '结束节点', 'message': '执行结束'})
                             state["output"]["end_time"] = datetime.now().isoformat()
                             break
                         
                         elif node_type == "llm":
                             # LLM节点 - 根据配置决定流式或非流式
-                            async for data in sse_yield({
-                                'type': 'thinking',
-                                'label': node_label,
-                                'message': f'正在调用大模型...'
-                            }):
-                                yield data
+                            yield send_event({'type': 'thinking', 'label': node_label, 'message': f'正在调用大模型...'})
                             
                             # 检查是否启用流式输出
                             is_streaming = node_data.get("stream", False)
                             
                             if is_streaming:
-                                # 流式执行 - 边思考边输出
-                                async def llm_stream_callback(chunk_data):
-                                    """LLM流式回调 - 实时推送每个片段"""
-                                    async for data in sse_yield({
-                                        'type': 'thinking_stream',
-                                        'content': chunk_data.get('content', ''),
-                                        'full_content': chunk_data.get('full_content', ''),
-                                        'label': node_label
-                                    }):
-                                        yield data
-                                
-                                # 执行LLM节点（流式版本）
-                                state = await LangGraphExecutor._execute_llm_node_streaming(
-                                    current_node, 
-                                    state,
-                                    sse_yield_func=llm_stream_callback
-                                )
-                                
-                                # 获取完整响应
-                                llm_output = state["variables"].get("llm_output", {})
-                                full_response = llm_output.get("response", "")
+                                # 流式执行 - 这里暂时不支持回调传参，改用非流式
+                                state = await LangGraphExecutor._execute_llm_node(current_node, state)
                             else:
                                 # 非流式执行 - 一次性返回
                                 state = await LangGraphExecutor._execute_llm_node(current_node, state)
-                                
-                                # 获取完整响应
-                                llm_output = state["variables"].get("llm_output", {})
-                                full_response = llm_output.get("response", "")
                             
-                            async for data in sse_yield({
-                                'type': 'thinking_result',
-                                'label': node_label,
-                                'content': full_response[:200] + ('...' if len(full_response) > 200 else ''),
-                                'full_content': full_response
-                            }):
-                                yield data
+                            # 获取完整响应
+                            llm_output = state["variables"].get("llm_output", {})
+                            full_response = llm_output.get("response", "")
+                            
+                            yield send_event({'type': 'thinking_result', 'label': node_label, 'content': full_response[:200] + ('...' if len(full_response) > 200 else ''), 'full_content': full_response})
                         
                         elif node_type == "skill":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': f'执行技能: {node_data.get("skill_id", "unknown")}'
-                            }):
-                                yield data
-                            
+                            yield send_event({'type': 'action', 'label': node_label, 'message': f'执行技能: {node_data.get("skill_id", "unknown")}'})
                             state = await LangGraphExecutor._execute_skill_node(node_data, state)
-                            
                             skill_result = state["variables"].get("skill_output", {})
-                            async for data in sse_yield({
-                                'type': 'observation',
-                                'label': '技能执行结果',
-                                'content': str(skill_result)[:500]
-                            }):
-                                yield data
+                            yield send_event({'type': 'observation', 'label': '技能执行结果', 'content': str(skill_result)[:500]})
                         
                         elif node_type == "agent":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '执行智能体...'
-                            }):
-                                yield data
-                            
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '执行智能体...'})
                             state = await LangGraphExecutor._execute_agent_node(node_data, state)
                         
                         elif node_type == "condition":
-                            async for data in sse_yield({
-                                'type': 'thinking',
-                                'label': node_label,
-                                'message': '条件判断中...'
-                            }):
-                                yield data
-                            
+                            yield send_event({'type': 'thinking', 'label': node_label, 'message': '条件判断中...'})
                             state = await LangGraphExecutor._execute_condition_node(node_data, state)
-                            
                             condition_result = state["variables"].get("condition_result", {}).get("result", False)
-                            async for data in sse_yield({
-                                'type': 'observation',
-                                'label': '条件判断结果',
-                                'content': f'结果: {condition_result}'
-                            }):
-                                yield data
+                            yield send_event({'type': 'observation', 'label': '条件判断结果', 'content': f'结果: {condition_result}'})
                         
                         elif node_type == "loop":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '循环节点'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '循环节点'})
                             state = await LangGraphExecutor._execute_loop_node(node_data, state)
                         
                         elif node_type == "output":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '生成输出'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '生成输出'})
                             state = await LangGraphExecutor._execute_output_node(node_data, state)
                         
                         elif node_type == "input":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '处理输入'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '处理输入'})
                             state = await LangGraphExecutor._execute_input_node(node_data, state)
                         
                         elif node_type == "iteration":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '执行迭代'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '执行迭代'})
                             state = await LangGraphExecutor._execute_iteration_node(node_data, state)
                         
                         elif node_type == "http":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '发送HTTP请求'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '发送HTTP请求'})
                             state = await LangGraphExecutor._execute_http_node(node_data, state)
                         
                         elif node_type == "code":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '执行代码'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '执行代码'})
                             state = await LangGraphExecutor._execute_code_node(node_data, state)
                         
                         elif node_type == "template":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '处理模板'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '处理模板'})
                             state = await LangGraphExecutor._execute_template_node(node_data, state)
                         
                         elif node_type == "variable_aggregator":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '聚合变量'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '聚合变量'})
                             state = await LangGraphExecutor._execute_variable_aggregator_node(node_data, state)
                         
                         elif node_type == "document_extractor":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '提取文档'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '提取文档'})
                             state = await LangGraphExecutor._execute_document_extractor_node(node_data, state)
                         
                         elif node_type == "variable_assigner":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '赋值变量'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '赋值变量'})
                             state = await LangGraphExecutor._execute_variable_assigner_node(node_data, state)
                         
                         elif node_type == "parameter_extractor":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '提取参数'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '提取参数'})
                             state = await LangGraphExecutor._execute_parameter_extractor_node(node_data, state)
                         
                         elif node_type == "json_extractor":
-                            async for data in sse_yield({
-                                'type': 'action',
-                                'label': node_label,
-                                'message': '提取JSON'
-                            }):
-                                yield data
+                            yield send_event({'type': 'action', 'label': node_label, 'message': '提取JSON'})
                             state = await LangGraphExecutor._execute_json_extractor_node(node_data, state)
+                            # 推送JSON提取结果
+                            json_result = state["variables"].get("json_extractor_output", {})
+                            yield send_event({'type': 'observation', 'label': 'JSON提取结果', 'content': str(json_result)[:500], 'data': json_result})
                         
                         else:
-                            async for data in sse_yield({
-                                'type': 'info',
-                                'label': node_label,
-                                'message': f'执行节点: {node_type}'
-                            }):
-                                yield data
+                            yield send_event({'type': 'info', 'label': node_label, 'message': f'执行节点: {node_type}'})
                             state = await LangGraphExecutor._execute_default_node(node_data, state)
                         
                         # 推送节点完成
-                        async for data in sse_yield({
-                            'type': 'node_complete',
-                            'node_id': current_node_id,
-                            'node_type': node_type,
-                            'node_label': node_label
-                        }):
-                            yield data
+                        yield send_event({'type': 'node_complete', 'node_id': current_node_id, 'node_type': node_type, 'node_label': node_label})
                         
                     except Exception as e:
-                        async for data in sse_yield({
-                            'type': 'error',
-                            'node_id': current_node_id,
-                            'message': str(e)
-                        }):
-                            yield data
+                        yield send_event({'type': 'error', 'node_id': current_node_id, 'message': str(e)})
                         state["error"] = str(e)
                         break
                     
@@ -611,45 +471,19 @@ async def sse_execution_generator(agent, input_data) -> AsyncGenerator[str, None
                         current_node_id = outgoing_edges[0].get("target") if outgoing_edges else None
                 
                 # 执行完成
-                async for data in sse_yield({
-                    'type': 'complete',
-                    'result': state.get("output", {}),
-                    'variables': state.get("variables", {})
-                }):
-                    yield data
+                yield send_event({'type': 'complete', 'result': state.get("output", {}), 'variables': state.get("variables", {})})
             else:
                 # 没有开始节点
-                async for data in sse_yield({
-                    'type': 'error',
-                    'message': '结构图没有开始节点'
-                }):
-                    yield data
+                yield send_event({'type': 'error', 'message': '结构图没有开始节点'})
         else:
             # 没有结构图，使用简化执行
-            async for data in sse_yield({
-                'type': 'thinking',
-                'label': '智能体执行',
-                'message': '执行中...'
-            }):
-                yield data
-            
+            yield send_event({'type': 'thinking', 'label': '智能体执行', 'message': '执行中...'})
             result = await LangGraphExecutor.execute_agent(agent, input_data)
-            
-            async for data in sse_yield({
-                'type': 'complete',
-                'result': result.get('output', {}) if isinstance(result, dict) else {},
-                'variables': result.get('variables', {}) if isinstance(result, dict) else result
-            }):
-                yield data
-            
+            yield send_event({'type': 'complete', 'result': result.get('output', {}) if isinstance(result, dict) else {}, 'variables': result.get('variables', {}) if isinstance(result, dict) else result})
+        
     except Exception as e:
         import traceback
-        async for data in sse_yield({
-            'type': 'error',
-            'message': str(e),
-            'traceback': traceback.format_exc()
-        }):
-            yield data
+        yield send_event({'type': 'error', 'message': str(e), 'traceback': traceback.format_exc()})
 
 
 @agent_router.post("/{agent_id}/graph/execute/sse")
@@ -662,14 +496,29 @@ async def execute_agent_graph_sse(agent_id: int, input_data: dict):
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
         
+        # 生成执行ID
+        execution_id = str(uuid.uuid4())
+        print(f"[API] 创建执行任务，execution_id: {execution_id}")
+        
+        # 创建执行任务（使用包装函数，以便可以取消）
+        async def wrapped_generator():
+            try:
+                # 注册执行
+                execution_manager[execution_id] = {'agent_id': agent_id, 'is_cancelled': False}
+                
+                # 执行生成器
+                async for data in sse_execution_generator(agent, input_data, execution_id):
+                    yield data
+            finally:
+                # 清理执行信息
+                print(f"[API] 清理执行任务，execution_id: {execution_id}")
+                if execution_id in execution_manager:
+                    del execution_manager[execution_id]
+        
         return StreamingResponse(
-            sse_execution_generator(agent, input_data),
+            wrapped_generator(),
             media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
-            }
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "Access-Control-Allow-Origin": "*", }
         )
     except Exception as e:
         import traceback
@@ -684,7 +533,6 @@ async def get_agent_graph(agent_id: int):
     try:
         import logging
         logger = logging.getLogger(__name__)
-        
         logger.info(f"=== 获取智能体结构图: agent_id={agent_id} ===")
         
         agent = await AgentService.get_agent_by_id(agent_id)
@@ -695,9 +543,7 @@ async def get_agent_graph(agent_id: int):
         logger.info(f"agent.graph_definition: {agent.graph_definition}")
         logger.info(f"agent.graph_definition 类型: {type(agent.graph_definition)}")
         
-        return success_response(data={
-            "graph_definition": agent.graph_definition
-        })
+        return success_response(data={"graph_definition": agent.graph_definition})
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
@@ -711,7 +557,6 @@ async def update_agent_graph(agent_id: int, graph_data: dict):
     try:
         import logging
         logger = logging.getLogger(__name__)
-        
         logger.info(f"=== 保存智能体结构图: agent_id={agent_id} ===")
         logger.info(f"接收到的 graph_data: {graph_data}")
         logger.info(f"graph_data 类型: {type(graph_data)}")
@@ -745,10 +590,7 @@ async def test_endpoint():
 
 
 @agent_router.post("/process-documents")
-async def process_documents(
-    directory_path: str = Query(..., description="文档目录路径"),
-    vector_store_path: str = Query(..., description="向量库存储路径")
-):
+async def process_documents(directory_path: str = Query(..., description="文档目录路径"), vector_store_path: str = Query(..., description="向量库存储路径")):
     """处理文档并生成向量库"""
     try:
         from base.plugins.agent.services.document_processing_service import DocumentProcessingService, VECTOR_SUPPORT
@@ -773,12 +615,7 @@ async def process_documents(
         document_count = vector_store._collection.count()
         
         return success_response(
-            data={
-                "vector_store_path": vector_store_path,
-                "collection_name": collection_name,
-                "document_count": document_count,
-                "message": f"成功处理文档并生成向量库，共处理 {document_count} 个文档片段"
-            },
+            data={"vector_store_path": vector_store_path, "collection_name": collection_name, "document_count": document_count, "message": f"成功处理文档并生成向量库，共处理 {document_count} 个文档片段"},
             msg="文档处理成功"
         )
     except Exception as e:
@@ -870,4 +707,40 @@ async def set_agent_skills(agent_id: int, data: dict):
         return fail_response(msg=str(e))
 
 
+@agent_router.post("/executions/{execution_id}/cancel")
+async def cancel_execution(execution_id: str):
+    """取消执行中的任务"""
+    try:
+        print(f"[API] 收到取消请求，execution_id: {execution_id}")
+        
+        # 检查执行是否存在
+        exec_info = execution_manager.get(execution_id)
+        if not exec_info:
+            return fail_response(msg="执行任务不存在或已结束", code=404)
+        
+        # 标记为取消
+        exec_info['is_cancelled'] = True
+        print(f"[API] 已标记任务为取消状态，execution_id: {execution_id}")
+        
+        return success_response(msg="取消请求已发送，执行将在安全点停止")
+    except Exception as e:
+        import traceback
+        print(f"[API] 取消执行错误: {e}")
+        print(traceback.format_exc())
+        return fail_response(msg=str(e), code=500)
 
+
+@agent_router.get("/executions")
+async def list_executions():
+    """列出所有正在执行的任务"""
+    try:
+        executions_list = []
+        for exec_id, exec_info in execution_manager.items():
+            executions_list.append({'execution_id': exec_id, 'agent_id': exec_info.get('agent_id'), 'is_cancelled': exec_info.get('is_cancelled', False)})
+        
+        return success_response(data={"executions": executions_list, "count": len(executions_list)})
+    except Exception as e:
+        import traceback
+        print(f"[API] 列执行错误: {e}")
+        print(traceback.format_exc())
+        return fail_response(msg=str(e), code=500)

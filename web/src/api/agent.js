@@ -32,77 +32,101 @@ export function executeAgentGraph(id, params) {
   return longRequest.post(`/v1/agent/agents/${id}/graph/execute`, params)
 }
 
-export async function executeAgentGraphSSE(id, params, callbacks = {}) {
+export function executeAgentGraphSSE(id, params, callbacks = {}) {
   const { onStart, onData, onComplete, onError } = callbacks
-  const abortController = new AbortController()
   
-  try {
-    const response = await fetch(`/api/v1/agent/agents/${id}/graph/execute/sse`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-      signal: abortController.signal,
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    
-    if (onStart) {
-      onStart()
-    }
-    
-    let buffer = ''
-    
-    while (true) {
-      if (abortController.signal.aborted) {
-        break
+  // 创建安全的函数包装器
+  const safeOnStart = typeof onStart === 'function' ? onStart : () => {}
+  const safeOnData = typeof onData === 'function' ? onData : () => {}
+  const safeOnComplete = typeof onComplete === 'function' ? onComplete : () => {}
+  const safeOnError = typeof onError === 'function' ? onError : () => {}
+  
+  const abortController = new AbortController()
+  let executionId = null
+
+  // 立即启动执行，不等待
+  setTimeout(async () => {
+    try {
+      const response = await fetch(`/api/v1/agent/agents/${id}/graph/execute/sse`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+        signal: abortController.signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
-      
-      const { done, value } = await reader.read()
-      if (done) break
-      
-      buffer += decoder.decode(value, { stream: true })
-      
-      const lines = buffer.split('\n')
-      buffer = lines.pop()
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const dataStr = line.slice(6).trim()
-          if (dataStr) {
-            try {
-              const data = JSON.parse(dataStr)
-              if (onData) {
-                onData(data)
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      safeOnStart()
+
+      let buffer = ''
+
+      while (true) {
+        if (abortController.signal.aborted) {
+          break
+        }
+
+        const { done, value } = await reader.read()
+        if (done) {
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim()
+            if (dataStr) {
+              try {
+                const data = JSON.parse(dataStr)
+                // 保存 execution_id
+                if (data.type === 'start' && data.execution_id) {
+                  executionId = data.execution_id
+                }
+                safeOnData(data)
+              } catch (e) {
+                // 静默忽略
               }
-            } catch (e) {
-              console.warn('Failed to parse SSE data:', e)
             }
           }
         }
       }
+
+      if (!abortController.signal.aborted) {
+        safeOnComplete()
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        safeOnError(error)
+      }
     }
-    
-    if (!abortController.signal.aborted && onComplete) {
-      onComplete()
-    }
-  } catch (error) {
-    if (error.name !== 'AbortError' && onError) {
-      onError(error)
-    }
-    if (error.name !== 'AbortError') {
-      throw error
-    }
-  }
-  
+  }, 0)
+
+  // 立即返回 controller
   return {
-    abort: () => abortController.abort()
+    abort: () => {
+      if (executionId) {
+        // 调用后端取消接口
+        fetch(`/api/v1/agent/executions/${executionId}/cancel`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }).catch(() => {
+          // 静默忽略
+        })
+      }
+      abortController.abort()
+    }
   }
 }
 
@@ -114,17 +138,29 @@ export async function executeAgentGraphAuto(id, params, callbacks = {}, graphDef
       graphDefinition = graphResponse.data.graph_definition
     }
   }
-  
+
   const hasStreamingNode = hasStreamingLLMNode(graphDefinition)
-  
+
   if (hasStreamingNode) {
-    return executeAgentGraphSSE(id, params, callbacks)
+    const controller = executeAgentGraphSSE(id, params, callbacks)
+    return controller
   } else {
-    const result = await executeAgentGraph(id, params)
-    return {
-      abort: () => {},
-      result
-    }
+    // 创建一个假的 abort controller
+    const fakeController = { abort: () => {} }
+    // 异步执行，不等待
+    (async () => {
+      try {
+        const result = await executeAgentGraph(id, params)
+        if (callbacks.onComplete) {
+          callbacks.onComplete(result)
+        }
+      } catch (error) {
+        if (callbacks.onError) {
+          callbacks.onError(error)
+        }
+      }
+    })()
+    return fakeController
   }
 }
 
