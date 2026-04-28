@@ -22,24 +22,6 @@ class CallMode(str, Enum):
         return names.get(value, value)
 
 
-class RequestType(str, Enum):
-    """请求类型枚举
-
-    用于标识API Key使用哪种接口类型
-    """
-    CHAT = "chat"  # Chat 接口 (/chat/completions)
-    RESPONSE = "response"  # Response 接口 (/responses)
-
-    @classmethod
-    def display_name(cls, value: str) -> str:
-        """获取请求类型的显示名称"""
-        names = {
-            cls.CHAT.value: "Chat",
-            cls.RESPONSE.value: "Response",
-        }
-        return names.get(value, value)
-
-
 class ModelServiceType(str, Enum):
     """模型服务类型枚举
 
@@ -86,4 +68,4 @@ class ModelServiceType(str, Enum):
         return self.value in [t.value for t in self.voice_services()]
 
 
-__all__ = ['ModelServiceType', 'CallMode', 'RequestType']
+__all__ = ['ModelServiceType', 'CallMode']

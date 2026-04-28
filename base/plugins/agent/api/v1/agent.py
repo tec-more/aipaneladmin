@@ -281,360 +281,96 @@ async def sse_execution_generator(agent, input_data, execution_id: str) -> Async
     try:
         import asyncio
         
-        # 检查是否有结构图配置
-        flow_data = None
-        if agent.graph_definition:
-            if isinstance(agent.graph_definition, str):
-                try:
-                    flow_data = json.loads(agent.graph_definition)
-                except json.JSONDecodeError:
-                    flow_data = None
-            else:
-                flow_data = agent.graph_definition
+        # 创建 SSE 队列供 LangGraph 使用
+        class SSEQueue:
+            def __init__(self):
+                self.queue = asyncio.Queue()
+            
+            async def put(self, event):
+                await self.queue.put(event)
+            
+            async def get(self):
+                return await self.queue.get()
+            
+            def empty(self):
+                return self.queue.empty()
         
-        if flow_data and isinstance(flow_data, dict) and flow_data.get("nodes"):
-            # 使用结构图执行
-            nodes = flow_data.get("nodes", [])
-            edges = flow_data.get("edges", [])
-            
-            # 查找开始节点
-            start_node = None
-            for node in nodes:
-                if node.get("type") == "start":
-                    start_node = node
+        sse_queue = SSEQueue()
+        
+        # 创建包装后的 sse_yield_func，把数据推送到队列
+        async def wrapped_sse_yield(event):
+            logger.info(f"[agent API] wrapped_sse_yield 收到事件: {event}")
+            await sse_queue.put(event)
+            logger.info(f"[agent API] 事件已入队列")
+        
+        # 启动 LangGraph 执行任务
+        async def execute_task():
+            try:
+                return await LangGraphExecutor.execute_agent(
+                    agent=agent,
+                    input_data=input_data,
+                    sse_yield_func=wrapped_sse_yield
+                )
+            except Exception as e:
+                print(f"[LangGraph 执行失败] {e}")
+                import traceback
+                traceback.print_exc()
+                return {
+                    "success": False,
+                    "message": str(e),
+                    "traceback": traceback.format_exc()
+                }
+        
+        # 同时运行执行和队列消费
+        task = asyncio.create_task(execute_task())
+        
+        # 推送初始化信息
+        yield send_event({'type': 'info', 'label': '初始化', 'message': '初始化执行环境...'})
+        
+        # 消费队列中的事件
+        done = False
+        while not done or not sse_queue.empty():
+            try:
+                # 检查取消
+                if await check_cancelled():
+                    print(f"[Execution] 检测到取消信号，停止执行")
+                    yield send_event({'type': 'cancelled', 'message': '执行被用户中断'})
+                    task.cancel()
                     break
-            if not start_node and nodes:
-                start_node = nodes[0]
-            
-            if start_node:
-                # 推送初始化信息
-                yield send_event({'type': 'info', 'label': '初始化', 'message': '初始化执行环境'})
                 
-                # 构建节点映射
-                node_map = {node.get("id"): node for node in nodes}
-                current_node_id = start_node.get("id")
+                # 尝试获取队列事件
+                try:
+                    if not sse_queue.empty():
+                        event = await asyncio.wait_for(sse_queue.get(), timeout=0.01)
+                        logger.info(f"[agent API] 从队列获取事件: {event}")
+                        yield send_event(event)
+                except asyncio.TimeoutError:
+                    pass
+                except Exception as e:
+                    logger.error(f"[agent API] 获取或发送事件失败: {e}")
                 
-                # 初始化状态
-                state = {"input": input_data, "output": {}, "variables": {}, "execution_trace": [], "current_node": None, "error": None, "agent": agent}
+                # 检查任务完成
+                if task.done():
+                    done = True
+                    
+            except Exception as e:
+                print(f"[SSE 推送失败] {e}")
+                break
+        
+        # 获取执行结果
+        try:
+            if not task.cancelled():
+                result = await task
                 
-                step_count = 0
-                max_steps = 100
-                
-                while current_node_id and step_count < max_steps:
-                    # 检查是否被取消
-                    if await check_cancelled():
-                        print(f"[Execution] 检测到取消信号，停止执行")
-                        yield send_event({'type': 'cancelled', 'message': '执行被用户中断'})
-                        break
-                    
-                    step_count += 1
-                    
-                    current_node = node_map.get(current_node_id)
-                    if not current_node:
-                        break
-                    
-                    node_type = current_node.get("type")
-                    node_data = current_node.get("data", {})
-                    node_label = node_data.get("label", node_type)
-                    
-                    # 再次检查是否被取消
-                    if await check_cancelled():
-                        print(f"[Execution] 检测到取消信号，停止执行")
-                        yield send_event({'type': 'cancelled', 'message': '执行被用户中断'})
-                        break
-                    
-                    # 推送节点开始
-                    yield send_event({'type': 'node_start', 'node_id': current_node_id, 'node_type': node_type, 'node_label': node_label, 'step': step_count})
-                    
-                    try:
-                        if node_type == "start":
-                            yield send_event({'type': 'info', 'label': '开始节点', 'message': '开始执行...'})
-                            state["variables"]["start_time"] = datetime.now().isoformat()
-                        
-                        elif node_type == "end":
-                            yield send_event({'type': 'info', 'label': '结束节点', 'message': '执行结束'})
-                            state["output"]["end_time"] = datetime.now().isoformat()
-                            break
-                        
-                        elif node_type == "llm":
-                            # LLM节点 - 真正的流式执行
-                            yield send_event({'type': 'thinking', 'label': node_label, 'message': f'正在调用大模型...'})
-                            
-                            # 创建事件队列
-                            event_queue = asyncio.Queue()
-                            
-                            # 创建回调函数
-                            async def stream_callback_wrapper(content, full_content):
-                                await event_queue.put({
-                                    'type': 'thinking_stream',
-                                    'label': node_label,
-                                    'content': content,
-                                    'full_content': full_content
-                                })
-                            
-                            # 启动执行任务
-                            async def execute_task():
-                                try:
-                                    # 直接在这里实现流式处理，避免回调嵌套问题
-                                    node_data = current_node.get("data", {})
-                                    prompt = node_data.get("prompt", "")
-                                    model_id = node_data.get("model_id")
-                                    
-                                    # 复制 _execute_llm_node 的逻辑，但使用流式
-                                    variables = state.get("variables", {})
-                                    import json
-                                    for key, value in variables.items():
-                                        if isinstance(value, (dict, list)):
-                                            val_str = json.dumps(value, ensure_ascii=False)
-                                        else:
-                                            val_str = str(value)
-                                        prompt = prompt.replace(f"{{{{{key}}}}}", val_str)
-                                    
-                                    input_text = state.get("input", {}).get("text", "")
-                                    if not input_text:
-                                        input_text = variables.get("input", {}).get("text", "")
-                                    system_prompt = node_data.get("system_prompt", "You are a helpful assistant.")
-                                    
-                                    messages = [{"role": "system", "content": system_prompt}]
-                                    recent_memories = variables.get("recent_memories", [])
-                                    important_memories = variables.get("important_memories", [])
-                                    
-                                    if recent_memories or important_memories:
-                                        memory_context = "\n"
-                                        if important_memories:
-                                            memory_context += "【重要历史记忆】:\n"
-                                            for idx, m in enumerate(important_memories):
-                                                memory_content = m.get("content", m) if isinstance(m, dict) else str(m)
-                                                memory_context += f"{idx+1}. {memory_content}\n"
-                                            memory_context += "\n"
-                                        if recent_memories:
-                                            memory_context += "【最近记忆】:\n"
-                                            for idx, m in enumerate(recent_memories):
-                                                memory_content = m.get("content", m) if isinstance(m, dict) else str(m)
-                                                memory_context += f"{idx+1}. {memory_content}\n"
-                                        if memory_context.strip():
-                                            messages.append({"role": "user", "content": f"历史记忆和上下文信息：\n{memory_context}\n"})
-                                    
-                                    if prompt and input_text:
-                                        combined_content = prompt.replace("{{input}}", input_text) if "{{input}}" in prompt else f"{prompt}\n\n用户输入：{input_text}"
-                                        messages.append({"role": "user", "content": combined_content})
-                                    elif prompt:
-                                        messages.append({"role": "user", "content": prompt})
-                                    else:
-                                        messages.append({"role": "user", "content": input_text})
-                                    
-                                    from base.plugins.llm.models.model import LLMModel
-                                    target_model = None
-                                    if model_id:
-                                        target_model = await LLMModel.filter(id=model_id, status="active").first()
-                                    
-                                    if not target_model:
-                                        target_model = await LLMModel.filter(status="active").first()
-                                    
-                                    if target_model:
-                                        from base.plugins.llm.services.chat_service import ChatService
-                                        full_response = ""
-                                        
-                                        async def callback(content):
-                                            nonlocal full_response
-                                            full_response += content
-                                            await event_queue.put({
-                                                'type': 'thinking_stream',
-                                                'label': node_label,
-                                                'content': content,
-                                                'full_content': full_response
-                                            })
-                                        
-                                        try:
-                                            async for chunk in ChatService.chat_stream(
-                                                model_id=target_model.id,
-                                                messages=messages,
-                                                temperature=0.7,
-                                                max_tokens=2000,
-                                                stream_callback=callback
-                                            ):
-                                                pass
-                                        except Exception as e:
-                                            print(f"流式调用失败，使用非流式: {e}")
-                                            # 回退到非流式
-                                            state_after = await LangGraphExecutor._execute_llm_node(current_node, state)
-                                            llm_out = state_after["variables"].get("llm_output", {})
-                                            full_response = llm_out.get("response", "")
-                                            if full_response:
-                                                await event_queue.put({
-                                                    'type': 'thinking_stream',
-                                                    'label': node_label,
-                                                    'content': full_response,
-                                                    'full_content': full_response
-                                                })
-                                            return state_after
-                                        
-                                        # 保存响应
-                                        output_variable = node_data.get("output_variable", "llm_output")
-                                        state["variables"][output_variable] = {
-                                            "prompt": prompt,
-                                            "model": target_model.model_name,
-                                            "response": full_response
-                                        }
-                                        state["variables"]["llm_output"] = {
-                                            "prompt": prompt,
-                                            "model": target_model.model_name,
-                                            "response": full_response
-                                        }
-                                        return state
-                                    else:
-                                        state_after = await LangGraphExecutor._execute_llm_node(current_node, state)
-                                        llm_out = state_after["variables"].get("llm_output", {})
-                                        full_response = llm_out.get("response", "")
-                                        if full_response:
-                                            await event_queue.put({
-                                                'type': 'thinking_stream',
-                                                'label': node_label,
-                                                'content': full_response,
-                                                'full_content': full_response
-                                            })
-                                        return state_after
-                                except Exception as e:
-                                    import traceback
-                                    traceback.print_exc()
-                                    await event_queue.put({
-                                        'type': 'error',
-                                        'message': str(e)
-                                    })
-                                    return state
-                            
-                            # 启动执行任务
-                            task = asyncio.create_task(execute_task())
-                            
-                            # 同时消费事件队列 - 无延迟优化
-                            done = False
-                            while not done or not event_queue.empty():
-                                try:
-                                    # 如果队列不为空，立即处理
-                                    if not event_queue.empty():
-                                        event = await event_queue.get()
-                                        yield send_event(event)
-                                        event_queue.task_done()
-                                    # 如果任务已完成，标记为 done
-                                    elif task.done():
-                                        done = True
-                                    # 否则，短暂等待（1ms）避免CPU过度占用
-                                    else:
-                                        await asyncio.sleep(0.001)
-                                except Exception as e:
-                                    print(f"处理事件失败: {e}")
-                                    break
-                            
-                            # 获取最终状态
-                            try:
-                                state = await task
-                            except Exception as e:
-                                print(f"执行任务失败: {e}")
-                        
-                        elif node_type == "skill":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': f'执行技能: {node_data.get("skill_id", "unknown")}'})
-                            state = await LangGraphExecutor._execute_skill_node(node_data, state)
-                            skill_result = state["variables"].get("skill_output", {})
-                            yield send_event({'type': 'observation', 'label': '技能执行结果', 'content': str(skill_result)[:500]})
-                        
-                        elif node_type == "agent":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '执行智能体...'})
-                            state = await LangGraphExecutor._execute_agent_node(node_data, state)
-                        
-                        elif node_type == "condition":
-                            yield send_event({'type': 'thinking', 'label': node_label, 'message': '条件判断中...'})
-                            state = await LangGraphExecutor._execute_condition_node(node_data, state)
-                            condition_result = state["variables"].get("condition_result", {}).get("result", False)
-                            yield send_event({'type': 'observation', 'label': '条件判断结果', 'content': f'结果: {condition_result}'})
-                        
-                        elif node_type == "loop":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '循环节点'})
-                            state = await LangGraphExecutor._execute_loop_node(node_data, state)
-                        
-                        elif node_type == "output":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '生成输出'})
-                            state = await LangGraphExecutor._execute_output_node(node_data, state)
-                        
-                        elif node_type == "input":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '处理输入'})
-                            state = await LangGraphExecutor._execute_input_node(node_data, state)
-                        
-                        elif node_type == "iteration":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '执行迭代'})
-                            state = await LangGraphExecutor._execute_iteration_node(node_data, state)
-                        
-                        elif node_type == "http":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '发送HTTP请求'})
-                            state = await LangGraphExecutor._execute_http_node(node_data, state)
-                        
-                        elif node_type == "code":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '执行代码'})
-                            state = await LangGraphExecutor._execute_code_node(node_data, state)
-                        
-                        elif node_type == "template":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '处理模板'})
-                            state = await LangGraphExecutor._execute_template_node(node_data, state)
-                        
-                        elif node_type == "variable_aggregator":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '聚合变量'})
-                            state = await LangGraphExecutor._execute_variable_aggregator_node(node_data, state)
-                        
-                        elif node_type == "document_extractor":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '提取文档'})
-                            state = await LangGraphExecutor._execute_document_extractor_node(node_data, state)
-                        
-                        elif node_type == "variable_assigner":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '赋值变量'})
-                            state = await LangGraphExecutor._execute_variable_assigner_node(node_data, state)
-                        
-                        elif node_type == "parameter_extractor":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '提取参数'})
-                            state = await LangGraphExecutor._execute_parameter_extractor_node(node_data, state)
-                        
-                        elif node_type == "json_extractor":
-                            yield send_event({'type': 'action', 'label': node_label, 'message': '提取JSON'})
-                            state = await LangGraphExecutor._execute_json_extractor_node(node_data, state)
-                            # 推送JSON提取结果
-                            json_result = state["variables"].get("json_extractor_output", {})
-                            yield send_event({'type': 'observation', 'label': 'JSON提取结果', 'content': str(json_result)[:500], 'data': json_result})
-                        
-                        else:
-                            yield send_event({'type': 'info', 'label': node_label, 'message': f'执行节点: {node_type}'})
-                            state = await LangGraphExecutor._execute_default_node(node_data, state)
-                        
-                        # 推送节点完成
-                        yield send_event({'type': 'node_complete', 'node_id': current_node_id, 'node_type': node_type, 'node_label': node_label})
-                        
-                    except Exception as e:
-                        yield send_event({'type': 'error', 'node_id': current_node_id, 'message': str(e)})
-                        state["error"] = str(e)
-                        break
-                    
-                    # 确定下一个节点
-                    if node_type == "condition":
-                        condition_result = state.get("variables", {}).get("condition_result", {}).get("result", False)
-                        outgoing_edges = [e for e in edges if e.get("source") == current_node_id]
-                        if len(outgoing_edges) >= 2:
-                            target_idx = 0 if condition_result else 1
-                            current_node_id = outgoing_edges[target_idx].get("target") if target_idx < len(outgoing_edges) else None
-                        elif outgoing_edges:
-                            current_node_id = outgoing_edges[0].get("target")
-                        else:
-                            current_node_id = None
-                    else:
-                        outgoing_edges = [e for e in edges if e.get("source") == current_node_id]
-                        current_node_id = outgoing_edges[0].get("target") if outgoing_edges else None
-                
-                # 执行完成
-                yield send_event({'type': 'complete', 'result': state.get("output", {}), 'variables': state.get("variables", {})})
-            else:
-                # 没有开始节点
-                yield send_event({'type': 'error', 'message': '结构图没有开始节点'})
-        else:
-            # 没有结构图，使用简化执行
-            yield send_event({'type': 'thinking', 'label': '智能体执行', 'message': '执行中...'})
-            result = await LangGraphExecutor.execute_agent(agent, input_data)
-            yield send_event({'type': 'complete', 'result': result.get('output', {}) if isinstance(result, dict) else {}, 'variables': result.get('variables', {}) if isinstance(result, dict) else result})
+                # 推送完成事件
+                yield send_event({
+                    'type': 'complete',
+                    'result': result.get('output', {}),
+                    'variables': result.get('variables', {})
+                })
+        except Exception as e:
+            print(f"获取执行结果失败: {e}")
+            yield send_event({'type': 'error', 'message': str(e)})
         
     except Exception as e:
         import traceback

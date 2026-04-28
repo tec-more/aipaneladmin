@@ -72,7 +72,8 @@
           >
             <div class="connection-point input" 
                  @mousedown.stop="onInputPointMouseDown($event, node)"
-                 @mouseup="onInputPointMouseUp($event, node)">
+                 @mouseup="onInputPointMouseUp($event, node)"
+            >
             </div>
             <div class="node-header">
               <span class="node-icon">{{ getNodeIcon(node.type) }}</span>
@@ -82,7 +83,8 @@
               </div>
             </div>
             <div class="connection-point output"
-                 @mousedown.stop="onOutputPointMouseDown($event, node)">
+                 @mousedown.stop="onOutputPointMouseDown($event, node)"
+            >
             </div>
           </div>
         </div>
@@ -102,7 +104,7 @@
             <template v-if="selectedNode.type === 'agent'">
               <el-divider content-position="left">智能体配置</el-divider>
               <el-form-item label="选择智能体">
-                <el-select v-model="selectedNode.data.agent_id" style="width: 100%">
+                <el-select v-model="selectedNode.data.agentId" style="width: 100%">
                   <el-option v-for="agent in agents" :key="agent.id" :label="agent.name" :value="agent.id" />
                 </el-select>
               </el-form-item>
@@ -114,11 +116,11 @@
             <template v-if="selectedNode.type === 'llm'">
               <el-divider content-position="left">LLM 配置</el-divider>
               <el-form-item label="选择模型">
-                <el-select v-model="selectedNode.data.model_id" style="width: 100%">
+                <el-select v-model="selectedNode.data.modelId" style="width: 100%">
                   <el-option 
                     v-for="model in models" 
                     :key="model.id" 
-                    :label="`${model.provider_name} - ${model.model_name}`" 
+                    :label="`${model.providerName} - ${model.modelName}`" 
                     :value="model.id" 
                   />
                 </el-select>
@@ -127,7 +129,7 @@
                 <el-slider v-model="selectedNode.data.temperature" :min="0" :max="2" :step="0.1" />
               </el-form-item>
               <el-form-item label="最大Token">
-                <el-input-number v-model="selectedNode.data.max_tokens" :min="1" :max="4096" />
+                <el-input-number v-model="selectedNode.data.maxTokens" :min="1" :max="4096" />
               </el-form-item>
               <el-form-item label="流式输出">
                 <el-switch v-model="selectedNode.data.stream" active-text="开" inactive-text="关" />
@@ -136,7 +138,7 @@
                 <el-input v-model="selectedNode.data.prompt" type="textarea" :rows="4" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_var" placeholder="例如: llm_output" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: llm_output" />
               </el-form-item>
             </template>
 
@@ -150,33 +152,33 @@
             <template v-if="selectedNode.type === 'loop'">
               <el-divider content-position="left">循环配置</el-divider>
               <el-form-item label="循环条件">
-                <el-input v-model="selectedNode.data.loop_condition" type="textarea" :rows="2" placeholder="例如: i < 5" />
+                <el-input v-model="selectedNode.data.condition" type="textarea" :rows="2" placeholder="例如: i < 5" />
               </el-form-item>
               <el-form-item label="最大次数">
-                <el-input-number v-model="selectedNode.data.loop_max" :min="1" :max="1000" />
+                <el-input-number v-model="selectedNode.data.loopMax" :min="1" :max="1000" />
               </el-form-item>
               <el-form-item label="循环变量">
-                <el-input v-model="selectedNode.data.loop_variable" placeholder="例如: i" />
+                <el-input v-model="selectedNode.data.loopVariable" placeholder="例如: i" />
               </el-form-item>
             </template>
 
             <template v-if="selectedNode.type === 'iteration'">
               <el-divider content-position="left">迭代配置</el-divider>
               <el-form-item label="迭代列表">
-                <el-input v-model="selectedNode.data.iteration_list" placeholder="变量名或JSON数组" />
+                <el-input v-model="selectedNode.data.iterationList" placeholder="变量名或JSON数组" />
               </el-form-item>
               <el-form-item label="当前项变量">
-                <el-input v-model="selectedNode.data.iteration_variable" placeholder="例如: item" />
+                <el-input v-model="selectedNode.data.iterationVariable" placeholder="例如: item" />
               </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'output'">
               <el-divider content-position="left">输出配置</el-divider>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_var" placeholder="例如: final_output" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: final_output" />
               </el-form-item>
               <el-form-item label="输出内容">
-                <el-input v-model="selectedNode.data.output_content" type="textarea" :rows="3" placeholder="可选，输出内容模板（支持 {{变量名}}）" />
+                <el-input v-model="selectedNode.data.outputContent" type="textarea" :rows="3" placeholder="可选，输出内容模板（支持 {{变量名}}）" />
               </el-form-item>
             </template>
 
@@ -217,66 +219,66 @@
                 <el-input v-model="selectedNode.data.template" type="textarea" :rows="4" placeholder="使用 {{变量名}} 引用变量" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_var" placeholder="例如: template_output" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: template_output" />
               </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'variable_aggregator'">
               <el-divider content-position="left">变量聚合器配置</el-divider>
               <el-form-item label="输入变量">
-                <el-input v-model="selectedNode.data.input_vars" type="textarea" :rows="3" placeholder="每行一个变量名" />
+                <el-input v-model="selectedNode.data.inputVars" type="textarea" :rows="3" placeholder="每行一个变量名" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_var" placeholder="例如: aggregated_output" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: aggregated_output" />
               </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'document_extractor'">
               <el-divider content-position="left">文档提取配置</el-divider>
               <el-form-item label="文档变量">
-                <el-input v-model="selectedNode.data.document_var" placeholder="存储文档的变量名" />
+                <el-input v-model="selectedNode.data.documentVar" placeholder="存储文档的变量名" />
               </el-form-item>
               <el-form-item label="提取规则">
-                <el-input v-model="selectedNode.data.extract_rules" type="textarea" :rows="3" placeholder="提取规则" />
+                <el-input v-model="selectedNode.data.extractRules" type="textarea" :rows="3" placeholder="提取规则" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_var" placeholder="例如: extracted_content" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: extracted_content" />
               </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'variable_assigner'">
               <el-divider content-position="left">变量赋值配置</el-divider>
               <el-form-item label="变量名">
-                <el-input v-model="selectedNode.data.var_name" placeholder="要赋值的变量名" />
+                <el-input v-model="selectedNode.data.varName" placeholder="要赋值的变量名" />
               </el-form-item>
               <el-form-item label="变量值">
-                <el-input v-model="selectedNode.data.var_value" type="textarea" :rows="3" placeholder="变量值（支持 {{变量名}}）" />
+                <el-input v-model="selectedNode.data.varValue" type="textarea" :rows="3" placeholder="变量值（支持 {{变量名}}）" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_var" placeholder="例如: assigned_var" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: assigned_var" />
               </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'parameter_extractor'">
               <el-divider content-position="left">参数提取配置</el-divider>
               <el-form-item label="输入变量">
-                <el-input v-model="selectedNode.data.input_variable" placeholder="要提取的变量名" />
+                <el-input v-model="selectedNode.data.inputVariable" placeholder="要提取的变量名" />
               </el-form-item>
               <el-form-item label="要提取的参数">
                 <el-input v-model="selectedNode.data.parameters" type="textarea" :rows="3" placeholder="每行一个参数名" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_var" placeholder="例如: extracted_params" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: extracted_params" />
               </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'json_extractor'">
               <el-divider content-position="left">JSON提取配置</el-divider>
               <el-form-item label="输入变量">
-                <el-input v-model="selectedNode.data.input_variable" placeholder="包含JSON的变量名（如: llm_output, thinking_process）" />
+                <el-input v-model="selectedNode.data.inputVariable" placeholder="包含JSON的变量名（如: llm_output, thinking_process）" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.output_variable" placeholder="例如: task_plan, structured_output" />
+                <el-input v-model="selectedNode.data.outputVariable" placeholder="例如: task_plan, structured_output" />
               </el-form-item>
               <el-form-item label="描述">
                 <el-input v-model="selectedNode.data.description" type="textarea" :rows="2" placeholder="节点描述（可选）" />
@@ -292,8 +294,8 @@
         <template v-if="selectedEdge">
           <div class="panel-header">连线配置</div>
           <div class="edge-info">
-            <p><strong>源节点：</strong>{{ getNodeById(selectedEdge.source)?.data.label }}</p>
-            <p><strong>目标节点：</strong>{{ getNodeById(selectedEdge.target)?.data.label }}</p>
+            <p><strong>源节点:</strong> {{ getNodeById(selectedEdge.source)?.data.label }}</p>
+            <p><strong>目标节点:</strong> {{ getNodeById(selectedEdge.target)?.data.label }}</p>
           </div>
           <el-button type="danger" size="small" @click="deleteSelectedEdge" style="width: 100%">
             删除连线
@@ -315,8 +317,8 @@
             <div class="message-content-wrapper">
               <div class="message-role">{{ msg.role === 'user' ? '用户' : 'AI' }}</div>
               <div class="message-content">
-                <span v-if="msg.role === 'assistant'" class="typing-indicator" v-show="index === dialogHistory.length - 1 && executing"></span>
                 {{ msg.content }}
+                <span v-if="msg.role === 'assistant'" class="typing-dots" v-show="index === dialogHistory.length - 1 && executing">{{ typingDots }}</span>
               </div>
               <div class="message-time">{{ msg.time }}</div>
             </div>
@@ -353,29 +355,29 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue'
-import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent'
-import { getModelList } from '@/api/llm'
+import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
+import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent';
+import { getModelList } from '@/api/llm';
 
 // 安全的 console 包装器
 const safeConsole = {
   log: function() {},
   error: function() {},
   warn: function() {}
-}
+};
 
 try {
   if (typeof console !== 'undefined') {
     if (typeof console.log === 'function') {
-      safeConsole.log = console.log.bind(console)
+      safeConsole.log = console.log.bind(console);
     }
     if (typeof console.error === 'function') {
-      safeConsole.error = console.error.bind(console)
+      safeConsole.error = console.error.bind(console);
     }
     if (typeof console.warn === 'function') {
-      safeConsole.warn = console.warn.bind(console)
+      safeConsole.warn = console.warn.bind(console);
     }
   }
 } catch (e) {
@@ -388,62 +390,65 @@ const props = defineProps({
   title: { type: String, default: '' },
   initialNodes: { type: Array, default: () => [] },
   initialEdges: { type: Array, default: () => [] }
-})
+});
 
-const emit = defineEmits(['save', 'execute', 'update:nodes', 'update:edges'])
+const emit = defineEmits(['save', 'execute', 'update:nodes', 'update:edges']);
 
-const canvas = ref(null)
-const fileInput = ref(null)
+const canvas = ref(null);
+const fileInput = ref(null);
 
-const saving = ref(false)
-const executing = ref(false)
-const executeDialog = ref(false)
-const executeInput = ref('{}')
-const executeResult = ref(null)
-const activeTab = ref('full')
-const realtimeSteps = ref([]) // 实时执行步骤
-const dialogHistory = ref([]) // 对话历史
-const currentInput = ref('') // 当前输入
-const latestResponse = ref('') // 最新回复
-const currentProcess = ref([]) // 当前执行过程（思考/行动/观察）
-const assistantMessage = ref(null) // 当前助手消息引用
-const currentAbortController = ref(null) // 当前中断控制器
+const saving = ref(false);
+const executing = ref(false);
+const executeDialog = ref(false);
+const executeInput = ref('{}');
+const executeResult = ref(null);
+const activeTab = ref('full');
+const realtimeSteps = ref([]); // 实时执行步骤
+const dialogHistory = ref([]); // 对话历史
+const currentInput = ref(''); // 当前输入
+const latestResponse = ref(''); // 最新回复
+const currentProcess = ref([]); // 当前执行过程（思考/行动/观察）
+const assistantMessage = ref(null); // 当前助手消息引用
+const currentAbortController = ref(null); // 当前中断控制器
 
-const agents = ref([])
-const skills = ref([])
-const models = ref([])
+const typingDots = ref(''); // 打字省略号
+let typingInterval = null; // 打字动画定时器
 
-const nodes = ref([])
-const edges = ref([])
-const selectedNode = ref(null)
-const selectedEdge = ref(null)
+const agents = ref([]);
+const skills = ref([]);
+const models = ref([]);
 
-const drawingEdge = ref(false)
-const edgeStartNode = ref(null)
-const edgeStartPoint = ref({ x: 0, y: 0 })
-const currentMousePos = ref({ x: 0, y: 0 })
-const draggingNode = ref(null)
-const dragOffset = ref({ x: 0, y: 0 })
+const nodes = ref([]);
+const edges = ref([]);
+const selectedNode = ref(null);
+const selectedEdge = ref(null);
+
+const drawingEdge = ref(false);
+const edgeStartNode = ref(null);
+const edgeStartPoint = ref({ x: 0, y: 0 });
+const currentMousePos = ref({ x: 0, y: 0 });
+const draggingNode = ref(null);
+const dragOffset = ref({ x: 0, y: 0 });
 
 const tempEdgePath = computed(() => {
-  if (!drawingEdge.value) return ''
+  if (!drawingEdge.value) return '';
   
-  const startX = edgeStartPoint.value.x
-  const startY = edgeStartPoint.value.y
-  const endX = currentMousePos.value.x
-  const endY = currentMousePos.value.y
+  const startX = edgeStartPoint.value.x;
+  const startY = edgeStartPoint.value.y;
+  const endX = currentMousePos.value.x;
+  const endY = currentMousePos.value.y;
   
   // 使用平滑的曲线绘制临时连线
-  const dx = endX - startX
-  const curvature = Math.min(Math.abs(dx) * 0.3, 80)
+  const dx = endX - startX;
+  const curvature = Math.min(Math.abs(dx) * 0.3, 80);
   
-  const cp1x = startX + curvature
-  const cp1y = startY
-  const cp2x = endX - curvature
-  const cp2y = endY
+  const cp1x = startX + curvature;
+  const cp1y = startY;
+  const cp2x = endX - curvature;
+  const cp2y = endY;
   
-  return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`
-})
+  return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+});
 
 const nodeCategories = [
   {
@@ -490,7 +495,7 @@ const nodeCategories = [
       { type: 'json_extractor', label: 'JSON提取', icon: Collection }
     ]
   }
-]
+];
 
 const getNodeIcon = (type) => {
   const icons = {
@@ -513,9 +518,9 @@ const getNodeIcon = (type) => {
     variable_assigner: '📝',
     parameter_extractor: '🔍',
     json_extractor: '📋'
-  }
-  return icons[type] || '📦'
-}
+  };
+  return icons[type] || '📦';
+};
 
 const getTraceStepType = (type) => {
   const types = {
@@ -527,16 +532,16 @@ const getTraceStepType = (type) => {
     condition: 'danger',
     loop: 'info',
     default: ''
-  }
-  return types[type] || ''
-}
+  };
+  return types[type] || '';
+};
 
 const formatContent = (content) => {
-  if (!content) return ''
+  if (!content) return '';
   
   // 如果内容包含HTML标签，直接返回以使用v-html渲染
   if (content.includes('<') && content.includes('>')) {
-    return content
+    return content;
   }
   
   // 否则，处理换行等格式
@@ -545,10 +550,10 @@ const formatContent = (content) => {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>')
-    .replace(/\s{4}/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
-}
+    .replace(/\s{4}/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+};
 
-const getNodeById = (id) => nodes.value.find(n => n.id === id)
+const getNodeById = (id) => nodes.value.find(n => n.id === id);
 
 // 实时执行步骤相关函数
 const getStepType = (type) => {
@@ -558,9 +563,9 @@ const getStepType = (type) => {
     observe: 'warning',
     info: 'info',
     error: 'danger'
-  }
-  return typeMap[type] || ''
-}
+  };
+  return typeMap[type] || '';
+};
 
 const getStepLabel = (type) => {
   const labelMap = {
@@ -569,9 +574,9 @@ const getStepLabel = (type) => {
     observe: '👁️ 观察',
     info: '📋 信息',
     error: '❌ 错误'
-  }
-  return labelMap[type] || type
-}
+  };
+  return labelMap[type] || type;
+};
 
 const addRealtimeStep = (type, title, content) => {
   realtimeSteps.value.push({
@@ -580,91 +585,91 @@ const addRealtimeStep = (type, title, content) => {
     content,
     completed: false,
     timestamp: new Date().toLocaleTimeString('zh-CN')
-  })
-}
+  });
+};
 
 const markLastStepCompleted = () => {
   if (realtimeSteps.value.length > 0) {
-    realtimeSteps.value[realtimeSteps.value.length - 1].completed = true
+    realtimeSteps.value[realtimeSteps.value.length - 1].completed = true;
   }
-}
+};
 
 const getEdgePath = (edge) => {
-  const sourceNode = getNodeById(edge.source)
-  const targetNode = getNodeById(edge.target)
+  const sourceNode = getNodeById(edge.source);
+  const targetNode = getNodeById(edge.target);
   
-  if (!sourceNode || !targetNode) return ''
+  if (!sourceNode || !targetNode) return '';
   
-  const sourceX = sourceNode.position.x + 180
-  const sourceY = sourceNode.position.y + 30
-  const targetX = targetNode.position.x
-  const targetY = targetNode.position.y + 30
+  const sourceX = sourceNode.position.x + 180;
+  const sourceY = sourceNode.position.y + 30;
+  const targetX = targetNode.position.x;
+  const targetY = targetNode.position.y + 30;
   
   // 计算同一源节点的连线索引，用于偏移
-  const sourceEdges = edges.value.filter(e => e.source === edge.source)
-  const edgeIndex = sourceEdges.findIndex(e => e.id === edge.id)
-  const totalEdgesFromSource = sourceEdges.length
+  const sourceEdges = edges.value.filter(e => e.source === edge.source);
+  const edgeIndex = sourceEdges.findIndex(e => e.id === edge.id);
+  const totalEdgesFromSource = sourceEdges.length;
   
   // 计算垂直偏移量，避免重叠
-  let yOffset = 0
+  let yOffset = 0;
   if (totalEdgesFromSource > 1) {
     // 计算每条连线的偏移位置
-    const spacing = 25 // 连线之间的间距
-    const totalHeight = (totalEdgesFromSource - 1) * spacing
-    const startOffset = -totalHeight / 2
-    yOffset = startOffset + edgeIndex * spacing
+    const spacing = 25; // 连线之间的间距
+    const totalHeight = (totalEdgesFromSource - 1) * spacing;
+    const startOffset = -totalHeight / 2;
+    yOffset = startOffset + edgeIndex * spacing;
   }
   
   // 计算控制点
-  const dx = targetX - sourceX
-  const dy = targetY - sourceY
-  const distance = Math.sqrt(dx * dx + dy * dy)
+  const dx = targetX - sourceX;
+  const dy = targetY - sourceY;
+  const distance = Math.sqrt(dx * dx + dy * dy);
   
   // 根据距离调整控制点，使曲线更自然
-  const curvature = Math.min(distance * 0.3, 100)
+  const curvature = Math.min(distance * 0.3, 100);
   
   // 计算控制点，考虑垂直偏移
-  const cp1x = sourceX + curvature
-  const cp1y = sourceY + yOffset
-  const cp2x = targetX - curvature
-  const cp2y = targetY + yOffset
+  const cp1x = sourceX + curvature;
+  const cp1y = sourceY + yOffset;
+  const cp2x = targetX - curvature;
+  const cp2y = targetY + yOffset;
   
-  return `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX} ${targetY}`
-}
+  return `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX} ${targetY}`;
+};
 
 const onDragStart = (event, nodeType) => {
-  event.dataTransfer.setData('nodeType', nodeType)
-  event.dataTransfer.effectAllowed = 'move'
-}
+  event.dataTransfer.setData('nodeType', nodeType);
+  event.dataTransfer.effectAllowed = 'move';
+};
 
 const onDragOver = (event) => {
-  event.preventDefault()
-  event.dataTransfer.dropEffect = 'move'
-}
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+};
 
 const onDrop = (event) => {
-  const type = event.dataTransfer.getData('nodeType')
-  if (!type) return
+  const type = event.dataTransfer.getData('nodeType');
+  if (!type) return;
   
-  const canvasEl = event.currentTarget
-  const rect = canvasEl.getBoundingClientRect()
+  const canvasEl = event.currentTarget;
+  const rect = canvasEl.getBoundingClientRect();
   const position = {
     x: event.clientX - rect.left + canvasEl.scrollLeft - 75,
     y: event.clientY - rect.top + canvasEl.scrollTop - 25
-  }
+  };
   
   const nodeData = {
-    label: type,
+    label: nodeTypes.find(n => n.type === type)?.label || type,
     description: ''
-  }
+  };
   
   if (type === 'loop') {
-    nodeData.loop_condition = 'i < 5'
-    nodeData.loop_max = 10
-    nodeData.loop_variable = 'i'
+    nodeData.loopCondition = 'i < 5';
+    nodeData.loopMax = 10;
+    nodeData.loopVariable = 'i';
   } else if (type === 'iteration') {
-    nodeData.iteration_list = ''
-    nodeData.iteration_variable = 'item'
+    nodeData.iterationList = '';
+    nodeData.iterationVariable = 'item';
   }
   
   const newNode = {
@@ -672,173 +677,172 @@ const onDrop = (event) => {
     type,
     position,
     data: nodeData
-  }
-  
-  nodes.value.push(newNode)
-}
+  };
+  nodes.value.push(newNode);
+};
 
 const onNodeClick = (node) => {
-  selectedEdge.value = null
-  selectedNode.value = node
-}
+  selectedEdge.value = null;
+  selectedNode.value = node;
+};
 
 const onNodeMouseDown = (event, node) => {
-  if (event.target.classList.contains('connection-point')) return
+  if (event.target.classList.contains('connection-point')) return;
   
-  draggingNode.value = node
-  const canvasEl = canvas.value
-  const rect = canvasEl.getBoundingClientRect()
+  draggingNode.value = node;
+  const canvasEl = canvas.value;
+  const rect = canvasEl.getBoundingClientRect();
   dragOffset.value = {
     x: event.clientX - rect.left - node.position.x,
     y: event.clientY - rect.top - node.position.y
-  }
-  event.preventDefault()
-}
+  };
+  event.preventDefault();
+};
 
 const onEdgeClick = (edge) => {
-  selectedNode.value = null
-  selectedEdge.value = edge
-}
+  selectedNode.value = null;
+  selectedEdge.value = edge;
+};
 
 const onOutputPointMouseDown = (event, node) => {
-  drawingEdge.value = true
-  edgeStartNode.value = node
+  drawingEdge.value = true;
+  edgeStartNode.value = node;
   edgeStartPoint.value = {
     x: node.position.x + 180,
     y: node.position.y + 30
-  }
-  currentMousePos.value = { ...edgeStartPoint.value }
-}
+  };
+  currentMousePos.value = { ...edgeStartPoint.value };
+};
 
 const onInputPointMouseDown = (event, node) => {
-  event.stopPropagation()
-}
+  event.stopPropagation();
+};
 
 const onInputPointMouseUp = (event, node) => {
   if (drawingEdge.value && edgeStartNode.value && edgeStartNode.value.id !== node.id) {
     const exists = edges.value.find(e => 
       e.source === edgeStartNode.value.id && e.target === node.id
-    )
+    );
     
     if (!exists) {
       const newEdge = {
         id: `edge-${Date.now()}`,
         source: edgeStartNode.value.id,
         target: node.id
-      }
-      edges.value.push(newEdge)
-      ElMessage.success('连线创建成功')
+      };
+      edges.value.push(newEdge);
+      ElMessage.success('连线创建成功');
     } else {
-      ElMessage.warning('连线已存在')
+      ElMessage.warning('连线已存在');
     }
   }
   
-  drawingEdge.value = false
-  edgeStartNode.value = null
-}
+  drawingEdge.value = false;
+  edgeStartNode.value = null;
+};
 
 const onMouseMove = (event) => {
   if (drawingEdge.value) {
-    const canvasEl = canvas.value
-    const rect = canvasEl.getBoundingClientRect()
+    const canvasEl = canvas.value;
+    const rect = canvasEl.getBoundingClientRect();
     currentMousePos.value = {
       x: event.clientX - rect.left + canvasEl.scrollLeft,
       y: event.clientY - rect.top + canvasEl.scrollTop
-    }
+    };
   }
   
   if (draggingNode.value) {
-    const canvasEl = canvas.value
-    const rect = canvasEl.getBoundingClientRect()
+    const canvasEl = canvas.value;
+    const rect = canvasEl.getBoundingClientRect();
     draggingNode.value.position = {
       x: event.clientX - rect.left + canvasEl.scrollLeft - dragOffset.value.x,
       y: event.clientY - rect.top + canvasEl.scrollTop - dragOffset.value.y
-    }
+    };
   }
-}
+};
 
 const onMouseUp = () => {
-  drawingEdge.value = false
-  edgeStartNode.value = null
-  draggingNode.value = null
-}
+  drawingEdge.value = false;
+  edgeStartNode.value = null;
+  draggingNode.value = null;
+};
 
 const deleteSelectedNode = () => {
   if (selectedNode.value) {
     edges.value = edges.value.filter(e => 
       e.source !== selectedNode.value.id && e.target !== selectedNode.value.id
-    )
+    );
     
-    const index = nodes.value.findIndex(n => n.id === selectedNode.value.id)
+    const index = nodes.value.findIndex(n => n.id === selectedNode.value.id);
     if (index > -1) {
-      nodes.value.splice(index, 1)
+      nodes.value.splice(index, 1);
     }
-    selectedNode.value = null
-    ElMessage.success('节点已删除')
+    selectedNode.value = null;
+    ElMessage.success('节点已删除');
   }
-}
+};
 
 const deleteSelectedEdge = () => {
   if (selectedEdge.value) {
-    const index = edges.value.findIndex(e => e.id === selectedEdge.value.id)
+    const index = edges.value.findIndex(e => e.id === selectedEdge.value.id);
     if (index > -1) {
-      edges.value.splice(index, 1)
+      edges.value.splice(index, 1);
     }
-    selectedEdge.value = null
-    ElMessage.success('连线已删除')
+    selectedEdge.value = null;
+    ElMessage.success('连线已删除');
   }
-}
+};
 
 const saveWorkflow = async () => {
   if (props.workflowId) {
-    saving.value = true
+    saving.value = true;
     try {
       const definition = {
         nodes: JSON.parse(JSON.stringify(nodes.value)),
         edges: JSON.parse(JSON.stringify(edges.value))
-      }
+      };
       
       await updateWorkflow(props.workflowId, {
         definition
-      })
-      ElMessage.success('保存成功')
+      });
+      ElMessage.success('保存成功');
     } catch (error) {
-      safeConsole.error('保存工程图失败:', error)
-      ElMessage.error('保存失败: ' + (error.message || error))
+      safeConsole.error('保存工程图失败:', error);
+      ElMessage.error('保存失败: ' + (error.message || error));
     } finally {
-      saving.value = false
+      saving.value = false;
     }
   }
   emit('save', { 
     nodes: JSON.parse(JSON.stringify(nodes.value)), 
     edges: JSON.parse(JSON.stringify(edges.value)) 
-  })
-}
+  });
+};
 
 const executeWorkflowDialog = () => {
-  executeDialog.value = true
-  executeInput.value = '{}'
-  executeResult.value = null
-}
+  executeDialog.value = true;
+  executeInput.value = '{}';
+  executeResult.value = null;
+};
 
 // 监听对话框打开，清空步骤
 watch(() => executeDialog.value, (newVal) => {
   if (newVal) {
-    realtimeSteps.value = [] // 打开时清空之前的步骤
-    executeResult.value = null
-    currentInput.value = ''
-    latestResponse.value = ''
+    realtimeSteps.value = []; // 打开时清空之前的步骤
+    executeResult.value = null;
+    currentInput.value = '';
+    latestResponse.value = '';
   }
-})
+});
 
 const clearDialogHistory = () => {
-  dialogHistory.value = []
-  currentInput.value = ''
-  latestResponse.value = ''
-  realtimeSteps.value = []
-  executeResult.value = null
-  ElMessage.success('对话历史已清空')
-}
+  dialogHistory.value = [];
+  currentInput.value = '';
+  latestResponse.value = '';
+  realtimeSteps.value = [];
+  executeResult.value = null;
+  ElMessage.success('对话历史已清空');
+};
 
 // 获取步骤图标
 const getStepIcon = (type) => {
@@ -853,24 +857,46 @@ const getStepIcon = (type) => {
     thinking: '🤔',
     action: '⚡',
     result: '📋'
+  };
+  return iconMap[type] || 'ℹ️';
+};
+
+// 启动打字省略号动画
+const startTypingAnimation = () => {
+  const dots = ['.', '..', '...', '..', '.'];
+  let index = 0;
+  typingInterval = setInterval(() => {
+    typingDots.value = dots[index];
+    index = (index + 1) % dots.length;
+  }, 350);
+};
+
+// 停止打字省略号动画
+const stopTypingAnimation = () => {
+  if (typingInterval) {
+    clearInterval(typingInterval);
+    typingInterval = null;
+    typingDots.value = '';
   }
-  return iconMap[type] || 'ℹ️'
-}
+};
 
 const doExecute = async () => {
   if (!props.workflowId && !props.agentId) {
-    ElMessage.warning('请先创建工程图或智能体')
-    return
+    ElMessage.warning('请先创建工程图或智能体');
+    return;
   }
   
   if (!currentInput.value.trim()) {
-    ElMessage.warning('请输入内容')
-    return
+    ElMessage.warning('请输入内容');
+    return;
   }
   
-  realtimeSteps.value = [] // 清空旧步骤
-  currentProcess.value = [] // 清空执行过程
-  executing.value = true
+  realtimeSteps.value = []; // 清空旧步骤
+  currentProcess.value = []; // 清空执行过程
+  executing.value = true;
+  
+  // 启动打字动画
+  startTypingAnimation();
   
   try {
     // 添加用户输入到历史
@@ -878,8 +904,8 @@ const doExecute = async () => {
       role: 'user',
       content: currentInput.value,
       time: new Date().toLocaleTimeString('zh-CN')
-    }
-    dialogHistory.value.push(userMessage)
+    };
+    dialogHistory.value.push(userMessage);
     
     // 创建并添加助手消息占位符
     assistantMessage.value = {
@@ -887,474 +913,481 @@ const doExecute = async () => {
       content: '',
       time: new Date().toLocaleTimeString('zh-CN'),
       process: []
-    }
-    dialogHistory.value.push(assistantMessage.value)
+    };
+    dialogHistory.value.push(assistantMessage.value);
     
-    addRealtimeStep('info', '开始执行', `输入文本: ${currentInput.value.trim().substring(0, 100)}...`)
-    markLastStepCompleted()
+    addRealtimeStep('info', '开始执行', `输入文本: ${currentInput.value.trim().substring(0, 100)}...`);
+    markLastStepCompleted();
     
     // 将普通文本转换为JSON格式，包含对话历史
     const input = {
       text: currentInput.value.trim(),
       history: [...dialogHistory.value.slice(0, -1)] // 排除刚添加的助手占位符
-    }
+    };
     
     // 清空输入框
-    currentInput.value = ''
+    currentInput.value = '';
     
     if (props.agentId) {
       // 立即获取并保存 controller（不使用 await）
       const controller = executeAgentGraphAuto(props.agentId, input, {
         onStart: () => {
-          addRealtimeStep('info', '准备执行', '正在建立SSE连接...')
-          markLastStepCompleted()
+          addRealtimeStep('info', '准备执行', '正在建立SSE连接...');
+          markLastStepCompleted();
         },
         onData: (data) => {
-          handleSSEData(data)
+          handleSSEData(data);
         },
         onComplete: (result) => {
-          addRealtimeStep('info', '执行完成', '智能体执行完成')
-          markLastStepCompleted()
-          ElMessage.success('执行完成')
+          addRealtimeStep('info', '执行完成', '智能体执行完成');
+          markLastStepCompleted();
+          ElMessage.success('执行完成');
           
           // 处理非SSE的结果（如果有）
           if (result) {
-            handleNonSSEResult(result)
+            handleNonSSEData(result);
           }
           
           // 执行完成时清理状态
-          executing.value = false
-          currentAbortController.value = null
+          stopTypingAnimation();
+          executing.value = false;
+          currentAbortController.value = null;
         },
         onError: (error) => {
-          addRealtimeStep('error', '执行失败', error.message || '未知错误')
-          markLastStepCompleted()
-          ElMessage.error('执行失败: ' + (error.message || '未知错误'))
+          addRealtimeStep('error', '执行失败', error.message || '未知错误');
+          markLastStepCompleted();
+          ElMessage.error('执行失败: ' + (error.message || '未知错误'));
           // 出错时清理状态
-          executing.value = false
-          currentAbortController.value = null
+          stopTypingAnimation();
+          executing.value = false;
+          currentAbortController.value = null;
         }
-      })
-      currentAbortController.value = controller
+      });
+      currentAbortController.value = controller;
     } else {
-      const res = await apiExecuteWorkflow(props.workflowId, input)
+      const result = await apiExecuteWorkflow(props.workflowId, input);
       
       // 处理非SSE的结果
-      handleNonSSEResult(res)
+      handleNonSSEData(result);
       // 非SSE模式，完成后清理
-      executing.value = false
-      currentAbortController.value = null
+      stopTypingAnimation();
+      executing.value = false;
+      currentAbortController.value = null;
     }
     
-    emit('execute', executeResult.value)
+    emit('execute', executeResult.value);
   } catch (error) {
-    safeConsole.error('执行失败:', error)
+    safeConsole.error('执行失败:', error);
     
     // 即使出错也要显示错误
     if (assistantMessage.value) {
-      assistantMessage.value.content = '执行失败: ' + (error.message || '未知错误')
+      assistantMessage.value.content = '执行失败: ' + (error.message || '未知错误');
     } else {
       const errorMessage = {
         role: 'assistant',
         content: '执行失败: ' + (error.message || '未知错误'),
         time: new Date().toLocaleTimeString('zh-CN')
-      }
-      dialogHistory.value.push(errorMessage)
+      };
+      dialogHistory.value.push(errorMessage);
     }
-    latestResponse.value = '执行失败: ' + (error.message || '未知错误')
+    latestResponse.value = '执行失败: ' + (error.message || '未知错误');
     
-    addRealtimeStep('error', '执行失败', error.message || '未知错误')
-    markLastStepCompleted()
+    addRealtimeStep('error', '执行失败', error.message || '未知错误');
+    markLastStepCompleted();
     
-    ElMessage.error('执行失败: ' + (error.message || '未知错误'))
+    ElMessage.error('执行失败: ' + (error.message || '未知错误'));
     
     // 出错时清理状态
-    executing.value = false
-    currentAbortController.value = null
+    stopTypingAnimation();
+    executing.value = false;
+    currentAbortController.value = null;
   }
-}
+};
 
 // 中断执行
 const abortExecution = () => {
   if (currentAbortController.value) {
-    currentAbortController.value.abort()
-    currentAbortController.value = null
-    executing.value = false
+    currentAbortController.value.abort();
+    currentAbortController.value = null;
+    executing.value = false;
+    stopTypingAnimation();
     
     // 添加中断提示
-    addRealtimeStep('warning', '执行中断', '用户手动中断执行')
-    markLastStepCompleted()
+    addRealtimeStep('warning', '执行中断', '用户手动中断执行');
+    markLastStepCompleted();
     
     if (assistantMessage.value) {
-      assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]'
+      assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]';
     }
     
-    ElMessage.info('执行已中断')
+    ElMessage.info('执行已中断');
   }
-}
+};
 
 // 处理SSE数据
 const handleSSEData = (data) => {
   switch (data.type) {
     case 'start':
-      addRealtimeStep('info', data.label || '开始', data.message || '执行开始')
-      markLastStepCompleted()
-      break
+      addRealtimeStep('info', data.label || '开始', data.message || '执行开始');
+      markLastStepCompleted();
+      break;
     
     case 'info':
-      addRealtimeStep('info', data.label || '信息', data.message || '')
-      markLastStepCompleted()
-      break
+      addRealtimeStep('info', data.label || '信息', data.message || '');
+      markLastStepCompleted();
+      break;
     
     case 'thinking':
       // 普通思考 - 只添加到实时步骤，不显示在对话框
-      addRealtimeStep('think', data.label || '思考', data.message || data.content || '')
-      markLastStepCompleted()
-      break
+      addRealtimeStep('think', data.label || '思考', data.message || data.content || '');
+      markLastStepCompleted();
+      break;
     
-    case 'thinking_stream':
+    case 'thinkingStream':
       // ✅ 流式思考！实时更新对话框和实时步骤
-      const rawContent = data.full_content || data.content || ''
+      const rawContent = data.fullContent || data.content || '';
       if (assistantMessage.value) {
-        assistantMessage.value.content = rawContent
+        assistantMessage.value.content = rawContent;
       }
-      addRealtimeStep('think', data.label || '思考中', rawContent)
-      break
+      addRealtimeStep('think', data.label || '思考中', rawContent);
+      break;
     
-    case 'thinking_result':
+    case 'thinkingResult':
       // 思考结果 - 只添加到实时步骤，不显示在对话框
-      const finalRawContent = data.full_content || data.content || ''
-      addRealtimeStep('think', '思考完成', finalRawContent)
-      markLastStepCompleted()
-      break
+      const finalRawContent = data.fullContent || data.content || '';
+      addRealtimeStep('think', '思考完成', finalRawContent);
+      markLastStepCompleted();
+      break;
     
     case 'action':
       // 行动过程 - 只添加到实时步骤，不显示在对话框
-      addRealtimeStep('act', data.label || '行动', data.message || data.content || '')
-      markLastStepCompleted()
-      break
+      addRealtimeStep('act', data.label || '行动', data.message || data.content || '');
+      markLastStepCompleted();
+      break;
     
     case 'observation':
       // 观察结果 - 只添加到实时步骤，不显示在对话框
-      addRealtimeStep('observe', data.label || '观察', data.content || '')
-      markLastStepCompleted()
-      break
+      addRealtimeStep('observe', data.label || '观察', data.content || '');
+      markLastStepCompleted();
+      break;
     
-    case 'node_start':
-      addRealtimeStep('info', `执行节点：${data.node_label || data.node_type}`, `步骤 ${data.step}`)
-      break
+    case 'nodeStart':
+      addRealtimeStep('info', `执行节点：${data.nodeLabel || data.nodeType}`, `步骤 ${data.step}`);
+      break;
     
-    case 'node_complete':
-      addRealtimeStep('success', `节点完成: ${data.node_label || data.node_type}`, '')
-      markLastStepCompleted()
-      break
+    case 'nodeComplete':
+      addRealtimeStep('success', `节点完成: ${data.nodeLabel || data.nodeType}`, '');
+      markLastStepCompleted();
+      break;
     
     case 'cancelled':
-      addRealtimeStep('warning', '执行中断', data.message || '执行被用户中断')
-      markLastStepCompleted()
+      addRealtimeStep('warning', '执行中断', data.message || '执行被用户中断');
+      markLastStepCompleted();
       
-      // 显示中断信息
+      // 显示中断提示
       if (assistantMessage.value) {
-        assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]'
+        assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]';
       }
       
       // 清理状态
-      executing.value = false
-      currentAbortController.value = null
-      break
+      stopTypingAnimation();
+      executing.value = false;
+      currentAbortController.value = null;
+      break;
     
     case 'complete':
       // 执行完成 - 添加结果
       executeResult.value = {
         result: data.result,
         variables: data.variables
-      }
+      };
       
       // 从结果中提取最终回复 - 直接使用原始内容，不JSON化
-      let finalContent = ''
+      let finalContent = '';
       if (data.variables) {
-        finalContent = data.variables.final_report || 
+        finalContent = data.variables.finalReport || 
                       data.variables.response || 
                       data.variables.text || 
                       data.variables.output || 
-                      ''
-        // 如果没有提取到内容，尝试从 variables 中获取 llm_output
-        if (!finalContent && data.variables.llm_output) {
-          finalContent = data.variables.llm_output.response || data.variables.llm_output.text || ''
+                      '';
+        // 如果没有提取到内容，尝试从 variables 中获取 llmOutput
+        if (!finalContent && data.variables.llmOutput) {
+          finalContent = data.variables.llmOutput.response || data.variables.llmOutput.text || '';
         }
       } else if (data.result) {
-        finalContent = data.result.output || data.result.text || ''
+        finalContent = data.result.output || data.result.text || '';
       }
       
       if (!finalContent) {
-        finalContent = '执行完成'
+        finalContent = '执行完成';
       }
       
       // 更新助手消息 - 只设置内容，不设置 process
       if (assistantMessage.value) {
-        assistantMessage.value.content = finalContent
+        assistantMessage.value.content = finalContent;
       }
       
-      latestResponse.value = finalContent
+      latestResponse.value = finalContent;
       
       // 清理状态
-      executing.value = false
-      currentAbortController.value = null
-      break
+      stopTypingAnimation();
+      executing.value = false;
+      currentAbortController.value = null;
+      break;
     
     case 'error':
-      addRealtimeStep('error', data.label || '错误', data.message || '')
-      markLastStepCompleted()
+      addRealtimeStep('error', data.label || '错误', data.message || '');
+      markLastStepCompleted();
       
       if (assistantMessage.value) {
-        assistantMessage.value.content = '执行错误: ' + (data.message || '')
+        assistantMessage.value.content = '执行错误: ' + (data.message || '');
       }
-      latestResponse.value = '执行错误: ' + (data.message || '')
+      latestResponse.value = '执行错误: ' + (data.message || '');
       
       // 清理状态
-      executing.value = false
-      currentAbortController.value = null
-      break
+      stopTypingAnimation();
+      executing.value = false;
+      currentAbortController.value = null;
+      break;
   }
-}
+};
 
 // 📝 格式化JSON为友好的显示内容
 const formatJsonToDisplay = (content, label) => {
-  if (!content) return content
+  if (!content) return content;
   
   // 先尝试解析JSON
-  let jsonData = null
-  let textToParse = content
+  let jsonData = null;
+  let textToParse = content;
   
   try {
     // 1. 直接解析
-    jsonData = JSON.parse(textToParse)
+    jsonData = JSON.parse(textToParse);
   } catch {
     try {
       // 2. 如果不行，尝试从文本中提取JSON部分
-      const jsonMatch = textToParse.match(/\{[\s\S]*\}/)
+      const jsonMatch = textToParse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        jsonData = JSON.parse(jsonMatch[0])
+        jsonData = JSON.parse(jsonMatch[0]);
       }
     } catch {
       // 解析失败，就返回原样（可能还在流式生成中）
-      return content
+      return content;
     }
   }
   
-  if (!jsonData) return content
+  if (!jsonData) return content;
   
   // 🔍 简单智能判断如何格式化！
-  let result = ''
+  let result = '';
   
   if (label?.includes('需求')) {
     // 需求分析的格式化
-    result = '📊 需求分析结果\n'
-    if (jsonData.project_type) result += `• 项目类型：${jsonData.project_type}\n`
-    if (jsonData.target_users) result += `• 目标用户：${jsonData.target_users}\n`
-    if (jsonData.business_goals) result += `• 业务目标：${jsonData.business_goals}\n`
-    if (Array.isArray(jsonData.core_features) && jsonData.core_features.length > 0) {
-      result += '• 核心功能：\n'
-      jsonData.core_features.forEach((f, i) => {
-        result += `  ${i+1}. ${f}\n`
-      })
+    result = '📊 需求分析结果\n';
+    if (jsonData.projectType) result += `• 项目类型：${jsonData.projectType}\n`;
+    if (jsonData.targetUsers) result += `• 目标用户：${jsonData.targetUsers}\n`;
+    if (jsonData.businessGoals) result += `• 业务目标：${jsonData.businessGoals}\n`;
+    if (Array.isArray(jsonData.coreFeatures) && jsonData.coreFeatures.length > 0) {
+      result += '• 核心功能：\n';
+      jsonData.coreFeatures.forEach((f, i) => {
+        result += `  ${i+1}. ${f}\n`;
+      });
     }
-  } else if (label?.includes('任务') || jsonData.total_task || jsonData.subtasks) {
+  } else if (label?.includes('任务') || jsonData.totalTask || jsonData.subtasks) {
     // 任务分解的格式化（兼容新旧字段）
-    result = '📋 任务分解结果\n'
-    if (jsonData.original_task || jsonData.total_task) {
-      result += `• 总任务：${jsonData.original_task || jsonData.total_task}\n`
+    result = '📋 任务分解结果\n';
+    if (jsonData.originalTask || jsonData.totalTask) {
+      result += `• 总任务：${jsonData.originalTask || jsonData.totalTask}\n`;
     }
-    if (jsonData.total_hours) {
-      result += `• 总工时：${jsonData.total_hours} 小时\n`
+    if (jsonData.totalHours) {
+      result += `• 总工时：${jsonData.totalHours} 小时\n`;
     }
     if (Array.isArray(jsonData.subtasks) && jsonData.subtasks.length > 0) {
-      result += '• 子任务清单：\n'
+      result += '• 子任务清单：\n';
       jsonData.subtasks.forEach((task, i) => {
-        const priorityIcon = task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢'
-        const name = task.name || task.task_name || ''
-        const estimate = task.estimated_hours ? ` (${task.estimated_hours}小时)` : ''
-        result += `  ${i+1}. ${priorityIcon} ${name}${estimate}\n`
-        if (task.description || task.task_description) {
-          result += `    ${task.description || task.task_description}\n`
+        const priorityIcon = task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢';
+        const name = task.name || task.taskName || '';
+        const estimate = task.estimatedHours ? ` (${task.estimatedHours}小时)` : '';
+        result += `  ${i+1}. ${priorityIcon} ${name}${estimate}\n`;
+        if (task.description || task.taskDescription) {
+          result += `    ${task.description || task.taskDescription}\n`;
         }
-      })
+      });
     }
     if (Array.isArray(jsonData.milestones) && jsonData.milestones.length > 0) {
-      result += '• 里程碑：\n'
+      result += '• 里程碑：\n';
       jsonData.milestones.forEach((m, i) => {
-        const milestoneEstimate = m.estimated_hours ? ` (${m.estimated_hours}小时)` : ''
-        result += `  ${i+1}. ${m.name}${milestoneEstimate}\n`
-      })
+        const milestoneEstimate = m.estimatedHours ? ` (${m.estimatedHours}小时)` : '';
+        result += `  ${i+1}. ${m.name}${milestoneEstimate}\n`;
+      });
     }
   } else if (label?.includes('评估')) {
     // 质量评估的格式化
-    result = '✅ 质量评估结果\n'
-    const score = jsonData.quality_score != null ? jsonData.quality_score : 'N/A'
-    if (score !== 'N/A') result += `• 质量评分：${score}/100\n`
-    if (jsonData.feedback) result += `• 评估反馈：${jsonData.feedback}\n`
+    result = '✅ 质量评估结果\n';
+    const score = jsonData.qualityScore != null ? jsonData.qualityScore : 'N/A';
+    if (score !== 'N/A') result += `• 质量评分：${score}/100\n`;
+    if (jsonData.feedback) result += `• 评估反馈：${jsonData.feedback}\n`;
     if (Array.isArray(jsonData.strengths) && jsonData.strengths.length > 0) {
-      result += '• 优点：\n'
+      result += '• 优点：\n';
       jsonData.strengths.forEach((s, i) => {
-        result += `  ${i+1}. ${s}\n`
-      })
+        result += `  ${i+1}. ${s}\n`;
+      });
     }
     if (Array.isArray(jsonData.weaknesses) && jsonData.weaknesses.length > 0) {
-      result += '• 可改进：\n'
+      result += '• 可改进：\n';
       jsonData.weaknesses.forEach((w, i) => {
-        result += `  ${i+1}. ${w}\n`
-      })
+        result += `  ${i+1}. ${w}\n`;
+      });
     }
   } else {
     // 默认显示，但也尽量友好
-    result = '📄 内容：\n' + content
+    result = '📄 内容：\n' + content;
   }
   
-  return result || content
-}
+  return result || content;
+};
 
 // 更新助手消息
 const updateAssistantMessage = () => {
   if (assistantMessage.value) {
-    assistantMessage.value.process = [...currentProcess.value]
+    assistantMessage.value.process = [...currentProcess.value];
     // 如果已经有内容就保持，否则显示等待
     if (!assistantMessage.value.content) {
-      assistantMessage.value.content = '思考中...'
+      assistantMessage.value.content = '思考中...';
     }
     // 强制触发响应式更新
-    const lastIndex = dialogHistory.value.length - 1
+    const lastIndex = dialogHistory.value.length - 1;
     if (lastIndex >= 0 && dialogHistory.value[lastIndex] === assistantMessage.value) {
       // 手动触发更新
-      dialogHistory.value = [...dialogHistory.value]
+      dialogHistory.value = [...dialogHistory.value];
     }
   }
-}
+};
 
-// 处理非SSE结果（兼容性）
-const handleNonSSEResult = (res) => {
-  if (!res.data) return
+// 处理非SSE数据（兼容性）
+const handleNonSSEData = (result) => {
+  if (!result) return;
   
-  const result = res.data
+  executeResult.value = result;
   
   // 解析执行结果 - 直接使用原始内容，不JSON化
-  let assistantResponse = ''
-  if (typeof res.data === 'string') {
-    assistantResponse = res.data
-  } else if (res.data.output || res.data.result || res.data.text || res.data.response) {
-    assistantResponse = res.data.output || res.data.result || res.data.text || res.data.response
-  } else if (res.data.variables) {
-    const vars = res.data.variables
-    assistantResponse = vars.final_report || vars.response || vars.text || vars.output || ''
-    // 如果没有提取到内容，尝试从 variables 中获取 llm_output
-    if (!assistantResponse && vars.llm_output) {
-      assistantResponse = vars.llm_output.response || vars.llm_output.text || ''
+  let assistantResponse = '';
+  if (typeof result === 'string') {
+    assistantResponse = result;
+  } else if (result.output || result.result || result.text || result.response) {
+    assistantResponse = result.output || result.result || result.text || result.response;
+  } else if (result.variables) {
+    const vars = result.variables;
+    assistantResponse = vars.finalReport || vars.response || vars.text || vars.output || '';
+    // 如果没有提取到内容，尝试从 variables 中获取 llmOutput
+    if (!assistantResponse && vars.llmOutput) {
+      assistantResponse = vars.llmOutput.response || vars.llmOutput.text || '';
     }
   }
   
   if (!assistantResponse) {
-    assistantResponse = '执行完成'
+    assistantResponse = '执行完成';
   }
   
   // 更新助手消息 - 只设置内容，不设置 process
   if (assistantMessage.value) {
-    assistantMessage.value.content = assistantResponse
+    assistantMessage.value.content = assistantResponse;
   }
   
-  latestResponse.value = assistantResponse
-  executeResult.value = res.data
-}
+  latestResponse.value = assistantResponse;
+};
 
 const exportWorkflow = () => {
   const data = {
     nodes: nodes.value,
     edges: edges.value
-  }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'workflow.json'
-  a.click()
-  URL.revokeObjectURL(url)
-  ElMessage.success('导出成功')
-}
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'workflow.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  ElMessage.success('导出成功');
+};
 
 const importWorkflow = () => {
-  fileInput.value.click()
-}
+  fileInput.value.click();
+};
 
 const handleFileImport = (event) => {
-  const file = event.target.files[0]
-  if (!file) return
+  const file = event.target.files[0];
+  if (!file) return;
   
-  const reader = new FileReader()
+  const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const data = JSON.parse(e.target.result)
-      if (data.nodes) nodes.value = data.nodes
-      if (data.edges) edges.value = data.edges
-      ElMessage.success('导入成功')
+      const data = JSON.parse(e.target.result);
+      if (data.nodes) nodes.value = data.nodes;
+      if (data.edges) edges.value = data.edges;
+      ElMessage.success('导入成功');
     } catch (err) {
-      ElMessage.error('文件格式错误')
+      ElMessage.error('文件格式错误');
     }
-  }
-  reader.readAsText(file)
-  event.target.value = ''
-}
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+};
 
 const fetchAgents = async () => {
   try {
-    const res = await getAgents({ limit: 1000 })
-    agents.value = res.data?.items || res.data || []
+    const result = await getAgents({ limit: 1000 });
+    agents.value = result.data?.items || result.data || [];
   } catch (error) {
-    safeConsole.error(error)
+    safeConsole.error(error);
   }
-}
+};
 
 const fetchSkills = async () => {
   try {
-    const res = await getSkills({ limit: 1000 })
-    skills.value = res.data?.items || res.data || []
+    const result = await getSkills({ limit: 1000 });
+    skills.value = result.data?.items || result.data || [];
   } catch (error) {
-    safeConsole.error(error)
+    safeConsole.error(error);
   }
-}
+};
 
 const fetchModels = async () => {
   try {
-    const res = await getModelList({ limit: 1000 })
-    models.value = res.data?.items || res.data || []
+    const result = await getModelList({ limit: 1000 });
+    models.value = result.data?.items || result.data || [];
   } catch (error) {
-    safeConsole.error(error)
+    safeConsole.error(error);
   }
-}
+};
 
 onMounted(() => {
-  fetchAgents()
-  fetchSkills()
-  fetchModels()
+  fetchAgents();
+  fetchSkills();
+  fetchModels();
   
   if (props.initialNodes.length > 0) {
-    nodes.value = props.initialNodes
+    nodes.value = props.initialNodes;
   }
   if (props.initialEdges.length > 0) {
-    edges.value = props.initialEdges
+    edges.value = props.initialEdges;
   }
-})
+});
 
 // 监听 initialNodes 变化
 watch(() => props.initialNodes, (newNodes) => {
   if (newNodes.length > 0) {
-    nodes.value = JSON.parse(JSON.stringify(newNodes))
+    nodes.value = JSON.parse(JSON.stringify(newNodes));
   }
-}, { immediate: true, deep: true })
+}, { immediate: true, deep: true });
 
 // 监听 initialEdges 变化
 watch(() => props.initialEdges, (newEdges) => {
   if (newEdges.length > 0) {
-    edges.value = JSON.parse(JSON.stringify(newEdges))
+    edges.value = JSON.parse(JSON.stringify(newEdges));
   }
-}, { immediate: true, deep: true })
+}, { immediate: true, deep: true });
 </script>
 
 <style scoped>
@@ -1654,338 +1687,6 @@ watch(() => props.initialEdges, (newEdges) => {
   font-size: 13px;
 }
 
-.task-plan-view {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.task-plan-card {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.subtask-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.subtask-item {
-  padding: 12px;
-  background: #f5f7fa;
-  border-radius: 6px;
-  border-left: 3px solid #409EFF;
-}
-
-.subtask-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.subtask-index {
-  min-width: 50px;
-  text-align: center;
-}
-
-.subtask-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: #303133;
-}
-
-.subtask-description {
-  color: #606266;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.subtask-meta {
-  margin-top: 8px;
-}
-
-.llm-response {
-  margin-bottom: 16px;
-}
-
-.response-meta {
-  margin-bottom: 8px;
-}
-
-.trace-step {
-  display: flex;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.thinking-content-card {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-}
-
-.thinking-content {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.thinking-content :deep(p) {
-  margin: 8px 0;
-  line-height: 1.8;
-}
-
-.thinking-content :deep(br) {
-  line-height: 2;
-}
-
-.thinking-content :deep(ul),
-.thinking-content :deep(ol) {
-  margin: 8px 0;
-  padding-left: 24px;
-}
-
-.thinking-content :deep(li) {
-  margin: 4px 0;
-  line-height: 1.8;
-}
-
-.thinking-content :deep(code) {
-  background: #f5f7fa;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #409EFF;
-}
-
-.thinking-content :deep(pre) {
-  background: #f5f7fa;
-  padding: 12px;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 8px 0;
-}
-
-.thinking-content :deep(h1),
-.thinking-content :deep(h2),
-.thinking-content :deep(h3),
-.thinking-content :deep(h4) {
-  margin: 12px 0 8px 0;
-  color: #303133;
-}
-
-.thinking-content :deep(blockquote) {
-  border-left: 4px solid #409EFF;
-  padding-left: 12px;
-  margin: 8px 0;
-  color: #606266;
-}
-
-.response-content {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.response-content :deep(p) {
-  margin: 8px 0;
-  line-height: 1.8;
-}
-
-.response-content :deep(br) {
-  line-height: 2;
-}
-
-.response-content :deep(ul),
-.response-content :deep(ol) {
-  margin: 8px 0;
-}
-
-/* 实时执行样式 */
-.realtime-execution-container {
-  max-height: 500px;
-  overflow-y: auto;
-  background: #f5f7fa;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.realtime-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  margin-bottom: 10px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e4e7ed;
-  transition: all 0.3s;
-}
-
-.realtime-step:hover {
-  border-color: #409EFF;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
-}
-
-.step-type-tag {
-  flex-shrink: 0;
-}
-
-.step-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.step-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: #303133;
-  margin-bottom: 6px;
-}
-
-.step-description {
-  font-size: 13px;
-  color: #606266;
-  line-height: 1.6;
-  word-wrap: break-word;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.step-check-icon {
-  flex-shrink: 0;
-  color: #67C23A;
-  font-size: 18px;
-  margin-top: 2px;
-}
-
-.executing-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  color: #909399;
-  font-size: 14px;
-}
-
-.loading-icon {
-  animation: rotate 1s linear infinite;
-  color: #409EFF;
-  font-size: 20px;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* 对话历史样式 */
-.dialog-history-container {
-  max-height: 300px;
-  overflow-y: auto;
-  background: #f5f7fa;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.dialog-turn {
-  margin-bottom: 12px;
-  padding: 12px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e4e7ed;
-}
-
-.dialog-turn:last-child {
-  margin-bottom: 0;
-}
-
-.turn-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.turn-time {
-  font-size: 12px;
-  color: #909399;
-}
-
-.turn-content {
-  font-size: 14px;
-  color: #303133;
-  line-height: 1.6;
-  word-wrap: break-word;
-}
-
-.latest-response-container {
-  background: #f0f9ff;
-  border: 1px solid #b3d8ff;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.response-content :deep(li) {
-  margin: 4px 0;
-  line-height: 1.8;
-}
-
-.response-content :deep(code) {
-  background: #f5f7fa;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #409EFF;
-}
-
-.response-content :deep(pre) {
-  background: #f5f7fa;
-  padding: 12px;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 8px 0;
-}
-
-.response-content :deep(h1),
-.response-content :deep(h2),
-.response-content :deep(h3),
-.response-content :deep(h4) {
-  margin: 12px 0 8px 0;
-  color: #303133;
-}
-
-.response-content :deep(blockquote) {
-  border-left: 4px solid #409EFF;
-  padding-left: 12px;
-  margin: 8px 0;
-  color: #606266;
-}
-
-.response-content-card {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  margin-top: 8px;
-}
-
-.response-content-card pre {
-  margin: 0;
-  padding: 0;
-  font-family: 'Microsoft YaHei', sans-serif;
-  font-size: 14px;
-  line-height: 1.8;
-  color: #303133;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
 /* 微信风格对话框 */
 .wechat-style-dialog .el-dialog__body {
   padding: 0;
@@ -2075,7 +1776,7 @@ watch(() => props.initialEdges, (newEdges) => {
 }
 
 .message.assistant .message-content {
-  background: #fff;
+  background: white;
   color: #303133;
   border-bottom-left-radius: 4px;
   border: 1px solid #e4e7ed;
@@ -2090,25 +1791,18 @@ watch(() => props.initialEdges, (newEdges) => {
 
 /* 流式消息样式 */
 .message-streaming {
-  background: linear-gradient(135deg, #fdf6ec 0%, #fff 100%);
+  background: linear-gradient(135deg, #fdf6ec 0%, white 100%);
   border-left: 3px solid #e6a23c;
 }
 
-/* 打字机光标效果 */
-.typing-indicator {
+/* 打字机点效果 */
+.typing-dots {
   display: inline-block;
-  width: 8px;
-  height: 18px;
-  background: #409eff;
-  margin-right: 4px;
-  animation: blink 1s infinite;
+  margin-left: 4px;
   vertical-align: text-bottom;
-  border-radius: 1px;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  font-weight: bold;
+  color: #606266;
+  min-width: 20px;
 }
 
 /* 推理模式样式 */
@@ -2150,7 +1844,7 @@ watch(() => props.initialEdges, (newEdges) => {
 .process-item {
   margin-bottom: 8px;
   padding: 8px;
-  background: #fff;
+  background: white;
   border-radius: 6px;
   border-left: 3px solid #409eff;
   transition: all 0.3s ease;
@@ -2237,7 +1931,7 @@ watch(() => props.initialEdges, (newEdges) => {
   align-items: flex-start;
   margin-bottom: 6px;
   padding: 6px;
-  background: #fff;
+  background: white;
   border-radius: 4px;
   font-size: 12px;
 }
@@ -2267,7 +1961,7 @@ watch(() => props.initialEdges, (newEdges) => {
 /* 输入区 */
 .chat-input-area {
   padding-top: 20px;
-  background: #fff;
+  background: white;
   border-top: 1px solid #e4e7ed;
 }
 

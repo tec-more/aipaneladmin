@@ -4,7 +4,7 @@ API密钥模型
 from tortoise import fields
 from datetime import datetime, timedelta
 from base.common.model import BaseModel, TimestampMixin
-from base.plugins.llm.models.enums import ModelServiceType, CallMode, RequestType
+from base.plugins.llm.models.enums import ModelServiceType, CallMode
 
 
 class LLMApiKey(BaseModel, TimestampMixin):
@@ -36,13 +36,6 @@ class LLMApiKey(BaseModel, TimestampMixin):
         max_length=50,
         default=CallMode.VENDOR_SDK.value,
         description="调用方式：openapi 使用openai库，vendor_sdk 使用厂商SDK"
-    )
-
-    # ========== 请求类型 ==========
-    request_type = fields.CharField(
-        max_length=50,
-        default=RequestType.CHAT.value,
-        description="请求类型：chat 使用 /chat/completions，response 使用 /responses"
     )
 
     # ========== 认证字段 ==========
@@ -114,8 +107,7 @@ class LLMApiKey(BaseModel, TimestampMixin):
             "api_secret": self.api_secret,
             "access_token": self.access_token,
             "endpoint_url": self.endpoint_url,
-            "call_mode": self.call_mode,
-            "request_type": self.request_type
+            "call_mode": self.call_mode
         }
     
     @property
