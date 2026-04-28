@@ -32,6 +32,9 @@ export function executeAgentGraph(id, params) {
   return longRequest.post(`/v1/agent/agents/${id}/graph/execute`, params)
 }
 
+/**
+ * 标准的SSE执行方法 - 有while循环持续接收消息
+ */
 export function executeAgentGraphSSE(id, params, callbacks = {}) {
   const { onStart, onData, onComplete, onError } = callbacks
   
@@ -43,15 +46,29 @@ export function executeAgentGraphSSE(id, params, callbacks = {}) {
   
   const abortController = new AbortController()
   let executionId = null
+  let isAborted = false
 
-  // 立即启动执行，不等待
-  setTimeout(async () => {
+  // 立即返回 controller，确保可以立即中断
+  const controller = {
+    abort: () => {
+      isAborted = true
+      if (executionId) {
+        // 调用后端取消接口
+        fetch(`/api/v1/agent/executions/${executionId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {})
+      }
+      abortController.abort()
+    }
+  }
+
+  // 启动SSE连接（异步，不阻塞）
+  queueMicrotask(async () => {
     try {
       const response = await fetch(`/api/v1/agent/agents/${id}/graph/execute/sse`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
         signal: abortController.signal,
       })
@@ -60,25 +77,32 @@ export function executeAgentGraphSSE(id, params, callbacks = {}) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
+      // 获取流式阅读器
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
 
+      // 回调 - 开始
       safeOnStart()
 
       let buffer = ''
 
+      // 🎯 关键的while循环 - 持续接收消息！
       while (true) {
-        if (abortController.signal.aborted) {
+        // 检查是否已中断
+        if (isAborted || abortController.signal.aborted) {
           break
         }
 
+        // 读取下一个数据块
         const { done, value } = await reader.read()
         if (done) {
           break
         }
 
+        // 解码并添加到缓冲区
         buffer += decoder.decode(value, { stream: true })
 
+        // 处理数据，按行分割
         const lines = buffer.split('\n')
         buffer = lines.pop()
 
@@ -92,76 +116,98 @@ export function executeAgentGraphSSE(id, params, callbacks = {}) {
                 if (data.type === 'start' && data.execution_id) {
                   executionId = data.execution_id
                 }
+                // 回调 - 收到数据
                 safeOnData(data)
               } catch (e) {
-                // 静默忽略
+                // 忽略解析错误
               }
             }
           }
         }
       }
 
-      if (!abortController.signal.aborted) {
+      // 回调 - 完成
+      if (!isAborted && !abortController.signal.aborted) {
         safeOnComplete()
       }
     } catch (error) {
+      // 回调 - 错误
       if (error.name !== 'AbortError') {
         safeOnError(error)
       }
     }
-  }, 0)
+  })
 
-  // 立即返回 controller
-  return {
-    abort: () => {
-      if (executionId) {
-        // 调用后端取消接口
-        fetch(`/api/v1/agent/executions/${executionId}/cancel`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }).catch(() => {
-          // 静默忽略
-        })
-      }
-      abortController.abort()
-    }
-  }
+  return controller
 }
 
 // 根据结构图自动选择执行方式
-export async function executeAgentGraphAuto(id, params, callbacks = {}, graphDefinition = null) {
-  if (!graphDefinition) {
-    const graphResponse = await getAgentGraph(id)
-    if (graphResponse && graphResponse.data && graphResponse.data.graph_definition) {
-      graphDefinition = graphResponse.data.graph_definition
+export function executeAgentGraphAuto(id, params, callbacks = {}, graphDefinition = null) {
+  // 立即创建 controller，支持立即中断
+  let realController = null
+  let isAborted = false
+  
+  const controller = {
+    abort: () => {
+      isAborted = true
+      if (realController) {
+        realController.abort()
+      }
     }
   }
 
-  const hasStreamingNode = hasStreamingLLMNode(graphDefinition)
-
-  if (hasStreamingNode) {
-    const controller = executeAgentGraphSSE(id, params, callbacks)
-    return controller
-  } else {
-    // 创建一个假的 abort controller
-    const fakeController = { abort: () => {} }
-    // 异步执行，不等待
-    (async () => {
-      try {
-        const result = await executeAgentGraph(id, params)
-        if (callbacks.onComplete) {
-          callbacks.onComplete(result)
-        }
-      } catch (error) {
-        if (callbacks.onError) {
-          callbacks.onError(error)
+  // 异步执行剩余逻辑
+  queueMicrotask(async () => {
+    if (isAborted) return
+    
+    try {
+      if (!graphDefinition) {
+        const graphResponse = await getAgentGraph(id)
+        if (isAborted) return
+        if (graphResponse && graphResponse.data && graphResponse.data.graph_definition) {
+          graphDefinition = graphResponse.data.graph_definition
         }
       }
-    })()
-    return fakeController
-  }
+
+      const hasStreamingNode = hasStreamingLLMNode(graphDefinition)
+
+      if (hasStreamingNode) {
+        // 使用SSE方式
+        realController = executeAgentGraphSSE(id, params, callbacks)
+        // 如果在此期间已经调用了 abort，立即中断
+        if (isAborted) {
+          realController.abort()
+        }
+      } else {
+        // 使用普通方式
+        const fakeController = { abort: () => {} }
+        realController = fakeController
+        
+        // 创建安全的函数包装器
+        const safeOnStart = typeof callbacks.onStart === 'function' ? callbacks.onStart : () => {}
+        const safeOnComplete = typeof callbacks.onComplete === 'function' ? callbacks.onComplete : () => {}
+        const safeOnError = typeof callbacks.onError === 'function' ? callbacks.onError : () => {}
+        
+        try {
+          safeOnStart()
+          const result = await executeAgentGraph(id, params)
+          if (!isAborted) {
+            safeOnComplete(result)
+          }
+        } catch (error) {
+          if (!isAborted) {
+            safeOnError(error)
+          }
+        }
+      }
+    } catch (error) {
+      if (!isAborted && callbacks.onError) {
+        callbacks.onError(error)
+      }
+    }
+  })
+
+  return controller
 }
 
 export function getAgentGraph(agentId) {

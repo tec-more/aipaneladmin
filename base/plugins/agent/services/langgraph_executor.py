@@ -637,7 +637,17 @@ class LangGraphExecutor:
             if memory_context.strip():
                 messages.append({"role": "user", "content": f"历史记忆和上下文信息：\n{memory_context}\n"})
         
-        messages.append({"role": "user", "content": input_text or prompt})
+        # 组合提示词和输入文本
+        if prompt and input_text:
+            # 如果都有，用提示词包裹输入文本
+            combined_content = prompt.replace("{{input}}", input_text) if "{{input}}" in prompt else f"{prompt}\n\n用户输入：{input_text}"
+            messages.append({"role": "user", "content": combined_content})
+        elif prompt:
+            # 只有提示词
+            messages.append({"role": "user", "content": prompt})
+        else:
+            # 只有输入文本
+            messages.append({"role": "user", "content": input_text})
         
         logger.info(f"[LLM节点] 消息长度: {len(str(messages))}")
         
@@ -817,7 +827,7 @@ class LangGraphExecutor:
         
         # 获取输入文本
         input_text = variables.get("input", {}).get("text", "")
-        system_prompt = node_data.get("system_prompt", "You are a helpful assistant.")
+        system_prompt = node_data.get("system_prompt", "")
         
         # 构建消息列表
         messages = [{"role": "system", "content": system_prompt}]
@@ -845,7 +855,17 @@ class LangGraphExecutor:
             if memory_context.strip():
                 messages.append({"role": "user", "content": f"历史记忆和上下文信息：\n{memory_context}\n"})
         
-        messages.append({"role": "user", "content": input_text or prompt})
+        # 组合提示词和输入文本
+        if prompt and input_text:
+            # 如果都有，用提示词包裹输入文本
+            combined_content = prompt.replace("{{input}}", input_text) if "{{input}}" in prompt else f"{prompt}\n\n用户输入：{input_text}"
+            messages.append({"role": "user", "content": combined_content})
+        elif prompt:
+            # 只有提示词
+            messages.append({"role": "user", "content": prompt})
+        else:
+            # 只有输入文本
+            messages.append({"role": "user", "content": input_text})
         
         # 获取模型
         target_model = None

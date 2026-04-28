@@ -137,7 +137,9 @@ async def create_chat(
             raise HTTPException(status_code=400, detail="模型未启用")
 
         # 2. 获取可用的API密钥
-        api_key_obj = await ChatService.get_available_api_key(model.provider_id)
+        api_key_obj = await LLMApiKey.filter(
+            model_id=model.model_id
+        ).first()
         if not api_key_obj:
             raise HTTPException(status_code=503, detail="没有可用的API密钥")
 
@@ -151,10 +153,11 @@ async def create_chat(
         credentials = api_key_obj.get_credentials()
         service = await ChatService.get_provider_service(
             provider_name_en=model.provider.name_en,
-            api_key=credentials.get("api_key", ""),
+            api_key=api_key_obj,
             endpoint_url=endpoint_url,
             api_secret=credentials.get("api_secret", ""),
-            call_mode=credentials.get("call_mode", "vendor_sdk")
+            call_mode=credentials.get("call_mode", "vendor_sdk"),
+            request_type=credentials.get("request_type", "chat")
         )
 
         # 4. 如果是流式请求

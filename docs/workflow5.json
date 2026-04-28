@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "id": "start-1777298129332",
+      "data": {
+        "label": "start",
+        "description": ""
+      },
+      "type": "start",
+      "position": {
+        "x": 79,
+        "y": 123
+      }
+    },
+    {
+      "id": "end-1777298132978",
+      "data": {
+        "label": "end",
+        "description": ""
+      },
+      "type": "end",
+      "position": {
+        "x": 294,
+        "y": 364
+      }
+    },
+    {
+      "id": "llm-1777298135990",
+      "data": {
+        "label": "任务分解",
+        "prompt": "你是一个资深的项目经理和软件架构师。\n\n用户需求：{{input.text}}\n\n请把这个需求分解成可执行的小任务，并返回**Markdown格式**的内容，要美观易读！\n\n内容包括：\n1. 项目总体概述\n2. 子任务清单（每个任务有：优先级、预计工时、描述）\n3. 里程碑\n\n格式要求：\n- 使用标题和列表\n- 优先级用 emoji 表示：🔴高、🟡中、🟢低\n- 清晰易读，不要 JSON！",
+        "model_id": 1,
+        "max_tokens": 4000,
+        "description": "把大需求分解成小任务",
+        "temperature": 0.7,
+        "stream": false
+      },
+      "type": "llm",
+      "position": {
+        "x": 202,
+        "y": 231
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1777298138034",
+      "source": "start-1777298129332",
+      "target": "llm-1777298135990"
+    },
+    {
+      "id": "edge-1777298140103",
+      "source": "llm-1777298135990",
+      "target": "end-1777298132978"
+    }
+  ]
+}

@@ -309,29 +309,16 @@
           <div
             v-for="(msg, index) in dialogHistory"
             :key="index"
-            :class="['message', msg.role]"
+            :class="['message', msg.role, { 'message-streaming': msg.role === 'assistant' && index === dialogHistory.length - 1 && executing }]"
           >
             <div class="message-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
             <div class="message-content-wrapper">
               <div class="message-role">{{ msg.role === 'user' ? '用户' : 'AI' }}</div>
-              <div class="message-content">{{ msg.content }}</div>
-              <div class="message-time">{{ msg.time }}</div>
-              
-              <!-- AI的思考、行动、观察、结果 - 可折叠 -->
-              <div v-if="msg.role === 'assistant' && msg.process && msg.process.length > 0" class="message-process">
-                <div
-                  v-for="(process, pIndex) in msg.process"
-                  :key="pIndex"
-                  :class="['process-item', process.type, { collapsed: process.collapsed }]"
-                >
-                  <div class="process-header" @click="process.collapsed = !process.collapsed">
-                    <span class="process-label">{{ process.label }}</span>
-                    <span class="process-time">{{ process.time }}</span>
-                    <span class="collapse-icon">{{ process.collapsed ? '▶' : '▼' }}</span>
-                  </div>
-                  <div class="process-content" v-show="!process.collapsed">{{ process.content }}</div>
-                </div>
+              <div class="message-content">
+                <span v-if="msg.role === 'assistant'" class="typing-indicator" v-show="index === dialogHistory.length - 1 && executing"></span>
+                {{ msg.content }}
               </div>
+              <div class="message-time">{{ msg.time }}</div>
             </div>
           </div>
         </div>
@@ -542,16 +529,6 @@ const getTraceStepType = (type) => {
     default: ''
   }
   return types[type] || ''
-}
-
-const hasTaskPlan = computed(() => {
-  const vars = executeResult.value?.variables
-  return vars && (vars.original_task || vars.subtasks || vars.task_plan || vars.plan)
-})
-
-const getSubtaskColor = (index) => {
-  const colors = ['', 'primary', 'success', 'warning', 'info', 'danger']
-  return colors[index % colors.length]
 }
 
 const formatContent = (content) => {
@@ -926,8 +903,8 @@ const doExecute = async () => {
     currentInput.value = ''
     
     if (props.agentId) {
-      // 立即获取并保存 controller（不要 await）
-      const controller = await executeAgentGraphAuto(props.agentId, input, {
+      // 立即获取并保存 controller（不使用 await）
+      const controller = executeAgentGraphAuto(props.agentId, input, {
         onStart: () => {
           addRealtimeStep('info', '准备执行', '正在建立SSE连接...')
           markLastStepCompleted()
@@ -935,15 +912,27 @@ const doExecute = async () => {
         onData: (data) => {
           handleSSEData(data)
         },
-        onComplete: () => {
+        onComplete: (result) => {
           addRealtimeStep('info', '执行完成', '智能体执行完成')
           markLastStepCompleted()
           ElMessage.success('执行完成')
+          
+          // 处理非SSE的结果（如果有）
+          if (result) {
+            handleNonSSEResult(result)
+          }
+          
+          // 执行完成时清理状态
+          executing.value = false
+          currentAbortController.value = null
         },
         onError: (error) => {
           addRealtimeStep('error', '执行失败', error.message || '未知错误')
           markLastStepCompleted()
           ElMessage.error('执行失败: ' + (error.message || '未知错误'))
+          // 出错时清理状态
+          executing.value = false
+          currentAbortController.value = null
         }
       })
       currentAbortController.value = controller
@@ -952,6 +941,9 @@ const doExecute = async () => {
       
       // 处理非SSE的结果
       handleNonSSEResult(res)
+      // 非SSE模式，完成后清理
+      executing.value = false
+      currentAbortController.value = null
     }
     
     emit('execute', executeResult.value)
@@ -975,7 +967,8 @@ const doExecute = async () => {
     markLastStepCompleted()
     
     ElMessage.error('执行失败: ' + (error.message || '未知错误'))
-  } finally {
+    
+    // 出错时清理状态
     executing.value = false
     currentAbortController.value = null
   }
@@ -1014,78 +1007,41 @@ const handleSSEData = (data) => {
       break
     
     case 'thinking':
-    case 'thinking_stream':
-      // 思考过程 - 添加到process
-      const thinkingStep = {
-        type: 'thinking',
-        label: data.label || '思考',
-        content: data.message || data.content || '',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      }
-      currentProcess.value.push(thinkingStep)
-      updateAssistantMessage()
-      
+      // 普通思考 - 只添加到实时步骤，不显示在对话框
       addRealtimeStep('think', data.label || '思考', data.message || data.content || '')
       markLastStepCompleted()
       break
     
-    case 'thinking_result':
-      // 思考结果 - 更新之前的思考内容
-      if (currentProcess.value.length > 0) {
-        const lastProcess = currentProcess.value[currentProcess.value.length - 1]
-        if (lastProcess.type === 'thinking') {
-          lastProcess.content = data.full_content || data.content || lastProcess.content
-        }
-      } else {
-        currentProcess.value.push({
-          type: 'thinking',
-          label: '思考结果',
-          content: data.full_content || data.content || '',
-          time: new Date().toLocaleTimeString('zh-CN'),
-          collapsed: false
-        })
+    case 'thinking_stream':
+      // ✅ 流式思考！实时更新对话框和实时步骤
+      const rawContent = data.full_content || data.content || ''
+      if (assistantMessage.value) {
+        assistantMessage.value.content = rawContent
       }
-      updateAssistantMessage()
-      
-      addRealtimeStep('think', '思考完成', data.content || '')
+      addRealtimeStep('think', data.label || '思考中', rawContent)
+      break
+    
+    case 'thinking_result':
+      // 思考结果 - 只添加到实时步骤，不显示在对话框
+      const finalRawContent = data.full_content || data.content || ''
+      addRealtimeStep('think', '思考完成', finalRawContent)
       markLastStepCompleted()
       break
     
     case 'action':
-      // 行动过程
-      const actionStep = {
-        type: 'action',
-        label: data.label || '行动',
-        content: data.message || data.content || '',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      }
-      currentProcess.value.push(actionStep)
-      updateAssistantMessage()
-      
+      // 行动过程 - 只添加到实时步骤，不显示在对话框
       addRealtimeStep('act', data.label || '行动', data.message || data.content || '')
       markLastStepCompleted()
       break
     
     case 'observation':
-      // 观察结果
-      const observeStep = {
-        type: 'action', // 使用action类型
-        label: data.label || '观察',
-        content: data.content || '',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      }
-      currentProcess.value.push(observeStep)
-      updateAssistantMessage()
-      
+      // 观察结果 - 只添加到实时步骤，不显示在对话框
       addRealtimeStep('observe', data.label || '观察', data.content || '')
       markLastStepCompleted()
       break
     
     case 'node_start':
-      addRealtimeStep('info', `执行节点: ${data.node_label || data.node_type}`, `步骤 ${data.step}`)
+      addRealtimeStep('info', `执行节点：${data.node_label || data.node_type}`, `步骤 ${data.step}`)
       break
     
     case 'node_complete':
@@ -1101,6 +1057,10 @@ const handleSSEData = (data) => {
       if (assistantMessage.value) {
         assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]'
       }
+      
+      // 清理状态
+      executing.value = false
+      currentAbortController.value = null
       break
     
     case 'complete':
@@ -1110,38 +1070,36 @@ const handleSSEData = (data) => {
         variables: data.variables
       }
       
-      // 从结果中提取最终回复
+      // 从结果中提取最终回复 - 直接使用原始内容，不JSON化
       let finalContent = ''
       if (data.variables) {
         finalContent = data.variables.final_report || 
                       data.variables.response || 
                       data.variables.text || 
                       data.variables.output || 
-                      JSON.stringify(data.variables, null, 2)
+                      ''
+        // 如果没有提取到内容，尝试从 variables 中获取 llm_output
+        if (!finalContent && data.variables.llm_output) {
+          finalContent = data.variables.llm_output.response || data.variables.llm_output.text || ''
+        }
       } else if (data.result) {
-        finalContent = data.result.output || data.result.text || JSON.stringify(data.result, null, 2)
+        finalContent = data.result.output || data.result.text || ''
       }
       
       if (!finalContent) {
         finalContent = '执行完成'
       }
       
-      // 添加结果到process
-      currentProcess.value.push({
-        type: 'result',
-        label: '结果',
-        content: finalContent,
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      })
-      
-      // 更新助手消息
+      // 更新助手消息 - 只设置内容，不设置 process
       if (assistantMessage.value) {
         assistantMessage.value.content = finalContent
-        assistantMessage.value.process = [...currentProcess.value]
       }
       
       latestResponse.value = finalContent
+      
+      // 清理状态
+      executing.value = false
+      currentAbortController.value = null
       break
     
     case 'error':
@@ -1152,8 +1110,107 @@ const handleSSEData = (data) => {
         assistantMessage.value.content = '执行错误: ' + (data.message || '')
       }
       latestResponse.value = '执行错误: ' + (data.message || '')
+      
+      // 清理状态
+      executing.value = false
+      currentAbortController.value = null
       break
   }
+}
+
+// 📝 格式化JSON为友好的显示内容
+const formatJsonToDisplay = (content, label) => {
+  if (!content) return content
+  
+  // 先尝试解析JSON
+  let jsonData = null
+  let textToParse = content
+  
+  try {
+    // 1. 直接解析
+    jsonData = JSON.parse(textToParse)
+  } catch {
+    try {
+      // 2. 如果不行，尝试从文本中提取JSON部分
+      const jsonMatch = textToParse.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        jsonData = JSON.parse(jsonMatch[0])
+      }
+    } catch {
+      // 解析失败，就返回原样（可能还在流式生成中）
+      return content
+    }
+  }
+  
+  if (!jsonData) return content
+  
+  // 🔍 简单智能判断如何格式化！
+  let result = ''
+  
+  if (label?.includes('需求')) {
+    // 需求分析的格式化
+    result = '📊 需求分析结果\n'
+    if (jsonData.project_type) result += `• 项目类型：${jsonData.project_type}\n`
+    if (jsonData.target_users) result += `• 目标用户：${jsonData.target_users}\n`
+    if (jsonData.business_goals) result += `• 业务目标：${jsonData.business_goals}\n`
+    if (Array.isArray(jsonData.core_features) && jsonData.core_features.length > 0) {
+      result += '• 核心功能：\n'
+      jsonData.core_features.forEach((f, i) => {
+        result += `  ${i+1}. ${f}\n`
+      })
+    }
+  } else if (label?.includes('任务') || jsonData.total_task || jsonData.subtasks) {
+    // 任务分解的格式化（兼容新旧字段）
+    result = '📋 任务分解结果\n'
+    if (jsonData.original_task || jsonData.total_task) {
+      result += `• 总任务：${jsonData.original_task || jsonData.total_task}\n`
+    }
+    if (jsonData.total_hours) {
+      result += `• 总工时：${jsonData.total_hours} 小时\n`
+    }
+    if (Array.isArray(jsonData.subtasks) && jsonData.subtasks.length > 0) {
+      result += '• 子任务清单：\n'
+      jsonData.subtasks.forEach((task, i) => {
+        const priorityIcon = task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢'
+        const name = task.name || task.task_name || ''
+        const estimate = task.estimated_hours ? ` (${task.estimated_hours}小时)` : ''
+        result += `  ${i+1}. ${priorityIcon} ${name}${estimate}\n`
+        if (task.description || task.task_description) {
+          result += `    ${task.description || task.task_description}\n`
+        }
+      })
+    }
+    if (Array.isArray(jsonData.milestones) && jsonData.milestones.length > 0) {
+      result += '• 里程碑：\n'
+      jsonData.milestones.forEach((m, i) => {
+        const milestoneEstimate = m.estimated_hours ? ` (${m.estimated_hours}小时)` : ''
+        result += `  ${i+1}. ${m.name}${milestoneEstimate}\n`
+      })
+    }
+  } else if (label?.includes('评估')) {
+    // 质量评估的格式化
+    result = '✅ 质量评估结果\n'
+    const score = jsonData.quality_score != null ? jsonData.quality_score : 'N/A'
+    if (score !== 'N/A') result += `• 质量评分：${score}/100\n`
+    if (jsonData.feedback) result += `• 评估反馈：${jsonData.feedback}\n`
+    if (Array.isArray(jsonData.strengths) && jsonData.strengths.length > 0) {
+      result += '• 优点：\n'
+      jsonData.strengths.forEach((s, i) => {
+        result += `  ${i+1}. ${s}\n`
+      })
+    }
+    if (Array.isArray(jsonData.weaknesses) && jsonData.weaknesses.length > 0) {
+      result += '• 可改进：\n'
+      jsonData.weaknesses.forEach((w, i) => {
+        result += `  ${i+1}. ${w}\n`
+      })
+    }
+  } else {
+    // 默认显示，但也尽量友好
+    result = '📄 内容：\n' + content
+  }
+  
+  return result || content
 }
 
 // 更新助手消息
@@ -1179,40 +1236,7 @@ const handleNonSSEResult = (res) => {
   
   const result = res.data
   
-  // 处理思考过程
-  if (result.variables) {
-    if (result.variables.analysis_raw || result.variables.analysis_result) {
-      currentProcess.value.push({
-        type: 'thinking',
-        label: '思考',
-        content: result.variables.analysis_raw?.response || JSON.stringify(result.variables.analysis_result, null, 2) || '需求分析完成',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      })
-    }
-    
-    if (result.variables.decompose_raw || result.variables.task_plan) {
-      currentProcess.value.push({
-        type: 'action',
-        label: '行动',
-        content: result.variables.decompose_raw?.response || JSON.stringify(result.variables.task_plan, null, 2) || '任务分解完成',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      })
-    }
-    
-    if (result.variables.observe_raw || result.variables.observation_result) {
-      currentProcess.value.push({
-        type: 'action',
-        label: '观察',
-        content: result.variables.observe_raw?.response || JSON.stringify(result.variables.observation_result, null, 2) || '评估完成',
-        time: new Date().toLocaleTimeString('zh-CN'),
-        collapsed: false
-      })
-    }
-  }
-  
-  // 解析执行结果
+  // 解析执行结果 - 直接使用原始内容，不JSON化
   let assistantResponse = ''
   if (typeof res.data === 'string') {
     assistantResponse = res.data
@@ -1220,23 +1244,20 @@ const handleNonSSEResult = (res) => {
     assistantResponse = res.data.output || res.data.result || res.data.text || res.data.response
   } else if (res.data.variables) {
     const vars = res.data.variables
-    assistantResponse = vars.final_report || vars.response || vars.text || vars.output || JSON.stringify(vars, null, 2)
-  } else {
-    assistantResponse = JSON.stringify(res.data, null, 2)
+    assistantResponse = vars.final_report || vars.response || vars.text || vars.output || ''
+    // 如果没有提取到内容，尝试从 variables 中获取 llm_output
+    if (!assistantResponse && vars.llm_output) {
+      assistantResponse = vars.llm_output.response || vars.llm_output.text || ''
+    }
   }
   
-  currentProcess.value.push({
-    type: 'result',
-    label: '结果',
-    content: assistantResponse,
-    time: new Date().toLocaleTimeString('zh-CN'),
-    collapsed: false
-  })
+  if (!assistantResponse) {
+    assistantResponse = '执行完成'
+  }
   
-  // 更新助手消息
+  // 更新助手消息 - 只设置内容，不设置 process
   if (assistantMessage.value) {
     assistantMessage.value.content = assistantResponse
-    assistantMessage.value.process = [...currentProcess.value]
   }
   
   latestResponse.value = assistantResponse
@@ -2065,6 +2086,56 @@ watch(() => props.initialEdges, (newEdges) => {
   color: #c0c4cc;
   margin-top: 4px;
   align-self: flex-end;
+}
+
+/* 流式消息样式 */
+.message-streaming {
+  background: linear-gradient(135deg, #fdf6ec 0%, #fff 100%);
+  border-left: 3px solid #e6a23c;
+}
+
+/* 打字机光标效果 */
+.typing-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 18px;
+  background: #409eff;
+  margin-right: 4px;
+  animation: blink 1s infinite;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* 推理模式样式 */
+.message.assistant .message-content {
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  line-height: 1.7;
+  color: #303133;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.message.assistant .message-content::first-letter {
+  font-weight: 600;
+}
+
+/* 流式内容动画 */
+.message-streaming .message-content {
+  animation: contentFadeIn 0.3s ease;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* 处理过程 */

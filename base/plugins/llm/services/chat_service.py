@@ -4,6 +4,7 @@
 from typing import Optional, List, Dict, AsyncIterator
 import logging
 from fastapi import HTTPException
+from openai import api_key
 
 from base.plugins.llm.models.model import LLMModel
 from base.plugins.llm.models.api_key import LLMApiKey
@@ -90,7 +91,7 @@ class ChatService:
         return available_keys[0]
 
     @staticmethod
-    async def get_provider_service(provider_name_en: str, api_key: str, endpoint_url: str, api_secret: str = None, call_mode: str = "vendor_sdk"):
+    async def get_provider_service(provider_name_en: str, api_key: LLMApiKey, endpoint_url: str, api_secret: str = None, call_mode: str = "vendor_sdk", request_type: str = "chat"):
         """
         根据厂商获取对应的服务实例
 
@@ -100,6 +101,7 @@ class ChatService:
             endpoint_url: API端点
             api_secret: API密钥（部分厂商需要）
             call_mode: 调用方式，openapi或vendor_sdk
+            request_type: 请求类型，chat或response
 
         Returns:
             厂商服务实例
@@ -108,50 +110,50 @@ class ChatService:
         if call_mode == "openapi":
             if not OpenAIService:
                 raise HTTPException(status_code=500, detail="OpenAPI服务未配置")
-            return OpenAIService(api_key=api_key, endpoint_url=endpoint_url)
+            return OpenAIService(api_key=api_key.api_key, endpoint_url=endpoint_url)
 
         # 否则使用厂商SDK模式
         if provider_name_en == "doubao":
             if not DoubaoService:
                 raise HTTPException(status_code=500, detail="豆包服务未配置")
-            return DoubaoService(api_key=api_key, endpoint_url=endpoint_url)
+            return DoubaoService(api_key=api_key, endpoint_url=endpoint_url, request_type=request_type)
 
         elif provider_name_en == "openai":
             if not OpenAIService:
                 raise HTTPException(status_code=500, detail="OpenAI服务未配置")
-            return OpenAIService(api_key=api_key, endpoint_url=endpoint_url)
+            return OpenAIService(api_key=api_key.api_key, endpoint_url=endpoint_url)
 
         elif provider_name_en == "anthropic":
             if not AnthropicService:
                 raise HTTPException(status_code=500, detail="Anthropic服务未配置")
-            return AnthropicService(api_key=api_key, endpoint_url=endpoint_url)
+            return AnthropicService(api_key=api_key.api_key, endpoint_url=endpoint_url)
 
         elif provider_name_en == "alibaba":
             if not AlibabaService:
                 raise HTTPException(status_code=500, detail="阿里云服务未配置")
-            return AlibabaService(api_key=api_key, endpoint_url=endpoint_url)
+            return AlibabaService(api_key=api_key.api_key, endpoint_url=endpoint_url)
 
         elif provider_name_en == "zhipu":
             if not ZhipuService:
                 raise HTTPException(status_code=500, detail="智谱AI服务未配置")
-            return ZhipuService(api_key=api_key, endpoint_url=endpoint_url)
+            return ZhipuService(api_key=api_key.api_key, endpoint_url=endpoint_url)
 
         elif provider_name_en == "deepseek":
             if not DeepSeekService:
                 raise HTTPException(status_code=500, detail="DeepSeek服务未配置")
-            return DeepSeekService(api_key=api_key, endpoint_url=endpoint_url)
+            return DeepSeekService(api_key=api_key.api_key, endpoint_url=endpoint_url)
 
         elif provider_name_en == "tencent":
             if not TencentService:
                 raise HTTPException(status_code=500, detail="腾讯服务未配置")
-            return TencentService(api_key=api_key, api_secret=api_secret, endpoint_url=endpoint_url)
+            return TencentService(api_key=api_key.api_key, api_secret=api_secret, endpoint_url=endpoint_url)
 
         elif provider_name_en == "baidu":
             if not BaiduService:
                 raise HTTPException(status_code=500, detail="百度服务未配置")
             if not api_secret:
                 raise HTTPException(status_code=400, detail="百度服务需要API Secret")
-            return BaiduService(api_key=api_key, api_secret=api_secret, endpoint_url=endpoint_url)
+            return BaiduService(api_key=api_key.api_key, api_secret=api_secret, endpoint_url=endpoint_url)
 
         raise HTTPException(status_code=400, detail=f"不支持的厂商: {provider_name_en}")
 
@@ -320,6 +322,9 @@ class ChatService:
         # 优先使用API密钥的call_mode，否则使用模型的call_mode
         call_mode = api_key_obj.call_mode or target_model.call_mode or "vendor_sdk"
         
+        # 获取请求类型，默认是chat
+        request_type = getattr(api_key_obj, 'request_type', 'chat')
+        
         # 构建端点URL - 优先使用API密钥的endpoint，其次使用模型的endpoint，最后使用默认值
         endpoint_url = api_key_obj.endpoint_url or target_model.endpoint_url or "https://api.openai.com/v1"
         
@@ -328,7 +333,8 @@ class ChatService:
             api_key_str,
             endpoint_url,
             api_secret,
-            call_mode
+            call_mode,
+            request_type
         )
         
         # 调用流式chat - 优先使用model_id（API标识），否则使用model_name

@@ -3,6 +3,7 @@
 """
 import logging
 from typing import AsyncIterator, Optional, List, Dict
+from base.plugins.llm.models.api_key import LLMApiKey
 
 logger = logging.getLogger(__name__)
 
@@ -17,22 +18,28 @@ except ImportError:
 class DoubaoService:
     """豆包大模型服务类"""
 
-    def __init__(self, api_key: str, endpoint_url: str = "https://ark.cn-beijing.volces.com/api/v3"):
+    def __init__(self, api_key: str, endpoint_url: str = "https://ark.cn-beijing.volces.com/api/v3", request_type: str = "chat"):
         self.api_key = api_key
+        self.request_type = request_type  # "chat" 或 "response"
+        # 清理端点 URL，移除错误的 /responses 路径
         self.endpoint_url = endpoint_url.rstrip('/')
+        # 确保路径以 /api/v3 结尾
+        if '/api/v3' not in self.endpoint_url:
+            self.endpoint_url = self.endpoint_url.rstrip('/') + '/api/v3'
         
         logger.info(f"[DoubaoService] 初始化参数:")
+        logger.info(f"  request_type: {self.request_type}")
         logger.info(f"  endpoint_url: {self.endpoint_url}")
-        logger.info(f"  api_key provided: {api_key is not None and len(api_key) > 0}")
-        if api_key:
-            logger.info(f"  api_key length: {len(api_key)}")
-            logger.info(f"  api_key starts with: {api_key[:8] if len(api_key) > 8 else api_key}...")
+        logger.info(f"  api_key provided: {self.api_key is not None and len(self.api_key) > 0}")
+        if self.api_key:
+            logger.info(f"  api_key length: {len(self.api_key)}")
+            logger.info(f"  api_key starts with: {self.api_key if len(self.api_key) > 8 else self.api_key}...")
         
         if HAS_ARK_SDK:
             logger.info(f"[DoubaoService] 使用官方 SDK")
             self.client = Ark(
                 base_url=self.endpoint_url,
-                api_key=self.api_key
+                api_key=self.api_key            
             )
         else:
             logger.info(f"[DoubaoService] SDK 不可用，将使用 HTTP 方式")
@@ -74,6 +81,7 @@ class DoubaoService:
                 }
             }
         """
+        # 默认使用 Chat 接口
         if HAS_ARK_SDK and self.client:
             try:
                 logger.info(f"[DoubaoService] 使用官方 SDK 调用")
@@ -87,7 +95,10 @@ class DoubaoService:
                 if messages:
                     logger.info(f"  last message: {messages[-1].get('content', '')[:100]}...")
                 
-                completion = self.client.chat.completions.create(
+                import asyncio
+                # 使用 to_thread 避免同步调用阻塞事件循环
+                completion = await asyncio.to_thread(
+                    self.client.chat.completions.create,
                     model=model,
                     messages=messages,
                     temperature=temperature,
@@ -138,7 +149,7 @@ class DoubaoService:
         
         url = f"{self.endpoint_url}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {self.api_key.api_key}",
             "Content-Type": "application/json"
         }
         
@@ -170,7 +181,7 @@ class DoubaoService:
         except Exception as e:
             logger.error(f"豆包服务异常: {str(e)}")
             raise
-
+    
     async def chat_stream(
         self,
         model: str,
@@ -199,17 +210,53 @@ class DoubaoService:
         if HAS_ARK_SDK and self.client:
             try:
                 logger.info(f"[DoubaoService] 使用官方 SDK 流式调用")
-                stream = self.client.chat.completions.create(
+                import asyncio
+                from typing import AsyncGenerator
+                
+                # 使用 to_thread 和异步生成器包装同步调用
+                def get_sync_stream():
+                    return self.client.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     top_p=top_p,
                     stream=True,
-                    stop=stop
-                )
+                    stop=stop)
+
+
+                stream = await asyncio.to_thread(get_sync_stream)
                 
-                for chunk in stream:
+                async def async_stream_wrapper():
+                    """将同步迭代器包装为异步生成器"""
+                    import threading
+                    queue = asyncio.Queue(maxsize=100)
+                    done = threading.Event()
+                    
+                    def sync_producer():
+                        try:
+                            for chunk in stream:
+                                queue.put_nowait(('data', chunk))
+                        except Exception as e:
+                            queue.put_nowait(('error', e))
+                        finally:
+                            done.set()
+                    
+                    # 在后台线程运行同步迭代
+                    thread = threading.Thread(target=sync_producer, daemon=True)
+                    thread.start()
+                    
+                    # 从队列获取数据
+                    while not done.is_set() or not queue.empty():
+                        try:
+                            msg_type, data = await asyncio.wait_for(queue.get(), timeout=0.1)
+                            if msg_type == 'error':
+                                raise data
+                            yield data
+                        except asyncio.TimeoutError:
+                            continue
+                
+                async for chunk in async_stream_wrapper():
                     result = {
                         "id": chunk.id,
                         "choices": [],
@@ -262,7 +309,7 @@ class DoubaoService:
         
         url = f"{self.endpoint_url}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {self.api_key.api_key}",
             "Content-Type": "application/json"
         }
         
@@ -328,6 +375,133 @@ class DoubaoService:
         english_chars = len(text) - chinese_chars
 
         return int(chinese_chars / 1.5 + english_chars / 4)
+
+    async def _response_http(
+        self,
+        model: str,
+        messages: List[Dict],
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+        top_p: float = 0.9,
+        stop: Optional[List[str]] = None
+    ) -> Dict:
+        """HTTP 方式调用 Response 接口"""
+        import httpx
+        
+        url = f"{self.endpoint_url}/responses"
+        headers = {
+            "Authorization": f"Bearer {self.api_key.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        # 构建 Response 接口的 payload
+        if messages and len(messages) > 0:
+            # 获取最后一条用户消息作为 input
+            last_user_msg = None
+            for msg in reversed(messages):
+                if msg.get("role") == "user":
+                    last_user_msg = msg.get("content", "")
+                    break
+            
+            input_content = last_user_msg if last_user_msg else str(messages[-1].get("content", ""))
+        else:
+            input_content = ""
+        
+        payload = {
+            "model": model,
+            "input": input_content,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "top_p": top_p,
+            "stream": False
+        }
+
+        if stop:
+            payload["stop"] = stop
+        
+        logger.info(f"[DoubaoService] Response 请求:")
+        logger.info(f"  url: {url}")
+        logger.info(f"  model: {model}")
+        logger.info(f"  input: {input_content[:100]}...")
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    url,
+                    headers=headers,
+                    json=payload
+                )
+                response.raise_for_status()
+                
+                # 解析 Response 接口返回并转换为 Chat 格式
+                resp_json = response.json()
+                
+                # 转换 Response 格式为 Chat 格式
+                return self._convert_response_to_chat_format(resp_json)
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"豆包 Response API错误: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"豆包 Response API调用失败: {e.response.text}")
+        except Exception as e:
+            logger.error(f"豆包 Response 服务异常: {str(e)}")
+            raise
+    
+    def _convert_response_to_chat_format(self, response_json: Dict) -> Dict:
+        """将 Response 接口返回格式转换为 Chat 格式"""
+        try:
+            # Response 格式通常是：
+            # {
+            #   "id": "...",
+            #   "output": "...",
+            #   "usage": { ... }
+            # }
+            # 或者：
+            # {
+            #   "id": "...",
+            #   "choices": [{"message": {...}}],
+            #   "usage": { ... }
+            # }
+            
+            # 如果已经是 Chat 格式，直接返回
+            if "choices" in response_json:
+                return response_json
+            
+            output_text = ""
+            
+            # 尝试从不同字段获取输出
+            if "output" in response_json:
+                output_text = response_json["output"]
+            elif "response" in response_json:
+                output_text = response_json["response"]
+            elif "text" in response_json:
+                output_text = response_json["text"]
+            
+            # 获取 usage
+            usage = response_json.get("usage", {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            })
+            
+            # 获取 id
+            id_val = response_json.get("id", "")
+            
+            # 构建 Chat 格式
+            return {
+                "id": id_val,
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": output_text
+                    },
+                    "finish_reason": "stop"
+                }],
+                "usage": usage
+            }
+        except Exception as e:
+            logger.warning(f"转换 Response 格式失败: {e}")
+            # 失败时尝试返回原始响应
+            return response_json
 
     @staticmethod
     def format_messages(messages: List[Dict]) -> List[Dict]:
