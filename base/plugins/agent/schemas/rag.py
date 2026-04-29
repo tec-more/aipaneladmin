@@ -35,6 +35,7 @@ class RAGKnowledgeBaseResponse(RAGKnowledgeBaseBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     document_count: int = Field(default=0, description="文档数量")
+    search_mode: str = Field(default="pgvector", description="搜索模式: llm_index, pgvector")
 
     class Config:
         from_attributes = True
@@ -95,6 +96,8 @@ class RAGDocumentChunkResponse(RAGDocumentChunkBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     similarity: Optional[float] = Field(None, description="相似度(检索时返回)")
+    knowledge_base_id: Optional[int] = Field(None, description="来源知识库ID")
+    knowledge_base_name: Optional[str] = Field(None, description="来源知识库名称")
 
     class Config:
         from_attributes = True
@@ -102,7 +105,8 @@ class RAGDocumentChunkResponse(RAGDocumentChunkBase):
 
 class RAGSearchRequest(BaseModel):
     """RAG搜索请求schema"""
-    knowledge_base_id: int = Field(..., description="知识库ID")
+    knowledge_base_id: Optional[int] = Field(None, description="单个知识库ID(二选一)")
+    knowledge_base_ids: Optional[List[int]] = Field(None, description="知识库ID列表(二选一)")
     query: str = Field(..., description="搜索查询")
     top_k: int = Field(default=5, description="返回结果数量")
     similarity_threshold: Optional[float] = Field(None, description="相似度阈值")

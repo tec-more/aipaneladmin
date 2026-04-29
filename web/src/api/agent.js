@@ -428,8 +428,22 @@ export function deleteRAGDocument(id) {
   return request.delete(`/v1/agent/rag/documents/${id}`)
 }
 
-export function processRAGDocument(id, chunk_size = 500, chunk_overlap = 50, split_strategy = "smart") {
-    return requestWithLongTimeout.post(`/v1/agent/rag/documents/${id}/process`, null, { params: { chunk_size, chunk_overlap, split_strategy } })
+export function processRAGDocument(id, chunk_size = 500, chunk_overlap = 50, split_strategy = "smart", use_llama_index = true) {
+    return requestWithLongTimeout.post(`/v1/agent/rag/documents/${id}/process`, null, { params: { chunk_size, chunk_overlap, split_strategy, use_llama_index } })
+}
+
+export function batchProcessRAGDocuments(doc_ids, chunk_size = 500, chunk_overlap = 50, split_strategy = "smart", use_llama_index = true) {
+    return requestWithLongTimeout.post('/v1/agent/rag/documents/batch-process', {
+        doc_ids,
+        chunk_size,
+        chunk_overlap,
+        split_strategy,
+        use_llama_index
+    })
+}
+
+export function searchRAG(data, use_llama_index = null) {
+  return requestWithLongTimeout.post('/v1/agent/rag/search', data, { params: { use_llama_index } })
 }
 
 export function getRAGDocumentChunks(docId, params) {
@@ -438,10 +452,6 @@ export function getRAGDocumentChunks(docId, params) {
 
 export function deleteRAGChunk(id) {
   return request.delete(`/v1/agent/rag/chunks/${id}`)
-}
-
-export function searchRAG(data) {
-  return requestWithLongTimeout.post('/v1/agent/rag/search', data)
 }
 
 export function uploadRAGDocument(knowledgeBaseId, file) {

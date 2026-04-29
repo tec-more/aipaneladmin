@@ -1,8 +1,9 @@
 """
-RAG (Retrieval-Augmented Generation) Models
+RAG (Retrieval-Augmented Generation) 模型
 """
 from tortoise import fields
 from base.common.model import BaseModel, TimestampMixin
+from base.common.pgvector import VectorField
 
 
 class RAGKnowledgeBase(BaseModel, TimestampMixin):
@@ -12,6 +13,9 @@ class RAGKnowledgeBase(BaseModel, TimestampMixin):
     status = fields.CharField(max_length=20, default="active", description="状态: active/inactive")
     vector_dimension = fields.IntField(default=1024, description="向量维度")
     config = fields.JSONField(null=True, description="知识库配置")
+    
+    # 搜索模式配置: llm_index, pgvector
+    search_mode = fields.CharField(max_length=20, default="pgvector", description="搜索模式: llm_index, pgvector")
     
     embedding_model = fields.ForeignKeyField(
         "models.LLMModel",
@@ -63,8 +67,12 @@ class RAGDocumentChunk(BaseModel, TimestampMixin):
     )
     chunk_index = fields.IntField(description="分块索引")
     content = fields.TextField(description="分块内容")
-    vector = fields.BinaryField(null=True, description="向量数据")
+    
+    # VectorField: 使用 pgvector 格式存储向量
+    vector = VectorField(dimension=1024, null=True, description="向量数据")
+    
     metadata = fields.JSONField(null=True, description="元数据")
+    node_id = fields.CharField(max_length=100, null=True, description="LlamaIndex Node ID")
 
     class Meta:
         table = "rag_document_chunk"

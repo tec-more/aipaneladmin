@@ -223,6 +223,13 @@ class Settings(BaseSettings):
 	SENDER_EMAIL: str = config.config.get("email", "sender_email", fallback="")
 	SENDER_PASSWORD: str = config.config.get("email", "sender_password", fallback="")
 	SENDER_NAME: str = config.config.get("email", "sender_name", fallback="AIPanelAdmin")
+	# ================================================= #
+	# ******************* Qdrant 配置 ******************* #
+	# ================================================= #
+	QDRANT_ENABLED: bool = config.config.getboolean("qdrant", "enabled", fallback=True)
+	QDRANT_HOST: str = config.config.get("qdrant", "host", fallback="http://localhost:6333")
+	QDRANT_API_KEY: str = config.config.get("qdrant", "api_key", fallback="")
+	QDRANT_TIMEOUT: int = config.config.getint("qdrant", "timeout", fallback=300)
 
 
 settings = Settings()

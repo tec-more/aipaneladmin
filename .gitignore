@@ -41,6 +41,7 @@ setup/win32/static/postgresql*.exe
 /vscode/
 /aiAgentCode/
 /promptfoo/
+/qdrant/
 .vscode/
 .venv/
 

@@ -102,7 +102,22 @@
             </el-form-item>
           </el-form>
 
-          <el-table :data="documents" style="width: 100%" v-loading="docLoading">
+          <div class="mb-4" v-if="selectedDocs.length > 0">
+            <el-button type="success" :loading="batchProcessing" @click="handleBatchProcess">
+              <el-icon><UploadIcon /></el-icon>
+              批量处理 ({{ selectedDocs.length }})
+            </el-button>
+            <el-button @click="selectedDocs = []">取消选择</el-button>
+          </div>
+
+          <el-table 
+            :data="documents" 
+            style="width: 100%" 
+            v-loading="docLoading"
+            @selection-change="handleDocSelection"
+            ref="docTableRef"
+          >
+            <el-table-column type="selection" width="55" />
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="title" label="文档标题" min-width="150" />
             <el-table-column prop="file_name" label="文件名" min-width="150" show-overflow-tooltip />
@@ -215,6 +230,16 @@
           </el-select>
           <div class="form-tip">选择用于向量化的 Embedding 模型，需要先配置该模型的 API Key</div>
         </el-form-item>
+        <el-form-item label="搜索模式">
+          <el-select v-model="kbFormData.search_mode" placeholder="请选择搜索模式">
+            <el-option label="pgvector（推荐）" value="pgvector" />
+            <el-option label="LlamaIndex + Qdrant" value="llm_index" />
+          </el-select>
+          <div class="form-tip">
+            <strong>pgvector</strong>: 推荐中小数据量，无需额外服务<br />
+            <strong>LlamaIndex</strong>: 大数据量推荐，需要运行 Qdrant
+          </div>
+        </el-form-item>
         <el-form-item label="配置">
           <el-input v-model="kbConfigJson" type="textarea" :rows="4" placeholder="JSON格式配置" />
         </el-form-item>
@@ -262,7 +287,7 @@
         drag
         :auto-upload="false"
         :limit="1"
-        accept=".txt,.md,.markdown,.py,.js,.html,.css,.json,.yaml,.yml"
+        accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.markdown,.py,.js,.html,.css,.json,.yaml,.yml"
         :on-change="handleFileChange"
         :on-exceed="handleExceed"
       >
@@ -272,7 +297,16 @@
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持 .txt, .md, .markdown, .py, .js, .html, .css, .json, .yaml, .yml 等文本文件
+            <strong>支持格式：</strong>
+            <div style="margin-top: 8px;">
+              <el-tag type="info" size="small" style="margin: 2px;">PDF (.pdf)</el-tag>
+              <el-tag type="info" size="small" style="margin: 2px;">Word (.docx)</el-tag>
+              <el-tag type="info" size="small" style="margin: 2px;">Excel (.xlsx)</el-tag>
+              <el-tag type="info" size="small" style="margin: 2px;">PPT (.pptx)</el-tag>
+              <br/>
+              <el-tag type="success" size="small" style="margin: 2px;">文本 (.txt, .md)</el-tag>
+              <el-tag type="success" size="small" style="margin: 2px;">代码 (.py, .js, .html)</el-tag>
+            </div>
           </div>
         </template>
       </el-upload>
@@ -323,6 +357,7 @@ import {
   updateRAGDocument,
   deleteRAGDocument,
   processRAGDocument,
+  batchProcessRAGDocuments,
   getRAGDocumentChunks,
   deleteRAGChunk,
   searchRAG,
@@ -345,6 +380,9 @@ const uploadDialogVisible = ref(false)
 const uploadFile = ref(null)
 const selectedUploadFile = ref(null)
 const processingDocumentId = ref(null)
+const batchProcessing = ref(false)
+const selectedDocs = ref([])
+const docTableRef = ref(null)
 
 const kbPageInfo = reactive({
   currentPage: 1,
@@ -378,7 +416,8 @@ const kbFormData = reactive({
   status: 'active',
   vector_dimension: 1024,
   config: {},
-  embedding_model_id: null
+  embedding_model_id: null,
+  search_mode: 'pgvector'
 })
 
 const kbConfigJson = computed({
@@ -525,6 +564,7 @@ const handleAddKB = () => {
   kbFormData.vector_dimension = 1024
   kbFormData.config = {}
   kbFormData.embedding_model_id = null
+  kbFormData.search_mode = 'pgvector'
   kbDialogVisible.value = true
 }
 
@@ -537,6 +577,7 @@ const handleEditKB = (row) => {
   kbFormData.vector_dimension = row.vector_dimension
   kbFormData.config = row.config || {}
   kbFormData.embedding_model_id = row.embedding_model_id || null
+  kbFormData.search_mode = row.search_mode || 'pgvector'
   kbDialogVisible.value = true
 }
 
@@ -688,6 +729,87 @@ const handleDeleteDocument = async (id) => {
   }
 }
 
+const handleDocSelection = (selection) => {
+    selectedDocs.value = selection
+}
+
+const handleBatchProcess = async () => {
+    if (selectedDocs.value.length === 0) {
+        ElMessage.warning('请选择要处理的文档')
+        return
+    }
+
+    try {
+        await ElMessageBox.prompt('请选择文档切片策略', '批量处理文档', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            inputPattern: /^(smart|paragraph|simple)$/,
+            inputErrorMessage: '请选择有效的切片策略',
+            inputType: 'select',
+            inputValue: 'smart',
+            inputOptions: [
+                { label: '智能切片（推荐）', value: 'smart' },
+                { label: '按段落', value: 'paragraph' },
+                { label: '简单切片', value: 'simple' }
+            ]
+        }).then(async ({ value: splitStrategy }) => {
+            await ElMessageBox.prompt('请输入切片大小（字符数）', '批量处理文档', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                inputValue: '500',
+                inputPattern: /^\d+$/,
+                inputErrorMessage: '请输入有效的数字'
+            }).then(async ({ value: chunkSizeStr }) => {
+                const chunkSize = parseInt(chunkSizeStr)
+                await ElMessageBox.prompt('请输入重叠大小（字符数）', '批量处理文档', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    inputValue: '50',
+                    inputPattern: /^\d+$/,
+                    inputErrorMessage: '请输入有效的数字'
+                }).then(async ({ value: chunkOverlapStr }) => {
+                    const chunkOverlap = parseInt(chunkOverlapStr)
+                    
+                    batchProcessing.value = true
+                    
+                    try {
+                        ElMessage.info(`正在处理 ${selectedDocs.value.length} 个文档，这可能需要一段时间，请耐心等待...`)
+                        
+                        const docIds = selectedDocs.value.map(doc => doc.id)
+                        const res = await batchProcessRAGDocuments(docIds, chunkSize, chunkOverlap, splitStrategy)
+                        
+                        if (res.data) {
+                            const { total, success, failed, results, errors } = res.data
+                            
+                            ElMessage.success(`批量处理完成！共 ${total} 个，成功 ${success} 个，失败 ${failed} 个`)
+                            
+                            if (errors.length > 0) {
+                                ElMessage.warning(`部分文档处理失败，请查看控制台详情`)
+                                console.error('失败的文档:', errors)
+                            }
+                        }
+                        
+                        fetchDocuments()
+                        selectedDocs.value = []
+                    } finally {
+                        batchProcessing.value = false
+                    }
+                }).catch(() => {
+                    ElMessage.info('已取消')
+                })
+            }).catch(() => {
+                ElMessage.info('已取消')
+            })
+        }).catch(() => {
+            ElMessage.info('已取消')
+        })
+    } catch (error) {
+        ElMessage.error('批量处理失败: ' + (error.response?.data?.msg || error.message))
+        console.error(error)
+        batchProcessing.value = false
+    }
+}
+
 const handleProcessDocument = async (row) => {
     try {
         await ElMessageBox.prompt('请选择文档切片策略', '处理文档', {
@@ -816,7 +938,7 @@ const handleSearch = async () => {
 
 const fetchLLMModels = async () => {
   try {
-    const res = await getModelList({ limit: 100 })
+    const res = await getModelList({ page: 1, page_size: 100 })
     if (res.data) {
       llmModels.value = res.data.items || res.data
     }

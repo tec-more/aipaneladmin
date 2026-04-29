@@ -2,7 +2,6 @@
 RAG (Retrieval-Augmented Generation) Service
 """
 import logging
-import struct
 import re
 import os
 from pathlib import Path
@@ -48,38 +47,9 @@ class TextSplitter:
 
 
 class VectorService:
-    """向量服务"""
+    """向量服务（已简化，只保留 pgvector 支持）"""
 
     VECTOR_DIMENSION = 1024
-
-    @staticmethod
-    def vector_to_bytes(vector: List[float]) -> bytes:
-        """将向量列表转换为二进制数据"""
-        if len(vector) != VectorService.VECTOR_DIMENSION:
-            raise ValueError(f"向量维度必须为 {VectorService.VECTOR_DIMENSION}")
-        return struct.pack(f'{VectorService.VECTOR_DIMENSION}f', *vector)
-
-    @staticmethod
-    def bytes_to_vector(data: bytes) -> List[float]:
-        """将二进制数据转换为向量列表"""
-        if len(data) != VectorService.VECTOR_DIMENSION * 4:
-            raise ValueError(f"向量数据长度不正确")
-        return list(struct.unpack(f'{VectorService.VECTOR_DIMENSION}f', data))
-
-    @staticmethod
-    def cosine_similarity(v1: List[float], v2: List[float]) -> float:
-        """计算余弦相似度"""
-        if len(v1) != len(v2):
-            raise ValueError("向量维度不匹配")
-
-        dot_product = sum(a * b for a, b in zip(v1, v2))
-        norm1 = sum(a * a for a in v1) ** 0.5
-        norm2 = sum(b * b for b in v2) ** 0.5
-
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
-
-        return dot_product / (norm1 * norm2)
 
 
 class RAGService:
@@ -214,17 +184,16 @@ class RAGService:
         return True
 
     @staticmethod
-    async def create_chunk(data: RAGDocumentChunkCreate, vector: Optional[List[float]] = None) -> RAGDocumentChunk:
-        """创建文档片段"""
-        vector_bytes = None
-        if vector:
-            vector_bytes = VectorService.vector_to_bytes(vector)
-
+    async def create_chunk(
+        data: RAGDocumentChunkCreate, 
+        vector: Optional[List[float]] = None
+    ) -> RAGDocumentChunk:
+        """创建文档片段（简化，只使用 pgvector）"""
         chunk = await RAGDocumentChunk.create(
             document_id=data.document_id,
             chunk_index=data.chunk_index,
             content=data.content,
-            vector=vector_bytes,
+            vector=vector,
             metadata=data.metadata
         )
         logger.info(f"创建文档片段: {chunk.id} (文档ID: {chunk.document_id})")
@@ -281,7 +250,7 @@ class RAGService:
         chunk_overlap: int = 50,
         split_strategy: str = "smart"
     ) -> RAGDocument:
-        """处理文档：分块并向量化"""
+        """处理文档：分块并向量化（简化，只使用 pgvector）"""
         doc = await RAGService.get_document(doc_id)
         if not doc:
             raise ValueError("文档不存在")
@@ -450,7 +419,7 @@ class RAGService:
         top_k: int = 5,
         similarity_threshold: Optional[float] = None
     ) -> List[dict]:
-        """向量搜索"""
+        """向量搜索（简化，只使用 pgvector）"""
         kb = await RAGService.get_knowledge_base(knowledge_base_id)
         if not kb:
             raise ValueError("知识库不存在")
@@ -459,38 +428,286 @@ class RAGService:
         embedding_service, model_id = await RAGService._get_embedding_service(kb)
         query_vector = await embedding_service.create_embedding(model_id, query_text)
 
-        chunks = await RAGDocumentChunk.filter(
-            document__knowledge_base_id=knowledge_base_id,
-            vector__not_isnull=True
-        ).prefetch_related('document')
-
-        results = []
-        for chunk in chunks:
+        # 使用 pgvector 搜索
+        return await RAGService._search_with_pgvector(
+            knowledge_base_id,
+            query_vector,
+            top_k,
+            similarity_threshold
+        )
+    
+    @staticmethod
+    async def search_across_knowledge_bases(
+        knowledge_base_ids: List[int],
+        query_text: str,
+        top_k: int = 5,
+        similarity_threshold: Optional[float] = None
+    ) -> List[dict]:
+        """跨知识库向量搜索"""
+        if not knowledge_base_ids:
+            raise ValueError("至少需要指定一个知识库 ID")
+        
+        all_results = []
+        
+        # 分组处理：相同 embedding model 的知识库可以一起处理（优化）
+        kb_groups = {}
+        for kb_id in knowledge_base_ids:
+            kb = await RAGService.get_knowledge_base(kb_id)
+            if not kb or kb.status != "active":
+                continue
+            
+            # 按 embedding model 分组
+            model_id = kb.embedding_model_id
+            if model_id not in kb_groups:
+                kb_groups[model_id] = {
+                    "kb": kb,
+                    "ids": [kb_id]
+                }
+            else:
+                kb_groups[model_id]["ids"].append(kb_id)
+        
+        # 处理每一组知识库
+        for group in kb_groups.values():
+            kb = group["kb"]
+            kb_ids = group["ids"]
+            
             try:
-                chunk_vector = VectorService.bytes_to_vector(chunk.vector)
-                similarity = VectorService.cosine_similarity(query_vector, chunk_vector)
+                # 获取 embedding 服务
+                embedding_service, model_id = await RAGService._get_embedding_service(kb)
+                query_vector = await embedding_service.create_embedding(model_id, query_text)
+                
+                # 根据搜索模式处理
+                search_mode = kb.search_mode or "pgvector"
+                
+                if search_mode == "llm_index":
+                    # 使用 LlamaIndex 搜索
+                    from base.plugins.agent.services.rag_service import HybridRAGService
+                    for kb_id in kb_ids:
+                        try:
+                            results = await HybridRAGService.search_with_llama_index(
+                                kb_id,
+                                query_text,
+                                top_k,
+                                similarity_threshold
+                            )
+                            # 添加知识库信息
+                            for res in results:
+                                chunk = await RAGService.get_chunk(res.get('chunk_id'))
+                                if chunk:
+                                    all_results.append({
+                                        'chunk': chunk,
+                                        'similarity': res.get('similarity'),
+                                        'knowledge_base_id': kb_id,
+                                        'knowledge_base_name': kb.name
+                                    })
+                        except Exception as e:
+                            logger.error(f"知识库 {kb_id} 使用 LlamaIndex 搜索失败: {e}")
+                
 
+                
+                else:
+                    # pgvector（默认） - 支持一次查询多个知识库
+                    try:
+                        results = await RAGService._search_with_pgvector_across_kbs(
+                            kb_ids,
+                            query_vector,
+                            top_k * len(kb_ids),
+                            similarity_threshold
+                        )
+                        for res in results:
+                            all_results.append(res)
+                    except Exception as e:
+                        logger.error(f"跨知识库 pgvector 搜索失败: {e}")
+                        # 回退到逐个搜索
+                        for kb_id in kb_ids:
+                            try:
+                                results = await RAGService._search_with_pgvector(
+                                    kb_id,
+                                    query_vector,
+                                    top_k,
+                                    similarity_threshold
+                                )
+                                for res in results:
+                                    res['knowledge_base_id'] = kb_id
+                                    res['knowledge_base_name'] = kb.name
+                                    all_results.append(res)
+                            except Exception as e2:
+                                logger.error(f"知识库 {kb_id} pgvector 搜索失败: {e2}")
+            
+            except Exception as e:
+                logger.error(f"处理知识库组失败: {e}")
+        
+        # 合并并排序所有结果
+        all_results.sort(key=lambda x: x['similarity'], reverse=True)
+        return all_results[:top_k]
+
+    @staticmethod
+    async def _search_with_pgvector(
+        knowledge_base_id: int,
+        query_vector: List[float],
+        top_k: int = 5,
+        similarity_threshold: Optional[float] = None
+    ) -> List[dict]:
+        """使用 pgvector 的向量搜索"""
+        from tortoise import Tortoise
+
+        # 构建 pgvector 格式的查询向量
+        vector_str = "[" + ",".join([f"{v:.10f}" for v in query_vector]) + "]"
+        
+        # 使用原始 SQL 进行查询
+        conn = Tortoise.get_connection("postgres")
+        
+        # 构建查询
+        sql_query = f"""
+        SELECT 
+            c.id,
+            c.document_id,
+            c.chunk_index,
+            c.content,
+            c.metadata,
+            c.created_at,
+            c.updated_at,
+            d.knowledge_base_id,
+            kb.name as knowledge_base_name,
+            (c.vector <=> '{vector_str}') as distance
+        FROM rag_document_chunk c
+        JOIN rag_document d ON c.document_id = d.id
+        JOIN rag_knowledge_base kb ON d.knowledge_base_id = kb.id
+        WHERE d.knowledge_base_id = $1
+            AND c.vector IS NOT NULL
+        ORDER BY distance
+        LIMIT $2
+        """
+        
+        results = []
+        try:
+            # 执行查询
+            raw_results = await conn.execute_query_dict(
+                sql_query,
+                [knowledge_base_id, top_k]
+            )
+            
+            # 转换结果
+            for row in raw_results:
+                # 距离转换为相似度
+                # pgvector 的余弦距离范围是 0 到 2，我们需要转换为相似度
+                distance = row.get('distance', 2.0)
+                similarity = 1.0 - (distance / 2.0)
+                
                 if similarity_threshold and similarity < similarity_threshold:
                     continue
+                
+                # 获取完整的 ORM 对象
+                chunk = await RAGDocumentChunk.get_or_none(id=row['id'])
+                
+                if chunk:
+                    results.append({
+                        'chunk': chunk,
+                        'similarity': similarity,
+                        'knowledge_base_id': row.get('knowledge_base_id'),
+                        'knowledge_base_name': row.get('knowledge_base_name')
+                    })
+            
+            # 按相似度排序（可能已有，但确保正确
+            results.sort(key=lambda x: x['similarity'], reverse=True)
+            
+        except Exception as e:
+            logger.error(f"pgvector 搜索出错: {e}")
+            raise
+        
+        return results[:top_k]
+    
+    @staticmethod
+    async def _search_with_pgvector_across_kbs(
+        knowledge_base_ids: List[int],
+        query_vector: List[float],
+        top_k: int = 10,
+        similarity_threshold: Optional[float] = None
+    ) -> List[dict]:
+        """使用 pgvector 的跨知识库向量搜索"""
+        from tortoise import Tortoise
 
-                results.append({
-                    'chunk': chunk,
-                    'similarity': similarity
-                })
-            except Exception as e:
-                logger.warning(f"处理片段 {chunk.id} 时出错: {str(e)}")
-
-        results.sort(key=lambda x: x['similarity'], reverse=True)
+        if not knowledge_base_ids:
+            return []
+        
+        # 构建 pgvector 格式的查询向量
+        vector_str = "[" + ",".join([f"{v:.10f}" for v in query_vector]) + "]"
+        
+        # 使用原始 SQL 进行查询
+        conn = Tortoise.get_connection("postgres")
+        
+        # 构建 IN 查询占位符
+        placeholders = ','.join(['$' + str(i+2) for i in range(len(knowledge_base_ids))])
+        
+        # 构建查询
+        sql_query = f"""
+        SELECT 
+            c.id,
+            c.document_id,
+            c.chunk_index,
+            c.content,
+            c.metadata,
+            c.created_at,
+            c.updated_at,
+            d.knowledge_base_id,
+            kb.name as knowledge_base_name,
+            (c.vector <=> '{vector_str}') as distance
+        FROM rag_document_chunk c
+        JOIN rag_document d ON c.document_id = d.id
+        JOIN rag_knowledge_base kb ON d.knowledge_base_id = kb.id
+        WHERE d.knowledge_base_id IN ({placeholders})
+            AND c.vector IS NOT NULL
+        ORDER BY distance
+        LIMIT $1
+        """
+        
+        results = []
+        try:
+            # 执行查询
+            params = [top_k] + knowledge_base_ids
+            raw_results = await conn.execute_query_dict(sql_query, params)
+            
+            # 转换结果
+            for row in raw_results:
+                # 距离转换为相似度
+                distance = row.get('distance', 2.0)
+                similarity = 1.0 - (distance / 2.0)
+                
+                if similarity_threshold and similarity < similarity_threshold:
+                    continue
+                
+                # 获取完整的 ORM 对象
+                chunk = await RAGDocumentChunk.get_or_none(id=row['id'])
+                
+                if chunk:
+                    results.append({
+                        'chunk': chunk,
+                        'similarity': similarity,
+                        'knowledge_base_id': row.get('knowledge_base_id'),
+                        'knowledge_base_name': row.get('knowledge_base_name')
+                    })
+            
+            # 按相似度排序
+            results.sort(key=lambda x: x['similarity'], reverse=True)
+            
+        except Exception as e:
+            logger.error(f"跨知识库 pgvector 搜索出错: {e}")
+            raise
+        
         return results[:top_k]
 
     @staticmethod
-    async def update_chunk_vector(chunk_id: int, vector: List[float]) -> Optional[RAGDocumentChunk]:
-        """更新片段向量"""
+    async def update_chunk_vector(
+        chunk_id: int, 
+        vector: List[float]
+    ) -> Optional[RAGDocumentChunk]:
+        """更新片段向量（简化，只使用 pgvector）"""
         chunk = await RAGService.get_chunk(chunk_id)
         if not chunk:
             return None
 
-        chunk.vector = VectorService.vector_to_bytes(vector)
+        # 只更新 pgvector 格式
+        chunk.vector = vector
         await chunk.save()
         return chunk
 
@@ -508,34 +725,20 @@ class DocumentProcessor:
     
     @staticmethod
     async def extract_text(file: UploadFile) -> tuple[str, str, int]:
-        """从上传的文件中提取文本内容"""
-        filename = file.filename or "unknown"
-        content = ""
-        file_ext = Path(filename).suffix.lower()
+        """从上传的文件中提取文本内容（使用新的解析器）"""
+        from base.plugins.agent.services.document_parser import DocumentParser
         
-        # 读取文件内容
-        file_bytes = await file.read()
-        file_size = len(file_bytes)
+        # 重置文件指针（因为可能读取了多次）
+        await file.seek(0)
         
-        if file_ext in ['.txt', '.md', '.markdown', '.py', '.js', '.html', '.css', '.json', '.yaml', '.yml']:
-            # 文本文件直接读取
-            try:
-                content = file_bytes.decode('utf-8')
-            except UnicodeDecodeError:
-                try:
-                    content = file_bytes.decode('gbk')
-                except:
-                    raise ValueError(f"无法解码文件 {filename}，请使用 UTF-8 或 GBK 编码")
-        elif file_ext in ['.pdf']:
-            raise ValueError("PDF 文件处理需要安装额外的依赖包，暂时只支持文本文件")
-        elif file_ext in ['.docx', '.doc']:
-            raise ValueError("Word 文档处理需要安装额外的依赖包，暂时只支持文本文件")
-        elif file_ext in ['.xlsx', '.xls', '.csv']:
-            raise ValueError("表格文件处理需要安装额外的依赖包，暂时只支持文本文件")
-        else:
-            raise ValueError(f"不支持的文件类型 {file_ext}，请上传文本文件")
+        # 使用新的解析器
+        content, file_type = await DocumentParser.parse_file(file)
         
-        file_type = file_ext[1:] if file_ext else "txt"
+        # 重新获取文件大小
+        await file.seek(0)
+        file_content = await file.read()
+        file_size = len(file_content)
+        
         return content, file_type, file_size
     
     @staticmethod
@@ -570,3 +773,79 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"文档上传失败: {filename} - {str(e)}")
             raise
+
+
+class HybridRAGService:
+    """混合 RAG 服务"""
+    
+    # 切换方式：可以通过配置或环境变量切换
+    USE_LLAMA_INDEX = True  # 默认使用 LlamaIndex
+    
+    @staticmethod
+    async def process_document_with_llama_index(
+        doc_id: int,
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
+        split_strategy: str = "smart"
+    ):
+        """使用 LlamaIndex 处理文档"""
+        from base.plugins.agent.services.llama_index_adapter import LlamaIndexAdapter
+        from base.plugins.agent.services.embedding_factory import EmbeddingFactory
+        
+        # 获取文档
+        doc = await RAGService.get_document(doc_id)
+        if not doc:
+            raise ValueError("文档不存在")
+        
+        # 获取知识库
+        knowledge_base = await doc.knowledge_base
+        if not knowledge_base.embedding_model:
+            raise ValueError("请先为知识库配置 Embedding 模型")
+        
+        # 获取 Embedding 模型
+        embedding_model_id = knowledge_base.embedding_model_id
+        embed_model = await EmbeddingFactory.get_embedding_model(embedding_model_id)
+        
+        # 先调用原有处理创建分片（用于保存数据）
+        # 这样数据库里还有数据，只是用 LlamaIndex 来做向量存储
+        await RAGService.process_document(doc_id, chunk_size, chunk_overlap, split_strategy)
+        
+        # 现在再用 LlamaIndex 索引
+        chunks = await RAGService.list_chunks(doc_id)
+        
+        adapter = LlamaIndexAdapter()
+        await adapter.index_chunks(knowledge_base.id, chunks, embed_model)
+        
+        return doc
+    
+    @staticmethod
+    async def search_with_llama_index(
+        knowledge_base_id: int,
+        query_text: str,
+        top_k: int = 5,
+        similarity_threshold: Optional[float] = None
+    ):
+        """使用 LlamaIndex 搜索"""
+        from base.plugins.agent.services.llama_index_adapter import LlamaIndexAdapter
+        from base.plugins.agent.services.embedding_factory import EmbeddingFactory
+        
+        kb = await RAGService.get_knowledge_base(knowledge_base_id)
+        if not kb:
+            raise ValueError("知识库不存在")
+        
+        if not kb.embedding_model:
+            raise ValueError("请先为知识库配置 Embedding 模型")
+        
+        # 获取 Embedding 模型
+        embedding_model_id = kb.embedding_model_id
+        embed_model = await EmbeddingFactory.get_embedding_model(embedding_model_id)
+        
+        adapter = LlamaIndexAdapter()
+        return await adapter.search(
+            knowledge_base_id,
+            query_text,
+            embed_model,
+            top_k,
+            similarity_threshold
+        )
+

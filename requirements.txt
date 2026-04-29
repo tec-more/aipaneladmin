@@ -67,3 +67,15 @@ volcengine-python-sdk[ark]
 pgvector
 numpy
 sentence-transformers
+llama-index
+llama-index-vector-stores-qdrant
+qdrant-client
+
+# 文档解析库
+pdfplumber
+python-docx
+openpyxl
+python-pptx
+pypdf
+openpyxl
+pandas
