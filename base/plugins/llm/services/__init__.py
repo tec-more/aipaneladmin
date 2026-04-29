@@ -6,6 +6,8 @@ LLM插件服务模块
 from base.plugins.llm.services.chat_service import ChatService
 from base.plugins.llm.services.doubao_service import DoubaoService
 from base.plugins.llm.services.openai_service import OpenAIService
+from base.plugins.llm.services.localai_service import LocalAIService
+from base.plugins.llm.services.baidu_service import BaiduService
 from base.plugins.llm.services.anthropic_service import AnthropicService
 from base.plugins.llm.services.alibaba_service import AlibabaService
 from base.plugins.llm.services.zhipu_service import ZhipuService
@@ -21,6 +23,7 @@ __all__ = [
     "AlibabaService",
     "ZhipuService",
     "DeepSeekService",
+    "LocalAIService",
     "TencentService",
     "BaiduService"
 ]

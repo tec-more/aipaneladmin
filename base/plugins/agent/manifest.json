@@ -14,14 +14,16 @@
         "skill",
         "memory",
         "workflow",
-        "dialog_flow"
+        "dialog_flow",
+        "rag"
     ],
     "schemas": [
         "agent",
         "skill",
         "memory",
         "workflow",
-        "dialog_flow"
+        "dialog_flow",
+        "rag"
     ],
     "dependencies": [],
     "is_installed": true,
@@ -58,6 +60,11 @@
                     "name": "记忆管理",
                     "path": "/agent/memory",
                     "component": "agent/memory"
+                },
+                {
+                    "name": "RAG知识库",
+                    "path": "/agent/rag",
+                    "component": "agent/rag"
                 },
                 {
                     "name": "执行记录",

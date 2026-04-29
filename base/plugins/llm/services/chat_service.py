@@ -27,6 +27,11 @@ except ImportError:
     OpenAIService = None
 
 try:
+    from base.plugins.llm.services.localai_service import LocalAIService
+except ImportError:
+    LocalAIService = None
+
+try:
     from base.plugins.llm.services.anthropic_service import AnthropicService
 except ImportError:
     AnthropicService = None
@@ -118,6 +123,11 @@ class ChatService:
             return DoubaoService(api_key=api_key, endpoint_url=endpoint_url)
 
         elif provider_name_en == "openai":
+            if not OpenAIService:
+                raise HTTPException(status_code=500, detail="OpenAI服务未配置")
+            return OpenAIService(api_key=api_key, endpoint_url=endpoint_url)
+        
+        elif provider_name_en == "local":
             if not OpenAIService:
                 raise HTTPException(status_code=500, detail="OpenAI服务未配置")
             return OpenAIService(api_key=api_key, endpoint_url=endpoint_url)

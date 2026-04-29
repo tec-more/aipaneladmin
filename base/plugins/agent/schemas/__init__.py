@@ -10,6 +10,12 @@ from base.plugins.agent.schemas.workflow import (
     WorkflowEdgeCreate, WorkflowEdgeUpdate, WorkflowEdgeResponse,
     WorkflowExecutionCreate, WorkflowExecutionResponse
 )
+from base.plugins.agent.schemas.rag import (
+    RAGKnowledgeBaseCreate, RAGKnowledgeBaseUpdate, RAGKnowledgeBaseResponse,
+    RAGDocumentCreate, RAGDocumentUpdate, RAGDocumentResponse,
+    RAGDocumentChunkCreate, RAGDocumentChunkResponse,
+    RAGSearchRequest, RAGSearchResponse
+)
 
 __all__ = [
     "AgentCreate", "AgentUpdate", "AgentResponse",
@@ -18,5 +24,9 @@ __all__ = [
     "WorkflowCreate", "WorkflowUpdate", "WorkflowResponse",
     "WorkflowNodeCreate", "WorkflowNodeUpdate", "WorkflowNodeResponse",
     "WorkflowEdgeCreate", "WorkflowEdgeUpdate", "WorkflowEdgeResponse",
-    "WorkflowExecutionCreate", "WorkflowExecutionResponse"
+    "WorkflowExecutionCreate", "WorkflowExecutionResponse",
+    "RAGKnowledgeBaseCreate", "RAGKnowledgeBaseUpdate", "RAGKnowledgeBaseResponse",
+    "RAGDocumentCreate", "RAGDocumentUpdate", "RAGDocumentResponse",
+    "RAGDocumentChunkCreate", "RAGDocumentChunkResponse",
+    "RAGSearchRequest", "RAGSearchResponse"
 ]

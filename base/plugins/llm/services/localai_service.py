@@ -9,8 +9,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class OpenAIService:
-    """OpenAI大模型服务类"""
+class LocalAIService:
+    """本地AI大模型服务类"""
 
     def __init__(self, api_key: str, endpoint_url: str = "https://api.openai.com/v1"):
         self.api_key = api_key

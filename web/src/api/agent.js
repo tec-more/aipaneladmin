@@ -1,6 +1,6 @@
 import request, { createRequestWithTimeout } from '@/utils/request'
 
-const longRequest = createRequestWithTimeout(300000)
+const requestWithLongTimeout = createRequestWithTimeout(300000)
 
 // ==================== 智能体管理 ====================
 
@@ -384,6 +384,74 @@ export function getDialogFlowExecutions(params) {
 
 export function getDialogFlowExecution(id) {
   return request.get(`/v1/agent/dialog-flows/executions/${id}`)
+}
+
+// ==================== RAG知识库管理 ====================
+
+export function getRAGKnowledgeBases(params) {
+  return request.get('/v1/agent/rag/knowledge-bases', { params })
+}
+
+export function getRAGKnowledgeBase(id) {
+  return request.get(`/v1/agent/rag/knowledge-bases/${id}`)
+}
+
+export function createRAGKnowledgeBase(data) {
+  return request.post('/v1/agent/rag/knowledge-bases', data)
+}
+
+export function updateRAGKnowledgeBase(id, data) {
+  return request.put(`/v1/agent/rag/knowledge-bases/${id}`, data)
+}
+
+export function deleteRAGKnowledgeBase(id) {
+  return request.delete(`/v1/agent/rag/knowledge-bases/${id}`)
+}
+
+export function getRAGDocuments(params) {
+  return request.get('/v1/agent/rag/documents', { params })
+}
+
+export function getRAGDocument(id) {
+  return request.get(`/v1/agent/rag/documents/${id}`)
+}
+
+export function createRAGDocument(data) {
+  return request.post('/v1/agent/rag/documents', data)
+}
+
+export function updateRAGDocument(id, data) {
+  return request.put(`/v1/agent/rag/documents/${id}`, data)
+}
+
+export function deleteRAGDocument(id) {
+  return request.delete(`/v1/agent/rag/documents/${id}`)
+}
+
+export function processRAGDocument(id, chunk_size = 500, chunk_overlap = 50, split_strategy = "smart") {
+    return requestWithLongTimeout.post(`/v1/agent/rag/documents/${id}/process`, null, { params: { chunk_size, chunk_overlap, split_strategy } })
+}
+
+export function getRAGDocumentChunks(docId, params) {
+  return request.get(`/v1/agent/rag/documents/${docId}/chunks`, { params })
+}
+
+export function deleteRAGChunk(id) {
+  return request.delete(`/v1/agent/rag/chunks/${id}`)
+}
+
+export function searchRAG(data) {
+  return requestWithLongTimeout.post('/v1/agent/rag/search', data)
+}
+
+export function uploadRAGDocument(knowledgeBaseId, file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return requestWithLongTimeout.post(`/v1/agent/rag/documents/upload?knowledge_base_id=${knowledgeBaseId}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 }
 
 // ==================== 工具函数 ====================

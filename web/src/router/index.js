@@ -154,6 +154,7 @@ const routes = [
       { path: 'agent/memory', name: 'AgentMemory', component: () => import('@/views/agent/memory/index.vue'), meta: { title: '记忆管理' } },
       { path: 'agent/dialog-flows', name: 'DialogFlows', component: () => import('@/views/agent/dialog-flows/index.vue'), meta: { title: '对话流' } },
       { path: 'agent/dialog-flows/edit/:id', name: 'DialogFlowEdit', component: () => import('@/views/agent/dialog-flows/edit.vue'), meta: { title: '编辑对话流' } },
+      { path: 'agent/rag', name: 'RAG', component: () => import('@/views/agent/rag/index.vue'), meta: { title: 'RAG知识库' } },
       { path: 'joke/agent-debug', name: 'JokeAgentDebug', component: () => import('@/views/joke/agent-debug.vue'), meta: { title: '笑话智能体调试' } },
 
     ]

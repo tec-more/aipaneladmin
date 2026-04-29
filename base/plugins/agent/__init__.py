@@ -3,7 +3,7 @@ Agent Development Base Plugin
 """
 
 from fastapi import APIRouter
-from .api.v1 import dialog_flow, workflow, agent, skill, memory, joke
+from .api.v1 import dialog_flow, workflow, agent, skill, memory, joke, rag
 
 # 创建主路由
 router = APIRouter(prefix="/v1/agent")
@@ -24,6 +24,7 @@ router.include_router(workflow.workflow_router)
 router.include_router(workflow.workflow_execution_router)
 router.include_router(dialog_flow.dialog_flow_router)
 router.include_router(joke.joke_router)
+router.include_router(rag.rag_router)
 
 async def on_enable(app):
     """Enable plugin"""
