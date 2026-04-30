@@ -54,6 +54,12 @@ async def init_data():
     try:
         await Tortoise.init(config=settings.TORTOISE_ORM)
         print("Tortoise ORM 初始化完成")
+        
+        # 确保所有表都已创建（安全模式）
+        print("生成数据库表...")
+        await Tortoise.generate_schemas(safe=True)
+        print("数据库表生成完成")
+        
     except Exception as e:
         print(f"初始化 Tortoise ORM 时出错: {e}")
         import traceback

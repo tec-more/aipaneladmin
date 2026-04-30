@@ -8,8 +8,7 @@ from base.core.users.services.user_service import UserService
 from base.common.security import get_current_user_id
 from base.common.response import SuccessResponse, ErrorResponse
 
-data_change_log_router = APIRouter()
-
+data_change_log_router = APIRouter(prefix="/data-changes", tags=["数据变更日志"])
 
 @data_change_log_router.get("/list")
 async def get_data_change_log_list(

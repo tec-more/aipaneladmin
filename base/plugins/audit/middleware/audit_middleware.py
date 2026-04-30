@@ -35,14 +35,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         module_name = self._extract_module_name(path)
-        config = await AuditConfig.get_or_none(module_name=module_name)
-        
-        if config and not config.enabled:
-            return await call_next(request)
-        
-        if config and config.exclude_paths:
-            if any(path.startswith(exclude) for exclude in config.exclude_paths):
-                return await call_next(request)
         
         user_id = None
         username = None
@@ -58,14 +50,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body = await request.body()
                 if body:
                     request_body = json.loads(body.decode("utf-8"))
-                    if config and config.sensitive_fields:
-                        request_body = self._mask_sensitive_fields(request_body, config.sensitive_fields)
             except Exception:
                 pass
         
         request_params = dict(request.query_params)
-        if config and config.sensitive_fields:
-            request_params = self._mask_sensitive_fields(request_params, config.sensitive_fields)
         
         ip_address = self._get_client_ip(request)
         user_agent = request.headers.get("user-agent")

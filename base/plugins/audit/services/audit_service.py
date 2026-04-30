@@ -66,6 +66,46 @@ class AuditTraceService:
         return trace_id
 
     @staticmethod
+    async def get_trace_list(
+        page: int = 1,
+        page_size: int = 20,
+        trace_id: Optional[str] = None,
+        user_id: Optional[int] = None,
+        module: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> Tuple[List[FullTraceResponse], int]:
+        """获取追踪链路列表"""
+        # 从审计日志中获取唯一的trace_id
+        query = AuditLog.all()
+        
+        if trace_id:
+            query = query.filter(trace_id=trace_id)
+        if user_id:
+            query = query.filter(user_id=user_id)
+        if module:
+            query = query.filter(module=module)
+        if start_time:
+            query = query.filter(created_at__gte=start_time)
+        if end_time:
+            query = query.filter(created_at__lte=end_time)
+        
+        # 获取唯一的trace_id
+        audit_logs = await query.order_by("-created_at")
+        trace_ids = list(set([log.trace_id for log in audit_logs if log.trace_id]))
+        
+        total = len(trace_ids)
+        offset = (page - 1) * page_size
+        trace_ids = trace_ids[offset:offset + page_size]
+        
+        traces = []
+        for tid in trace_ids:
+            trace = await AuditTraceService.get_full_trace(tid)
+            traces.append(trace)
+        
+        return traces, total
+
+    @staticmethod
     async def get_full_trace(trace_id: str) -> FullTraceResponse:
         """获取完整的追踪链路数据"""
         # 获取各层数据
@@ -398,6 +438,57 @@ class AuditReportService:
         return reports, total
 
     @staticmethod
+    async def create_report_simple(
+        report_name: str,
+        report_type: str,
+        start_time: datetime,
+        end_time: datetime,
+        summary: Optional[str] = None,
+        modules: Optional[List[str]] = None,
+        generated_by: Optional[int] = None,
+        generated_by_name: Optional[str] = None
+    ) -> AuditReport:
+        """创建审计报告（简化版）"""
+        report_data = {
+            "modules": modules or [],
+            "summary": summary
+        }
+        
+        report = await AuditReport.create(
+            report_type=report_type,
+            report_name=report_name,
+            start_time=start_time,
+            end_time=end_time,
+            report_data=report_data,
+            summary=summary,
+            generated_by=generated_by,
+            generated_by_name=generated_by_name,
+            status="generated"
+        )
+        return report
+
+    @staticmethod
+    async def update_report(
+        report_id: int,
+        report_name: Optional[str] = None,
+        summary: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> Optional[AuditReport]:
+        """更新审计报告"""
+        report = await AuditReport.get_or_none(id=report_id)
+        if not report:
+            return None
+        
+        if report_name:
+            report.report_name = report_name
+        if summary:
+            report.summary = summary
+        if status:
+            report.status = status
+        await report.save()
+        return report
+
+    @staticmethod
     async def generate_compliance_report(
         start_time: datetime,
         end_time: datetime,
@@ -649,3 +740,55 @@ class RiskAuditService:
                 trace_id=trace_id
             )
         return None
+
+    @staticmethod
+    async def update_status(
+        record_id: int,
+        status: str,
+        resolved_by: Optional[int] = None,
+        resolution_note: Optional[str] = None
+    ) -> Optional[RiskAuditRecord]:
+        """更新风险记录状态"""
+        record = await RiskAuditRecord.get_or_none(id=record_id)
+        if not record:
+            return None
+        
+        record.status = status
+        if resolved_by:
+            record.resolved_by = resolved_by
+            record.resolved_time = datetime.now()
+        if resolution_note:
+            record.resolution_note = resolution_note
+        await record.save()
+        return record
+
+    @staticmethod
+    async def get_statistics(
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """获取风险统计信息"""
+        query = RiskAuditRecord.all()
+
+        if start_time:
+            query = query.filter(created_at__gte=start_time)
+        if end_time:
+            query = query.filter(created_at__lte=end_time)
+
+        total = await query.count()
+        critical_count = await query.filter(risk_level="critical").count()
+        high_count = await query.filter(risk_level="high").count()
+        medium_count = await query.filter(risk_level="medium").count()
+        low_count = await query.filter(risk_level="low").count()
+        pending_count = await query.filter(status="open").count()
+        resolved_count = await query.filter(status="resolved").count()
+
+        return {
+            "total": total,
+            "critical": critical_count,
+            "high": high_count,
+            "medium": medium_count,
+            "low": low_count,
+            "pending": pending_count,
+            "resolved": resolved_count
+        }

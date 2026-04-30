@@ -8,8 +8,7 @@ from base.core.users.services.user_service import UserService
 from base.common.security import get_current_user_id
 from base.common.response import SuccessResponse, ErrorResponse
 
-login_log_router = APIRouter()
-
+login_log_router = APIRouter(prefix="/login-logs", tags=["登录日志"])
 
 @login_log_router.get("/list")
 async def get_login_log_list(

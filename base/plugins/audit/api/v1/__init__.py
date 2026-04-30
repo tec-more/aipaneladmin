@@ -1,9 +1,21 @@
-from fastapi import APIRouter
-from . import audit_log, data_change_log, login_log, audit_config
+"""
+Audit Plugin API v1 路由
+"""
 
-router = APIRouter()
+from base.plugins.audit.api.v1.login_log import login_log_router
+from base.plugins.audit.api.v1.audit_log import audit_log_router
+from base.plugins.audit.api.v1.data_change_log import data_change_log_router
+from base.plugins.audit.api.v1.audit_config import audit_config_router
+from base.plugins.audit.api.v1.trace import trace_router
+from base.plugins.audit.api.v1.risks import risks_router
+from base.plugins.audit.api.v1.reports import reports_router
 
-router.include_router(audit_log.audit_log_router, prefix="/audit-logs", tags=["审计日志"])
-router.include_router(data_change_log.data_change_log_router, prefix="/data-changes", tags=["数据变更日志"])
-router.include_router(login_log.login_log_router, prefix="/login-logs", tags=["登录日志"])
-router.include_router(audit_config.audit_config_router, prefix="/audit-configs", tags=["审计配置"])
+__all__ = [
+    "login_log_router",
+    "audit_log_router", 
+    "data_change_log_router",
+    "audit_config_router",
+    "trace_router",
+    "risks_router",
+    "reports_router"
+]

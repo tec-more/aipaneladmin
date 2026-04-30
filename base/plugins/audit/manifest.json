@@ -3,7 +3,7 @@
     "display_name": "全链路审计模块",
     "version": "2.0.0",
     "description": "提供完整的全链路审计功能，包括输入层、决策层、执行层、输出层、系统层审计，支持全链路追踪、决策可解释、合规留痕、风险审计",
-    "author": "AI Panel Admin",
+    "author": "hepan",
     "is_installed": true,
     "is_enabled": true,
     "route_prefix": "/v1/audit",

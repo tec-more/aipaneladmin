@@ -97,3 +97,45 @@ async def delete_menu(
         )
 
     return SuccessResponse(msg="删除成功")
+
+
+@router.post("/sync-audit-menu", summary="同步审计模块菜单")
+async def sync_audit_menu(current_user_id: int = Depends(get_current_user_id)):
+    """手动同步审计模块菜单(管理员功能)"""
+    current_user = await UserService.get_by_id(current_user_id)
+    if not current_user or not current_user.is_superuser:
+        return ErrorResponse(msg="无权限执行此操作", status_code=status.HTTP_403_FORBIDDEN)
+
+    try:
+        from base.common.plugin_manager import plugin_manager
+        manifest = plugin_manager.get_manifest("audit")
+        if not manifest:
+            return ErrorResponse(msg="审计插件manifest不存在", status_code=status.HTTP_404_NOT_FOUND)
+
+        result = await plugin_manager._process_plugin_menus("audit", manifest)
+        if result:
+            return SuccessResponse(msg="审计模块菜单同步成功")
+        else:
+            return ErrorResponse(msg="审计模块菜单同步失败", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        import traceback
+        return ErrorResponse(msg=f"同步失败: {str(e)}\n{traceback.format_exc()}", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@router.get("/debug/all-menus", summary="调试：获取所有菜单")
+async def debug_all_menus(current_user_id: int = Depends(get_current_user_id)):
+    """调试：获取数据库中所有菜单(管理员功能)"""
+    current_user = await UserService.get_by_id(current_user_id)
+    if not current_user or not current_user.is_superuser:
+        return ErrorResponse(msg="无权限执行此操作", status_code=status.HTTP_403_FORBIDDEN)
+
+    try:
+        from base.core.users.models.rbac import Menu
+        all_menus = await Menu.all().order_by("sort", "id")
+        menu_dicts = []
+        for menu in all_menus:
+            menu_dicts.append(await menu.to_dict())
+        return SuccessResponse(data=menu_dicts)
+    except Exception as e:
+        import traceback
+        return ErrorResponse(msg=f"获取菜单失败: {str(e)}\n{traceback.format_exc()}", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)

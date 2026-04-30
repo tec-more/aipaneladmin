@@ -11,8 +11,7 @@ from base.core.users.services.user_service import UserService
 from base.common.security import get_current_user_id
 from base.common.response import SuccessResponse, ErrorResponse
 
-audit_config_router = APIRouter()
-
+audit_config_router = APIRouter(prefix="/audit-configs", tags=["审计配置"])
 
 @audit_config_router.post("/")
 async def create_audit_config(
