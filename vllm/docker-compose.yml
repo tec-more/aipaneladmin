@@ -1,0 +1,43 @@
+
+services:
+  # 1. Qwen3.6-35B 大模型 → GPU 加速 (llama.cpp + TQ3 + TurboQuant)
+  llama-cpp:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    container_name: llama-cpp-qwen
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./models:/models
+    command: >
+      --model /models/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+      --host 0.0.0.0
+      --port 8001
+      --n-gpu-layers 99
+      --ctx-size 32768
+      --parallel 4
+      --cont-batching
+      --cache-capacity 4096MiB
+
+  # 2. bge-m3 向量模型 → 纯 CPU 运行 (不占显卡)
+  bge-m3-embedding:
+    image: vllm/vllm-openai:latest
+    container_name: bge-m3-cpu
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - VLLM_TARGET_DEVICE=cpu
+    command: >
+      --model BAAI/bge-m3
+      --task embedding
+      --port 8000
+      --host 0.0.0.0
+      --device cpu
