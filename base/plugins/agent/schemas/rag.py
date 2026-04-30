@@ -14,6 +14,10 @@ class RAGKnowledgeBaseBase(BaseModel):
     vector_dimension: int = Field(default=1024, description="向量维度")
     config: Optional[dict] = Field(None, description="知识库配置")
     embedding_model_id: Optional[int] = Field(None, description="关联的Embedding模型ID")
+    search_mode: str = Field(default="pgvector", description="搜索模式: llm_index, pgvector")
+    is_public: bool = Field(default=False, description="是否为公有文档库")
+    access_level: str = Field(default="private", description="访问级别: private, dept, public")
+    visible_department_ids: Optional[List[int]] = Field(None, description="可见的部门ID列表")
 
 
 class RAGKnowledgeBaseCreate(RAGKnowledgeBaseBase):
@@ -27,15 +31,21 @@ class RAGKnowledgeBaseUpdate(BaseModel):
     description: Optional[str] = Field(None, description="知识库描述")
     status: Optional[str] = Field(None, description="状态: active/inactive")
     config: Optional[dict] = Field(None, description="知识库配置")
+    search_mode: Optional[str] = Field(None, description="搜索模式: llm_index, pgvector")
+    is_public: Optional[bool] = Field(None, description="是否为公有文档库")
+    access_level: Optional[str] = Field(None, description="访问级别: private, dept, public")
+    visible_department_ids: Optional[List[int]] = Field(None, description="可见的部门ID列表")
 
 
 class RAGKnowledgeBaseResponse(RAGKnowledgeBaseBase):
     """知识库响应schema"""
     id: int = Field(..., description="知识库ID")
+    created_by: Optional[int] = Field(None, description="创建者ID")
+    dept_id: Optional[int] = Field(None, description="所属部门ID")
+    visible_department_ids: Optional[List[int]] = Field(None, description="可见的部门ID列表")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     document_count: int = Field(default=0, description="文档数量")
-    search_mode: str = Field(default="pgvector", description="搜索模式: llm_index, pgvector")
 
     class Config:
         from_attributes = True

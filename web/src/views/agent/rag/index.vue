@@ -240,6 +240,38 @@
             <strong>LlamaIndex</strong>: 大数据量推荐，需要运行 Qdrant
           </div>
         </el-form-item>
+        <el-form-item label="公开访问">
+          <el-switch v-model="kbFormData.is_public" />
+          <div class="form-tip">开启后所有用户都可以访问此知识库</div>
+        </el-form-item>
+        <el-form-item label="访问级别">
+          <el-select v-model="kbFormData.access_level" placeholder="请选择访问级别">
+            <el-option label="私有（仅创建者）" value="private" />
+            <el-option label="部门内可见" value="dept" />
+            <el-option label="完全公开" value="public" />
+          </el-select>
+          <div class="form-tip">
+            <strong>私有</strong>: 仅创建者可以访问<br />
+            <strong>部门</strong>: 同部门用户可以访问<br />
+            <strong>公开</strong>: 所有人可以访问
+          </div>
+        </el-form-item>
+        <el-form-item label="可见部门" v-if="kbFormData.access_level === 'dept'">
+          <el-select
+            v-model="kbFormData.visible_department_ids"
+            multiple
+            placeholder="请选择可见部门"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="dept in departments"
+              :key="dept.id"
+              :label="dept.name"
+              :value="dept.id"
+            />
+          </el-select>
+          <div class="form-tip">选择可以访问此知识库的部门，可多选</div>
+        </el-form-item>
         <el-form-item label="配置">
           <el-input v-model="kbConfigJson" type="textarea" :rows="4" placeholder="JSON格式配置" />
         </el-form-item>
@@ -361,7 +393,8 @@ import {
   getRAGDocumentChunks,
   deleteRAGChunk,
   searchRAG,
-  uploadRAGDocument
+  uploadRAGDocument,
+  getDepartments
 } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 
@@ -417,8 +450,13 @@ const kbFormData = reactive({
   vector_dimension: 1024,
   config: {},
   embedding_model_id: null,
-  search_mode: 'pgvector'
+  search_mode: 'pgvector',
+  is_public: false,
+  access_level: 'private',
+  visible_department_ids: []
 })
+
+const departments = ref([])
 
 const kbConfigJson = computed({
   get: () => JSON.stringify(kbFormData.config, null, 2),
@@ -565,6 +603,9 @@ const handleAddKB = () => {
   kbFormData.config = {}
   kbFormData.embedding_model_id = null
   kbFormData.search_mode = 'pgvector'
+  kbFormData.is_public = false
+  kbFormData.access_level = 'private'
+  kbFormData.visible_department_ids = []
   kbDialogVisible.value = true
 }
 
@@ -578,6 +619,9 @@ const handleEditKB = (row) => {
   kbFormData.config = row.config || {}
   kbFormData.embedding_model_id = row.embedding_model_id || null
   kbFormData.search_mode = row.search_mode || 'pgvector'
+  kbFormData.is_public = row.is_public || false
+  kbFormData.access_level = row.access_level || 'private'
+  kbFormData.visible_department_ids = row.visible_department_ids || []
   kbDialogVisible.value = true
 }
 
@@ -947,9 +991,21 @@ const fetchLLMModels = async () => {
   }
 }
 
+const fetchDepartments = async () => {
+  try {
+    const res = await getDepartments({ page: 1, page_size: 100 })
+    if (res.data) {
+      departments.value = res.data.items || res.data
+    }
+  } catch (error) {
+    console.error('获取部门列表失败:', error)
+  }
+}
+
 onMounted(() => {
   fetchKnowledgeBases()
   fetchLLMModels()
+  fetchDepartments()
 })
 </script>
 

@@ -464,6 +464,10 @@ export function uploadRAGDocument(knowledgeBaseId, file) {
   })
 }
 
+export function getDepartments(params) {
+  return request.get('/v1/departments/list', { params })
+}
+
 // ==================== 工具函数 ====================
 
 export function hasStreamingLLMNode(graphDefinition) {

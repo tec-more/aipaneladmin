@@ -6,7 +6,7 @@ import re
 import os
 from pathlib import Path
 from typing import List, Optional
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 from base.plugins.agent.models.rag import (
     RAGKnowledgeBase,
     RAGDocument,
@@ -19,6 +19,8 @@ from base.plugins.agent.schemas.rag import (
     RAGDocumentUpdate,
     RAGDocumentChunkCreate
 )
+from base.common.permissions import get_user_data_scope_cached, get_user_permissions_cached
+from base.common.security import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +121,10 @@ class RAGService:
         return True
 
     @staticmethod
-    async def create_document(data: RAGDocumentCreate) -> RAGDocument:
+    async def create_document(
+        data: RAGDocumentCreate, 
+        user_id: Optional[int] = None
+    ) -> RAGDocument:
         """创建文档"""
         doc = await RAGDocument.create(
             knowledge_base_id=data.knowledge_base_id,
@@ -129,9 +134,10 @@ class RAGService:
             file_size=data.file_size,
             file_path=data.file_path,
             content=data.content,
-            metadata=data.metadata
+            metadata=data.metadata,
+            created_by_id=user_id
         )
-        logger.info(f"创建文档: {doc.title} (ID: {doc.id})")
+        logger.info(f"创建文档: {doc.title} (ID: {doc.id}, 创建者: {user_id})")
         return doc
 
     @staticmethod
@@ -186,7 +192,8 @@ class RAGService:
     @staticmethod
     async def create_chunk(
         data: RAGDocumentChunkCreate, 
-        vector: Optional[List[float]] = None
+        vector: Optional[List[float]] = None,
+        user_id: Optional[int] = None
     ) -> RAGDocumentChunk:
         """创建文档片段（简化，只使用 pgvector）"""
         chunk = await RAGDocumentChunk.create(
@@ -194,9 +201,10 @@ class RAGService:
             chunk_index=data.chunk_index,
             content=data.content,
             vector=vector,
-            metadata=data.metadata
+            metadata=data.metadata,
+            created_by_id=user_id
         )
-        logger.info(f"创建文档片段: {chunk.id} (文档ID: {chunk.document_id})")
+        logger.info(f"创建文档片段: {chunk.id} (文档ID: {chunk.document_id}, 创建者: {user_id})")
         return chunk
 
     @staticmethod
@@ -248,7 +256,8 @@ class RAGService:
         doc_id: int, 
         chunk_size: int = 500, 
         chunk_overlap: int = 50,
-        split_strategy: str = "smart"
+        split_strategy: str = "smart",
+        user_id: Optional[int] = None
     ) -> RAGDocument:
         """处理文档：分块并向量化（简化，只使用 pgvector）"""
         doc = await RAGService.get_document(doc_id)
@@ -291,7 +300,8 @@ class RAGService:
                             chunk_index=idx,
                             content=chunk_content
                         ),
-                        vector=vector
+                        vector=vector,
+                        user_id=user_id
                     )
                     logger.info(f"片段 {idx} 向量化完成")
                 except Exception as e:
@@ -302,7 +312,8 @@ class RAGService:
                             document_id=doc_id,
                             chunk_index=idx,
                             content=chunk_content
-                        )
+                        ),
+                        user_id=user_id
                     )
 
             doc.chunk_count = len(chunks)
@@ -714,10 +725,11 @@ class RAGService:
     @staticmethod
     async def upload_document(
         knowledge_base_id: int,
-        file: UploadFile
+        file: UploadFile,
+        user_id: Optional[int] = None
     ) -> RAGDocument:
         """上传文档"""
-        return await DocumentProcessor.upload_document(knowledge_base_id, file)
+        return await DocumentProcessor.upload_document(knowledge_base_id, file, user_id)
 
 
 class DocumentProcessor:
@@ -744,7 +756,8 @@ class DocumentProcessor:
     @staticmethod
     async def upload_document(
         knowledge_base_id: int,
-        file: UploadFile
+        file: UploadFile,
+        user_id: Optional[int] = None
     ) -> RAGDocument:
         """上传文档并创建记录"""
         filename = file.filename or "unknown"
@@ -764,10 +777,11 @@ class DocumentProcessor:
                 metadata={
                     "uploaded": True,
                     "file_type": file_type
-                }
+                },
+                created_by_id=user_id
             )
             
-            logger.info(f"文档上传成功: {filename} (ID: {doc.id})")
+            logger.info(f"文档上传成功: {filename} (ID: {doc.id}, 创建者: {user_id})")
             return doc
             
         except Exception as e:
@@ -786,7 +800,8 @@ class HybridRAGService:
         doc_id: int,
         chunk_size: int = 500,
         chunk_overlap: int = 50,
-        split_strategy: str = "smart"
+        split_strategy: str = "smart",
+        user_id: Optional[int] = None
     ):
         """使用 LlamaIndex 处理文档"""
         from base.plugins.agent.services.llama_index_adapter import LlamaIndexAdapter
@@ -808,7 +823,7 @@ class HybridRAGService:
         
         # 先调用原有处理创建分片（用于保存数据）
         # 这样数据库里还有数据，只是用 LlamaIndex 来做向量存储
-        await RAGService.process_document(doc_id, chunk_size, chunk_overlap, split_strategy)
+        await RAGService.process_document(doc_id, chunk_size, chunk_overlap, split_strategy, user_id)
         
         # 现在再用 LlamaIndex 索引
         chunks = await RAGService.list_chunks(doc_id)
@@ -848,4 +863,325 @@ class HybridRAGService:
             top_k,
             similarity_threshold
         )
+
+
+class RAGPermissionService:
+    """RAG 权限服务"""
+
+    @staticmethod
+    async def get_user_info(user_id: int):
+        """获取用户信息"""
+        from base.core.users.models.users import User
+        return await User.get_or_none(id=user_id)
+
+    @staticmethod
+    async def check_public_or_permission(
+        knowledge_base: RAGKnowledgeBase, 
+        user_id: int
+    ) -> bool:
+        """检查知识库是否公开或用户有权访问"""
+        # 检查是否公开 - 兼容字段可能不存在的情况
+        try:
+            if (hasattr(knowledge_base, 'access_level') and knowledge_base.access_level == "public") or \
+               (hasattr(knowledge_base, 'is_public') and knowledge_base.is_public):
+                return True
+        except:
+            pass
+        
+        # 检查部门权限 - 支持多部门
+        try:
+            if hasattr(knowledge_base, 'access_level') and knowledge_base.access_level == "dept":
+                user = await RAGPermissionService.get_user_info(user_id)
+                if user and hasattr(knowledge_base, 'visible_departments'):
+                    # 检查用户部门是否在可见部门列表中
+                    if user.dept_id:
+                        depts = await knowledge_base.visible_departments.filter(id=user.dept_id).count()
+                        if depts > 0:
+                            return True
+                    # 如果没有设置可见部门，检查是否有旧的dept_id字段（向后兼容）
+                    if hasattr(knowledge_base, 'dept_id') and knowledge_base.dept_id and user.dept_id == knowledge_base.dept_id:
+                        return True
+        except Exception as e:
+            pass
+        
+        # 检查创建者权限
+        try:
+            if hasattr(knowledge_base, 'created_by_id') and knowledge_base.created_by_id == user_id:
+                return True
+        except:
+            pass
+        
+        # 如果权限字段不存在，默认允许访问（向后兼容）
+        if not hasattr(knowledge_base, 'is_public') and not hasattr(knowledge_base, 'access_level'):
+            return True
+        
+        return False
+
+    @staticmethod
+    async def check_knowledge_base_permission(
+        knowledge_base_id: int, 
+        user_id: int
+    ) -> bool:
+        """检查用户是否有权访问知识库"""
+        kb = await RAGService.get_knowledge_base(knowledge_base_id)
+        if not kb:
+            raise HTTPException(status_code=404, detail="知识库不存在")
+
+        has_access = await RAGPermissionService.check_public_or_permission(kb, user_id)
+        if not has_access:
+            raise HTTPException(status_code=403, detail="无权限访问该知识库")
+
+        return True
+
+    @staticmethod
+    async def check_document_permission(
+        document_id: int,
+        user_id: int
+    ) -> bool:
+        """检查用户是否有权访问文档"""
+        doc = await RAGService.get_document(document_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail="文档不存在")
+
+        kb = await doc.knowledge_base
+        return await RAGPermissionService.check_knowledge_base_permission(kb.id, user_id)
+
+    @staticmethod
+    async def get_accessible_knowledge_bases_query(
+        user_id: int,
+        data_filter: Optional[dict] = None
+    ):
+        """获取用户可访问的知识库查询"""
+        from base.common.permissions import get_user_data_scope_cached
+        data_scope = await get_user_data_scope_cached(user_id)
+
+        if data_scope == "all":
+            query = RAGKnowledgeBase.all()
+        elif data_scope == "dept":
+            user = await RAGPermissionService.get_user_info(user_id)
+            if user and user.dept_id:
+                query = RAGKnowledgeBase.filter(
+                    (RAGKnowledgeBase.dept_id == user.dept_id) | 
+                    (RAGKnowledgeBase.access_level == "public") | 
+                    (RAGKnowledgeBase.is_public == True)
+                )
+            else:
+                query = RAGKnowledgeBase.filter(
+                    (RAGKnowledgeBase.access_level == "public") | 
+                    (RAGKnowledgeBase.is_public == True)
+                )
+        else:
+            query = RAGKnowledgeBase.filter(
+                (RAGKnowledgeBase.created_by_id == user_id) | 
+                (RAGKnowledgeBase.access_level == "public") | 
+                (RAGKnowledgeBase.is_public == True)
+            )
+
+        if data_filter and "dept" in data_filter:
+            query = query.filter(dept_id__in=data_filter["dept"])
+
+        return query
+
+
+async def add_permission_methods_to_rag_service():
+    """为RAGService添加权限相关方法"""
+
+    @staticmethod
+    async def create_knowledge_base_with_permission(
+        data: RAGKnowledgeBaseCreate,
+        user_id: int
+    ) -> RAGKnowledgeBase:
+        """创建知识库（带创建者信息）"""
+        kb = await RAGKnowledgeBase.create(
+            name=data.name,
+            description=data.description,
+            status=data.status,
+            vector_dimension=data.vector_dimension,
+            config=data.config,
+            embedding_model_id=data.embedding_model_id,
+            is_public=data.is_public,
+            access_level=data.access_level,
+            created_by_id=user_id
+        )
+        
+        # 如果指定了可见部门，建立关联
+        if data.visible_department_ids:
+            from base.core.dept.models.department import Department
+            for dept_id in data.visible_department_ids:
+                dept = await Department.get_or_none(id=dept_id)
+                if dept:
+                    await kb.visible_departments.add(dept)
+        
+        logger.info(f"创建知识库: {kb.name} (ID: {kb.id}, 创建者: {user_id})")
+        return kb
+
+    @staticmethod
+    async def list_knowledge_bases_with_filter(
+        data_filter: Optional[dict],
+        skip: int = 0,
+        limit: int = 100,
+        name: str = "",
+        status: str = ""
+    ) -> List[RAGKnowledgeBase]:
+        """列出知识库（带权限过滤）"""
+        user_id = data_filter.get("user_id") if data_filter else None
+        if not user_id:
+            query = RAGKnowledgeBase.all()
+        else:
+            query = await RAGPermissionService.get_accessible_knowledge_bases_query(
+                user_id, data_filter
+            )
+
+        if name:
+            query = query.filter(name__icontains=name)
+        if status:
+            query = query.filter(status=status)
+        return await query.offset(skip).limit(limit).order_by("-created_at")
+
+    @staticmethod
+    async def count_knowledge_bases_with_filter(
+        data_filter: Optional[dict],
+        name: str = "",
+        status: str = ""
+    ) -> int:
+        """统计知识库数量（带权限过滤）"""
+        user_id = data_filter.get("user_id") if data_filter else None
+        if not user_id:
+            query = RAGKnowledgeBase.all()
+        else:
+            query = await RAGPermissionService.get_accessible_knowledge_bases_query(
+                user_id, data_filter
+            )
+
+        if name:
+            query = query.filter(name__icontains=name)
+        if status:
+            query = query.filter(status=status)
+        return await query.count()
+
+    @staticmethod
+    async def get_knowledge_base_with_permission(
+        kb_id: int,
+        user_id: int
+    ) -> Optional[RAGKnowledgeBase]:
+        """获取知识库（带权限检查）"""
+        kb = await RAGService.get_knowledge_base(kb_id)
+        if not kb:
+            return None
+
+        has_access = await RAGPermissionService.check_public_or_permission(kb, user_id)
+        if not has_access:
+            return None
+
+        return kb
+
+    @staticmethod
+    async def update_knowledge_base_with_permission(
+        kb_id: int,
+        data: RAGKnowledgeBaseUpdate,
+        user_id: int
+    ) -> Optional[RAGKnowledgeBase]:
+        """更新知识库（带权限检查）"""
+        kb = await RAGService.get_knowledge_base_with_permission(kb_id, user_id)
+        if not kb:
+            return None
+
+        # 更新普通字段
+        update_data = data.model_dump(exclude_unset=True, exclude={"visible_department_ids"})
+        for field, value in update_data.items():
+            setattr(kb, field, value)
+        await kb.save()
+        
+        # 更新部门关联
+        if hasattr(data, "visible_department_ids") and data.visible_department_ids is not None:
+            from base.core.dept.models.department import Department
+            # 先清空现有关联
+            await kb.visible_departments.clear()
+            # 添加新的关联
+            for dept_id in data.visible_department_ids:
+                dept = await Department.get_or_none(id=dept_id)
+                if dept:
+                    await kb.visible_departments.add(dept)
+        
+        logger.info(f"更新知识库: {kb.name} (ID: {kb.id})")
+        return kb
+
+    @staticmethod
+    async def delete_knowledge_base_with_permission(
+        kb_id: int,
+        user_id: int
+    ) -> bool:
+        """删除知识库（带权限检查）"""
+        kb = await RAGService.get_knowledge_base_with_permission(kb_id, user_id)
+        if not kb:
+            return False
+
+        await kb.delete()
+        logger.info(f"删除知识库: {kb.name} (ID: {kb.id})")
+        return True
+
+    @staticmethod
+    async def get_document_with_permission(
+        doc_id: int,
+        user_id: int
+    ) -> Optional[RAGDocument]:
+        """获取文档（带权限检查）"""
+        doc = await RAGService.get_document(doc_id)
+        if not doc:
+            return None
+
+        await RAGPermissionService.check_document_permission(doc_id, user_id)
+        return doc
+
+    @staticmethod
+    async def update_document_with_permission(
+        doc_id: int,
+        data: RAGDocumentUpdate,
+        user_id: int
+    ) -> Optional[RAGDocument]:
+        """更新文档（带权限检查）"""
+        await RAGPermissionService.check_document_permission(doc_id, user_id)
+        return await RAGService.update_document(doc_id, data)
+
+    @staticmethod
+    async def delete_document_with_permission(
+        doc_id: int,
+        user_id: int
+    ) -> bool:
+        """删除文档（带权限检查）"""
+        await RAGPermissionService.check_document_permission(doc_id, user_id)
+        return await RAGService.delete_document(doc_id)
+
+    @staticmethod
+    async def delete_chunk_with_permission(
+        chunk_id: int,
+        user_id: int
+    ) -> bool:
+        """删除文档片段（带权限检查）"""
+        chunk = await RAGService.get_chunk(chunk_id)
+        if not chunk:
+            return False
+
+        doc = await chunk.document
+        await RAGPermissionService.check_document_permission(doc.id, user_id)
+        return await RAGService.delete_chunk(chunk_id)
+
+    RAGService.create_knowledge_base_with_permission = create_knowledge_base_with_permission
+    RAGService.list_knowledge_bases_with_filter = list_knowledge_bases_with_filter
+    RAGService.count_knowledge_bases_with_filter = count_knowledge_bases_with_filter
+    RAGService.get_knowledge_base_with_permission = get_knowledge_base_with_permission
+    RAGService.update_knowledge_base_with_permission = update_knowledge_base_with_permission
+    RAGService.delete_knowledge_base_with_permission = delete_knowledge_base_with_permission
+    RAGService.check_knowledge_base_permission = RAGPermissionService.check_knowledge_base_permission
+    RAGService.check_document_permission = RAGPermissionService.check_document_permission
+    RAGService.get_document_with_permission = get_document_with_permission
+    RAGService.update_document_with_permission = update_document_with_permission
+    RAGService.delete_document_with_permission = delete_document_with_permission
+    RAGService.delete_chunk_with_permission = delete_chunk_with_permission
+
+    logger.info("已为RAGService添加权限方法")
+
+
+import asyncio
+asyncio.create_task(add_permission_methods_to_rag_service())
 

@@ -24,6 +24,25 @@ class RAGKnowledgeBase(BaseModel, TimestampMixin):
         null=True,
         description="关联的Embedding模型"
     )
+    
+    # 权限相关字段
+    created_by = fields.ForeignKeyField(
+        "models.User",
+        related_name="rag_knowledge_bases_created",
+        on_delete=fields.SET_NULL,
+        null=True,
+        description="创建者"
+    )
+    # 多对多关系：可见的部门
+    visible_departments = fields.ManyToManyField(
+        "models.Department",
+        related_name="visible_rag_knowledge_bases",
+        through="rag_knowledge_base_department",
+        null=True,
+        description="可见的部门列表"
+    )
+    is_public = fields.BooleanField(default=False, description="是否为公有文档库")
+    access_level = fields.CharField(max_length=20, default="private", description="访问级别: private, dept, public")
 
     class Meta:
         table = "rag_knowledge_base"
@@ -49,6 +68,15 @@ class RAGDocument(BaseModel, TimestampMixin):
     status = fields.CharField(max_length=20, default="pending", description="状态: pending/processing/completed/failed")
     chunk_count = fields.IntField(default=0, description="分块数量")
     metadata = fields.JSONField(null=True, description="元数据")
+    
+    # 审计字段
+    created_by = fields.ForeignKeyField(
+        "models.User",
+        related_name="rag_documents_created",
+        on_delete=fields.SET_NULL,
+        null=True,
+        description="创建者"
+    )
 
     class Meta:
         table = "rag_document"
@@ -73,6 +101,15 @@ class RAGDocumentChunk(BaseModel, TimestampMixin):
     
     metadata = fields.JSONField(null=True, description="元数据")
     node_id = fields.CharField(max_length=100, null=True, description="LlamaIndex Node ID")
+    
+    # 审计字段
+    created_by = fields.ForeignKeyField(
+        "models.User",
+        related_name="rag_document_chunks_created",
+        on_delete=fields.SET_NULL,
+        null=True,
+        description="创建者"
+    )
 
     class Meta:
         table = "rag_document_chunk"
