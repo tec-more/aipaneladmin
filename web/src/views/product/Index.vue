@@ -351,7 +351,7 @@ const handleReset = () => {
 }
 
 const handleDetail = (row) => {
-  router.push(`/product/${row.id}`)
+  router.push(`/panel/product/${row.id}`)
 }
 
 const handleAdd = () => {

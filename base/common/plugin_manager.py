@@ -414,8 +414,7 @@ class PluginManager:
                     has_changes = len(changes_detail) > 0
                     
                     if has_changes:
-                        log.info(f"[菜单调试] 菜单 {menu_config['name']} ({menu_config['path']}) 发生变化: {', '.join(changes_detail)}")
-                        log.debug(f"[菜单调试] 顶级菜单检查: parent_id={parent_id}, existing_menu.parent_id={existing_menu.parent_id}")
+                        log.debug(f"菜单 {menu_config['name']} ({menu_config['path']}) 发生变化: {', '.join(changes_detail)}")
                     
                     if has_changes:
                         # 只有在真正变化时才更新菜单 - 保留现有 sort 值

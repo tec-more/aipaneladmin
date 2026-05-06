@@ -2,6 +2,7 @@
 from tortoise.models import Model
 from base.common.events.event_bus import event_bus
 from base.common.setting import settings
+from base.common.context import get_current_trace_id
 from loguru import logger
 from datetime import datetime, date
 import functools
@@ -93,7 +94,8 @@ async def patched_model_save(self, using_db=None, **kwargs):
             "table_name": table_name,
             "record_id": record_id,
             "change_type": change_type,
-            "after_data": after_data
+            "after_data": after_data,
+            "trace_id": get_current_trace_id()
         }
         if old_data:
             event_kwargs["before_data"] = old_data
@@ -133,7 +135,8 @@ async def patched_model_delete(self, using_db=None, **kwargs):
             table_name=table_name,
             record_id=record_id,
             change_type="DELETE",
-            before_data=before_data
+            before_data=before_data,
+            trace_id=get_current_trace_id()
         )
 
         return result

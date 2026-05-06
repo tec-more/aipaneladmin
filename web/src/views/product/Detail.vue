@@ -359,7 +359,7 @@ const fetchProductDetail = async () => {
 }
 
 const handleBack = () => {
-  router.push('/product')
+  router.push('/panel/product')
 }
 
 const openEditDialog = () => {
@@ -419,7 +419,7 @@ const handleDelete = async () => {
     })
     await deleteProduct(productId.value)
     ElMessage.success('删除成功')
-    router.push('/product')
+    router.push('/panel/product')
   } catch (e) {
     // 取消或错误
   }

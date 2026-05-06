@@ -26,6 +26,7 @@ class DataChangeHandler(BaseEventHandler):
         before_data = kwargs.get('before_data')
         after_data = kwargs.get('after_data')
         changed_fields = kwargs.get('changed_fields', [])
+        trace_id = kwargs.get('trace_id')
 
         if not table_name or not record_id or not change_type:
             logger.warning("数据变更事件缺少必要参数")
@@ -41,7 +42,8 @@ class DataChangeHandler(BaseEventHandler):
                 "changed_fields": changed_fields,
                 "user_id": user_id,
                 "username": username,
+                "trace_id": trace_id,
             })
-            logger.debug(f"记录数据变更日志: {table_name}.{record_id} {change_type}")
+            logger.debug(f"记录数据变更日志: {table_name}.{record_id} {change_type} (trace_id={trace_id})")
         except Exception as e:
             logger.error(f"记录数据变更日志失败: {e}")

@@ -129,7 +129,7 @@ const handleDelete = async () => {
     })
     await deleteOrder(route.params.id)
     ElMessage.success('删除成功')
-    router.push('/order')
+    router.push('/panel/order')
   } catch (e) {
     // 取消或错误
   }

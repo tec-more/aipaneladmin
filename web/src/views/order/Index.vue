@@ -159,7 +159,7 @@ const handleReset = () => {
 }
 
 const handleDetail = (row) => {
-  router.push(`/order/${row.id}`)
+  router.push(`/panel/order/${row.id}`)
 }
 
 const handleDelete = async (row) => {

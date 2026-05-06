@@ -336,6 +336,7 @@ class DataChangeLog(BaseModel, TimestampMixin):
     ip_address = fields.CharField(max_length=50, null=True, description="IP地址")
     user_agent = fields.CharField(max_length=500, null=True, description="用户代理")
     
+    trace_id = fields.CharField(max_length=100, null=True, description="全链路追踪ID", index=True)
     business_no = fields.CharField(max_length=100, null=True, description="业务流水号")
     remark = fields.TextField(null=True, description="备注")
 
