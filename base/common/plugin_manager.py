@@ -388,13 +388,13 @@ class PluginManager:
                     if existing_menu.path != menu_config["path"]:
                         changes_detail.append(f"path: {existing_menu.path} != {menu_config['path']}")
                     # 处理空字符串和 None 的情况（两者视为相等）
-                    db_icon = existing_menu.icon or None
-                    config_icon = menu_config.get("icon")
+                    db_icon = existing_menu.icon if existing_menu.icon else None
+                    config_icon = menu_config.get("icon") if menu_config.get("icon") else None
                     if db_icon != config_icon:
                         changes_detail.append(f"icon: {existing_menu.icon} != {config_icon}")
                     # 处理 component 的空字符串和 None 的情况
-                    db_component = existing_menu.component or None
-                    config_component = menu_config.get("component")
+                    db_component = existing_menu.component if existing_menu.component else None
+                    config_component = menu_config.get("component") if menu_config.get("component") else None
                     if db_component != config_component:
                         changes_detail.append(f"component: {existing_menu.component} != {config_component}")
                     if existing_menu.parent_id != parent_id:
@@ -404,8 +404,8 @@ class PluginManager:
                     if existing_menu.menu_type != menu_config.get("menu_type", "menu"):
                         changes_detail.append(f"menu_type: {existing_menu.menu_type} != {menu_config.get('menu_type', 'menu')}")
                     # 处理 permission 的空字符串和 None 的情况
-                    db_permission = existing_menu.permission or None
-                    config_permission = menu_config.get("permission_code")
+                    db_permission = existing_menu.permission if existing_menu.permission else None
+                    config_permission = menu_config.get("permission_code") if menu_config.get("permission_code") else None
                     if db_permission != config_permission:
                         changes_detail.append(f"permission: {existing_menu.permission} != {config_permission}")
                     if not existing_menu.is_active:
@@ -414,7 +414,8 @@ class PluginManager:
                     has_changes = len(changes_detail) > 0
                     
                     if has_changes:
-                        log.debug(f"菜单 {menu_config['name']} ({menu_config['path']}) 发生变化: {', '.join(changes_detail)}")
+                        log.info(f"[菜单调试] 菜单 {menu_config['name']} ({menu_config['path']}) 发生变化: {', '.join(changes_detail)}")
+                        log.debug(f"[菜单调试] 顶级菜单检查: parent_id={parent_id}, existing_menu.parent_id={existing_menu.parent_id}")
                     
                     if has_changes:
                         # 只有在真正变化时才更新菜单 - 保留现有 sort 值
