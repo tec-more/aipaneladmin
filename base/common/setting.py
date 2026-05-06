@@ -206,6 +206,16 @@ class Settings(BaseSettings):
 
 	DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 	OPERATION_LOG_RECORD: bool = True
+	
+	# ================================================= #
+	# ******************* 审计配置 ******************* #
+	# ================================================= #
+	AUDIT_ENABLED: bool = config.config.getboolean("audit", "enabled", fallback=True)
+	AUDIT_RETAIN_DAYS: int = config.config.getint("audit", "retention_days", fallback=90)
+	AUDIT_LOG_HTTP_REQUESTS: bool = config.config.getboolean("audit", "log_http_requests", fallback=True)
+	AUDIT_LOG_DATA_CHANGES: bool = config.config.getboolean("audit", "log_data_changes", fallback=True)
+	AUDIT_LOG_LOGIN: bool = config.config.getboolean("audit", "log_login", fallback=True)
+	TRACE_ENABLED: bool = config.config.getboolean("audit", "trace_enabled", fallback=True)
 	# ================================================= #
 	# ******************* Gzip压缩配置 ******************* #
 	# ================================================= #
@@ -230,6 +240,18 @@ class Settings(BaseSettings):
 	QDRANT_HOST: str = config.config.get("qdrant", "host", fallback="http://localhost:6333")
 	QDRANT_API_KEY: str = config.config.get("qdrant", "api_key", fallback="")
 	QDRANT_TIMEOUT: int = config.config.getint("qdrant", "timeout", fallback=300)
+
+	# ================================================= #
+	# ******************* 监控配置 ******************* #
+	# ================================================= #
+	PROMETHEUS_ENABLED: bool = config.config.getboolean("monitoring", "prometheus_enabled", fallback=True)
+	PROMETHEUS_PORT: int = config.config.getint("monitoring", "prometheus_port", fallback=9090)
+	
+	ELK_ENABLED: bool = config.config.getboolean("elk", "enabled", fallback=False)
+	
+	JAEGER_ENABLED: bool = config.config.getboolean("jaeger", "enabled", fallback=False)
+	JAEGER_HOST: str = config.config.get("jaeger", "host", fallback="localhost")
+	JAEGER_PORT: int = config.config.getint("jaeger", "port", fallback=6831)
 
 
 settings = Settings()

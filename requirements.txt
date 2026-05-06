@@ -79,3 +79,12 @@ python-pptx
 pypdf
 openpyxl
 pandas
+
+# 监控相关依赖
+prometheus-client
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-requests
+opentelemetry-instrumentation-httpx
+opentelemetry-exporter-jaeger-thrift

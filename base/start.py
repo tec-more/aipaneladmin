@@ -35,6 +35,14 @@ async def lifespan(app: FastAPI):
     try:
         await init_data()
 
+        # 注册ORM审计事件监听器
+        try:
+            from base.plugins.audit.middleware.orm_audit_middleware import register_orm_audit_handlers
+            register_orm_audit_handlers()
+            print("ORM审计事件监听器已注册")
+        except Exception as e:
+            print(f"注册ORM审计事件监听器失败: {e}")
+
         # 初始化插件系统
         plugin_manager.set_app(app)
         await plugin_manager.load_enabled_plugins()
@@ -343,6 +351,9 @@ def init_app() -> FastAPI:
 
     app.openapi = custom_openapi
 
+    # 注册监控功能
+    setup_monitoring(app)
+
     # 注册中间件、路由和异常处理
     register_exceptions_with_logging(app)  # 使用带详细日志的异常处理器
     register_middlewares(app)
@@ -359,3 +370,35 @@ def init_app() -> FastAPI:
         print(f"[警告] 无法导入voice_websocket: {e}")
 
     return app
+
+
+def setup_monitoring(app: FastAPI):
+    """设置监控功能"""
+    
+    # 注册健康检查端点
+    try:
+        from base.common.health import router as health_router
+        app.include_router(health_router, prefix="/health")
+        print("[监控] 健康检查端点已注册: /health")
+    except ImportError as e:
+        print(f"[警告] 无法导入健康检查模块: {e}")
+    
+    # 注册Prometheus中间件和指标端点
+    if getattr(settings, 'PROMETHEUS_ENABLED', False):
+        try:
+            from base.common.prometheus import PrometheusMiddleware, metrics_endpoint
+            app.add_middleware(PrometheusMiddleware)
+            app.add_api_route("/metrics", metrics_endpoint, methods=["GET"])
+            print("[监控] Prometheus监控已启用: /metrics")
+        except ImportError as e:
+            print(f"[警告] 无法导入Prometheus模块: {e}")
+    
+    # 初始化Jaeger分布式追踪
+    if getattr(settings, 'JAEGER_ENABLED', False):
+        try:
+            from base.common.tracing import setup_jaeger, instrument_app
+            setup_jaeger()
+            instrument_app(app)
+            print(f"[监控] Jaeger追踪已启用: {settings.JAEGER_HOST}:{settings.JAEGER_PORT}")
+        except ImportError as e:
+            print(f"[警告] 无法导入Jaeger模块: {e}")

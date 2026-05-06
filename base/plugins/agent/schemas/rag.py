@@ -32,6 +32,7 @@ class RAGKnowledgeBaseUpdate(BaseModel):
     status: Optional[str] = Field(None, description="状态: active/inactive")
     config: Optional[dict] = Field(None, description="知识库配置")
     search_mode: Optional[str] = Field(None, description="搜索模式: llm_index, pgvector")
+    embedding_model_id: Optional[int] = Field(None, description="关联的Embedding模型ID")
     is_public: Optional[bool] = Field(None, description="是否为公有文档库")
     access_level: Optional[str] = Field(None, description="访问级别: private, dept, public")
     visible_department_ids: Optional[List[int]] = Field(None, description="可见的部门ID列表")

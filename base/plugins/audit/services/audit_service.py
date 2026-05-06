@@ -2,7 +2,6 @@ import uuid
 import time
 from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
-from contextvars import ContextVar
 
 from base.plugins.audit.models.audit_log import (
     AuditLog,
@@ -27,9 +26,13 @@ from base.plugins.audit.schemas.audit_log import (
     RiskAuditRecordUpdate,
     FullTraceResponse
 )
-
-# 上下文变量，用于存储当前的trace_id
-_trace_id_var: ContextVar[Optional[str]] = ContextVar('trace_id', default=None)
+from base.common.context import (
+    current_trace_id,
+    current_user_id,
+    current_username,
+    set_trace_id,
+    clear_trace_id as clear_context_trace_id
+)
 
 
 def generate_trace_id() -> str:
@@ -39,17 +42,17 @@ def generate_trace_id() -> str:
 
 def get_current_trace_id() -> Optional[str]:
     """获取当前的trace_id"""
-    return _trace_id_var.get()
+    return current_trace_id.get()
 
 
 def set_current_trace_id(trace_id: str) -> None:
     """设置当前的trace_id"""
-    _trace_id_var.set(trace_id)
+    set_trace_id(trace_id)
 
 
 def clear_trace_id() -> None:
     """清除当前的trace_id"""
-    _trace_id_var.set(None)
+    clear_context_trace_id()
 
 
 class AuditTraceService:

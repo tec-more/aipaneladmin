@@ -31,7 +31,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(exclude) for exclude in self.exclude_paths):
             return await call_next(request)
         
-        if not hasattr(settings, "OPERATION_LOG_RECORD") or not settings.OPERATION_LOG_RECORD:
+        if not getattr(settings, 'AUDIT_ENABLED', True) or not getattr(settings, 'AUDIT_LOG_HTTP_REQUESTS', True):
             return await call_next(request)
         
         module_name = self._extract_module_name(path)

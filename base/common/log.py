@@ -1,6 +1,7 @@
 import logging
 import sys
 import atexit
+import json
 from typing_extensions import override
 from loguru import logger
 from base.common.setting import settings
@@ -8,6 +9,34 @@ from base.common.setting import settings
 
 # 全局变量记录日志处理器ID
 _logger_handlers = []
+
+
+def json_formatter(record):
+    """JSON格式日志输出，用于ELK/EFK日志收集"""
+    log_entry = {
+        "timestamp": record["time"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "level": record["level"].name,
+        "logger": record["name"],
+        "function": record["function"],
+        "line": record["line"],
+        "module": record["module"],
+        "message": record["message"],
+        "app_name": record.get("extra", {}).get("app_name", settings.app_name),
+    }
+    
+    if record["extra"].get("trace_id"):
+        log_entry["trace_id"] = record["extra"]["trace_id"]
+    
+    if record["extra"].get("user_id"):
+        log_entry["user_id"] = record["extra"]["user_id"]
+    
+    if record["exception"]:
+        log_entry["exception"] = {
+            "type": record["exception"].__class__.__name__,
+            "message": str(record["exception"]),
+        }
+    
+    return json.dumps(log_entry) + "\n"
 
 
 class InterceptHandler(logging.Handler):
@@ -132,6 +161,21 @@ def setup_logging():
         diagnose=True
     )
     _logger_handlers.append(handler_id)
+
+    # 步骤6.5：配置JSON格式日志（用于ELK/EFK收集）
+    elk_enabled = getattr(settings, 'ELK_ENABLED', False)
+    if elk_enabled:
+        handler_id = logger.add(
+            str(log_dir / "app.json"),
+            format=json_formatter,
+            level="INFO",
+            rotation="00:00",
+            retention=30,
+            compression="gz",
+            encoding="utf-8",
+            enqueue=use_async
+        )
+        _logger_handlers.append(handler_id)
 
     # 步骤7：配置标准库日志
     logging.basicConfig(handlers=[InterceptHandler()], level="DEBUG" if settings.debug else "INFO", force=True)

@@ -2,7 +2,7 @@
 用户认证API
 """
 from datetime import timedelta
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 
 from base.core.users.schemas.users import (
     UserLogin,
@@ -22,6 +22,19 @@ from base.common.security import (
     get_current_user_id,
 )
 from base.common.response import SuccessResponse, ErrorResponse
+from base.plugins.audit.services.login_log_service import LoginLogService
+from base.common.setting import settings
+
+
+def is_login_log_enabled() -> bool:
+    return getattr(settings, 'AUDIT_LOG_LOGIN', True)
+
+
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 router = APIRouter(prefix="/v1/auth", tags=["认证管理"])
 
@@ -55,7 +68,7 @@ async def register(user_data: UserCreate):
 
 
 @router.post("/login", summary="用户登录")
-async def login(login_data: UserLogin):
+async def login(login_data: UserLogin, request: Request):
     """
     用户登录
 
@@ -65,9 +78,27 @@ async def login(login_data: UserLogin):
     Returns:
         Token和用户信息
     """
+    ip_address = get_client_ip(request)
+    user_agent = request.headers.get("user-agent")
+
+    async def log_login(username: str, user_id: int = None, success: bool = True, fail_reason: str = None):
+        if not is_login_log_enabled():
+            return
+        await LoginLogService.create_log({
+            "user_id": user_id,
+            "username": username,
+            "login_type": "login",
+            "login_method": "password",
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "success": success,
+            "fail_reason": fail_reason
+        })
+
     # 验证用户
     user = await UserService.authenticate(login_data.username, login_data.password)
     if not user:
+        await log_login(login_data.username, success=False, fail_reason="用户名或密码错误")
         return ErrorResponse(
             msg="用户名或密码错误",
             status_code=status.HTTP_401_UNAUTHORIZED
@@ -75,6 +106,7 @@ async def login(login_data: UserLogin):
 
     # 检查用户是否激活
     if not user.is_active:
+        await log_login(user.username, user.id, success=False, fail_reason="账号已被禁用")
         return ErrorResponse(
             msg="账号已被禁用,请联系管理员",
             status_code=status.HTTP_403_FORBIDDEN
@@ -86,6 +118,9 @@ async def login(login_data: UserLogin):
         data={"sub": str(user.id), "username": user.username},
         expires_delta=access_token_expires
     )
+
+    # 记录登录成功日志
+    await log_login(user.username, user.id, success=True)
 
     # 获取用户信息
     user_dict = await user.to_dict()
@@ -187,7 +222,7 @@ async def email_login(login_data: EmailLoginSchema):
 
 
 @router.post("/logout", summary="用户登出")
-async def logout(user_id: int = Depends(get_current_user_id)):
+async def logout(request: Request, user_id: int = Depends(get_current_user_id)):
     """
     用户登出(客户端需要删除本地token)
 
@@ -197,6 +232,20 @@ async def logout(user_id: int = Depends(get_current_user_id)):
     Returns:
         登出成功消息
     """
-    # JWT是无状态的,登出主要由前端处理(删除token)
-    # 这里可以添加一些登出日志记录
+    if is_login_log_enabled():
+        user = await UserService.get_by_id(user_id)
+        if user:
+            ip_address = get_client_ip(request)
+            user_agent = request.headers.get("user-agent")
+            
+            await LoginLogService.create_log({
+                "user_id": user.id,
+                "username": user.username,
+                "login_type": "logout",
+                "login_method": "password",
+                "ip_address": ip_address,
+                "user_agent": user_agent,
+                "success": True
+            })
+    
     return SuccessResponse(msg="登出成功")

@@ -24,6 +24,7 @@ services:
       --ctx-size 32768
       --parallel 4
       --cont-batching
+      --api-key sk-hp123456789
 
   # 2. bge-m3 向量模型 → 纯 CPU 运行 (不占显卡)
   bge:
@@ -39,3 +40,4 @@ services:
       --port 8202
       --embedding
       --n-gpu-layers 0
+      --api-key sk-hp123456789
