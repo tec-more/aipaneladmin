@@ -82,6 +82,10 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   (response) => {
+    // 如果是文件下载请求，直接返回原始响应
+    if (response.config.responseType === 'blob') {
+      return response
+    }
     const res = response.data
     // 后端成功响应码为 0 或 success 为 true
     if (res.code === 0 || res.code === 200 || res.success === true) {

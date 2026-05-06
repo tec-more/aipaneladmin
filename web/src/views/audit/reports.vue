@@ -47,7 +47,7 @@
 
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="title" label="报告标题" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="report_name" label="报告标题" min-width="200" show-overflow-tooltip />
         <el-table-column prop="report_type" label="报告类型" width="100" align="center">
           <template #default="{ row }">
             <el-tag size="small" :type="getReportTypeTagType(row.report_type)">
@@ -55,8 +55,8 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="start_date" label="开始日期" width="120" />
-        <el-table-column prop="end_date" label="结束日期" width="120" />
+        <el-table-column prop="start_time" label="开始日期" width="120" />
+        <el-table-column prop="end_time" label="结束日期" width="120" />
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag size="small" :type="getStatusTagType(row.status)">
@@ -64,7 +64,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_by" label="创建人" width="120" />
+        <el-table-column prop="generated_by_name" label="创建人" width="120" />
         <el-table-column prop="created_at" label="创建时间" width="180" />
         <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
@@ -98,18 +98,18 @@
             {{ getReportTypeLabel(currentReport.report_type) }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="报告标题" :span="2">{{ currentReport.title }}</el-descriptions-item>
-        <el-descriptions-item label="开始日期">{{ currentReport.start_date }}</el-descriptions-item>
-        <el-descriptions-item label="结束日期">{{ currentReport.end_date }}</el-descriptions-item>
+        <el-descriptions-item label="报告标题" :span="2">{{ currentReport.report_name }}</el-descriptions-item>
+        <el-descriptions-item label="开始日期">{{ currentReport.start_time }}</el-descriptions-item>
+        <el-descriptions-item label="结束日期">{{ currentReport.end_time }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag size="small" :type="getStatusTagType(currentReport.status)">
             {{ getStatusLabel(currentReport.status) }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="创建人">{{ currentReport.created_by }}</el-descriptions-item>
+        <el-descriptions-item label="创建人">{{ currentReport.generated_by_name }}</el-descriptions-item>
         <el-descriptions-item label="报告摘要" :span="2">{{ currentReport.summary }}</el-descriptions-item>
         <el-descriptions-item label="报告内容" :span="2">
-          <pre v-if="currentReport.content" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;">{{ currentReport.content }}</pre>
+          <pre v-if="currentReport.report_data" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;">{{ currentReport.report_data }}</pre>
         </el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ currentReport.created_at }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{ currentReport.updated_at }}</el-descriptions-item>
@@ -122,8 +122,8 @@
 
     <el-dialog v-model="createDialogVisible" :title="isEdit ? '编辑报告' : '生成报告'" width="700px" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="报告标题" prop="title">
-          <el-input v-model="form.title" placeholder="请输入报告标题" />
+        <el-form-item label="报告标题" prop="report_name">
+          <el-input v-model="form.report_name" placeholder="请输入报告标题" />
         </el-form-item>
         <el-form-item label="报告类型" prop="report_type">
           <el-select v-model="form.report_type" placeholder="请选择报告类型" style="width: 100%;">
@@ -136,7 +136,7 @@
         </el-form-item>
         <el-form-item label="时间范围" prop="date_range">
           <el-date-picker
-            v-model="formDateRange"
+            v-model="form.date_range"
             type="daterange"
             range-separator="至"
             start-placeholder="开始日期"
@@ -182,7 +182,6 @@ const formRef = ref(null)
 
 const tableData = ref([])
 const dateRange = ref([])
-const formDateRange = ref([])
 
 const searchForm = reactive({
   report_type: '',
@@ -198,16 +197,17 @@ const pagination = reactive({
 })
 
 const form = ref({
-  title: '',
+  report_name: '',
   report_type: 'daily',
-  start_date: '',
-  end_date: '',
+  start_time: '',
+  end_time: '',
   summary: '',
-  modules: []
+  modules: [],
+  date_range: []
 })
 
 const rules = {
-  title: [{ required: true, message: '请输入报告标题', trigger: 'blur' }],
+  report_name: [{ required: true, message: '请输入报告标题', trigger: 'blur' }],
   report_type: [{ required: true, message: '请选择报告类型', trigger: 'change' }],
   date_range: [{ required: true, message: '请选择时间范围', trigger: 'change' }]
 }
@@ -296,13 +296,15 @@ const handleDetail = async (row) => {
 const handleDownload = async (row) => {
   try {
     const response = await downloadReport(row.id)
-    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `${row.title}.pdf`)
+    link.setAttribute('download', `${row.report_name}.pdf`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
     ElMessage.success('下载成功')
   } catch (e) {
     ElMessage.error('下载失败')
@@ -312,14 +314,14 @@ const handleDownload = async (row) => {
 const handleCreate = () => {
   isEdit.value = false
   form.value = {
-    title: '',
+    report_name: '',
     report_type: 'daily',
-    start_date: '',
-    end_date: '',
+    start_time: '',
+    end_time: '',
     summary: '',
-    modules: []
+    modules: [],
+    date_range: []
   }
-  formDateRange.value = []
   createDialogVisible.value = true
 }
 
@@ -327,37 +329,37 @@ const handleEdit = (row) => {
   isEdit.value = true
   currentReport.value = row
   form.value = {
-    title: row.title,
+    report_name: row.report_name,
     report_type: row.report_type,
-    start_date: row.start_date,
-    end_date: row.end_date,
+    start_time: row.start_time,
+    end_time: row.end_time,
     summary: row.summary || '',
-    modules: row.modules || []
+    modules: row.modules || [],
+    date_range: [row.start_time, row.end_time]
   }
-  formDateRange.value = [row.start_date, row.end_date]
   createDialogVisible.value = true
 }
 
 const handleSubmit = async () => {
   await formRef.value.validate()
-  if (formDateRange.value && formDateRange.value.length === 2) {
-    form.value.start_date = formDateRange.value[0]
-    form.value.end_date = formDateRange.value[1]
+  if (form.value.date_range && form.value.date_range.length === 2) {
+    form.value.start_time = form.value.date_range[0]
+    form.value.end_time = form.value.date_range[1]
   }
   submitLoading.value = true
   try {
     if (isEdit.value) {
       await apiUpdateReport(currentReport.value.id, {
-        report_name: form.value.title,
+        report_name: form.value.report_name,
         summary: form.value.summary
       })
       ElMessage.success('更新成功')
     } else {
       await apiCreateReport({
-        report_name: form.value.title,
+        report_name: form.value.report_name,
         report_type: form.value.report_type,
-        start_time: form.value.start_date,
-        end_time: form.value.end_date,
+        start_time: form.value.start_time,
+        end_time: form.value.end_time,
         summary: form.value.summary,
         modules: form.value.modules
       })

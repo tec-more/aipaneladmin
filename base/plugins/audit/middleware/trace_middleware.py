@@ -28,12 +28,12 @@ from base.plugins.audit.schemas.audit_log import (
 from base.common.setting import settings
 
 
-ENABLED = True
+ENABLED = getattr(settings, 'TRACE_ENABLED', True)
 PRIORITY = 10
 
 
 def is_trace_enabled() -> bool:
-    return getattr(settings, 'TRACE_ENABLED', True)
+    return ENABLED
 
 
 class TraceMiddleware(BaseHTTPMiddleware):
