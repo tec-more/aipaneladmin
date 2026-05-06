@@ -1,10 +1,11 @@
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST, push_to_gateway, CollectorRegistry
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 import time
 import os
+import asyncio
 from typing import Dict, Callable
 
 
@@ -82,3 +83,45 @@ async def metrics_endpoint(request: Request) -> Response:
 
 
 prometheus_middleware = PrometheusMiddleware.__new__(PrometheusMiddleware)
+
+
+def push_metrics():
+    """推送指标到 Pushgateway"""
+    from base.common.setting import settings
+    from loguru import logger
+    
+    if not getattr(settings, 'PROMETHEUS_PUSH_ENABLED', False):
+        return
+    
+    pushgateway_url = getattr(settings, 'PROMETHEUS_PUSHGATEWAY', 'localhost:9091')
+    job_name = getattr(settings, 'app_name', 'aipaneladmin')
+    
+    try:
+        push_to_gateway(
+            pushgateway_url,
+            job=job_name,
+            registry=prometheus_middleware.registry
+        )
+        logger.debug(f"Metrics pushed to Pushgateway: {pushgateway_url}")
+    except Exception as e:
+        logger.error(f"Failed to push metrics to Pushgateway: {e}")
+
+
+async def start_push_worker():
+    """启动定时推送任务"""
+    from base.common.setting import settings
+    from loguru import logger
+    
+    if not getattr(settings, 'PROMETHEUS_PUSH_ENABLED', False):
+        return
+    
+    push_interval = getattr(settings, 'PROMETHEUS_PUSH_INTERVAL', 10)
+    logger.info(f"Starting Prometheus push worker, interval: {push_interval}s")
+    
+    while True:
+        try:
+            push_metrics()
+        except Exception as e:
+            logger.error(f"Error in push worker: {e}")
+        
+        await asyncio.sleep(push_interval)

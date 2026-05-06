@@ -10,7 +10,10 @@ class DataChangeService:
     @staticmethod
     async def create_log(data: DataChangeLogCreate) -> DataChangeLog:
         """创建数据变更日志"""
-        log = await DataChangeLog.create(**data.model_dump(exclude_unset=True))
+        if isinstance(data, dict):
+            log = await DataChangeLog.create(**data)
+        else:
+            log = await DataChangeLog.create(**data.model_dump(exclude_unset=True))
         return log
 
     @staticmethod

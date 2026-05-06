@@ -10,7 +10,10 @@ class LoginLogService:
     @staticmethod
     async def create_log(data: LoginLogCreate) -> LoginLog:
         """创建登录日志"""
-        log = await LoginLog.create(**data.model_dump(exclude_unset=True))
+        if isinstance(data, dict):
+            log = await LoginLog.create(**data)
+        else:
+            log = await LoginLog.create(**data.model_dump(exclude_unset=True))
         return log
 
     @staticmethod

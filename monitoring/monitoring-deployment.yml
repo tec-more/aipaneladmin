@@ -21,7 +21,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "3100:3100"
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
@@ -45,6 +45,16 @@ services:
       - "9411:9411"
     environment:
       - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    networks:
+      - monitoring
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    volumes:
+      - pushgateway_data:/pushgateway
     networks:
       - monitoring
 
@@ -90,6 +100,7 @@ volumes:
   prometheus_data:
   grafana_data:
   elasticsearch_data:
+  pushgateway_data:
 
 networks:
   monitoring:

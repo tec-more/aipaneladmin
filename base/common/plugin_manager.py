@@ -377,21 +377,64 @@ class PluginManager:
                 )
                 
                 if existing_menu:
-                    # 更新菜单 - 保留现有 sort 值
-                    update_data = MenuUpdate(
-                        name=menu_config["name"],
-                        path=menu_config["path"],
-                        icon=menu_config.get("icon"),
-                        component=menu_config.get("component"),
-                        parent_id=parent_id,
-                        sort=existing_menu.sort,  # 保留数据库中的排序值，不覆盖
-                        is_hidden=menu_config.get("is_hidden", False),
-                        menu_type=menu_config.get("menu_type", "menu"),
-                        permission_code=menu_config.get("permission_code"),
-                        is_active=True
-                    )
-                    menu = await MenuService.update_menu(existing_menu.id, update_data)
-                    log.debug(f"更新菜单: {menu_config['name']} ({menu_config['path']}) - 保留排序值: {existing_menu.sort}")
+                    # 检查菜单是否真的发生了变化
+                    # 注意：配置中用 is_hidden，数据库模型中用 is_visible，需要转换
+                    config_is_visible = not menu_config.get("is_hidden", False)
+                    
+                    # 调试：打印每个字段的比较结果
+                    changes_detail = []
+                    if existing_menu.name != menu_config["name"]:
+                        changes_detail.append(f"name: {existing_menu.name} != {menu_config['name']}")
+                    if existing_menu.path != menu_config["path"]:
+                        changes_detail.append(f"path: {existing_menu.path} != {menu_config['path']}")
+                    # 处理空字符串和 None 的情况（两者视为相等）
+                    db_icon = existing_menu.icon or None
+                    config_icon = menu_config.get("icon")
+                    if db_icon != config_icon:
+                        changes_detail.append(f"icon: {existing_menu.icon} != {config_icon}")
+                    # 处理 component 的空字符串和 None 的情况
+                    db_component = existing_menu.component or None
+                    config_component = menu_config.get("component")
+                    if db_component != config_component:
+                        changes_detail.append(f"component: {existing_menu.component} != {config_component}")
+                    if existing_menu.parent_id != parent_id:
+                        changes_detail.append(f"parent_id: {existing_menu.parent_id} != {parent_id}")
+                    if existing_menu.is_visible != config_is_visible:
+                        changes_detail.append(f"is_visible: {existing_menu.is_visible} != {config_is_visible}")
+                    if existing_menu.menu_type != menu_config.get("menu_type", "menu"):
+                        changes_detail.append(f"menu_type: {existing_menu.menu_type} != {menu_config.get('menu_type', 'menu')}")
+                    # 处理 permission 的空字符串和 None 的情况
+                    db_permission = existing_menu.permission or None
+                    config_permission = menu_config.get("permission_code")
+                    if db_permission != config_permission:
+                        changes_detail.append(f"permission: {existing_menu.permission} != {config_permission}")
+                    if not existing_menu.is_active:
+                        changes_detail.append(f"is_active: {existing_menu.is_active} != True")
+                    
+                    has_changes = len(changes_detail) > 0
+                    
+                    if has_changes:
+                        log.debug(f"菜单 {menu_config['name']} ({menu_config['path']}) 发生变化: {', '.join(changes_detail)}")
+                    
+                    if has_changes:
+                        # 只有在真正变化时才更新菜单 - 保留现有 sort 值
+                        update_data = MenuUpdate(
+                            name=menu_config["name"],
+                            path=menu_config["path"],
+                            icon=menu_config.get("icon"),
+                            component=menu_config.get("component"),
+                            parent_id=parent_id,
+                            sort=existing_menu.sort,  # 保留数据库中的排序值，不覆盖
+                            is_hidden=menu_config.get("is_hidden", False),
+                            menu_type=menu_config.get("menu_type", "menu"),
+                            permission_code=menu_config.get("permission_code"),
+                            is_active=True
+                        )
+                        menu = await MenuService.update_menu(existing_menu.id, update_data)
+                        log.debug(f"更新菜单: {menu_config['name']} ({menu_config['path']}) - 保留排序值: {existing_menu.sort}")
+                    else:
+                        log.debug(f"菜单未变化，跳过更新: {menu_config['name']} ({menu_config['path']})")
+                        menu = existing_menu
                 else:
                     # 创建菜单 - 使用配置中的 sort 值
                     create_data = MenuCreate(

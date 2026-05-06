@@ -436,6 +436,9 @@ const submit = async () => {
           updateData[field] = null
         }
       })
+      
+      // 处理备注字段：允许空字符串，不转换为null
+      // description 字段保持原样
 
       // 处理遮蔽值：如果字段包含****，则不更新该字段
       if (updateData.api_key && updateData.api_key.includes('****')) {
@@ -448,6 +451,11 @@ const submit = async () => {
         delete updateData.access_token
       }
 
+      // 删除 id 字段，因为 URL 中已经包含了
+      delete updateData.id
+
+      console.log('[submit] 发送更新请求，数据:', JSON.parse(JSON.stringify(updateData)))
+      
       await updateApiKey(form.id, updateData)
       ElMessage.success('更新成功')
       dialogVisible.value = false
@@ -460,6 +468,7 @@ const submit = async () => {
       fetchData()
     }
   } catch (error) {
+    console.error('[submit] 更新失败:', error)
     ElMessage.error(error.response?.data?.detail || '操作失败')
   }
 }

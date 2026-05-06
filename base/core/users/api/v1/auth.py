@@ -22,12 +22,17 @@ from base.common.security import (
     get_current_user_id,
 )
 from base.common.response import SuccessResponse, ErrorResponse
-from base.plugins.audit.services.login_log_service import LoginLogService
 from base.common.setting import settings
 
 
 def is_login_log_enabled() -> bool:
-    return getattr(settings, 'AUDIT_LOG_LOGIN', True)
+    return getattr(settings, 'AUDIT_ENABLED', True) and getattr(settings, 'AUDIT_LOG_LOGIN', True)
+
+
+def get_event_bus():
+    """延迟导入事件总线，确保处理器已注册"""
+    from base.common.events.event_bus import event_bus
+    return event_bus
 
 
 def get_client_ip(request: Request) -> str:
@@ -84,16 +89,19 @@ async def login(login_data: UserLogin, request: Request):
     async def log_login(username: str, user_id: int = None, success: bool = True, fail_reason: str = None):
         if not is_login_log_enabled():
             return
-        await LoginLogService.create_log({
-            "user_id": user_id,
-            "username": username,
-            "login_type": "login",
-            "login_method": "password",
-            "ip_address": ip_address,
-            "user_agent": user_agent,
-            "success": success,
-            "fail_reason": fail_reason
-        })
+        event_bus = get_event_bus()
+        print(f"[登录] 获取事件总线实例ID: {id(event_bus)}, user.login 订阅者: {len(event_bus._handlers.get('user.login', []))}")
+        await event_bus.publish(
+            "user.login",
+            user_id=user_id,
+            username=username,
+            login_type="login",
+            login_method="password",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            success=success,
+            fail_reason=fail_reason
+        )
 
     # 验证用户
     user = await UserService.authenticate(login_data.username, login_data.password)
@@ -238,14 +246,16 @@ async def logout(request: Request, user_id: int = Depends(get_current_user_id)):
             ip_address = get_client_ip(request)
             user_agent = request.headers.get("user-agent")
             
-            await LoginLogService.create_log({
-                "user_id": user.id,
-                "username": user.username,
-                "login_type": "logout",
-                "login_method": "password",
-                "ip_address": ip_address,
-                "user_agent": user_agent,
-                "success": True
-            })
+            event_bus = get_event_bus()
+            await event_bus.publish(
+                "user.logout",
+                user_id=user.id,
+                username=user.username,
+                login_type="logout",
+                login_method="password",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=True
+            )
     
     return SuccessResponse(msg="登出成功")

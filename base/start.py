@@ -24,6 +24,43 @@ logging.basicConfig(
 # 禁用websockets.client的调试日志
 logging.getLogger('websockets.client').setLevel(logging.WARNING)
 
+
+def register_audit_handlers():
+    """注册审计事件处理器（在应用创建时调用，确保每个进程都注册）"""
+    try:
+        import base.plugins.audit.services.orm_event_service
+        from base.plugins.audit.services.orm_event_service import register_orm_audit_handlers
+        from base.plugins.audit.handlers.data_change_handler import DataChangeHandler
+        from base.plugins.audit.handlers.login_event_handler import LoginEventHandler
+        from base.common.events.event_bus import event_bus
+        from base.common.setting import settings
+
+        print(f"[审计] 事件总线实例ID: {id(event_bus)}")
+        print(f"[审计] AUDIT_ENABLED: {getattr(settings, 'AUDIT_ENABLED', False)}")
+        print(f"[审计] AUDIT_LOG_LOGIN: {getattr(settings, 'AUDIT_LOG_LOGIN', False)}")
+        print(f"[审计] AUDIT_LOG_DATA_CHANGES: {getattr(settings, 'AUDIT_LOG_DATA_CHANGES', False)}")
+
+        register_orm_audit_handlers()
+        
+        data_change_handler = DataChangeHandler()
+        event_bus.subscribe("model.created", data_change_handler.handle)
+        event_bus.subscribe("model.updated", data_change_handler.handle)
+        event_bus.subscribe("model.deleted", data_change_handler.handle)
+        print(f"[审计] 数据变更处理器已订阅, is_enabled: {data_change_handler.is_enabled()}")
+        print(f"[审计] model.created 订阅者数量: {len(event_bus._handlers.get('model.created', []))}")
+
+        login_event_handler = LoginEventHandler()
+        event_bus.subscribe("user.login", login_event_handler.handle)
+        event_bus.subscribe("user.logout", login_event_handler.handle)
+        print(f"[审计] 登录事件处理器已订阅, is_enabled: {login_event_handler.is_enabled()}")
+        print(f"[审计] user.login 订阅者数量: {len(event_bus._handlers.get('user.login', []))}")
+
+        print("[审计] 事件处理器注册完成")
+    except Exception as e:
+        print(f"[审计] 注册事件处理器失败: {e}")
+        import traceback
+        traceback.print_exc()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动逻辑
@@ -35,13 +72,7 @@ async def lifespan(app: FastAPI):
     try:
         await init_data()
 
-        # 注册ORM审计事件监听器
-        try:
-            from base.plugins.audit.middleware.orm_audit_middleware import register_orm_audit_handlers
-            register_orm_audit_handlers()
-            print("ORM审计事件监听器已注册")
-        except Exception as e:
-            print(f"注册ORM审计事件监听器失败: {e}")
+        # 审计事件处理器已在 init_app 中注册
 
         # 初始化插件系统
         plugin_manager.set_app(app)
@@ -58,6 +89,18 @@ async def lifespan(app: FastAPI):
         task2 = asyncio.create_task(update_membership_data_task())
         background_tasks.append(task2)
         print("会员数据更新定时任务已启动（每10分钟）")
+
+        # 启动 Prometheus 推送工作器
+        if getattr(settings, 'PROMETHEUS_PUSH_ENABLED', False):
+            try:
+                from base.common.prometheus import start_push_worker
+                task3 = asyncio.create_task(start_push_worker())
+                background_tasks.append(task3)
+                print("Prometheus 推送工作器已启动")
+            except ImportError as e:
+                print(f"无法启动 Prometheus 推送工作器: {e}")
+        else:
+            print("Prometheus 推送工作器已禁用（PROMETHEUS_PUSH_ENABLED=false）")
 
         yield
 
@@ -357,6 +400,9 @@ def init_app() -> FastAPI:
     # 注册中间件、路由和异常处理
     register_exceptions_with_logging(app)  # 使用带详细日志的异常处理器
     register_middlewares(app)
+    
+    # 注册审计事件处理器（在应用创建时调用，确保每个进程都注册）
+    register_audit_handlers()
 
     # 使用自动路由注册机制
     register_routers(app)

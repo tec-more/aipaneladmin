@@ -68,6 +68,7 @@ class LLMApiKey(BaseModel, TimestampMixin):
         """保存前自动设置 quota_reset_date"""
         if not self.quota_reset_date:
             self.quota_reset_date = datetime.now().date()
+        # 确保调用父类的 save 方法时传递所有参数
         await super().save(*args, **kwargs)
 
     @property

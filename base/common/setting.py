@@ -246,6 +246,9 @@ class Settings(BaseSettings):
 	# ================================================= #
 	PROMETHEUS_ENABLED: bool = config.config.getboolean("monitoring", "prometheus_enabled", fallback=True)
 	PROMETHEUS_PORT: int = config.config.getint("monitoring", "prometheus_port", fallback=9090)
+	PROMETHEUS_PUSH_ENABLED: bool = config.config.getboolean("monitoring", "push_enabled", fallback=False)
+	PROMETHEUS_PUSHGATEWAY: str = config.config.get("monitoring", "pushgateway", fallback="localhost:9091")
+	PROMETHEUS_PUSH_INTERVAL: int = config.config.getint("monitoring", "push_interval", fallback=10)
 	
 	ELK_ENABLED: bool = config.config.getboolean("elk", "enabled", fallback=False)
 	

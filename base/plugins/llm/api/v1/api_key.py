@@ -238,14 +238,19 @@ async def update_api_key(
 
     update_data = data.model_dump(exclude_unset=True)
     
-    for field_name, value in update_data.items():
+    # 处理空字符串转换为None
+    for field_name, value in list(update_data.items()):
         if value == '':
             update_data[field_name] = None
 
+    # 使用 update_fields 来明确指定要更新的字段，确保 Tortoise ORM 正确更新
+    update_fields = []
     for field_name, value in update_data.items():
         setattr(key, field_name, value)
+        update_fields.append(field_name)
 
-    await key.save()
+    # 明确保存，指定要更新的字段
+    await key.save(update_fields=update_fields)
 
     from base.plugins.llm.models.enums import ModelServiceType
     service_type_display = ModelServiceType.display_name(key.model_service_type)
@@ -262,7 +267,8 @@ async def update_api_key(
         "api_secret": mask_secret(key.api_secret) if key.api_secret else None,
         "access_token": key.access_token,
         "endpoint_url": key.endpoint_url,
-        "is_voice_service": key.is_voice_service
+        "is_voice_service": key.is_voice_service,
+        "description": key.description
     }, msg="API密钥更新成功")
 
 
