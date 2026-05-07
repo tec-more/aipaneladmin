@@ -1,4 +1,4 @@
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST, push_to_gateway, CollectorRegistry
+from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST, push_to_gateway
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
@@ -6,41 +6,112 @@ from starlette.types import ASGIApp
 import time
 import os
 import asyncio
+import psutil
 from typing import Dict, Callable
+
+
+# 全局注册表和指标
+registry = CollectorRegistry()
+
+# 全局指标
+request_counter = Counter(
+    'http_requests_total',
+    'Total HTTP Requests',
+    ['method', 'endpoint', 'status_code'],
+    registry=registry
+)
+
+request_duration = Histogram(
+    'http_request_duration_seconds',
+    'HTTP Request Duration',
+    ['method', 'endpoint'],
+    registry=registry,
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+)
+
+active_requests = Gauge(
+    'http_active_requests',
+    'Active HTTP Requests',
+    registry=registry
+)
+
+response_size = Histogram(
+    'http_response_size_bytes',
+    'HTTP Response Size',
+    ['method', 'endpoint'],
+    registry=registry
+)
+
+# 系统资源指标
+process_cpu_percent = Gauge(
+    'process_cpu_percent',
+    'Process CPU usage percent',
+    registry=registry
+)
+
+process_memory_rss = Gauge(
+    'process_memory_rss_bytes',
+    'Process RSS memory in bytes',
+    registry=registry
+)
+
+process_memory_vms = Gauge(
+    'process_memory_vms_bytes',
+    'Process VMS memory in bytes',
+    registry=registry
+)
+
+system_cpu_percent = Gauge(
+    'system_cpu_percent',
+    'System-wide CPU usage percent',
+    registry=registry
+)
+
+system_memory_used = Gauge(
+    'system_memory_used_bytes',
+    'System memory used in bytes',
+    registry=registry
+)
+
+system_memory_available = Gauge(
+    'system_memory_available_bytes',
+    'System memory available in bytes',
+    registry=registry
+)
+
+_system_process = None
+
+
+def get_process():
+    global _system_process
+    if _system_process is None:
+        _system_process = psutil.Process()
+    return _system_process
+
+
+def update_system_metrics():
+    """更新系统资源指标"""
+    try:
+        process = get_process()
+        
+        # 进程指标
+        process_cpu_percent.set(process.cpu_percent())
+        mem_info = process.memory_info()
+        process_memory_rss.set(mem_info.rss)
+        process_memory_vms.set(mem_info.vms)
+        
+        # 系统指标
+        system_cpu_percent.set(psutil.cpu_percent())
+        mem = psutil.virtual_memory()
+        system_memory_used.set(mem.used)
+        system_memory_available.set(mem.available)
+    except Exception:
+        pass
 
 
 class PrometheusMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp):
         super().__init__(app)
-        self.registry = CollectorRegistry()
-        
-        self.request_counter = Counter(
-            'http_requests_total',
-            'Total HTTP Requests',
-            ['method', 'endpoint', 'status_code'],
-            registry=self.registry
-        )
-        
-        self.request_duration = Histogram(
-            'http_request_duration_seconds',
-            'HTTP Request Duration',
-            ['method', 'endpoint'],
-            registry=self.registry,
-            buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
-        )
-        
-        self.active_requests = Gauge(
-            'http_active_requests',
-            'Active HTTP Requests',
-            registry=self.registry
-        )
-        
-        self.response_size = Histogram(
-            'http_response_size_bytes',
-            'HTTP Response Size',
-            ['method', 'endpoint'],
-            registry=self.registry
-        )
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         method = request.method
@@ -49,7 +120,7 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         if endpoint == '/metrics':
             return await call_next(request)
         
-        self.active_requests.inc()
+        active_requests.inc()
         start_time = time.time()
         
         try:
@@ -62,10 +133,10 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
             raise
         finally:
             duration = time.time() - start_time
-            self.active_requests.dec()
-            self.request_counter.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
-            self.request_duration.labels(method=method, endpoint=endpoint).observe(duration)
-            self.response_size.labels(method=method, endpoint=endpoint).observe(content_length)
+            active_requests.dec()
+            request_counter.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+            request_duration.labels(method=method, endpoint=endpoint).observe(duration)
+            response_size.labels(method=method, endpoint=endpoint).observe(content_length)
         
         return response
 
@@ -76,13 +147,9 @@ async def metrics_endpoint(request: Request) -> Response:
     if not getattr(settings, 'PROMETHEUS_ENABLED', False):
         return Response(status_code=404, content="Prometheus endpoint not enabled")
     
-    from base.common.prometheus import prometheus_middleware
-    
-    data = generate_latest(prometheus_middleware.registry)
+    update_system_metrics()
+    data = generate_latest(registry)
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
-
-
-prometheus_middleware = PrometheusMiddleware.__new__(PrometheusMiddleware)
 
 
 def push_metrics():
@@ -100,7 +167,7 @@ def push_metrics():
         push_to_gateway(
             pushgateway_url,
             job=job_name,
-            registry=prometheus_middleware.registry
+            registry=registry
         )
         logger.debug(f"Metrics pushed to Pushgateway: {pushgateway_url}")
     except Exception as e:

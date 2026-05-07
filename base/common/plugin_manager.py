@@ -774,21 +774,12 @@ class PluginManager:
             log.error("插件依赖存在循环，加载失败")
             return
         
-        # 按拓扑排序顺序启用插件
+        # 按拓扑排序顺序启用插件（启用时会自动处理菜单）
         log.debug(f"插件拓扑排序结果: {order}")
         for plugin_name in order:
             await self.enable_plugin(plugin_name)
         
-        # 额外处理：确保所有已启用插件的菜单都被处理
-        log.info("开始处理所有已启用插件的菜单...")
-        for plugin_name in enabled_plugins:
-            plugin = self._plugins.get(plugin_name)
-            if plugin:
-                manifest = self.get_manifest(plugin_name)
-                if manifest:
-                    log.debug(f"处理插件 {plugin_name} 的菜单...")
-                    await self._process_plugin_menus(plugin_name, manifest)
-        log.info("插件菜单处理完成")
+        log.info("插件加载完成")
 
     async def startup(self) -> None:
         """应用启动时调用"""

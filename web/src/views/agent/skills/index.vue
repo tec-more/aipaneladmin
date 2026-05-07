@@ -4,24 +4,26 @@
       <template #header>
         <div class="card-header">
           <span>技能管理</span>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            新增技能
-          </el-button>
+          <div class="button-group">
+            <el-button type="default" @click="goToCategory">
+              <el-icon><Folder /></el-icon>
+              技能分类管理
+            </el-button>
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              新增技能
+            </el-button>
+          </div>
         </div>
       </template>
-      
+
       <el-form :inline="true" :model="searchForm" class="mb-4">
         <el-form-item label="技能名称">
           <el-input v-model="searchForm.name" placeholder="请输入技能名称" clearable />
         </el-form-item>
-        <el-form-item label="技能类型">
-          <el-select v-model="searchForm.type" placeholder="请选择类型" clearable>
-            <el-option label="工具调用" value="tool" />
-            <el-option label="API调用" value="api" />
-            <el-option label="数据处理" value="data" />
-            <el-option label="条件判断" value="condition" />
-            <el-option label="其他" value="other" />
+        <el-form-item label="分类">
+          <el-select v-model="searchForm.category_id" placeholder="请选择分类" clearable>
+            <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -41,16 +43,27 @@
           </el-button>
         </el-form-item>
       </el-form>
-      
+
       <el-table :data="skills" style="width: 100%" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="技能名称" min-width="120" />
-        <el-table-column prop="type" label="技能类型" width="120">
+        <el-table-column prop="category_name" label="分类" width="120">
           <template #default="{ row }">
-            <el-tag :type="getTypeTagType(row.type)">{{ getTypeName(row.type) }}</el-tag>
+            <span v-if="row.category_name">{{ row.category_name }}</span>
+            <span v-else class="text-gray">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="bound_tools" label="绑定的工具" width="180">
+          <template #default="{ row }">
+            <div v-if="row.bound_tools && row.bound_tools.length > 0" class="tool-tags">
+              <el-tag v-for="tool in row.bound_tools" :key="tool" size="small" type="info" class="tool-tag">
+                {{ tool }}
+              </el-tag>
+            </div>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="description" label="描述" min-width="150" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
@@ -70,9 +83,9 @@
                 <el-icon><Edit /></el-icon>
                 编辑
               </el-button>
-              <el-button type="info" size="small" @click="handleTest(row)">
-                <el-icon><VideoPlay /></el-icon>
-                测试
+              <el-button type="info" size="small" @click="handleView(row)">
+                <el-icon><Document /></el-icon>
+                查看内容
               </el-button>
               <el-button type="danger" size="small" @click="handleDelete(row.id)">
                 <el-icon><Delete /></el-icon>
@@ -82,7 +95,7 @@
           </template>
         </el-table-column>
       </el-table>
-      
+
       <div class="mt-4">
         <el-pagination
           v-model:current-page="pageInfo.currentPage"
@@ -96,76 +109,48 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="700px">
-      <el-form :model="formData" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="技能名称" prop="name">
-          <el-input v-model="formData.name" placeholder="请输入技能名称" />
-        </el-form-item>
-        <el-form-item label="技能类型" prop="type">
-          <el-select v-model="formData.type" placeholder="请选择技能类型" style="width: 100%">
-            <el-option label="工具调用" value="tool" />
-            <el-option label="API调用" value="api" />
-            <el-option label="数据处理" value="data" />
-            <el-option label="条件判断" value="condition" />
-            <el-option label="其他" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="formData.description" type="textarea" :rows="2" placeholder="请输入描述" />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="formData.status" placeholder="请选择状态">
-            <el-option label="启用" value="active" />
-            <el-option label="禁用" value="inactive" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="参数配置">
-          <el-input v-model="parametersJson" type="textarea" :rows="4" placeholder="JSON格式参数配置" />
-        </el-form-item>
-        <el-form-item label="实现代码">
-          <el-input v-model="formData.implementation" type="textarea" :rows="6" placeholder="技能实现代码（Python）" />
-        </el-form-item>
-      </el-form>
+    <el-dialog v-model="viewDialogVisible" title="技能内容" width="800px">
+      <div class="skill-content">
+        <div class="content-header">
+          <h3>{{ currentSkill?.name }}</h3>
+          <div v-if="currentSkill?.bound_tools && currentSkill.bound_tools.length > 0" class="bound-tools">
+            <span class="bound-tools-label">绑定的工具：</span>
+            <el-tag v-for="tool in currentSkill.bound_tools" :key="tool" size="small" type="info">
+              {{ tool }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="content-body">
+          <div v-if="skillContent" class="markdown-content">
+            <div v-html="renderMarkdown(skillContent)" />
+          </div>
+          <div v-else class="empty-content">
+            暂无内容
+          </div>
+        </div>
+      </div>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="testDialogVisible" title="测试技能" width="600px">
-      <el-form :model="testForm" label-width="100px">
-        <el-form-item label="技能名称">
-          <el-input :value="currentSkill?.name" disabled />
-        </el-form-item>
-        <el-form-item label="输入参数">
-          <el-input v-model="testForm.input" type="textarea" :rows="4" placeholder="JSON格式输入参数" />
-        </el-form-item>
-        <el-form-item label="执行结果">
-          <el-input v-model="testResult" type="textarea" :rows="4" readonly placeholder="执行结果" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="testDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="executeTest" :loading="testLoading">执行</el-button>
+        <el-button @click="viewDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, VideoPlay } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Document, Folder } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSkills, createSkill, updateSkill, deleteSkill, executeSkill } from '@/api/agent'
+import { getSkills, deleteSkill, getSkillContent, getActiveSkillCategories } from '@/api/agent'
 
 const router = useRouter()
 const loading = ref(false)
 const skills = ref([])
+const categories = ref([])
 
 const searchForm = reactive({
   name: '',
-  type: '',
+  category_id: null,
   status: ''
 })
 
@@ -175,57 +160,25 @@ const pageInfo = reactive({
   total: 0
 })
 
-const dialogVisible = ref(false)
-const dialogTitle = ref('新增技能')
-const formRef = ref(null)
-const formData = reactive({
-  id: null,
-  name: '',
-  type: 'tool',
-  description: '',
-  status: 'active',
-  parameters: {},
-  implementation: ''
-})
-
-const parametersJson = computed({
-  get: () => JSON.stringify(formData.parameters, null, 2),
-  set: (val) => {
-    try {
-      formData.parameters = JSON.parse(val)
-    } catch (e) {}
-  }
-})
-
-const rules = {
-  name: [{ required: true, message: '请输入技能名称', trigger: 'blur' }],
-  type: [{ required: true, message: '请选择技能类型', trigger: 'change' }],
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
-}
-
-const testDialogVisible = ref(false)
-const testLoading = ref(false)
+const viewDialogVisible = ref(false)
 const currentSkill = ref(null)
-const testForm = reactive({ input: '{}' })
-const testResult = ref('')
-
-const typeMap = {
-  tool: '工具调用',
-  api: 'API调用',
-  data: '数据处理',
-  condition: '条件判断',
-  other: '其他'
-}
-
-const getTypeName = (type) => typeMap[type] || type
-const getTypeTagType = (type) => {
-  const map = { tool: 'primary', api: 'success', data: 'warning', condition: 'info', other: '' }
-  return map[type] || ''
-}
+const skillContent = ref('')
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+const renderMarkdown = (content) => {
+  return content
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+    .replace(/\*(.*)\*/gim, '<em>$1</em>')
+    .replace(/^- (.*$)/gim, '<li>$1</li>')
+    .replace(/^(\d+)\. (.*$)/gim, '<li>$1. $2</li>')
+    .replace(/\n/gim, '<br/>')
 }
 
 const fetchSkills = async () => {
@@ -255,7 +208,7 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchForm.name = ''
-  searchForm.type = ''
+  searchForm.category_id = null
   searchForm.status = ''
   handleSearch()
 }
@@ -274,30 +227,24 @@ const handleAdd = () => {
   router.push('/panel/agent/skills/create')
 }
 
+const goToCategory = () => {
+  router.push('/panel/agent/skills/category')
+}
+
 const handleEdit = (row) => {
   router.push(`/panel/agent/skills/edit/${row.id}`)
 }
 
-const handleSubmit = async () => {
-  if (!formRef.value) return
-  await formRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        if (formData.id) {
-          await updateSkill(formData.id, formData)
-          ElMessage.success('编辑成功')
-        } else {
-          await createSkill(formData)
-          ElMessage.success('新增成功')
-        }
-        dialogVisible.value = false
-        fetchSkills()
-      } catch (error) {
-        ElMessage.error('操作失败')
-        console.error(error)
-      }
-    }
-  })
+const handleView = async (row) => {
+  currentSkill.value = row
+  try {
+    const res = await getSkillContent(row.id)
+    skillContent.value = res.data.content || ''
+  } catch (error) {
+    skillContent.value = ''
+    console.error(error)
+  }
+  viewDialogVisible.value = true
 }
 
 const handleDelete = async (id) => {
@@ -314,35 +261,19 @@ const handleDelete = async (id) => {
   }
 }
 
-const handleTest = (row) => {
-  currentSkill.value = row
-  testForm.input = JSON.stringify(row.parameters || {}, null, 2)
-  testResult.value = ''
-  testDialogVisible.value = true
-}
-
-const executeTest = async () => {
-  testLoading.value = true
+const fetchCategories = async () => {
   try {
-    let input = {}
-    try {
-      input = JSON.parse(testForm.input)
-    } catch (e) {
-      ElMessage.error('输入参数格式错误')
-      return
+    const res = await getActiveSkillCategories()
+    if (res.data) {
+      categories.value = res.data
     }
-    const res = await executeSkill(currentSkill.value.id, input)
-    testResult.value = JSON.stringify(res.data, null, 2)
-    ElMessage.success('执行成功')
   } catch (error) {
-    testResult.value = error.message || '执行失败'
-    ElMessage.error('执行失败')
-  } finally {
-    testLoading.value = false
+    console.error('获取分类列表失败', error)
   }
 }
 
 onMounted(() => {
+  fetchCategories()
   fetchSkills()
 })
 </script>
@@ -352,6 +283,13 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.button-group {
+  display: flex;
+  gap: 8px;
+}
+.text-gray {
+  color: #999;
 }
 .mb-4 {
   margin-bottom: 16px;
@@ -364,5 +302,80 @@ onMounted(() => {
   justify-content: flex-start;
   align-items: center;
   gap: 4px;
+}
+.tool-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tool-tag {
+  margin: 2px 0;
+}
+.skill-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+.content-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+.content-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.bound-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bound-tools-label {
+  font-size: 12px;
+  color: #666;
+}
+.content-body {
+  padding: 8px;
+}
+.markdown-content {
+  line-height: 1.8;
+  color: #333;
+}
+.markdown-content h1 {
+  font-size: 20px;
+  margin: 16px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #409eff;
+}
+.markdown-content h2 {
+  font-size: 18px;
+  margin: 14px 0 10px;
+  color: #409eff;
+}
+.markdown-content h3 {
+  font-size: 16px;
+  margin: 12px 0 8px;
+}
+.markdown-content strong {
+  font-weight: bold;
+  color: #333;
+}
+.markdown-content em {
+  font-style: italic;
+  color: #666;
+}
+.markdown-content ul, .markdown-content ol {
+  padding-left: 24px;
+}
+.markdown-content li {
+  margin: 6px 0;
+}
+.empty-content {
+  text-align: center;
+  color: #999;
+  padding: 40px;
 }
 </style>

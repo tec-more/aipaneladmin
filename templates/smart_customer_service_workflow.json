@@ -1,0 +1,91 @@
+{
+  "name": "跨境电商智能客服",
+  "description": "集成订单查询、费用查询等功能的智能客服",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "data": {"label": "开始对话"}
+    },
+    {
+      "id": "intent_analysis",
+      "type": "llm",
+      "data": {
+        "label": "意图分析",
+        "system_prompt": "你是一个客服意图分析专家。请分析用户的问题属于以下哪种意图：\n\n1. order_query - 订单查询\n2. fee_query - 费用查询\n3. product_info - 产品咨询\n4. refund_request - 退款申请\n5. shipping_tracking - 物流查询\n6. general_qa - 通用问题\n\n请只返回意图代码，不要其他内容。",
+        "model": "doubao-seed-2.0-pro"
+      }
+    },
+    {
+      "id": "intent_router",
+      "type": "condition",
+      "data": {
+        "label": "根据意图路由"
+      }
+    },
+    {
+      "id": "extract_order_params",
+      "type": "llm",
+      "data": {
+        "label": "提取订单参数",
+        "system_prompt": "从用户的问题中提取以下信息（如果有的话）：\n- order_id: 订单ID（类似 123-4567890-1234567）\n- customer_email: 客户邮箱\n- platform: 站点（us/uk/jp等）\n- days: 查询最近几天\n\n请以 JSON 格式返回，不要其他内容。如果某个信息不存在，则值为空字符串。",
+        "model": "doubao-seed-2.0-pro"
+      }
+    },
+    {
+      "id": "call_order_query",
+      "type": "skill",
+      "data": {
+        "label": "调用订单查询",
+        "skill_type": "amazon_order_query",
+        "input_variable": "intent_result",
+        "output_variable": "order_data"
+      }
+    },
+    {
+      "id": "extract_fee_params",
+      "type": "llm",
+      "data": {
+        "label": "提取费用参数",
+        "system_prompt": "从用户的问题中提取以下信息（如果有的话）：\n- order_id: 订单ID\n- start_date: 开始日期（YYYY-MM-DD）\n- end_date: 结束日期（YYYY-MM-DD）\n- platform: 站点（us/uk/jp等）\n\n请以 JSON 格式返回，不要其他内容。",
+        "model": "doubao-seed-2.0-pro"
+      }
+    },
+    {
+      "id": "call_fee_query",
+      "type": "skill",
+      "data": {
+        "label": "调用费用查询",
+        "skill_type": "amazon_fee_query",
+        "input_variable": "fee_params",
+        "output_variable": "fee_data"
+      }
+    },
+    {
+      "id": "generate_response",
+      "type": "llm",
+      "data": {
+        "label": "生成客服回复",
+        "system_prompt": "你是一个专业的跨境电商客服。请根据查询结果，用友好、专业的语言回复客户。要求：\n1. 如果有数据，请结构化展示\n2. 对于英文的订单，适当解释说明\n3. 语言要亲切、有帮助",
+        "model": "doubao-seed-2.0-pro"
+      }
+    },
+    {
+      "id": "end",
+      "type": "output",
+      "data": {"label": "回复用户"}
+    }
+  ],
+  "edges": [
+    {"source": "start", "target": "intent_analysis"},
+    {"source": "intent_analysis", "target": "intent_router"},
+    {"source": "intent_router", "target": "extract_order_params", "condition": "intent == 'order_query'"},
+    {"source": "intent_router", "target": "extract_fee_params", "condition": "intent == 'fee_query'"},
+    {"source": "extract_order_params", "target": "call_order_query"},
+    {"source": "call_order_query", "target": "generate_response"},
+    {"source": "extract_fee_params", "target": "call_fee_query"},
+    {"source": "call_fee_query", "target": "generate_response"},
+    {"source": "generate_response", "target": "end"}
+  ]
+}
+

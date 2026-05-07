@@ -10,10 +10,15 @@ class Skill(BaseModel, TimestampMixin):
     
     name = fields.CharField(max_length=100, description="Skill name")
     description = fields.TextField(null=True, description="Skill description")
-    type = fields.CharField(max_length=50, description="Skill type")
-    parameters = fields.JSONField(null=True, description="Skill parameters")
-    implementation = fields.TextField(null=True, description="Skill implementation code")
+    implementation = fields.TextField(null=True, description="Skill content (Markdown format)")
     status = fields.CharField(max_length=20, default="active", description="Status: active/inactive")
+    category = fields.ForeignKeyField(
+        "models.SkillCategory", 
+        related_name="skills", 
+        null=True, 
+        on_delete=fields.SET_NULL,
+        description="Skill category"
+    )
     
     class Meta:
         table = "skill"

@@ -1,43 +1,80 @@
 """
-技能注册表
+Skill（技能）注册表
+技能由后台管理，存储在数据库中
 """
-from typing import Dict, Type, Optional
-import importlib
-import os
-import pkgutil
+from typing import Dict, Optional, List
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class SkillInfo:
+    """技能信息对象"""
+    def __init__(self, skill_id: str, name: str, description: str = "", content: str = ""):
+        self.skill_id = skill_id
+        self.name = name
+        self.description = description
+        self.content = content
+    
+    def get_required_tools(self) -> list:
+        """从内容中提取工具（如果需要）"""
+        return []
+    
+    def to_dict(self) -> Dict:
+        return {
+            "skill_id": self.skill_id,
+            "name": self.name,
+            "description": self.description,
+            "content": self.content
+        }
+
 
 class SkillRegistry:
     """技能注册表"""
-    _skills: Dict[str, Type] = {}
+    _skills: Dict[str, SkillInfo] = {}
     
     @classmethod
-    def register(cls, skill_type: str, skill_class: Type) -> None:
+    def register(cls, skill_id: str, name: str, description: str = "", content: str = "") -> None:
         """
         注册技能
         
         Args:
-            skill_type: 技能类型
-            skill_class: 技能类
+            skill_id: 技能 ID
+            name: 技能名称
+            description: 技能描述
+            content: 技能内容（markdown 文档）
         """
-        cls._skills[skill_type] = skill_class
+        skill_info = SkillInfo(skill_id, name, description, content)
+        cls._skills[skill_id] = skill_info
+        logger.info(f"Registered skill: {skill_id}")
     
     @classmethod
-    def get_skill(cls, skill_type: str) -> Optional[Type]:
+    def get_skill(cls, skill_id: str) -> Optional[SkillInfo]:
         """
-        获取技能类
+        获取技能
         
         Args:
-            skill_type: 技能类型
+            skill_id: 技能 ID
             
         Returns:
-            技能类
+            技能信息
         """
-        return cls._skills.get(skill_type)
+        return cls._skills.get(skill_id)
+    
+    @classmethod
+    def get_all_skills(cls) -> Dict[str, SkillInfo]:
+        """
+        获取所有注册的技能
+        
+        Returns:
+            技能字典
+        """
+        return cls._skills
     
     @classmethod
     def get_skill_types(cls) -> list:
         """
-        获取所有技能类型
+        获取所有技能类型（技能 ID 列表）
         
         Returns:
             技能类型列表
@@ -45,73 +82,51 @@ class SkillRegistry:
         return list(cls._skills.keys())
     
     @classmethod
-    def is_skill_registered(cls, skill_type: str) -> bool:
+    def list_skills(cls) -> List[Dict]:
         """
-        检查技能是否已注册
+        列出所有技能的信息
         
-        Args:
-            skill_type: 技能类型
-            
         Returns:
-            是否已注册
+            技能信息列表
         """
-        return skill_type in cls._skills
+        return [
+            skill.to_dict()
+            for skill in cls._skills.values()
+        ]
     
     @classmethod
-    async def auto_register_from_database(cls) -> None:
+    async def load_from_database(cls) -> None:
         """
-        从数据库自动注册技能
-        从数据库中读取技能配置，注册到注册表
+        从数据库加载所有技能
         """
         try:
             from base.plugins.agent.models.skill import Skill
-            from base.plugins.agent.skills.base import BaseSkill
             
-            # 获取所有活跃的技能
             skills = await Skill.filter(status="active").all()
             
-            # 注册技能
+            cls._skills.clear()
             for skill in skills:
-                # 检查技能是否已经注册
-                if not cls.is_skill_registered(skill.type):
-                    # 创建一个动态技能类
-                    class DynamicSkill(BaseSkill):
-                        @staticmethod
-                        def execute(params: dict):
-                            # 这里可以根据skill.implementation执行自定义逻辑
-                            # 目前返回默认响应
-                            return {
-                                "success": True,
-                                "skill_id": skill.id,
-                                "skill_name": skill.name,
-                                "parameters": params,
-                                "result": "Skill executed successfully"
-                            }
-                    
-                    # 注册技能
-                    cls.register(skill.type, DynamicSkill)
+                cls.register(
+                    skill_id=skill.type,
+                    name=skill.name,
+                    description=skill.description or "",
+                    content=skill.implementation or ""
+                )
+            
+            logger.info(f"Loaded {len(skills)} skills from database")
         except Exception as e:
-            print(f"Error auto-registering skills from database: {e}")
+            logger.error(f"Failed to load skills from database: {e}")
     
     @classmethod
     async def auto_register_all(cls) -> None:
         """
         自动注册所有技能
-        包括从代码和数据库注册
+        从数据库加载
         """
-        # 延迟导入避免循环导入
-        import importlib
-        import os
-        import pkgutil
-        
-        # 从代码自动注册技能
-        current_dir = os.path.dirname(__file__)
-        for _, module_name, _ in pkgutil.iter_modules([current_dir]):
-            if module_name in ['base', 'registry']:
-                continue
-            try:
-                module = importlib.import_module(f'base.plugins.agent.skills.{module_name}')
-            except Exception as e:
-                print(f"Error importing skill module {module_name}: {e}")
-        
-        await cls.auto_register_from_database()
+        await cls.load_from_database()
+    
+    @classmethod
+    def clear(cls) -> None:
+        """清空所有注册的技能"""
+        cls._skills.clear()
+        logger.info("Cleared all skills from registry")

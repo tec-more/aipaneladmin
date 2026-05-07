@@ -12,6 +12,9 @@
     "models": [
         "agent",
         "skill",
+        "skill_category",
+        "tool",
+        "tool_tag",
         "memory",
         "workflow",
         "dialog_flow",
@@ -20,6 +23,9 @@
     "schemas": [
         "agent",
         "skill",
+        "skill_category",
+        "tool",
+        "tool_tag",
         "memory",
         "workflow",
         "dialog_flow",
@@ -55,6 +61,11 @@
                     "name": "技能管理",
                     "path": "/agent/skills",
                     "component": "agent/skills"
+                },
+                {
+                    "name": "工具管理",
+                    "path": "/agent/tools",
+                    "component": "agent/tools"
                 },
                 {
                     "name": "记忆管理",

@@ -3,31 +3,37 @@ Agent Development Base Plugin
 """
 
 from fastapi import APIRouter
-from .api.v1 import dialog_flow, workflow, agent, skill, memory, joke, rag
 
-# 创建主路由
 router = APIRouter(prefix="/v1/agent")
 
-# 测试端点
-@router.get("/test")
-async def test_endpoint():
-    """测试端点"""
-    print("=== 测试端点被调用 ===")
-    from base.common.response import success_response
-    return success_response(data={"message": "测试成功"}, msg="测试端点响应成功")
 
-# 包含所有子路由
-router.include_router(agent.agent_router)
-router.include_router(skill.skill_router)
-router.include_router(memory.memory_router)
-router.include_router(workflow.workflow_router)
-router.include_router(workflow.workflow_execution_router)
-router.include_router(dialog_flow.dialog_flow_router)
-router.include_router(joke.joke_router)
-router.include_router(rag.rag_router)
+def _setup_routes():
+    """延迟设置路由，避免提前导入模型"""
+    from .api.v1 import dialog_flow, workflow, agent, skill, skill_category, tool, tool_tag, memory, joke, rag
+    
+    @router.get("/test")
+    async def test_endpoint():
+        """测试端点"""
+        print("=== 测试端点被调用 ===")
+        from base.common.response import success_response
+        return success_response(data={"message": "测试成功"}, msg="测试端点响应成功")
+
+    router.include_router(agent.agent_router)
+    router.include_router(skill.skill_router)
+    router.include_router(skill_category.skill_category_router)
+    router.include_router(tool.tool_router)
+    router.include_router(tool_tag.tool_tag_router)
+    router.include_router(memory.memory_router)
+    router.include_router(workflow.workflow_router)
+    router.include_router(workflow.workflow_execution_router)
+    router.include_router(dialog_flow.dialog_flow_router)
+    router.include_router(joke.joke_router)
+    router.include_router(rag.rag_router)
+
 
 async def on_enable(app):
     """Enable plugin"""
+    _setup_routes()
     app.include_router(router)
     return True
 

@@ -13,7 +13,7 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 if __name__ == "__main__":
     import uvicorn
-    PORT = 9998
+    PORT = 8000
     
     # 从环境变量获取配置，或使用默认值
     WORKERS = int(os.environ.get("UVICORN_WORKERS", "1"))  # 默认4个worker
@@ -48,8 +48,6 @@ if __name__ == "__main__":
             log_level="info",  # 设置日志级别
             limit_concurrency=LIMIT_CONCURRENCY,  # 限制并发连接数
             timeout_keep_alive=TIMEOUT_KEEP_ALIVE,  # 保持连接超时
-            # 以下配置优化长请求处理
-            timeout_notify=30,  # 通知超时
             backlog=2048,  # 等待连接队列大小
         )
     except Exception as e:

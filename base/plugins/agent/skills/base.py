@@ -1,33 +1,33 @@
 """
-技能基类
+Skill（技能）基类
+技能由后台管理，存储在数据库中
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class BaseSkill:
     """
     技能基类
-    所有技能都应该继承自这个类
+    技能的内容（markdown）存储在数据库的 implementation 字段中
     """
-    
-    @staticmethod
-    def execute(params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        执行技能
-        
-        Args:
-            params: 输入参数
-            
-        Returns:
-            执行结果
-        """
-        raise NotImplementedError("子类必须实现execute方法")
     
     @classmethod
     def get_name(cls) -> str:
-        """
-        获取技能名称
-        
-        Returns:
-            技能名称
-        """
+        """获取技能名称"""
         return cls.__name__
+    
+    @classmethod
+    def get_description(cls) -> str:
+        """获取技能描述"""
+        return cls.__doc__ or ""
+    
+    @classmethod
+    def get_required_tools(cls) -> list:
+        """
+        获取技能依赖的工具列表
+        子类可重写
+        """
+        return []

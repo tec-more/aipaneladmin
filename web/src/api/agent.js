@@ -268,6 +268,44 @@ export function getSkillUsage(id) {
   return request.get(`/v1/agent/skills/${id}/usage`)
 }
 
+export function getSkillContent(id) {
+  return request.get(`/v1/agent/skills/${id}/content`)
+}
+
+export function getSkillsByCategory(categoryId) {
+  return request.get(`/v1/agent/skills/category/${categoryId}`)
+}
+
+// ==================== 技能分类管理 ====================
+
+export function getSkillCategories(params) {
+  return request.get('/v1/agent/skill-categories/', { params })
+}
+
+export function getSkillCategory(id) {
+  return request.get(`/v1/agent/skill-categories/${id}`)
+}
+
+export function createSkillCategory(data) {
+  return request.post('/v1/agent/skill-categories/', data)
+}
+
+export function updateSkillCategory(id, data) {
+  return request.put(`/v1/agent/skill-categories/${id}`, data)
+}
+
+export function deleteSkillCategory(id) {
+  return request.delete(`/v1/agent/skill-categories/${id}`)
+}
+
+export function getSkillCategoryTree() {
+  return request.get('/v1/agent/skill-categories/tree/list')
+}
+
+export function getActiveSkillCategories() {
+  return request.get('/v1/agent/skill-categories/active/list')
+}
+
 // ==================== 记忆管理 ====================
 
 export function getMemories(params) {
@@ -466,6 +504,62 @@ export function uploadRAGDocument(knowledgeBaseId, file) {
 
 export function getDepartments(params) {
   return request.get('/v1/departments/list', { params })
+}
+
+// ==================== 工具管理 ====================
+
+export function getTools(params) {
+  return request.get('/v1/agent/tools/', { params })
+}
+
+export function getTool(id) {
+  return request.get(`/v1/agent/tools/${id}`)
+}
+
+export function createTool(data) {
+  return request.post('/v1/agent/tools/', data)
+}
+
+export function updateTool(id, data) {
+  return request.put(`/v1/agent/tools/${id}`, data)
+}
+
+export function deleteTool(id) {
+  return request.delete(`/v1/agent/tools/${id}`)
+}
+
+export function getActiveTools() {
+  return request.get('/v1/agent/tools/active/list')
+}
+
+// ==================== 工具标签管理 ====================
+
+export function getToolTags(params) {
+  return request.get('/v1/agent/tool-tags/', { params })
+}
+
+export function getToolTag(id) {
+  return request.get(`/v1/agent/tool-tags/${id}`)
+}
+
+export function createToolTag(data) {
+  return request.post('/v1/agent/tool-tags/', data)
+}
+
+export function updateToolTag(id, data) {
+  return request.put(`/v1/agent/tool-tags/${id}`, data)
+}
+
+export function deleteToolTag(id) {
+  return request.delete(`/v1/agent/tool-tags/${id}`)
+}
+
+export function getActiveToolTags() {
+  return request.get('/v1/agent/tool-tags/active/list')
+}
+
+export function getToolTagsWithCount() {
+  return request.get('/v1/agent/tool-tags/with-count')
 }
 
 // ==================== 工具函数 ====================

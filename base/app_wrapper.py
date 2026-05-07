@@ -54,7 +54,9 @@ class ASGIAppWithPrefix:
             if (original_path.startswith("/docs") or
                 original_path.startswith("/openapi") or
                 original_path.startswith("/redoc") or
-                original_path.startswith("/static")):
+                original_path.startswith("/static") or
+                original_path.startswith("/metrics") or
+                original_path.startswith("/health")):
                 # 直接传给 FastAPI，不处理
                 await self.app(scope, receive, send)
                 return

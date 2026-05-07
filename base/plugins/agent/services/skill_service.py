@@ -1,9 +1,11 @@
 """
 Skill service
 """
+import re
 from typing import List, Optional
 from tortoise.exceptions import DoesNotExist
 from base.plugins.agent.models.skill import Skill
+from base.plugins.agent.models.skill_category import SkillCategory
 from base.plugins.agent.schemas.skill import SkillCreate, SkillUpdate
 
 
@@ -11,28 +13,76 @@ class SkillService:
     """Skill service class"""
 
     @staticmethod
+    def parse_bound_tools(implementation: str) -> List[str]:
+        """
+        Parse bound tools from skill implementation (Markdown content)
+
+        Extracts tool names from the following format in markdown:
+        ## 🔧 可用工具
+        - tool_name1
+        - tool_name2
+
+        Or:
+        ## 可用工具
+        - amazon_order_query（订单查询）
+        - amazon_fee_query（费用查询）
+        """
+        if not implementation:
+            return []
+
+        tools = []
+        lines = implementation.split('\n')
+        in_tools_section = False
+
+        for line in lines:
+            stripped = line.strip()
+
+            if stripped.startswith('##') and ('可用工具' in stripped or '工具列表' in stripped or '可用工具' in stripped):
+                in_tools_section = True
+                continue
+
+            if in_tools_section:
+                if stripped.startswith('##'):
+                    in_tools_section = False
+                    break
+
+                tool_match = re.match(r'^[-*]\s*(?:\[.*?\]\s*)?([a-zA-Z_][a-zA-Z0-9_]*)', stripped)
+                if tool_match:
+                    tool_name = tool_match.group(1)
+                    if tool_name and tool_name not in tools:
+                        tools.append(tool_name)
+                elif stripped.startswith('-') or stripped.startswith('*'):
+                    continue
+                elif stripped and not stripped.startswith('#'):
+                    if stripped.startswith('-') or stripped.startswith('*'):
+                        parts = stripped[1:].strip().split('（')[0].split('(')[0].strip()
+                        if parts and parts not in tools:
+                            tools.append(parts)
+
+        return tools
+
+    @staticmethod
     async def create_skill(skill_data: SkillCreate) -> Skill:
         """Create skill"""
         skill = await Skill.create(
             name=skill_data.name,
             description=skill_data.description,
-            type=skill_data.type,
-            parameters=skill_data.parameters,
             implementation=skill_data.implementation,
-            status=skill_data.status
+            status=skill_data.status,
+            category_id=skill_data.category_id
         )
         return skill
 
     @staticmethod
-    async def get_skills(skip: int = 0, limit: int = 100, name: str = "", type: str = "", status: str = "") -> List[Skill]:
+    async def get_skills(skip: int = 0, limit: int = 100, name: str = "", status: str = "", category_id: int = None) -> List[Skill]:
         """Get skill list"""
         query = Skill.all()
         if name:
             query = query.filter(name__icontains=name)
-        if type:
-            query = query.filter(type=type)
         if status:
             query = query.filter(status=status)
+        if category_id:
+            query = query.filter(category_id=category_id)
         skills = await query.offset(skip).limit(limit)
         return skills
 
@@ -68,15 +118,15 @@ class SkillService:
         return True
 
     @staticmethod
-    async def get_skills_by_type(skill_type: str) -> List[Skill]:
-        """Get skills by type"""
-        skills = await Skill.filter(type=skill_type).all()
-        return skills
-
-    @staticmethod
     async def get_active_skills() -> List[Skill]:
         """Get active skills"""
         skills = await Skill.filter(status="active").all()
+        return skills
+
+    @staticmethod
+    async def get_skills_by_category(category_id: int) -> List[Skill]:
+        """Get skills by category"""
+        skills = await Skill.filter(category_id=category_id, status="active").all()
         return skills
 
     @staticmethod
@@ -85,22 +135,15 @@ class SkillService:
         skill = await SkillService.get_skill_by_id(skill_id)
         if not skill or skill.status != "active":
             return {"success": False, "message": "Skill not found or inactive"}
-        
+
         try:
-            # 从注册表中获取技能
-            from base.plugins.agent.skills.registry import SkillRegistry
-            skill_class = SkillRegistry.get_skill(skill.type)
-            if skill_class:
-                return skill_class.execute(parameters)
-            else:
-                # 返回默认响应
-                return {
-                    "success": True,
-                    "skill_id": skill_id,
-                    "skill_name": skill.name,
-                    "parameters": parameters,
-                    "result": "Skill executed successfully"
-                }
+            return {
+                "success": True,
+                "skill_id": skill_id,
+                "skill_name": skill.name,
+                "content_preview": skill.implementation[:200] + "..." if skill.implementation else None,
+                "message": "Skill content loaded successfully"
+            }
         except Exception as e:
             return {"success": False, "message": str(e)}
 
@@ -110,14 +153,69 @@ class SkillService:
         skill = await SkillService.get_skill_by_id(skill_id)
         if not skill:
             return {"error": "Skill not found"}
-        
-        # Get number of agents using this skill
+
         agents = await skill.agents.all()
         agent_count = len(agents)
-        
+
         return {
             "skill_id": skill_id,
             "skill_name": skill.name,
             "agent_count": agent_count,
             "agents": [agent.name for agent in agents]
         }
+
+    @staticmethod
+    async def get_skill_content(skill_id: int) -> Optional[dict]:
+        """Get skill content (Markdown)"""
+        skill = await SkillService.get_skill_by_id(skill_id)
+        if not skill:
+            return None
+
+        return {
+            "id": skill.id,
+            "name": skill.name,
+            "content": skill.implementation or ""
+        }
+
+    @staticmethod
+    async def get_skill_with_category(skill_id: int) -> Optional[dict]:
+        """Get skill with category information"""
+        skill = await SkillService.get_skill_by_id(skill_id)
+        if not skill:
+            return None
+
+        category_name = None
+        if skill.category_id:
+            category = await SkillCategory.get_or_none(id=skill.category_id)
+            if category:
+                category_name = category.name
+
+        agent_count = await skill.agents.count()
+        bound_tools = SkillService.parse_bound_tools(skill.implementation)
+
+        return {
+            "id": skill.id,
+            "name": skill.name,
+            "description": skill.description,
+            "implementation": skill.implementation,
+            "status": skill.status,
+            "category_id": skill.category_id,
+            "category_name": category_name,
+            "created_at": skill.created_at,
+            "updated_at": skill.updated_at,
+            "agent_count": agent_count,
+            "bound_tools": bound_tools
+        }
+
+    @staticmethod
+    async def get_all_skills_with_category() -> List[dict]:
+        """Get all skills with category information"""
+        skills = await Skill.all()
+        result = []
+
+        for skill in skills:
+            detail = await SkillService.get_skill_with_category(skill.id)
+            if detail:
+                result.append(detail)
+
+        return result
