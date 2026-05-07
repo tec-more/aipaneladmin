@@ -1,0 +1,172 @@
+{
+  "agent": {
+    "name": "智能旅行预订助手",
+    "description": "基于LangChain和ReAct的智能旅行预订助手，帮助用户规划行程、预订机票酒店",
+    "status": "active",
+    "reasoning_strategy": "react",
+    "default_memory_mode": "private",
+    "memory_capacity": 200,
+    "system_prompt": "你是一个专业的旅行预订助手，帮助用户规划完美的旅行行程。\n\n你的能力：\n- 分析用户旅行需求：目的地、日期、预算、人数、偏好\n- 查询航班信息、价格比较、机票预订\n- 查询酒店信息、房间选择、酒店预订\n- 查询目的地天气、景点推荐\n- 生成完整的旅行方案\n\n你的边界：\n- 不直接处理支付，引导用户到官方渠道\n- 不编造不存在的航班或酒店信息\n- 保护用户隐私信息\n\n行为准则：\n- 友好专业，主动提问获取完整需求\n- 提供多个选项供用户选择\n- 及时响应用户变更需求\n- 给出合理建议和注意事项\n\n反思逻辑：\n先分析需求→再查询信息→评估结果→确认方案→总结回复",
+    "graph_definition": {
+      "nodes": [
+        {
+          "id": "think-1",
+          "type": "llm",
+          "name": "需求分析",
+          "position": {"x": 100, "y": 100},
+          "config": {
+            "prompt": "分析用户的旅行需求，提取以下信息：\n- 目的地\n- 出发/返回日期\n- 出行人数\n- 预算范围\n- 特殊偏好（如酒店星级、航班时间等）\n\n如果信息不完整，明确指出需要补充什么信息。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "act-1",
+          "type": "tool",
+          "name": "查询航班",
+          "position": {"x": 100, "y": 200},
+          "config": {
+            "tool_name": "flight_query",
+            "description": "查询可用航班信息"
+          }
+        },
+        {
+          "id": "act-2",
+          "type": "tool",
+          "name": "查询酒店",
+          "position": {"x": 300, "y": 200},
+          "config": {
+            "tool_name": "hotel_query",
+            "description": "查询目的地酒店信息"
+          }
+        },
+        {
+          "id": "act-3",
+          "type": "tool",
+          "name": "查询天气",
+          "position": {"x": 500, "y": 200},
+          "config": {
+            "tool_name": "weather_query",
+            "description": "查询目的地天气预报"
+          }
+        },
+        {
+          "id": "observe-1",
+          "type": "llm",
+          "name": "方案评估",
+          "position": {"x": 300, "y": 300},
+          "config": {
+            "prompt": "整合航班、酒店、天气信息，评估是否满足用户需求。\n考虑因素：\n- 价格是否在预算内\n- 时间是否合适\n- 酒店位置是否便利\n- 天气是否适合出行\n\n如果有多个选项，对比各选项优劣。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "decision-1",
+          "type": "decision",
+          "name": "是否需要更多查询",
+          "position": {"x": 300, "y": 400},
+          "config": {
+            "condition": "是否需要更多信息或需要重新查询？"
+          }
+        },
+        {
+          "id": "final-1",
+          "type": "llm",
+          "name": "生成方案",
+          "position": {"x": 300, "y": 500},
+          "config": {
+            "prompt": "根据所有信息，生成完整的旅行方案，包括：\n\n1. 航班信息（航班号、时间、价格）\n2. 酒店信息（酒店名称、房型、价格、位置）\n3. 行程建议\n4. 注意事项\n5. 总预算预估\n\n格式友好，易于阅读。",
+            "model_id": 1
+          }
+        }
+      ],
+      "edges": [
+        {"source": "think-1", "target": "act-1"},
+        {"source": "think-1", "target": "act-2"},
+        {"source": "think-1", "target": "act-3"},
+        {"source": "act-1", "target": "observe-1"},
+        {"source": "act-2", "target": "observe-1"},
+        {"source": "act-3", "target": "observe-1"},
+        {"source": "observe-1", "target": "decision-1"},
+        {"source": "decision-1", "target": "think-1", "condition": "yes"},
+        {"source": "decision-1", "target": "final-1", "condition": "no"}
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "flight_query",
+      "display_name": "航班查询",
+      "description": "查询航班信息，包括价格、时间、航空公司",
+      "func_path": "base.plugins.agent.tools.travel.flight_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "origin": {"type": "string", "description": "出发地"},
+          "destination": {"type": "string", "description": "目的地"},
+          "date": {"type": "string", "description": "出发日期"},
+          "passengers": {"type": "integer", "description": "乘客人数"}
+        },
+        "required": ["origin", "destination", "date"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "hotel_query",
+      "display_name": "酒店查询",
+      "description": "查询酒店信息，包括价格、位置、房型",
+      "func_path": "base.plugins.agent.tools.travel.hotel_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {"type": "string", "description": "城市"},
+          "check_in": {"type": "string", "description": "入住日期"},
+          "check_out": {"type": "string", "description": "退房日期"},
+          "guests": {"type": "integer", "description": "客人人数"}
+        },
+        "required": ["city", "check_in", "check_out"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "weather_query",
+      "display_name": "天气查询",
+      "description": "查询目的地天气预报",
+      "func_path": "base.plugins.agent.tools.travel.weather_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {"type": "string", "description": "城市"},
+          "days": {"type": "integer", "description": "查询天数"}
+        },
+        "required": ["city"]
+      },
+      "enabled": true
+    }
+  ],
+  "skills": [
+    {
+      "name": "行程规划",
+      "description": "根据用户需求和查询结果规划最佳行程",
+      "implementation": "## 行程规划技能\n\n### 目标\n帮助用户规划合理的旅行行程安排。\n\n### 步骤\n1. 分析用户旅行天数\n2. 推荐每日活动安排\n3. 考虑交通时间\n4. 留出灵活时间\n5. 给出注意事项",
+      "status": "active",
+      "category_id": 1
+    },
+    {
+      "name": "预算管理",
+      "description": "帮助用户管理旅行预算，优化支出",
+      "implementation": "## 预算管理技能\n\n### 目标\n确保旅行支出在用户预算范围内。\n\n### 步骤\n1. 汇总各项费用\n2. 计算总预算\n3. 给出省钱建议\n4. 推荐性价比高的选择",
+      "status": "active",
+      "category_id": 1
+    }
+  ],
+  "rag": {
+    "name": "旅行知识库",
+    "description": "包含旅行攻略、目的地介绍、常见问题等知识",
+    "documents": [
+      "热门目的地旅行攻略",
+      "出行注意事项",
+      "签证办理指南",
+      "行李打包清单"
+    ]
+  }
+}

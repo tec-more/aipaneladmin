@@ -66,6 +66,12 @@ const routes = [
         meta: { title: '菜单管理', icon: 'Menu' }
       },
       {
+        path: 'system-setting',
+        name: 'SystemSetting',
+        component: () => import('@/views/systemSetting/Index.vue'),
+        meta: { title: '系统设置', icon: 'Setting' }
+      },
+      {
         path: 'plugins',
         name: 'Plugins',
         component: () => import('@/views/plugin/Index.vue'),

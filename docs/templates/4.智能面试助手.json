@@ -1,0 +1,144 @@
+{
+  "agent": {
+    "name": "智能面试助手",
+    "description": "专业的面试助手，支持简历解析、问题生成、答案评估、面试报告",
+    "status": "active",
+    "reasoning_strategy": "react",
+    "default_memory_mode": "private",
+    "memory_capacity": 200,
+    "system_prompt": "你是一个专业的面试官，帮助企业进行高效的人才面试。\n\n你的能力：\n- 解析简历，提取关键信息\n- 根据岗位要求生成面试问题\n- 评估候选人答案，给出评分\n- 生成完整的面试评估报告\n- 提供录用建议\n\n你的边界：\n- 不替代最终人事决策\n- 保持客观公正\n- 保护候选人隐私\n\n行为准则：\n- 专业公正\n- 问题有针对性\n- 评估有依据\n- 报告详实",
+    "graph_definition": {
+      "nodes": [
+        {
+          "id": "resume",
+          "type": "llm",
+          "name": "简历解析",
+          "position": {"x": 150, "y": 80},
+          "config": {
+            "prompt": "解析候选人简历，提取以下信息：\n\n1. 基本信息：姓名、学历、工作年限\n2. 工作经历：公司、职位、职责、业绩\n3. 技能专长：专业技能、软技能\n4. 项目经验：项目描述、角色、成果\n5. 教育背景：学校、专业、成就\n\n总结候选人的优势和待考察点。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "requirement",
+          "type": "rag",
+          "name": "岗位要求",
+          "position": {"x": 350, "y": 80},
+          "config": {
+            "rag_id": 1,
+            "description": "检索岗位要求、职责描述、能力模型"
+          }
+        },
+        {
+          "id": "question",
+          "type": "llm",
+          "name": "问题生成",
+          "position": {"x": 250, "y": 200},
+          "config": {
+            "prompt": "根据简历分析和岗位要求，生成面试问题：\n\n1. 行为面试题（STAR法则）：考察过去经历\n2. 情景面试题：考察应对能力\n3. 专业技能题：考察技术能力\n4. 价值观匹配题：考察文化适配\n5. 自我认知题：考察自我认知\n\n每个问题注明考察维度和评分标准。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "evaluate",
+          "type": "llm",
+          "name": "答案评估",
+          "position": {"x": 150, "y": 350},
+          "config": {
+            "prompt": "评估候选人的回答，从以下维度评分（1-10分）：\n\n1. 专业性：回答的专业程度\n2. 逻辑性：回答的条理清晰程度\n3. 真实性：回答的可信程度\n4. 匹配度：与岗位要求的匹配程度\n5. 表达力：语言表达能力\n\n给出详细评语和改进建议。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "score",
+          "type": "tool",
+          "name": "评分记录",
+          "position": {"x": 350, "y": 350},
+          "config": {
+            "tool_name": "score_record",
+            "description": "记录面试评分"
+          }
+        },
+        {
+          "id": "report",
+          "type": "llm",
+          "name": "生成报告",
+          "position": {"x": 250, "y": 500},
+          "config": {
+            "prompt": "生成完整的面试评估报告，包括：\n\n1. 候选人概览：背景、优势、劣势\n2. 面试表现：各维度评分、详细评价\n3. 能力分析：胜任力分析、发展潜力\n4. 文化适配：价值观匹配度分析\n5. 录用建议：建议录用/待定/不推荐，说明理由\n6. 后续安排：如建议录用，提出入职建议和培训计划",
+            "model_id": 1
+          }
+        }
+      ],
+      "edges": [
+        {"source": "resume", "target": "question"},
+        {"source": "requirement", "target": "question"},
+        {"source": "question", "target": "evaluate"},
+        {"source": "evaluate", "target": "score"},
+        {"source": "score", "target": "report"}
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "score_record",
+      "display_name": "评分记录",
+      "description": "记录和保存面试评分",
+      "func_path": "base.plugins.agent.tools.interview.score_record",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "candidate_id": {"type": "string", "description": "候选人ID"},
+          "dimension": {"type": "string", "description": "评分维度"},
+          "score": {"type": "integer", "description": "评分"},
+          "comment": {"type": "string", "description": "评语"}
+        },
+        "required": ["candidate_id", "dimension", "score"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "interview_schedule",
+      "display_name": "面试安排",
+      "description": "安排面试日程",
+      "func_path": "base.plugins.agent.tools.interview.interview_schedule",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "candidate_id": {"type": "string", "description": "候选人ID"},
+          "interviewers": {"type": "array", "description": "面试官列表"},
+          "time": {"type": "string", "description": "面试时间"},
+          "format": {"type": "string", "description": "面试形式：线上/线下"}
+        },
+        "required": ["candidate_id", "time"]
+      },
+      "enabled": true
+    }
+  ],
+  "skills": [
+    {
+      "name": "面试技巧",
+      "description": "专业的面试提问和评估技巧",
+      "implementation": "## 面试技巧技能\n\n### STAR法则提问\n- Situation：情境\n- Task：任务\n- Action：行动\n- Result：结果\n\n### 行为面试法\n- 关注过去行为预测未来表现\n- 追问具体细节\n- 区分事实和观点\n\n### 评估标准\n- 评分依据明确\n- 多维度综合评价\n- 避免主观偏见",
+      "status": "active",
+      "category_id": 5
+    },
+    {
+      "name": "人才评估",
+      "description": "人才评估和发展建议",
+      "implementation": "## 人才评估技能\n\n### 胜任力模型\n- 专业能力\n- 软技能\n- 领导力潜质\n- 学习能力\n\n### 发展建议\n- 优势发挥\n- 短板提升\n- 职业规划\n- 培训计划",
+      "status": "active",
+      "category_id": 5
+    }
+  ],
+  "rag": {
+    "name": "面试知识库",
+    "description": "包含岗位要求、面试题库、评估标准等",
+    "documents": [
+      "岗位JD库",
+      "面试题库",
+      "胜任力模型",
+      "评估标准"
+    ]
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "agent": {
+    "name": "电商智能客服",
+    "description": "专业的电商在线客服，处理用户咨询、售后问题、投诉处理等",
+    "status": "active",
+    "reasoning_strategy": "react",
+    "default_memory_mode": "private",
+    "memory_capacity": 150,
+    "system_prompt": "你是一个专业的电商客服，为用户提供友好、高效的服务。\n\n你的能力：\n- 识别用户意图：咨询、售后、投诉、推荐等\n- 查询商品信息、库存、价格\n- 查询订单状态、物流信息\n- 处理退款、换货申请\n- 解答常见问题\n- 安抚用户情绪\n\n你的边界：\n- 不处理涉及隐私的敏感信息\n- 不承诺超出权限的事情\n- 复杂问题及时转接人工\n\n行为准则：\n- 友好耐心，使用礼貌用语\n- 快速响应用户问题\n- 主动提供帮助\n- 无法解决时及时转接人工\n\n反思逻辑：\n识别意图→查询信息→生成回复→确认是否解决→如未解决则转接人工",
+    "graph_definition": {
+      "nodes": [
+        {
+          "id": "intent",
+          "type": "llm",
+          "name": "意图识别",
+          "position": {"x": 200, "y": 80},
+          "config": {
+            "prompt": "分析用户消息，识别用户意图，分类为以下之一：\n\n1. 商品咨询 - 询问商品信息、规格、价格、库存等\n2. 订单查询 - 询问订单状态、物流信息、配送时间等\n3. 售后问题 - 退换货、退款、质量问题等\n4. 投诉建议 - 用户不满、建议反馈等\n5. 商品推荐 - 寻找合适商品\n6. 其他 - 无法明确分类的\n\n同时识别用户情绪：正面/中性/负面/愤怒",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "faq",
+          "type": "rag",
+          "name": "FAQ检索",
+          "position": {"x": 80, "y": 200},
+          "config": {
+            "rag_id": 1,
+            "description": "从FAQ库中检索相关答案"
+          }
+        },
+        {
+          "id": "order_query",
+          "type": "tool",
+          "name": "订单查询",
+          "position": {"x": 250, "y": 200},
+          "config": {
+            "tool_name": "order_query",
+            "description": "查询订单信息"
+          }
+        },
+        {
+          "id": "product_query",
+          "type": "tool",
+          "name": "商品查询",
+          "position": {"x": 420, "y": 200},
+          "config": {
+            "tool_name": "product_query",
+            "description": "查询商品信息"
+          }
+        },
+        {
+          "id": "logistics_query",
+          "type": "tool",
+          "name": "物流查询",
+          "position": {"x": 590, "y": 200},
+          "config": {
+            "tool_name": "logistics_query",
+            "description": "查询物流信息"
+          }
+        },
+        {
+          "id": "reply",
+          "type": "llm",
+          "name": "生成回复",
+          "position": {"x": 300, "y": 350},
+          "config": {
+            "prompt": "根据意图识别和查询结果，生成友好的回复。\n\n要求：\n- 语气温和友好\n- 信息准确完整\n- 复杂问题给出解决步骤\n- 如用户情绪负面，先安抚再处理问题",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "decision",
+          "type": "decision",
+          "name": "是否转人工",
+          "position": {"x": 300, "y": 480},
+          "config": {
+            "condition": "判断是否需要转接人工客服：\n- 问题复杂，无法自动处理\n- 用户明确要求人工\n- 用户情绪愤怒，需要人工安抚\n- 涉及退款、投诉等敏感操作\n\n如果满足以上任一条件，则转接人工。"
+          }
+        },
+        {
+          "id": "escalate",
+          "type": "llm",
+          "name": "转接人工",
+          "position": {"x": 150, "y": 580},
+          "config": {
+            "prompt": "告知用户已转接人工客服，告知用户排队情况，安抚用户等待。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "final",
+          "type": "llm",
+          "name": "结束对话",
+          "position": {"x": 450, "y": 580},
+          "config": {
+            "prompt": "询问用户问题是否解决，是否还有其他需要帮助的。\n\n如用户表示满意，礼貌结束对话，并邀请用户评价服务。",
+            "model_id": 1
+          }
+        }
+      ],
+      "edges": [
+        {"source": "intent", "target": "faq"},
+        {"source": "intent", "target": "order_query", "condition": "订单查询"},
+        {"source": "intent", "target": "product_query", "condition": "商品咨询"},
+        {"source": "intent", "target": "logistics_query", "condition": "物流查询"},
+        {"source": "faq", "target": "reply"},
+        {"source": "order_query", "target": "reply"},
+        {"source": "product_query", "target": "reply"},
+        {"source": "logistics_query", "target": "reply"},
+        {"source": "reply", "target": "decision"},
+        {"source": "decision", "target": "escalate", "condition": "yes"},
+        {"source": "decision", "target": "final", "condition": "no"}
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "order_query",
+      "display_name": "订单查询",
+      "description": "查询订单信息，包括状态、金额、商品等",
+      "func_path": "base.plugins.agent.tools.ecommerce.order_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "order_id": {"type": "string", "description": "订单号"}
+        },
+        "required": ["order_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "product_query",
+      "display_name": "商品查询",
+      "description": "查询商品信息，包括价格、库存、规格等",
+      "func_path": "base.plugins.agent.tools.ecommerce.product_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "product_id": {"type": "string", "description": "商品ID"},
+          "keyword": {"type": "string", "description": "搜索关键词"}
+        }
+      },
+      "enabled": true
+    },
+    {
+      "name": "logistics_query",
+      "display_name": "物流查询",
+      "description": "查询物流信息",
+      "func_path": "base.plugins.agent.tools.ecommerce.logistics_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "tracking_number": {"type": "string", "description": "物流单号"}
+        },
+        "required": ["tracking_number"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "refund_request",
+      "display_name": "退款申请",
+      "description": "提交退款申请",
+      "func_path": "base.plugins.agent.tools.ecommerce.refund_request",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "order_id": {"type": "string", "description": "订单号"},
+          "reason": {"type": "string", "description": "退款原因"}
+        },
+        "required": ["order_id", "reason"]
+      },
+      "enabled": true
+    }
+  ],
+  "skills": [
+    {
+      "name": "情绪安抚",
+      "description": "安抚情绪激动或不满的用户",
+      "implementation": "## 情绪安抚技能\n\n### 目标\n平复用户情绪，建立良好沟通氛围。\n\n### 步骤\n1. 表达理解和共情\n2. 真诚道歉（如适用）\n3. 承诺解决问题\n4. 给出处理方案\n5. 保持耐心",
+      "status": "active",
+      "category_id": 2
+    },
+    {
+      "name": "问题升级",
+      "description": "处理需要升级的复杂问题",
+      "implementation": "## 问题升级技能\n\n### 目标\n确保复杂问题得到妥善处理。\n\n### 步骤\n1. 记录问题详情\n2. 评估是否需要升级\n3. 告知用户处理流程\n4. 转接相关负责人\n5. 跟进处理进度",
+      "status": "active",
+      "category_id": 2
+    }
+  ],
+  "rag": {
+    "name": "电商知识库",
+    "description": "包含商品知识、售后政策、常见问题等",
+    "documents": [
+      "常见问题FAQ",
+      "退换货政策",
+      "配送说明",
+      "支付方式",
+      "商品使用指南"
+    ]
+  }
+}

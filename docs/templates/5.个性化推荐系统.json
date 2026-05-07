@@ -1,0 +1,184 @@
+{
+  "agent": {
+    "name": "个性化推荐系统",
+    "description": "智能推荐系统，支持用户画像、协同过滤、内容推荐、混合推荐",
+    "status": "active",
+    "reasoning_strategy": "function_call",
+    "default_memory_mode": "private",
+    "memory_capacity": 200,
+    "system_prompt": "你是一个专业的推荐系统，为用户提供个性化的推荐服务。\n\n你的能力：\n- 构建用户画像（兴趣、偏好、消费能力等）\n- 基于协同过滤推荐\n- 基于内容的推荐\n- 混合推荐策略\n- 生成推荐理由，提升可解释性\n\n你的边界：\n- 保护用户隐私\n- 避免推荐重复内容\n- 保持推荐多样性\n\n行为准则：\n- 推荐精准相关\n- 结果多样有趣\n- 解释清晰可信",
+    "graph_definition": {
+      "nodes": [
+        {
+          "id": "profile",
+          "type": "llm",
+          "name": "用户画像",
+          "position": {"x": 150, "y": 80},
+          "config": {
+            "prompt": "分析用户行为数据，构建用户画像：\n\n1. 基本特征：年龄、性别、地域\n2. 兴趣偏好：浏览历史、搜索记录、收藏内容\n3. 消费特征：消费水平、购买频率、品牌偏好\n4. 行为特征：活跃时间、使用习惯\n5. 社交特征：关注内容、分享行为\n\n用标签化方式总结用户画像。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "behavior",
+          "type": "tool",
+          "name": "行为数据",
+          "position": {"x": 350, "y": 80},
+          "config": {
+            "tool_name": "user_behavior_query",
+            "description": "查询用户历史行为数据"
+          }
+        },
+        {
+          "id": "cf",
+          "type": "tool",
+          "name": "协同过滤",
+          "position": {"x": 100, "y": 220},
+          "config": {
+            "tool_name": "collaborative_filtering",
+            "description": "基于用户或物品的协同过滤推荐"
+          }
+        },
+        {
+          "id": "content",
+          "type": "tool",
+          "name": "内容推荐",
+          "position": {"x": 250, "y": 220},
+          "config": {
+            "tool_name": "content_based",
+            "description": "基于内容相似度的推荐"
+          }
+        },
+        {
+          "id": "trending",
+          "type": "tool",
+          "name": "热门推荐",
+          "position": {"x": 400, "y": 220},
+          "config": {
+            "tool_name": "trending_query",
+            "description": "查询热门和 trending 内容"
+          }
+        },
+        {
+          "id": "rank",
+          "type": "llm",
+          "name": "排序优化",
+          "position": {"x": 250, "y": 360},
+          "config": {
+            "prompt": "对多个推荐源的结果进行融合和重排序：\n\n考虑因素：\n1. 相关性：与用户兴趣的匹配度\n2. 新鲜度：内容的时效性\n3. 多样性：避免内容同质化\n4. 惊喜度：推荐用户可能感兴趣但未关注的\n5. 商业目标：根据业务需求调整\n\n输出Top N推荐结果，每个结果附推荐理由。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "explain",
+          "type": "llm",
+          "name": "推荐解释",
+          "position": {"x": 250, "y": 500},
+          "config": {
+            "prompt": "为每个推荐生成友好的解释，提升推荐的可信度：\n\n解释模板：\n- \"基于你对XX的兴趣，推荐...\"\n- \"购买了XX的用户也喜欢...\"\n- \"根据你的浏览历史，发现你可能喜欢...\"\n- \"这是当前热门的...\"\n\n解释要自然，不使用生硬的技术术语。",
+            "model_id": 1
+          }
+        }
+      ],
+      "edges": [
+        {"source": "profile", "target": "cf"},
+        {"source": "behavior", "target": "cf"},
+        {"source": "profile", "target": "content"},
+        {"source": "behavior", "target": "content"},
+        {"source": "cf", "target": "rank"},
+        {"source": "content", "target": "rank"},
+        {"source": "trending", "target": "rank"},
+        {"source": "rank", "target": "explain"}
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "user_behavior_query",
+      "display_name": "行为数据查询",
+      "description": "查询用户历史行为数据",
+      "func_path": "base.plugins.agent.tools.recommendation.user_behavior_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {"type": "string", "description": "用户ID"},
+          "behavior_type": {"type": "string", "description": "行为类型：view/buy/collect"},
+          "days": {"type": "integer", "description": "查询天数"}
+        },
+        "required": ["user_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "collaborative_filtering",
+      "display_name": "协同过滤",
+      "description": "基于协同过滤的推荐",
+      "func_path": "base.plugins.agent.tools.recommendation.collaborative_filtering",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {"type": "string", "description": "用户ID"},
+          "method": {"type": "string", "description": "方法：user_based/item_based"},
+          "top_k": {"type": "integer", "description": "返回数量"}
+        },
+        "required": ["user_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "content_based",
+      "display_name": "内容推荐",
+      "description": "基于内容的推荐",
+      "func_path": "base.plugins.agent.tools.recommendation.content_based",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {"type": "string", "description": "用户ID"},
+          "top_k": {"type": "integer", "description": "返回数量"}
+        },
+        "required": ["user_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "trending_query",
+      "display_name": "热门查询",
+      "description": "查询热门内容",
+      "func_path": "base.plugins.agent.tools.recommendation.trending_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {"type": "string", "description": "分类"},
+          "top_k": {"type": "integer", "description": "返回数量"}
+        }
+      },
+      "enabled": true
+    }
+  ],
+  "skills": [
+    {
+      "name": "推荐策略",
+      "description": "推荐系统策略和优化",
+      "implementation": "## 推荐策略技能\n\n### 冷启动处理\n- 新用户：热门推荐 + 兴趣引导\n- 新物品：相似物品关联\n- 解决数据稀疏问题\n\n### 多样性与准确性平衡\n- 避免信息茧房\n- 引入探索性推荐\n- 长期兴趣与短期热点结合\n\n### A/B测试\n- 实验设计\n- 指标监测\n- 策略迭代",
+      "status": "active",
+      "category_id": 6
+    },
+    {
+      "name": "用户理解",
+      "description": "用户行为分析和理解",
+      "implementation": "## 用户理解技能\n\n### 用户分群\n- 按行为特征分群\n- 按价值分层\n- 按生命周期阶段划分\n\n### 需求挖掘\n- 显式需求 vs 隐式需求\n- 场景化推荐\n- 实时意图识别\n\n### 兴趣演化\n- 跟踪兴趣变化\n- 预测趋势\n- 适时推荐新品",
+      "status": "active",
+      "category_id": 6
+    }
+  ],
+  "rag": {
+    "name": "推荐知识库",
+    "description": "包含商品库、用户标签、推荐规则等",
+    "documents": [
+      "商品库",
+      "用户标签体系",
+      "推荐规则",
+      "黑名单过滤"
+    ]
+  }
+}

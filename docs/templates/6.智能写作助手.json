@@ -1,0 +1,167 @@
+{
+  "agent": {
+    "name": "智能写作助手",
+    "description": "专业的写作助手，支持文章生成、内容润色、风格转换、逻辑优化",
+    "status": "active",
+    "reasoning_strategy": "react",
+    "default_memory_mode": "private",
+    "memory_capacity": 200,
+    "system_prompt": "你是一个专业的写作助手，帮助用户提升写作质量。\n\n你的能力：\n- 生成文章初稿（大纲→初稿）\n- 内容润色和优化\n- 风格转换（正式/轻松/学术等）\n- 逻辑和结构优化\n- 错别字和语法检查\n\n你的边界：\n- 不代写作业或考试内容\n- 保持用户原创性\n- 提供建议而非替代用户创作\n\n行为准则：\n- 尊重用户风格\n- 提供多种选择\n- 解释修改原因",
+    "graph_definition": {
+      "nodes": [
+        {
+          "id": "analyze",
+          "type": "llm",
+          "name": "需求分析",
+          "position": {"x": 250, "y": 80},
+          "config": {
+            "prompt": "分析用户写作需求：\n\n1. 文章类型：博客/论文/邮件/文案/报告等\n2. 目标读者：受众群体、专业程度\n3. 写作风格：正式/轻松/学术/商务\n4. 篇幅要求：大概字数\n5. 核心要点：需要表达的关键信息\n\n如果信息不完整，引导用户补充。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "rag",
+          "type": "rag",
+          "name": "参考资料",
+          "position": {"x": 100, "y": 200},
+          "config": {
+            "rag_id": 1,
+            "description": "检索相关的写作模板、范文、专业术语等"
+          }
+        },
+        {
+          "id": "outline",
+          "type": "llm",
+          "name": "大纲生成",
+          "position": {"x": 250, "y": 200},
+          "config": {
+            "prompt": "根据需求生成文章大纲：\n\n1. 引人入胜的标题建议（3-5个）\n2. 清晰的段落结构\n3. 每个段落的核心要点\n4. 逻辑过渡建议\n\n大纲要有层次感，逻辑递进。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "draft",
+          "type": "llm",
+          "name": "初稿生成",
+          "position": {"x": 400, "y": 200},
+          "config": {
+            "prompt": "根据大纲生成文章初稿：\n\n要求：\n- 内容充实，有细节\n- 语言流畅自然\n- 符合目标风格\n- 段落之间过渡自然\n\n初稿可以有多个版本供选择。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "polish",
+          "type": "llm",
+          "name": "内容润色",
+          "position": {"x": 150, "y": 350},
+          "config": {
+            "prompt": "对文章进行润色优化：\n\n1. 词汇优化：替换普通词汇，使用更精准的表达\n2. 句式变化：长短句结合，增强节奏感\n3. 修辞运用：适当使用比喻、排比等\n4. 细节丰富：让内容更生动具体\n\n保留原文核心意思，只做优化。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "check",
+          "type": "tool",
+          "name": "质量检查",
+          "position": {"x": 350, "y": 350},
+          "config": {
+            "tool_name": "quality_check",
+            "description": "检查语法、拼写、标点等"
+          }
+        },
+        {
+          "id": "final",
+          "type": "llm",
+          "name": "最终版本",
+          "position": {"x": 250, "y": 500},
+          "config": {
+            "prompt": "整合所有优化，输出最终版本，并附写作总结：\n\n1. 最终文章\n2. 主要修改说明\n3. 写作建议和技巧\n4. 可进一步优化的方向\n\n格式清晰，易于对比。",
+            "model_id": 1
+          }
+        }
+      ],
+      "edges": [
+        {"source": "analyze", "target": "rag"},
+        {"source": "analyze", "target": "outline"},
+        {"source": "rag", "target": "draft"},
+        {"source": "outline", "target": "draft"},
+        {"source": "draft", "target": "polish"},
+        {"source": "polish", "target": "check"},
+        {"source": "check", "target": "final"}
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "quality_check",
+      "display_name": "质量检查",
+      "description": "检查语法、拼写、标点错误",
+      "func_path": "base.plugins.agent.tools.writing.quality_check",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "description": "待检查文本"},
+          "language": {"type": "string", "description": "语言"}
+        },
+        "required": ["text"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "style_transfer",
+      "display_name": "风格转换",
+      "description": "转换文章风格",
+      "func_path": "base.plugins.agent.tools.writing.style_transfer",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "description": "原文"},
+          "target_style": {"type": "string", "description": "目标风格"}
+        },
+        "required": ["text", "target_style"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "synonym_query",
+      "display_name": "同义词查询",
+      "description": "查询同义词和相关表达",
+      "func_path": "base.plugins.agent.tools.writing.synonym_query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "word": {"type": "string", "description": "单词"},
+          "context": {"type": "string", "description": "上下文"}
+        },
+        "required": ["word"]
+      },
+      "enabled": true
+    }
+  ],
+  "skills": [
+    {
+      "name": "写作技巧",
+      "description": "各类文体的写作技巧",
+      "implementation": "## 写作技巧技能\n\n### 标题技巧\n- 吸引眼球\n- 概括主题\n- 设置悬念\n\n### 开篇技巧\n- 故事引入\n- 提问启发\n- 数据震撼\n\n### 结构技巧\n- 总-分-总\n- 并列结构\n- 递进结构\n\n### 结尾技巧\n- 总结升华\n- 行动号召\n- 留有余味",
+      "status": "active",
+      "category_id": 7
+    },
+    {
+      "name": "风格指导",
+      "description": "不同写作风格的特点和应用",
+      "implementation": "## 风格指导技能\n\n### 正式风格\n- 用词严谨\n- 句子完整\n- 避免口语\n\n### 轻松风格\n- 用词活泼\n- 句式灵活\n- 适当口语\n\n### 学术风格\n- 术语准确\n- 逻辑严密\n- 引用规范\n\n### 商务风格\n- 简洁明了\n- 重点突出\n- 专业礼貌",
+      "status": "active",
+      "category_id": 7
+    }
+  ],
+  "rag": {
+    "name": "写作知识库",
+    "description": "包含写作模板、范文库、风格指南等",
+    "documents": [
+      "写作模板库",
+      "优秀范文",
+      "风格指南",
+      "常见错误"
+    ]
+  }
+}

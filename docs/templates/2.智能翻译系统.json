@@ -1,0 +1,123 @@
+{
+  "agent": {
+    "name": "智能翻译系统",
+    "description": "专业的智能翻译助手，支持多语言互译、专业领域翻译、质量校验",
+    "status": "active",
+    "reasoning_strategy": "function_call",
+    "default_memory_mode": "private",
+    "memory_capacity": 100,
+    "system_prompt": "你是一个专业的翻译助手，提供准确、流畅的翻译服务。\n\n你的能力：\n- 支持多语言互译（中、英、日、韩、法、德等）\n- 专业领域翻译（医疗、法律、技术、商务等）\n- 翻译质量校验\n- 专业术语处理\n- 译文润色优化\n\n你的边界：\n- 不翻译违法违规内容\n- 对模糊内容主动询问确认\n- 专业内容提醒用户人工复核\n\n行为准则：\n- 翻译准确，忠实原文\n- 语言流畅自然\n- 专业术语规范\n- 及时响应用户",
+    "graph_definition": {
+      "nodes": [
+        {
+          "id": "detect",
+          "type": "llm",
+          "name": "语言检测",
+          "position": {"x": 200, "y": 100},
+          "config": {
+            "prompt": "检测原文语言和用户期望的目标语言。\n如果原文和目标语言未明确指定，请询问用户。",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "translate",
+          "type": "tool",
+          "name": "执行翻译",
+          "position": {"x": 200, "y": 220},
+          "config": {
+            "tool_name": "translation_api",
+            "description": "调用翻译API进行翻译"
+          }
+        },
+        {
+          "id": "polish",
+          "type": "llm",
+          "name": "译文润色",
+          "position": {"x": 200, "y": 340},
+          "config": {
+            "prompt": "对翻译结果进行润色优化：\n- 修正生硬表达\n- 优化语句流畅度\n- 统一术语表达\n- 保持原文意思不变",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "verify",
+          "type": "llm",
+          "name": "质量校验",
+          "position": {"x": 400, "y": 340},
+          "config": {
+            "prompt": "对翻译结果进行质量校验：\n1. 将译文回译到原语言\n2. 对比回译结果与原文的差异\n3. 评估翻译准确性\n4. 指出可能的问题并建议修正",
+            "model_id": 1
+          }
+        },
+        {
+          "id": "final",
+          "type": "llm",
+          "name": "输出结果",
+          "position": {"x": 300, "y": 460},
+          "config": {
+            "prompt": "输出最终翻译结果，格式清晰：\n\n原文：\n[原文内容]\n\n译文：\n[译文内容]\n\n说明：\n[如有需要，补充翻译说明或注意事项]",
+            "model_id": 1
+          }
+        }
+      ],
+      "edges": [
+        {"source": "detect", "target": "translate"},
+        {"source": "translate", "target": "polish"},
+        {"source": "polish", "target": "verify"},
+        {"source": "verify", "target": "final"}
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "translation_api",
+      "display_name": "翻译API",
+      "description": "调用翻译API进行文本翻译",
+      "func_path": "base.plugins.agent.tools.translation.translate_text",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "description": "待翻译文本"},
+          "source_lang": {"type": "string", "description": "源语言"},
+          "target_lang": {"type": "string", "description": "目标语言"}
+        },
+        "required": ["text", "target_lang"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "term_lookup",
+      "display_name": "术语查询",
+      "description": "查询专业术语的标准译法",
+      "func_path": "base.plugins.agent.tools.translation.term_lookup",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "term": {"type": "string", "description": "术语"},
+          "domain": {"type": "string", "description": "领域"}
+        },
+        "required": ["term"]
+      },
+      "enabled": true
+    }
+  ],
+  "skills": [
+    {
+      "name": "专业翻译",
+      "description": "各专业领域的翻译技巧",
+      "implementation": "## 专业翻译技能\n\n### 医疗领域\n- 准确使用医学术语\n- 注意药品名称译法\n- 保持医疗文书的专业性\n\n### 法律领域\n- 使用规范的法律用语\n- 保持法律文件的严谨性\n- 注意法律概念的准确传达\n\n### 技术领域\n- 使用标准的技术术语\n- 确保技术内容的准确性\n- 清晰明了地传达技术信息",
+      "status": "active",
+      "category_id": 3
+    }
+  ],
+  "rag": {
+    "name": "翻译知识库",
+    "description": "包含专业术语库、翻译风格指南等",
+    "documents": [
+      "专业术语库",
+      "翻译风格指南",
+      "常见翻译错误",
+      "文化差异说明"
+    ]
+  }
+}
