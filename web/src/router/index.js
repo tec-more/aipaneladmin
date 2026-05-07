@@ -36,6 +36,12 @@ const routes = [
         meta: { title: '用户管理', icon: 'User' }
       },
       {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/user/Profile.vue'),
+        meta: { title: '个人信息', hidden: true }
+      },
+      {
         path: 'departments',
         name: 'Departments',
         component: () => import('@/views/department/Index.vue'),

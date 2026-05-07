@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Request
 from base.core.users.schemas.users import (
     UserLogin,
     UserCreate,
+    UserUpdate,
     TokenResponse,
     UserResponse,
     UserUpdatePassword,
@@ -227,6 +228,41 @@ async def email_login(login_data: EmailLoginSchema):
         msg="此接口已弃用。普通用户请使用 /api/v1/customer/auth/login-code，管理员请使用用户名密码登录",
         status_code=status.HTTP_410_GONE
     )
+
+
+@router.put("/update-profile", summary="更新当前用户信息")
+async def update_profile(
+        profile_data: UserUpdate,
+        user_id: int = Depends(get_current_user_id)
+):
+    """
+    更新当前登录用户的个人信息
+
+    Args:
+        profile_data: 用户更新数据
+        user_id: 从token中解析的用户ID
+
+    Returns:
+        更新后的用户信息
+    """
+    # 检查邮箱是否被其他用户使用
+    if profile_data.email:
+        if await UserService.check_email_exists(profile_data.email, exclude_id=user_id):
+            return ErrorResponse(
+                msg="邮箱已被其他用户使用",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    # 更新用户
+    user = await UserService.update_user(user_id, profile_data)
+    if not user:
+        return ErrorResponse(
+            msg="用户不存在",
+            status_code=status.HTTP_404_NOT_FOUND
+        )
+
+    user_dict = await user.to_dict()
+    return SuccessResponse(data=user_dict, msg="更新成功")
 
 
 @router.post("/logout", summary="用户登出")

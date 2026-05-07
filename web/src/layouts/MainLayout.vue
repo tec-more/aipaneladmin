@@ -322,7 +322,7 @@ const handleCommand = async (command) => {
     passwordForm.value = { old_password: '', new_password: '', confirm_password: '' }
     passwordVisible.value = true
   } else if (command === 'profile') {
-    ElMessage.info('个人信息功能待开发')
+    router.push('/panel/profile')
   }
 }
 
