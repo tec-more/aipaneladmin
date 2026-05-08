@@ -19,8 +19,7 @@ class AgentService:
             description=agent_data.description,
             status=agent_data.status,
             config=agent_data.config,
-            memory_capacity=agent_data.memory_capacity,
-            system_prompt=agent_data.system_prompt
+            memory_capacity=agent_data.memory_capacity
         )
         
         return agent
@@ -175,8 +174,6 @@ class AgentService:
             description=agent_data.get('description', ''),
             status=agent_data.get('status', 'active'),
             memory_capacity=agent_data.get('memory_capacity', 100),
-            system_prompt=agent_data.get('system_prompt', ''),
-            reasoning_strategy=agent_data.get('reasoning_strategy', 'function_call'),
             default_memory_mode=agent_data.get('default_memory_mode', 'public'),
             graph_definition=graph_definition
         )

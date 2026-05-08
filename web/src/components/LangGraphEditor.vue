@@ -152,6 +152,21 @@
                   />
                 </el-select>
               </el-form-item>
+              <el-form-item label="选择技能">
+                <el-select 
+                  v-model="selectedNode.data.skillIds" 
+                  multiple 
+                  style="width: 100%" 
+                  placeholder="选择技能"
+                >
+                  <el-option 
+                    v-for="skill in skills" 
+                    :key="skill.id" 
+                    :label="skill.name" 
+                    :value="skill.id" 
+                  />
+                </el-select>
+              </el-form-item>
               <el-form-item label="温度">
                 <el-slider v-model="selectedNode.data.temperature" :min="0" :max="2" :step="0.1" />
               </el-form-item>
@@ -492,8 +507,7 @@ const nodeCategories = [
     name: 'AI 节点',
     nodes: [
       { type: 'agent', label: '智能体', icon: User },
-      { type: 'llm', label: '大模型', icon: Cpu },
-      { type: 'skill', label: '技能', icon: Tools }
+      { type: 'llm', label: '大模型', icon: Cpu }
     ]
   },
   {
@@ -535,7 +549,6 @@ const getNodeIcon = (type) => {
     output: '📤',
     agent: '🤖',
     llm: '🧠',
-    skill: '⚡',
     condition: '🔀',
     loop: '🔄',
     iteration: '🔁',
@@ -565,7 +578,6 @@ const getTraceStepType = (type) => {
     end: 'success',
     llm: 'primary',
     agent: 'info',
-    skill: 'warning',
     condition: 'danger',
     loop: 'info',
     default: ''
@@ -715,6 +727,13 @@ const onDrop = (event) => {
   } else if (type === 'iteration') {
     nodeData.iterationList = '';
     nodeData.iterationVariable = 'item';
+  } else if (type === 'llm') {
+    nodeData.temperature = 0.7;
+    nodeData.maxTokens = 1024;
+    nodeData.stream = false;
+    nodeData.skillIds = [];
+    nodeData.enableReact = true;
+    nodeData.maxIterations = 5;
   }
   
   const newNode = {
@@ -1332,6 +1351,7 @@ const transformNode = (node) => {
     transformed.data.temperature = node.data?.temperature ?? 0.7;
     transformed.data.maxTokens = node.data?.maxTokens ?? 1024;
     transformed.data.stream = node.data?.stream ?? false;
+    transformed.data.skillIds = node.data?.skillIds || node.data?.skill_ids || [];
     transformed.data.outputVar = node.data?.outputVar || '';
   } else if (nodeType === 'tool') {
     transformed.data.toolName = node.config?.tool_name || node.data?.toolName || '';

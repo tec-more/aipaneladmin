@@ -50,7 +50,6 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="skill_count" label="关联技能" width="100" />
         <el-table-column prop="memory_count" label="记忆数量" width="100" />
         <el-table-column prop="memory_capacity" label="记忆容量" width="100" />
         <el-table-column prop="created_at" label="创建时间" width="180">
@@ -58,16 +57,12 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="400" fixed="right">
+        <el-table-column label="操作" min-width="320" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button type="primary" size="small" @click="handleEdit(row)">
                 <el-icon><Edit /></el-icon>
                 编辑
-              </el-button>
-              <el-button type="info" size="small" @click="handleSkills(row)">
-                <el-icon><Connection /></el-icon>
-                技能
               </el-button>
               <el-button type="success" size="small" @click="handleGraph(row)">
                 <el-icon><Share /></el-icon>
@@ -126,20 +121,6 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="skillsDialogVisible" title="管理技能关联" width="800px">
-      <el-transfer
-        v-model="selectedSkillIds"
-        :data="allSkillsForTransfer"
-        :titles="['可选技能', '已关联技能']"
-        :props="{ key: 'id', label: 'name' }"
-        style="width: 100%"
-      />
-      <template #footer>
-        <el-button @click="skillsDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveSkills">保存</el-button>
-      </template>
-    </el-dialog>
-    
     <input
       type="file"
       ref="fileInput"
@@ -153,15 +134,13 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share, Upload } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Memo, Share, Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAgents, createAgent, updateAgent, deleteAgent, getAgentSkills, setAgentSkills, importAgent } from '@/api/agent'
-import { getSkills } from '@/api/agent'
+import { getAgents, createAgent, updateAgent, deleteAgent, importAgent } from '@/api/agent'
 
 const router = useRouter()
 const loading = ref(false)
 const agents = ref([])
-const allSkills = ref([])
 const fileInput = ref(null)
 
 const searchForm = reactive({
@@ -203,11 +182,6 @@ const rules = {
   status: [{ required: true, message: '请选择状态', trigger: 'change' }]
 }
 
-const skillsDialogVisible = ref(false)
-const currentAgentId = ref(null)
-const selectedSkillIds = ref([])
-const allSkillsForTransfer = computed(() => allSkills.value.map(s => ({ id: s.id, name: s.name })))
-
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -230,17 +204,6 @@ const fetchAgents = async () => {
     console.error(error)
   } finally {
     loading.value = false
-  }
-}
-
-const fetchSkills = async () => {
-  try {
-    const res = await getSkills({ limit: 1000 })
-    if (res.data) {
-      allSkills.value = res.data.items || res.data
-    }
-  } catch (error) {
-    console.error('获取技能列表失败', error)
   }
 }
 
@@ -309,31 +272,6 @@ const handleDelete = async (id) => {
   }
 }
 
-const handleSkills = async (row) => {
-  currentAgentId.value = row.id
-  try {
-    const res = await getAgentSkills(row.id)
-    const data = res.data?.skills || []
-    selectedSkillIds.value = Array.isArray(data) ? data : []
-    skillsDialogVisible.value = true
-  } catch (error) {
-    ElMessage.error('获取技能关联失败')
-    console.error(error)
-  }
-}
-
-const handleSaveSkills = async () => {
-  try {
-    await setAgentSkills(currentAgentId.value, selectedSkillIds.value)
-    ElMessage.success('保存成功')
-    skillsDialogVisible.value = false
-    fetchAgents()
-  } catch (error) {
-    ElMessage.error('保存失败')
-    console.error(error)
-  }
-}
-
 const handleMemory = (row) => {
   window.location.href = `/panel/agent/memory?agent_id=${row.id}`
 }
@@ -386,7 +324,6 @@ const handleFileChange = async (event) => {
 
 onMounted(() => {
   fetchAgents()
-  fetchSkills()
 })
 </script>
 

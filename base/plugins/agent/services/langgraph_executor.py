@@ -587,6 +587,10 @@ class LangGraphExecutor:
                 if sse_yield_func:
                     await sse_yield_func({'type': 'action', 'label': node_label, 'message': f'执行技能: {node_data.get("skill_id", "unknown")}'})
                 state = await LangGraphExecutor._execute_skill_node(node_data, state)
+            elif node_type == "tool":
+                if sse_yield_func:
+                    await sse_yield_func({'type': 'action', 'label': node_label, 'message': f'执行工具: {node_data.get("tool_name", "unknown")}'})
+                state = await LangGraphExecutor._execute_tool_node(node_data, state)
             elif node_type == "condition":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'thinking', 'label': node_label, 'message': '条件判断中...'})
@@ -804,12 +808,66 @@ class LangGraphExecutor:
         node_id = current_node.get("id", "")
         node_data = current_node.get("data", {})
         prompt = node_data.get("prompt", "")
-        model_id = node_data.get("model_id")
+        model_id = node_data.get("model_id") or node_data.get("modelId")
         model_name = node_data.get("model", "gpt-3.5-turbo")
         node_label = node_data.get("label", "")
+        skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
         
         import logging
         logger = logging.getLogger(__name__)
+        
+        # 加载关联的技能和解析绑定的工具
+        skills_data = []
+        bound_tools_set = set()
+        if skill_ids:
+            try:
+                from base.plugins.agent.models.skill import Skill
+                from base.plugins.agent.services.skill_service import SkillService
+                for skill_id in skill_ids:
+                    skill = await Skill.get_or_none(id=skill_id, status="active")
+                    if skill:
+                        skills_data.append({
+                            "id": skill.id,
+                            "name": skill.name,
+                            "description": skill.description,
+                            "implementation": skill.implementation
+                        })
+                        # 解析技能绑定的工具
+                        bound_tools = SkillService.parse_bound_tools(skill.implementation)
+                        if bound_tools:
+                            for tool in bound_tools:
+                                bound_tools_set.add(tool)
+            except Exception as e:
+                logger.exception(f"获取技能信息失败: {e}")
+        
+        # 如果有关联技能，将技能信息添加到提示词中
+        if skills_data:
+            skill_context = "\n【可用技能】:\n"
+            for skill in skills_data:
+                skill_context += f"技能名称: {skill['name']}\n"
+                skill_context += f"技能描述: {skill['description']}\n"
+                skill_context += f"技能实现: {skill['implementation']}\n\n"
+            
+            if prompt:
+                prompt = skill_context + "\n" + prompt
+            else:
+                prompt = skill_context
+        
+        # 获取所有绑定工具的函数调用schema
+        tools = []
+        functions = []
+        if bound_tools_set:
+            try:
+                from base.plugins.agent.tools.registry import ToolRegistry
+                all_tools_info = ToolRegistry.get_all_tools_info()
+                # 只获取技能绑定的工具
+                for tool_name in bound_tools_set:
+                    if tool_name in all_tools_info:
+                        tools.append(all_tools_info[tool_name])
+                        functions.append(all_tools_info[tool_name])
+                logger.info(f"获取到 {len(tools)} 个可用工具: {list(bound_tools_set)}")
+            except Exception as e:
+                logger.exception(f"获取工具信息失败: {e}")
         
         variables = state.get("variables", {})
         for key, value in variables.items():
@@ -874,6 +932,7 @@ class LangGraphExecutor:
                 from base.plugins.llm.services.chat_service import ChatService
                 from base.plugins.llm.models.provider import LLMProvider
                 from base.plugins.llm.models.api_key import LLMApiKey
+                from base.plugins.agent.tools.registry import ToolRegistry
                 
                 provider = await LLMProvider.get_or_none(id=target_model.provider_id)
                 if provider:
@@ -896,15 +955,62 @@ class LangGraphExecutor:
                         )
                         
                         actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
-                        response = await service.chat(
-                            model=actual_model_for_call,
-                            messages=messages,
-                            temperature=0.7,
-                            max_tokens=1000
-                        )
                         
+                        # 准备调用参数
+                        chat_kwargs = {
+                            "model": actual_model_for_call,
+                            "messages": messages,
+                            "temperature": 0.7,
+                            "max_tokens": 1000
+                        }
+                        
+                        # 如果有工具，添加函数调用参数
+                        if functions:
+                            chat_kwargs["functions"] = functions
+                            chat_kwargs["function_call"] = "auto"  # 允许模型自动选择是否调用工具
+                        
+                        response = await service.chat(**chat_kwargs)
+                        
+                        # 处理响应
                         if isinstance(response, dict) and response.get("choices"):
-                            llm_response = response["choices"][0].get("message", {}).get("content", "")
+                            message = response["choices"][0].get("message", {})
+                            
+                            # 检查是否有函数调用
+                            if message.get("function_call"):
+                                function_call = message.get("function_call")
+                                function_name = function_call.get("name")
+                                function_args = function_call.get("arguments", {})
+                                
+                                logger.info(f"大模型请求调用工具: {function_name}, 参数: {function_args}")
+                                
+                                # 执行工具调用
+                                try:
+                                    tool_class = ToolRegistry.get_tool(function_name)
+                                    if tool_class:
+                                        tool_result = await tool_class.execute(**function_args)
+                                        logger.info(f"工具执行成功: {function_name}, 结果: {tool_result}")
+                                        
+                                        # 将工具调用结果添加到消息中
+                                        messages.append(message)
+                                        messages.append({
+                                            "role": "function",
+                                            "name": function_name,
+                                            "content": str(tool_result)
+                                        })
+                                        
+                                        # 再次调用大模型获取最终响应
+                                        second_response = await service.chat(**chat_kwargs)
+                                        if isinstance(second_response, dict) and second_response.get("choices"):
+                                            llm_response = second_response["choices"][0].get("message", {}).get("content", "")
+                                        else:
+                                            llm_response = str(second_response)
+                                    else:
+                                        llm_response = f"工具 {function_name} 未找到"
+                                except Exception as tool_e:
+                                    logger.exception(f"工具执行失败: {tool_e}")
+                                    llm_response = f"工具执行失败: {str(tool_e)}"
+                            else:
+                                llm_response = message.get("content", "")
                         else:
                             llm_response = str(response)
         except Exception as e:
@@ -914,12 +1020,31 @@ class LangGraphExecutor:
             logger.warning(f"使用模拟响应")
             llm_response = await LangGraphExecutor._generate_mock_response(input_text, prompt, node_label)
         
+        # 尝试解析 LLM 响应中的 JSON
+        parsed_response = None
+        if llm_response:
+            import json
+            try:
+                # 尝试找到 JSON 部分（支持在文本中嵌入 JSON）
+                json_start = llm_response.find("{")
+                json_end = llm_response.rfind("}") + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = llm_response[json_start:json_end]
+                    parsed_response = json.loads(json_str)
+                    logger.info(f"成功解析 LLM 输出 JSON: {parsed_response}")
+            except Exception as e:
+                logger.warning(f"解析 JSON 失败: {e}")
+        
         output_variable = node_data.get("output_variable", "llm_output")
-        state["variables"][output_variable] = {
-            "prompt": prompt,
-            "model": actual_model,
-            "response": llm_response
-        }
+        if parsed_response:
+            # 直接将解析后的对象存储为变量
+            state["variables"][output_variable] = parsed_response
+        else:
+            state["variables"][output_variable] = {
+                "prompt": prompt,
+                "model": actual_model,
+                "response": llm_response
+            }
         
         return state
     
@@ -933,12 +1058,66 @@ class LangGraphExecutor:
         node_id = current_node.get("id", "")
         node_data = current_node.get("data", {})
         prompt = node_data.get("prompt", "")
-        model_id = node_data.get("model_id")
+        model_id = node_data.get("model_id") or node_data.get("modelId")
         model_name = node_data.get("model", "gpt-3.5-turbo")
         node_label = node_data.get("label", "")
+        skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
         
         import logging
         logger = logging.getLogger(__name__)
+        
+        # 加载关联的技能和解析绑定的工具
+        skills_data = []
+        bound_tools_set = set()
+        if skill_ids:
+            try:
+                from base.plugins.agent.models.skill import Skill
+                from base.plugins.agent.services.skill_service import SkillService
+                for skill_id in skill_ids:
+                    skill = await Skill.get_or_none(id=skill_id, status="active")
+                    if skill:
+                        skills_data.append({
+                            "id": skill.id,
+                            "name": skill.name,
+                            "description": skill.description,
+                            "implementation": skill.implementation
+                        })
+                        # 解析技能绑定的工具
+                        bound_tools = SkillService.parse_bound_tools(skill.implementation)
+                        if bound_tools:
+                            for tool in bound_tools:
+                                bound_tools_set.add(tool)
+            except Exception as e:
+                logger.exception(f"获取技能信息失败: {e}")
+        
+        # 如果有关联技能，将技能信息添加到提示词中
+        if skills_data:
+            skill_context = "\n【可用技能】:\n"
+            for skill in skills_data:
+                skill_context += f"技能名称: {skill['name']}\n"
+                skill_context += f"技能描述: {skill['description']}\n"
+                skill_context += f"技能实现: {skill['implementation']}\n\n"
+            
+            if prompt:
+                prompt = skill_context + "\n" + prompt
+            else:
+                prompt = skill_context
+        
+        # 获取所有绑定工具的函数调用schema
+        tools = []
+        functions = []
+        if bound_tools_set:
+            try:
+                from base.plugins.agent.tools.registry import ToolRegistry
+                all_tools_info = ToolRegistry.get_all_tools_info()
+                # 只获取技能绑定的工具
+                for tool_name in bound_tools_set:
+                    if tool_name in all_tools_info:
+                        tools.append(all_tools_info[tool_name])
+                        functions.append(all_tools_info[tool_name])
+                logger.info(f"获取到 {len(tools)} 个可用工具: {list(bound_tools_set)}")
+            except Exception as e:
+                logger.exception(f"获取工具信息失败: {e}")
         
         variables = state.get("variables", {})
         for key, value in variables.items():
@@ -1029,6 +1208,7 @@ class LangGraphExecutor:
                 from base.plugins.llm.services.chat_service import ChatService
                 from base.plugins.llm.models.provider import LLMProvider
                 from base.plugins.llm.models.api_key import LLMApiKey
+                from base.plugins.agent.tools.registry import ToolRegistry
                 provider = await LLMProvider.get_or_none(id=target_model.provider_id)
                 if provider:
                     api_key = await LLMApiKey.filter(model_id=target_model.id).first()
@@ -1050,15 +1230,62 @@ class LangGraphExecutor:
                         )
                         
                         actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
-                        response = await service.chat(
-                            model=actual_model_for_call,
-                            messages=messages,
-                            temperature=0.7,
-                            max_tokens=2000
-                        )
                         
+                        # 准备调用参数
+                        chat_kwargs = {
+                            "model": actual_model_for_call,
+                            "messages": messages,
+                            "temperature": 0.7,
+                            "max_tokens": 2000
+                        }
+                        
+                        # 如果有工具，添加函数调用参数
+                        if functions:
+                            chat_kwargs["functions"] = functions
+                            chat_kwargs["function_call"] = "auto"
+                        
+                        response = await service.chat(**chat_kwargs)
+                        
+                        # 处理响应
                         if isinstance(response, dict) and response.get("choices"):
-                            full_response = response["choices"][0].get("message", {}).get("content", "")
+                            message = response["choices"][0].get("message", {})
+                            
+                            # 检查是否有函数调用
+                            if message.get("function_call"):
+                                function_call = message.get("function_call")
+                                function_name = function_call.get("name")
+                                function_args = function_call.get("arguments", {})
+                                
+                                logger.info(f"大模型请求调用工具: {function_name}, 参数: {function_args}")
+                                
+                                # 执行工具调用
+                                try:
+                                    tool_class = ToolRegistry.get_tool(function_name)
+                                    if tool_class:
+                                        tool_result = await tool_class.execute(**function_args)
+                                        logger.info(f"工具执行成功: {function_name}, 结果: {tool_result}")
+                                        
+                                        # 将工具调用结果添加到消息中
+                                        messages.append(message)
+                                        messages.append({
+                                            "role": "function",
+                                            "name": function_name,
+                                            "content": str(tool_result)
+                                        })
+                                        
+                                        # 再次调用大模型获取最终响应
+                                        second_response = await service.chat(**chat_kwargs)
+                                        if isinstance(second_response, dict) and second_response.get("choices"):
+                                            full_response = second_response["choices"][0].get("message", {}).get("content", "")
+                                        else:
+                                            full_response = str(second_response)
+                                    else:
+                                        full_response = f"工具 {function_name} 未找到"
+                                except Exception as tool_e:
+                                    logger.exception(f"工具执行失败: {tool_e}")
+                                    full_response = f"工具执行失败: {str(tool_e)}"
+                            else:
+                                full_response = message.get("content", "")
                         else:
                             full_response = str(response)
                         
@@ -1137,6 +1364,97 @@ class LangGraphExecutor:
             "parameters": parameters,
             "result": "技能执行结果"
         }
+        
+        return state
+    
+    @staticmethod
+    async def _execute_tool_node(node_data: Dict, state: AgentState) -> AgentState:
+        """执行工具节点"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        node_config = node_data.get("data", {}) if isinstance(node_data.get("data"), dict) else node_data
+        tool_name = node_config.get("tool_name", "")
+        
+        if not tool_name:
+            logger.error("工具节点缺少 tool_name")
+            state["variables"]["tool_result"] = {
+                "success": False,
+                "message": "缺少工具名称"
+            }
+            return state
+        
+        # 从变量中获取参数，或者使用默认参数
+        variables = state.get("variables", {})
+        
+        # 先尝试从 think 节点的输出中获取工具参数
+        tool_params = {}
+        
+        # 遍历所有变量，查找可能的工具输出
+        for var_name, var_value in variables.items():
+            if isinstance(var_value, dict):
+                # 检查是否是 LLM 输出，并且包含 tool_name 和 tool_args
+                if "tool_args" in var_value:
+                    tool_params = var_value["tool_args"]
+                    logger.info(f"从变量 {var_name} 提取工具参数")
+                    break
+        
+        # 如果没有找到，尝试从 variables 的根级别查找
+        if not tool_params:
+            # 提取所有参数
+            tool_params = {k: v for k, v in variables.items() if k not in ["input", "output", "tool_result"]}
+        
+        # 也支持在工具节点中直接配置参数
+        if node_config.get("params"):
+            node_params = node_config.get("params", {})
+            
+            # 替换参数中的变量
+            processed_params = {}
+            variables = state.get("variables", {})
+            
+            for key, value in node_params.items():
+                processed_value = value
+                if isinstance(value, str):
+                    # 替换 {{var}} 格式的变量
+                    # 支持 {{key.nested_key}} 格式
+                    for var_name, var_value in variables.items():
+                        if isinstance(var_value, dict):
+                            # 支持嵌套变量替换
+                            for nested_key, nested_value in var_value.items():
+                                placeholder = f"{{{{{var_name}.{nested_key}}}}}"
+                                if placeholder in processed_value:
+                                    processed_value = processed_value.replace(placeholder, str(nested_value))
+                        # 支持简单变量替换
+                        placeholder = f"{{{{{var_name}}}}}"
+                        if placeholder in processed_value:
+                            processed_value = processed_value.replace(placeholder, str(var_value))
+                
+                processed_params[key] = processed_value
+            
+            tool_params.update(processed_params)
+        
+        logger.info(f"执行工具: {tool_name}, 参数: {tool_params}")
+        
+        try:
+            from base.plugins.agent.tools.registry import ToolRegistry
+            
+            tool_class = ToolRegistry.get_tool(tool_name)
+            if not tool_class:
+                raise ValueError(f"工具未注册: {tool_name}")
+            
+            result = await tool_class.execute(tool_params)
+            
+            logger.info(f"工具执行成功: {result}")
+            # 存储结果到变量中，同时使用工具名作为变量名
+            state["variables"]["tool_result"] = result
+            state["variables"][tool_name] = result
+            
+        except Exception as e:
+            logger.exception(f"工具执行失败: {e}")
+            state["variables"]["tool_result"] = {
+                "success": False,
+                "message": str(e)
+            }
         
         return state
     
@@ -1292,11 +1610,37 @@ class LangGraphExecutor:
         variable_value = node_config.get("var_value", node_config.get("variable_value", ""))
         
         variables = state.get("variables", {})
-        for key, value in variables.items():
-            if isinstance(variable_value, str):
-                variable_value = variable_value.replace(f"{{{{{key}}}}}", str(value))
         
-        state["variables"][variable_name] = variable_value
+        # 如果有 params 参数，则批量设置多个变量
+        params = node_config.get("params", {})
+        if params and isinstance(params, dict):
+            for key, value in params.items():
+                processed_value = value
+                if isinstance(processed_value, str):
+                    # 替换变量引用
+                    for var_key, var_value in variables.items():
+                        # 支持简单变量替换 {{var}}
+                        placeholder = f"{{{{{var_key}}}}}"
+                        if placeholder in processed_value:
+                            processed_value = processed_value.replace(placeholder, str(var_value))
+                        
+                        # 支持嵌套变量替换 {{var.key}}
+                        if isinstance(var_value, dict):
+                            for nested_key, nested_value in var_value.items():
+                                nested_placeholder = f"{{{{{var_key}.{nested_key}}}}}"
+                                if nested_placeholder in processed_value:
+                                    processed_value = processed_value.replace(nested_placeholder, str(nested_value))
+                
+                state["variables"][key] = processed_value
+        
+        # 如果指定了单个变量名，也设置单个变量
+        if variable_name:
+            for key, value in variables.items():
+                if isinstance(variable_value, str):
+                    variable_value = variable_value.replace(f"{{{{{key}}}}}", str(value))
+            
+            state["variables"][variable_name] = variable_value
+        
         return state
     
     @staticmethod

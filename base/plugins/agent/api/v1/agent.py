@@ -39,8 +39,6 @@ async def create_agent(agent: AgentCreate):
             description=created_agent.description,
             status=created_agent.status,
             memory_capacity=created_agent.memory_capacity,
-            system_prompt=created_agent.system_prompt,
-            reasoning_strategy=created_agent.reasoning_strategy,
             llm_model_id=None,
             created_at=created_agent.created_at,
             updated_at=created_agent.updated_at,
@@ -72,8 +70,6 @@ async def import_agent(import_data: dict):
             "description": imported_agent.description,
             "status": imported_agent.status,
             "memory_capacity": imported_agent.memory_capacity,
-            "system_prompt": imported_agent.system_prompt,
-            "reasoning_strategy": imported_agent.reasoning_strategy,
             "created_at": imported_agent.created_at.isoformat() if imported_agent.created_at else None,
             "updated_at": imported_agent.updated_at.isoformat() if imported_agent.updated_at else None,
             "skill_count": skill_count,
@@ -117,8 +113,6 @@ async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: st
             "description": agent.description,
             "status": agent.status,
             "memory_capacity": agent.memory_capacity,
-            "system_prompt": agent.system_prompt,
-            "reasoning_strategy": agent.reasoning_strategy,
             "created_at": agent.created_at.isoformat() if agent.created_at else None,
             "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
             "skill_count": skill_count,
@@ -143,8 +137,6 @@ async def get_agent(agent_id: int):
         "description": agent.description,
         "status": agent.status,
         "memory_capacity": agent.memory_capacity,
-        "system_prompt": agent.system_prompt,
-        "reasoning_strategy": agent.reasoning_strategy,
         "created_at": agent.created_at.isoformat() if agent.created_at else None,
         "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
         "skill_count": skill_count,
@@ -169,8 +161,6 @@ async def update_agent(agent_id: int, agent: AgentUpdate):
         "description": updated_agent.description,
         "status": updated_agent.status,
         "memory_capacity": updated_agent.memory_capacity,
-        "system_prompt": updated_agent.system_prompt,
-        "reasoning_strategy": updated_agent.reasoning_strategy,
         "created_at": updated_agent.created_at.isoformat() if updated_agent.created_at else None,
         "updated_at": updated_agent.updated_at.isoformat() if updated_agent.updated_at else None,
         "skill_count": skill_count,
@@ -547,106 +537,6 @@ async def process_documents(directory_path: str = Query(..., description="文档
         )
     except Exception as e:
         return fail_response(msg=str(e), code=500)
-
-
-@agent_router.get("/{agent_id}/skills")
-async def get_agent_skills(agent_id: int):
-    """Get agent skills"""
-    try:
-        agent = await AgentService.get_agent_by_id(agent_id)
-        if not agent:
-            return fail_response(msg="智能体不存在", code=404)
-        
-        # 安全获取 config
-        skill_ids = []
-        if hasattr(agent, 'config') and agent.config is not None:
-            skill_ids = agent.config.get("skills", [])
-        
-        from base.plugins.agent.services.skill_service import SkillService
-        skills = []
-        if skill_ids:
-            for skill_id in skill_ids:
-                skill_detail = await SkillService.get_skill_with_category(skill_id)
-                if skill_detail:
-                    skills.append(skill_detail)
-        
-        return success_response(data={"skills": skills})
-    except Exception as e:
-        return fail_response(msg=str(e))
-
-
-@agent_router.post("/{agent_id}/skills/{skill_id}")
-async def add_skill_to_agent(agent_id: int, skill_id: int):
-    """Add skill to agent"""
-    try:
-        agent = await AgentService.get_agent_by_id(agent_id)
-        if not agent:
-            return fail_response(msg="智能体不存在", code=404)
-        
-        # 安全获取和更新 config
-        config = {}
-        if hasattr(agent, 'config') and agent.config is not None:
-            config = agent.config
-        
-        skills = config.get("skills", [])
-        if skill_id not in skills:
-            skills.append(skill_id)
-            config["skills"] = skills
-            agent.config = config
-            await agent.save()
-        
-        return success_response(msg="技能添加成功")
-    except Exception as e:
-        return fail_response(msg=str(e))
-
-
-@agent_router.delete("/{agent_id}/skills/{skill_id}")
-async def remove_skill_from_agent(agent_id: int, skill_id: int):
-    """Remove skill from agent"""
-    try:
-        agent = await AgentService.get_agent_by_id(agent_id)
-        if not agent:
-            return fail_response(msg="智能体不存在", code=404)
-        
-        # 安全获取和更新 config
-        config = {}
-        if hasattr(agent, 'config') and agent.config is not None:
-            config = agent.config
-        
-        skills = config.get("skills", [])
-        if skill_id in skills:
-            skills.remove(skill_id)
-            config["skills"] = skills
-            agent.config = config
-            await agent.save()
-        
-        return success_response(msg="技能移除成功")
-    except Exception as e:
-        return fail_response(msg=str(e))
-
-
-@agent_router.put("/{agent_id}/skills")
-async def set_agent_skills(agent_id: int, data: dict):
-    """Set agent skills"""
-    try:
-        agent = await AgentService.get_agent_by_id(agent_id)
-        if not agent:
-            return fail_response(msg="智能体不存在", code=404)
-        
-        # 安全获取和更新 config
-        config = {}
-        if hasattr(agent, 'config') and agent.config is not None:
-            config = agent.config
-        
-        skill_ids = data.get("skill_ids", [])
-        config["skills"] = skill_ids
-        agent.config = config
-        await agent.save()
-        
-        return success_response(msg="技能设置成功")
-    except Exception as e:
-        return fail_response(msg=str(e))
-
 
 @agent_router.post("/executions/{execution_id}/cancel")
 async def cancel_execution(execution_id: str):

@@ -38,20 +38,11 @@
           <el-input-number v-model="formData.memory_capacity" :min="1" :max="10000" />
           <span style="margin-left: 10px; color: #909399;">条</span>
         </el-form-item>
-        <el-form-item label="推理策略">
-          <el-select v-model="formData.reasoning_strategy" placeholder="请选择推理策略" style="width: 100%">
-            <el-option label="Function Call 模式" value="function_call" />
-            <el-option label="ReAct 模式" value="react" />
-          </el-select>
-        </el-form-item>
         <el-form-item label="默认记忆模式">
           <el-select v-model="formData.default_memory_mode" placeholder="请选择记忆模式" style="width: 100%">
             <el-option label="公共记忆（所有用户共享）" value="public" />
             <el-option label="私有记忆（每个用户独立）" value="private" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="系统提示词">
-          <el-input v-model="formData.system_prompt" type="textarea" :rows="6" placeholder="请输入系统提示词" />
         </el-form-item>
 
       </el-form>
@@ -79,8 +70,6 @@ const formData = reactive({
   description: '',
   status: 'active',
   memory_capacity: 100,
-  system_prompt: '',
-  reasoning_strategy: 'function_call',
   default_memory_mode: 'public'
 })
 
@@ -115,8 +104,6 @@ const handleSubmit = async () => {
           description: formData.description,
           status: formData.status,
           memory_capacity: formData.memory_capacity,
-          system_prompt: formData.system_prompt,
-          reasoning_strategy: formData.reasoning_strategy,
           default_memory_mode: formData.default_memory_mode,
           config: formData.config
         }
