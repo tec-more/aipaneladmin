@@ -355,11 +355,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue';
-import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit } from '@element-plus/icons-vue';
-import { ElMessage } from 'element-plus';
-import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent';
-import { getModelList } from '@/api/llm';
+import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent'
+import { getModelList } from '@/api/llm'
+import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer';
 
 // 安全的 console 包装器
 const safeConsole = {
@@ -423,6 +424,9 @@ const edges = ref([]);
 const selectedNode = ref(null);
 const selectedEdge = ref(null);
 
+// 连线类型配置 - 使用全局配置
+const edgeType = getDefaultEdgeType();
+
 const drawingEdge = ref(false);
 const edgeStartNode = ref(null);
 const edgeStartPoint = ref({ x: 0, y: 0 });
@@ -438,16 +442,8 @@ const tempEdgePath = computed(() => {
   const endX = currentMousePos.value.x;
   const endY = currentMousePos.value.y;
   
-  // 使用平滑的曲线绘制临时连线
-  const dx = endX - startX;
-  const curvature = Math.min(Math.abs(dx) * 0.3, 80);
-  
-  const cp1x = startX + curvature;
-  const cp1y = startY;
-  const cp2x = endX - curvature;
-  const cp2y = endY;
-  
-  return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+  // 使用全局配置的连线类型渲染临时连线
+  return getEdgePathByType(edgeType, startX, startY, endX, endY, 0);
 });
 
 const nodeCategories = [
@@ -605,36 +601,28 @@ const getEdgePath = (edge) => {
   const targetX = targetNode.position.x;
   const targetY = targetNode.position.y + 30;
   
-  // 计算同一源节点的连线索引，用于偏移
+  // 计算同一源节点和目标节点的连线索引，用于双向偏移
   const sourceEdges = edges.value.filter(e => e.source === edge.source);
+  const targetEdges = edges.value.filter(e => e.target === edge.target);
   const edgeIndex = sourceEdges.findIndex(e => e.id === edge.id);
+  const targetEdgeIndex = targetEdges.findIndex(e => e.id === edge.id);
   const totalEdgesFromSource = sourceEdges.length;
+  const totalEdgesToTarget = targetEdges.length;
   
   // 计算垂直偏移量，避免重叠
-  let yOffset = 0;
-  if (totalEdgesFromSource > 1) {
-    // 计算每条连线的偏移位置
-    const spacing = 25; // 连线之间的间距
-    const totalHeight = (totalEdgesFromSource - 1) * spacing;
+  let totalOffset = 0;
+  if (totalEdgesFromSource > 1 || totalEdgesToTarget > 1) {
+    const spacing = 30;
+    
+    const avgIndex = (edgeIndex + targetEdgeIndex) / 2;
+    const maxCount = Math.max(totalEdgesFromSource, totalEdgesToTarget);
+    const totalHeight = (maxCount - 1) * spacing;
     const startOffset = -totalHeight / 2;
-    yOffset = startOffset + edgeIndex * spacing;
+    totalOffset = startOffset + avgIndex * spacing;
   }
   
-  // 计算控制点
-  const dx = targetX - sourceX;
-  const dy = targetY - sourceY;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  
-  // 根据距离调整控制点，使曲线更自然
-  const curvature = Math.min(distance * 0.3, 100);
-  
-  // 计算控制点，考虑垂直偏移
-  const cp1x = sourceX + curvature;
-  const cp1y = sourceY + yOffset;
-  const cp2x = targetX - curvature;
-  const cp2y = targetY + yOffset;
-  
-  return `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX} ${targetY}`;
+  // 使用全局配置的连线类型渲染
+  return getEdgePathByType(edgeType, sourceX, sourceY, targetX, targetY, totalOffset);
 };
 
 const onDragStart = (event, nodeType) => {

@@ -23,6 +23,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src')
     }
   },
+  define: {
+    __DEFAULT_EDGE_TYPE__: JSON.stringify('smoothstep') 
+    // 全局默认连线类型：阶梯线
+    // straight , step , bezier , smoothbezier , smoothstep
+  },
   server: {
     port: 3000,
     proxy: {

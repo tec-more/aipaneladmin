@@ -384,6 +384,7 @@ import {
 import { ElMessage } from 'element-plus'
 import { getDialogFlow, updateDialogFlow, executeDialogFlow } from '@/api/agent'
 import { getAgents } from '@/api/agent'
+import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer'
 
 const route = useRoute()
 const router = useRouter()
@@ -488,7 +489,11 @@ const dragOffset = ref({ x: 0, y: 0 })
 
 const tempEdgePath = computed(() => {
   if (!drawingEdge.value) return ''
-  return `M ${edgeStartPoint.value.x} ${edgeStartPoint.value.y} L ${currentMousePos.value.x} ${currentMousePos.value.y}`
+  const startX = edgeStartPoint.value.x
+  const startY = edgeStartPoint.value.y
+  const endX = currentMousePos.value.x
+  const endY = currentMousePos.value.y
+  return getEdgePathByType(edgeType, startX, startY, endX, endY, 0)
 })
 
 const statusMap = { draft: '草稿', active: '启用', inactive: '禁用' }
@@ -527,6 +532,9 @@ const getNodeById = (id) => {
   return nodes.value.find(n => n.id === id)
 }
 
+// 使用全局配置的连线类型
+const edgeType = getDefaultEdgeType()
+
 const getEdgePath = (edge) => {
   const sourceNode = getNodeById(edge.source)
   const targetNode = getNodeById(edge.target)
@@ -538,9 +546,26 @@ const getEdgePath = (edge) => {
   const targetX = targetNode.position.x
   const targetY = targetNode.position.y + 20
   
-  const midX = (sourceX + targetX) / 2
+  // 计算同一源节点和目标节点的连线索引，用于双向偏移
+  const sourceEdges = nodes.value ? edges.value.filter(e => e.source === edge.source) : []
+  const targetEdges = nodes.value ? edges.value.filter(e => e.target === edge.target) : []
+  const edgeIndex = sourceEdges.findIndex(e => e.id === edge.id)
+  const targetEdgeIndex = targetEdges.findIndex(e => e.id === edge.id)
+  const totalEdgesFromSource = sourceEdges.length
+  const totalEdgesToTarget = targetEdges.length
   
-  return `M ${sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${targetY}, ${targetX} ${targetY}`
+  // 计算垂直偏移量，避免重叠
+  let totalOffset = 0
+  if (totalEdgesFromSource > 1 || totalEdgesToTarget > 1) {
+    const spacing = 30
+    const avgIndex = (edgeIndex + targetEdgeIndex) / 2
+    const maxCount = Math.max(totalEdgesFromSource, totalEdgesToTarget)
+    const totalHeight = (maxCount - 1) * spacing
+    const startOffset = -totalHeight / 2
+    totalOffset = startOffset + avgIndex * spacing
+  }
+  
+  return getEdgePathByType(edgeType, sourceX, sourceY, targetX, targetY, totalOffset)
 }
 
 const goBack = () => {
