@@ -55,6 +55,37 @@ async def create_agent(agent: AgentCreate):
         return fail_response(msg=str(e))
 
 
+@agent_router.post("/import")
+async def import_agent(import_data: dict):
+    """Import agent from template"""
+    try:
+        imported_agent = await AgentService.import_agent(import_data)
+        
+        skill_count = 0
+        memory_count = 0
+        workflow_count = 0
+        dialog_flow_count = 0
+        
+        data = {
+            "id": imported_agent.id,
+            "name": imported_agent.name,
+            "description": imported_agent.description,
+            "status": imported_agent.status,
+            "memory_capacity": imported_agent.memory_capacity,
+            "system_prompt": imported_agent.system_prompt,
+            "reasoning_strategy": imported_agent.reasoning_strategy,
+            "created_at": imported_agent.created_at.isoformat() if imported_agent.created_at else None,
+            "updated_at": imported_agent.updated_at.isoformat() if imported_agent.updated_at else None,
+            "skill_count": skill_count,
+            "memory_count": memory_count
+        }
+        
+        return success_response(data=data, msg="智能体导入成功")
+    except Exception as e:
+        import traceback
+        return fail_response(msg=f"导入失败: {str(e)}", data={"traceback": traceback.format_exc()})
+
+
 @agent_router.get("/")
 async def get_agents(skip: int = 0, limit: int = 100, name: str = "", status: str = ""):
     """Get all agents"""
@@ -526,13 +557,18 @@ async def get_agent_skills(agent_id: int):
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
         
-        config = agent.config or {}
-        skill_ids = config.get("skills", [])
+        # 安全获取 config
+        skill_ids = []
+        if hasattr(agent, 'config') and agent.config is not None:
+            skill_ids = agent.config.get("skills", [])
         
-        from base.plugins.agent.models.skill import Skill
+        from base.plugins.agent.services.skill_service import SkillService
         skills = []
         if skill_ids:
-            skills = await Skill.filter(id__in=skill_ids).all()
+            for skill_id in skill_ids:
+                skill_detail = await SkillService.get_skill_with_category(skill_id)
+                if skill_detail:
+                    skills.append(skill_detail)
         
         return success_response(data={"skills": skills})
     except Exception as e:
@@ -547,13 +583,16 @@ async def add_skill_to_agent(agent_id: int, skill_id: int):
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
         
-        if not agent.config:
-            agent.config = {}
+        # 安全获取和更新 config
+        config = {}
+        if hasattr(agent, 'config') and agent.config is not None:
+            config = agent.config
         
-        skills = agent.config.get("skills", [])
+        skills = config.get("skills", [])
         if skill_id not in skills:
             skills.append(skill_id)
-            agent.config["skills"] = skills
+            config["skills"] = skills
+            agent.config = config
             await agent.save()
         
         return success_response(msg="技能添加成功")
@@ -569,13 +608,16 @@ async def remove_skill_from_agent(agent_id: int, skill_id: int):
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
         
-        if not agent.config:
-            agent.config = {}
+        # 安全获取和更新 config
+        config = {}
+        if hasattr(agent, 'config') and agent.config is not None:
+            config = agent.config
         
-        skills = agent.config.get("skills", [])
+        skills = config.get("skills", [])
         if skill_id in skills:
             skills.remove(skill_id)
-            agent.config["skills"] = skills
+            config["skills"] = skills
+            agent.config = config
             await agent.save()
         
         return success_response(msg="技能移除成功")
@@ -591,11 +633,14 @@ async def set_agent_skills(agent_id: int, data: dict):
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
         
-        if not agent.config:
-            agent.config = {}
+        # 安全获取和更新 config
+        config = {}
+        if hasattr(agent, 'config') and agent.config is not None:
+            config = agent.config
         
         skill_ids = data.get("skill_ids", [])
-        agent.config["skills"] = skill_ids
+        config["skills"] = skill_ids
+        agent.config = config
         await agent.save()
         
         return success_response(msg="技能设置成功")

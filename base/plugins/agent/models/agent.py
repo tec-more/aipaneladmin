@@ -23,6 +23,8 @@ class Agent(BaseModel, TimestampMixin):
     # 默认记忆模式：public（公共记忆）/private（私有记忆）
     default_memory_mode = fields.CharField(max_length=20, default="public", description="Default memory mode: public/private")
     
+    config = fields.JSONField(null=True, description="Agent configuration (skills, tools, etc.)")
+    
     class Meta:
         table = "agent"
     

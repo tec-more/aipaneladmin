@@ -16,6 +16,10 @@ export function createAgent(data) {
   return request.post('/v1/agent/agents/', data)
 }
 
+export function importAgent(data) {
+  return request.post('/v1/agent/agents/import', data)
+}
+
 export function updateAgent(id, data) {
   return request.put(`/v1/agent/agents/${id}`, data)
 }

@@ -1316,6 +1316,57 @@ const importWorkflow = () => {
   fileInput.value.click();
 };
 
+const transformNode = (node) => {
+  if (!node) return null;
+  
+  // 转换节点格式：模板格式 -> 系统格式
+  const nodeType = node.type || 'default';
+  const position = node.position || node.data?.position || { x: Math.random() * 500, y: Math.random() * 300 };
+  
+  const transformed = {
+    id: node.id || `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    type: nodeType,
+    position: position,
+    data: {
+      label: node.name || node.data?.label || '节点',
+      description: node.data?.description || ''
+    }
+  };
+
+  // 处理不同类型的节点
+  if (nodeType === 'llm') {
+    transformed.data.prompt = node.config?.prompt || node.data?.prompt || '';
+    transformed.data.modelId = node.config?.model_id || node.data?.modelId || null;
+    transformed.data.temperature = node.data?.temperature ?? 0.7;
+    transformed.data.maxTokens = node.data?.maxTokens ?? 1024;
+    transformed.data.stream = node.data?.stream ?? false;
+    transformed.data.outputVar = node.data?.outputVar || '';
+  } else if (nodeType === 'tool') {
+    transformed.data.toolName = node.config?.tool_name || node.data?.toolName || '';
+    transformed.data.description = node.config?.description || node.data?.description || '';
+  } else if (nodeType === 'decision' || nodeType === 'condition') {
+    transformed.type = 'condition';
+    transformed.data.condition = node.config?.condition || node.data?.condition || '';
+  }
+
+  return transformed;
+};
+
+const transformEdge = (edge, index) => {
+  if (!edge || !edge.source || !edge.target) return null;
+  
+  // 转换边格式
+  return {
+    id: edge.id || `${edge.source}-${edge.target}-${index}`,
+    source: edge.source,
+    target: edge.target,
+    sourceHandle: edge.sourceHandle || null,
+    targetHandle: edge.targetHandle || null,
+    condition: edge.condition || null,
+    type: edge.type || 'default'
+  };
+};
+
 const handleFileImport = (event) => {
   const file = event.target.files[0];
   if (!file) return;
@@ -1324,11 +1375,44 @@ const handleFileImport = (event) => {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.nodes) nodes.value = data.nodes;
-      if (data.edges) edges.value = data.edges;
+      
+      // 支持多种格式：
+      // 1. 直接包含 nodes/edges
+      // 2. 包含 graph_definition
+      // 3. 包含 agent.graph_definition（完整模板格式）
+      let importData = data;
+      if (data.agent?.graph_definition) {
+        importData = data.agent.graph_definition;
+      } else if (data.graph_definition) {
+        importData = data.graph_definition;
+      }
+      
+      // 清空当前选择
+      selectedNode.value = null;
+      selectedEdge.value = null;
+      
+      // 安全地更新节点和边
+      if (importData.nodes) {
+        const transformedNodes = importData.nodes.map(transformNode).filter(
+          node => node && node.id && node.type
+        );
+        
+        // 先清空，再添加，避免直接替换导致的问题
+        nodes.value.splice(0, nodes.value.length, ...transformedNodes);
+      }
+      
+      if (importData.edges) {
+        const transformedEdges = importData.edges.map((edge, index) => transformEdge(edge, index)).filter(
+          edge => edge && edge.source && edge.target
+        );
+        
+        edges.value.splice(0, edges.value.length, ...transformedEdges);
+      }
+      
       ElMessage.success('导入成功');
     } catch (err) {
       ElMessage.error('文件格式错误');
+      console.error(err);
     }
   };
   reader.readAsText(file);
@@ -1377,15 +1461,27 @@ onMounted(() => {
 
 // 监听 initialNodes 变化
 watch(() => props.initialNodes, (newNodes) => {
-  if (newNodes.length > 0) {
-    nodes.value = JSON.parse(JSON.stringify(newNodes));
+  if (newNodes && newNodes.length > 0) {
+    const clonedNodes = JSON.parse(JSON.stringify(newNodes)).filter(
+      node => node && node.id && node.type
+    );
+    if (clonedNodes.length > 0) {
+      selectedNode.value = null;
+      nodes.value.splice(0, nodes.value.length, ...clonedNodes);
+    }
   }
 }, { immediate: true, deep: true });
 
 // 监听 initialEdges 变化
 watch(() => props.initialEdges, (newEdges) => {
-  if (newEdges.length > 0) {
-    edges.value = JSON.parse(JSON.stringify(newEdges));
+  if (newEdges && newEdges.length > 0) {
+    const clonedEdges = JSON.parse(JSON.stringify(newEdges)).filter(
+      edge => edge && edge.source && edge.target
+    );
+    if (clonedEdges.length > 0) {
+      selectedEdge.value = null;
+      edges.value.splice(0, edges.value.length, ...clonedEdges);
+    }
   }
 }, { immediate: true, deep: true });
 </script>

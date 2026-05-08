@@ -4,10 +4,16 @@
       <template #header>
         <div class="card-header">
           <span>智能体</span>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            新增智能体
-          </el-button>
+          <div style="display: flex; gap: 8px;">
+            <el-button @click="handleImport">
+              <el-icon><Upload /></el-icon>
+              导入
+            </el-button>
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              新增智能体
+            </el-button>
+          </div>
         </div>
       </template>
       
@@ -133,21 +139,30 @@
         <el-button type="primary" @click="handleSaveSkills">保存</el-button>
       </template>
     </el-dialog>
+    
+    <input
+      type="file"
+      ref="fileInput"
+      accept=".json"
+      style="display: none"
+      @change="handleFileChange"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Connection, Memo, Share, Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAgents, createAgent, updateAgent, deleteAgent, getAgentSkills, setAgentSkills } from '@/api/agent'
+import { getAgents, createAgent, updateAgent, deleteAgent, getAgentSkills, setAgentSkills, importAgent } from '@/api/agent'
 import { getSkills } from '@/api/agent'
 
 const router = useRouter()
 const loading = ref(false)
 const agents = ref([])
 const allSkills = ref([])
+const fileInput = ref(null)
 
 const searchForm = reactive({
   name: '',
@@ -325,6 +340,48 @@ const handleMemory = (row) => {
 
 const handleGraph = (row) => {
   router.push(`/panel/agent/graph/${row.id}`)
+}
+
+const handleImport = () => {
+  fileInput.value?.click()
+}
+
+const handleFileChange = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  try {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result)
+        
+        await ElMessageBox.confirm(
+          '确定要导入该智能体配置吗？',
+          '导入确认',
+          { type: 'warning' }
+        )
+        
+        const res = await importAgent(data)
+        if (res) {
+          ElMessage.success('导入成功！')
+          fetchAgents()
+        }
+      } catch (parseError) {
+        ElMessage.error('JSON格式错误，请检查文件')
+        console.error(parseError)
+      }
+    }
+    reader.readAsText(file)
+  } catch (error) {
+    ElMessage.error('文件读取失败')
+    console.error(error)
+  } finally {
+    // clear input value to allow select same file again
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+  }
 }
 
 onMounted(() => {
