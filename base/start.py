@@ -414,7 +414,7 @@ def init_app() -> FastAPI:
         print("[手动注册] WebSocket路由已注册: /v1/llm/voice/translation/streaming")
     except ImportError as e:
         print(f"[警告] 无法导入voice_websocket: {e}")
-
+    
     return app
 
 

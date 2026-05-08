@@ -320,9 +320,9 @@ async def sse_execution_generator(agent, input_data, execution_id: str) -> Async
         
         # 创建包装后的 sse_yield_func，把数据推送到队列
         async def wrapped_sse_yield(event):
-            logger.info(f"[agent API] wrapped_sse_yield 收到事件: {event}")
+            print(f"[agent API] wrapped_sse_yield 收到事件: {event}")
             await sse_queue.put(event)
-            logger.info(f"[agent API] 事件已入队列")
+            print(f"[agent API] 事件已入队列")
         
         # 启动 LangGraph 执行任务
         async def execute_task():
