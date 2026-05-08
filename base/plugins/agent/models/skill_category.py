@@ -16,6 +16,7 @@ class SkillCategory(BaseModel, TimestampMixin):
     
     class Meta:
         table = "skill_category"
+        unique_together = (("name",),)  # 确保分类名称唯一
     
     def __str__(self):
         return self.name

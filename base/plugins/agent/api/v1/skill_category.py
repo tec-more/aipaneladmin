@@ -2,7 +2,7 @@
 Skill Category API routes
 """
 from typing import List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from base.plugins.agent.schemas.skill_category import (
     SkillCategoryCreate, 
     SkillCategoryUpdate, 
@@ -16,9 +16,12 @@ skill_category_router = APIRouter(prefix="/skill-categories", tags=["skill-categ
 
 
 @skill_category_router.post("/")
-async def create_category(category: SkillCategoryCreate):
+async def create_category(category: SkillCategoryCreate, request: Request):
     """Create a new skill category"""
     try:
+        print(f"=== 创建技能分类 ===")
+        print(f"接收到的数据: {category.model_dump()}")
+        
         created_category = await SkillCategoryService.create_category(category)
         if not created_category:
             return fail_response(msg="创建失败，可能存在重复名称", code=400)
@@ -26,6 +29,9 @@ async def create_category(category: SkillCategoryCreate):
         detail = await SkillCategoryService.get_category_with_details(created_category.id)
         return success_response(data=detail, msg="分类创建成功")
     except Exception as e:
+        print(f"创建分类时出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return fail_response(msg=str(e))
 
 

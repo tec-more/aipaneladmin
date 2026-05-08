@@ -15,6 +15,12 @@ class SkillCategoryService:
     async def create_category(category_data: SkillCategoryCreate) -> Optional[SkillCategory]:
         """Create skill category"""
         try:
+            # 先检查是否已存在同名分类
+            existing = await SkillCategory.filter(name=category_data.name).first()
+            if existing:
+                print(f"分类名称已存在: {category_data.name}")
+                return None
+            
             category = await SkillCategory.create(
                 name=category_data.name,
                 description=category_data.description,
@@ -23,7 +29,8 @@ class SkillCategoryService:
                 status=category_data.status
             )
             return category
-        except IntegrityError:
+        except IntegrityError as e:
+            print(f"数据库完整性错误: {e}")
             return None
 
     @staticmethod
