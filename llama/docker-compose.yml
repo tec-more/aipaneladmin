@@ -21,17 +21,17 @@ services:
       --host 0.0.0.0
       --port 8201
       --n-gpu-layers 99
-      --ctx-size 16384
-      --batch-size 512
-      --ubatch-size 256
-      --parallel 1
+      --ctx-size 32768
+      --batch-size 1024
+      --ubatch-size 512
+      --parallel 2
       --cont-batching
       --jinja
       --chat-template-kwargs '{"enable_thinking":false}'
       --api-key sk-hp123456789
       --no-mmap
       --mlock
-      --threads 12
+      --threads 14
 
   # 2. bge-m3 向量模型 → 纯 CPU 运行 (不占显卡)
   bge:
