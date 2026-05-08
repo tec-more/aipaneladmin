@@ -90,50 +90,82 @@
         </div>
       </div>
       
-      <div class="flow-container" @dragover="onDragOver" @drop="onDrop" @mousemove="onMouseMove" @mouseup="onMouseUp">
-        <div class="canvas" ref="canvas">
-          <svg class="edges-svg">
-            <defs>
-              <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                <polygon points="0 0, 10 3, 0 6" fill="#409eff" />
-              </marker>
-            </defs>
-            <g v-for="edge in edges" :key="edge.id" @click="onEdgeClick(edge)">
-              <path
-                :d="getEdgePath(edge)"
-                class="workflow-edge"
-                :class="{ 'selected': selectedEdge?.id === edge.id }"
-                marker-end="url(#arrowhead)"
-              />
-            </g>
-            <path v-if="drawingEdge" :d="tempEdgePath" class="temp-edge" />
-          </svg>
-          
-          <div 
-            v-for="node in nodes" 
-            :key="node.id"
-            class="workflow-node"
-            :class="{ 
-              'selected': selectedNode?.id === node.id,
-              [node.type + '-node']: true 
-            }"
-            @click="onNodeClick(node)"
-            @mousedown="onNodeMouseDown($event, node)"
-            :style="{ left: node.position.x + 'px', top: node.position.y + 'px' }"
-          >
-            <div class="connection-point input" 
-                 @mousedown.stop="onInputPointMouseDown($event, node)"
-                 @mouseup="onInputPointMouseUp($event, node)">
-            </div>
-            <div class="node-header">
-              <span class="node-icon">{{ getNodeIcon(node.type) }}</span>
-              <span class="node-label">{{ node.data.label }}</span>
-            </div>
-            <div class="connection-point output"
-                 @mousedown.stop="onOutputPointMouseDown($event, node)">
+      <div class="flow-container" ref="flowContainerRef" @dragover="onDragOver" @drop="onDrop" @mousemove="onMouseMove" @mouseup="onMouseUp" @wheel.prevent="onWheel">
+        <div class="canvas-wrapper">
+          <div class="canvas" ref="canvasRef" :style="canvasStyle">
+            <svg class="edges-svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                  <polygon points="0 0, 10 3, 0 6" fill="#409eff" />
+                </marker>
+              </defs>
+              <g v-for="edge in edges" :key="edge.id" @click="onEdgeClick(edge)">
+                <path
+                  :d="getEdgePath(edge)"
+                  class="workflow-edge"
+                  :class="{ 'selected': selectedEdge?.id === edge.id }"
+                  marker-end="url(#arrowhead)"
+                />
+              </g>
+              <path v-if="drawingEdge" :d="tempEdgePath" class="temp-edge" />
+            </svg>
+            
+            <div 
+              v-for="node in nodes" 
+              :key="node.id"
+              class="workflow-node"
+              :class="{ 
+                'selected': selectedNode?.id === node.id,
+                [node.type + '-node']: true 
+              }"
+              @click="onNodeClick(node)"
+              @mousedown="onNodeMouseDown($event, node)"
+              :style="{ 
+                left: node.position.x + 'px', 
+                top: node.position.y + 'px'
+              }"
+            >
+              <div class="connection-point input" 
+                   @mousedown.stop="onInputPointMouseDown($event, node)"
+                   @mouseup="onInputPointMouseUp($event, node)">
+              </div>
+              <div class="node-header">
+                <span class="node-icon">{{ getNodeIcon(node.type) }}</span>
+                <span class="node-label">{{ node.data.label }}</span>
+              </div>
+              <div class="connection-point output"
+                   @mousedown.stop="onOutputPointMouseDown($event, node)">
+              </div>
             </div>
           </div>
         </div>
+      </div>
+      
+      <div class="canvas-zoom-controls">
+        <el-button 
+          icon="ZoomIn" 
+          @click="zoomIn" 
+          :disabled="zoom >= MAX_ZOOM"
+          size="small"
+          circle
+          title="放大"
+        />
+        <div class="canvas-zoom-value">{{ Math.round(zoom * 100) }}%</div>
+        <el-button 
+          icon="ZoomOut" 
+          @click="zoomOut" 
+          :disabled="zoom <= MIN_ZOOM"
+          size="small"
+          circle
+          title="缩小"
+        />
+        <el-button 
+          icon="Refresh" 
+          @click="resetZoom" 
+          size="small"
+          circle
+          title="重置"
+        />
       </div>
       
       <div class="config-panel" v-if="selectedNode || selectedEdge">
@@ -609,6 +641,7 @@ import { getWorkflow, updateWorkflow, executeWorkflow } from '@/api/agent'
 import { getAgents, getSkills } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer'
+import { ZoomIn, ZoomOut, Refresh } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -704,6 +737,43 @@ const currentMousePos = ref({ x: 0, y: 0 })
 const draggingNode = ref(null)
 const dragOffset = ref({ x: 0, y: 0 })
 
+const zoom = ref(1)
+const MIN_ZOOM = 0.2
+const MAX_ZOOM = 3
+const ZOOM_STEP = 0.1
+
+const canvasRef = ref(null)
+const flowContainerRef = ref(null)
+
+const canvasStyle = computed(() => {
+  return {
+    transform: `scale(${zoom.value})`,
+    transformOrigin: 'top left'
+  };
+});
+
+const zoomIn = () => {
+  if (zoom.value < MAX_ZOOM) {
+    zoom.value = Math.min(zoom.value + ZOOM_STEP, MAX_ZOOM)
+  }
+}
+
+const zoomOut = () => {
+  if (zoom.value > MIN_ZOOM) {
+    zoom.value = Math.max(zoom.value - ZOOM_STEP, MIN_ZOOM)
+  }
+}
+
+const resetZoom = () => {
+  zoom.value = 1
+}
+
+const onWheel = (event) => {
+  event.preventDefault()
+  const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+  zoom.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta))
+}
+
 const tempEdgePath = computed(() => {
   if (!drawingEdge.value) return ''
   const startX = edgeStartPoint.value.x
@@ -753,8 +823,8 @@ const getEdgePath = (edge) => {
   const targetY = targetNode.position.y + 20
   
   // 计算同一源节点和目标节点的连线索引，用于双向偏移
-  const sourceEdges = edges.filter(e => e.source === edge.source)
-  const targetEdges = edges.filter(e => e.target === edge.target)
+  const sourceEdges = edges.value.filter(e => e.source === edge.source)
+  const targetEdges = edges.value.filter(e => e.target === edge.target)
   const edgeIndex = sourceEdges.findIndex(e => e.id === edge.id)
   const targetEdgeIndex = targetEdges.findIndex(e => e.id === edge.id)
   const totalEdgesFromSource = sourceEdges.length
@@ -1151,6 +1221,50 @@ onMounted(() => {
   gap: 10px;
 }
 
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 15px;
+  border-left: 1px solid #e4e7ed;
+  .el-button {
+    margin-left: 0 !important;
+  }
+}
+
+.zoom-value {
+  font-size: 12px;
+  color: #606266;
+  min-width: 45px;
+  text-align: center;
+}
+
+.canvas-zoom-controls {
+  position: fixed;
+  bottom: 30px;
+  right: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  .el-button {
+    margin-left: 3px !important;
+  }
+}
+
+.canvas-zoom-value {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+  min-width: 40px;
+  text-align: center;
+}
+
 .editor-container {
   flex: 1;
   display: flex;
@@ -1205,11 +1319,18 @@ onMounted(() => {
   overflow: auto;
 }
 
-.canvas {
+.canvas-wrapper {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 600px;
+}
+
+.canvas {
+  position: relative;
+  width: 5000px;
+  height: 5000px;
+  min-width: 100%;
+  min-height: 100%;
   background: #fafafa;
   background-image: 
     linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),

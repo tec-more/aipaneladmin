@@ -35,12 +35,24 @@
             <li>点击节点选中并配置</li>
             <li>从右侧连接点拖拽连线</li>
             <li>点击连线可删除</li>
+            <li>滚轮缩放画布</li>
           </ul>
         </div>
       </div>
 
-      <div class="canvas-wrapper" @dragover="onDragOver" @drop="onDrop" @mousemove="onMouseMove" @mouseup="onMouseUp">
-        <div class="canvas" ref="canvas">
+      <div 
+        class="canvas-wrapper" 
+        @dragover="onDragOver" 
+        @drop="onDrop" 
+        @mousemove="onMouseMove" 
+        @mouseup="onMouseUp"
+        @wheel.prevent="onWheel"
+      >
+        <div 
+          class="canvas" 
+          ref="canvas"
+          :style="canvasStyle"
+        >
           <svg class="edges-svg">
             <defs>
               <marker id="arrowhead-lg" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
@@ -68,7 +80,7 @@
             }"
             @click="onNodeClick(node)"
             @mousedown="onNodeMouseDown($event, node)"
-            :style="{ left: node.position.x + 'px', top: node.position.y + 'px' }"
+            :style="getNodeStyle(node)"
           >
             <div class="connection-point input" 
                  @mousedown.stop="onInputPointMouseDown($event, node)"
@@ -90,6 +102,33 @@
         </div>
       </div>
 
+      <div class="canvas-zoom-controls">
+        <el-button 
+          :icon="ZoomIn" 
+          @click="zoomIn" 
+          :disabled="zoom >= MAX_ZOOM"
+          size="small"
+          circle
+          title="放大"
+        />
+        <div class="canvas-zoom-value">{{ Math.round(zoom * 100) }}%</div>
+        <el-button 
+          :icon="ZoomOut" 
+          @click="zoomOut" 
+          :disabled="zoom <= MIN_ZOOM"
+          size="small"
+          circle
+          title="缩小"
+        />
+        <el-button 
+          :icon="Refresh" 
+          @click="resetZoom" 
+          size="small"
+          circle
+          title="重置"
+        />
+      </div>
+
       <div class="config-panel" v-if="selectedNode || selectedEdge">
         <template v-if="selectedNode">
           <div class="panel-header">节点配置</div>
@@ -101,18 +140,6 @@
               <el-input v-model="selectedNode.data.description" type="textarea" :rows="2" />
             </el-form-item>
 
-            <template v-if="selectedNode.type === 'agent'">
-              <el-divider content-position="left">智能体配置</el-divider>
-              <el-form-item label="选择智能体">
-                <el-select v-model="selectedNode.data.agentId" style="width: 100%">
-                  <el-option v-for="agent in agents" :key="agent.id" :label="agent.name" :value="agent.id" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="提示词">
-                <el-input v-model="selectedNode.data.prompt" type="textarea" :rows="4" />
-              </el-form-item>
-            </template>
-
             <template v-if="selectedNode.type === 'llm'">
               <el-divider content-position="left">LLM 配置</el-divider>
               <el-form-item label="选择模型">
@@ -120,7 +147,7 @@
                   <el-option 
                     v-for="model in models" 
                     :key="model.id" 
-                    :label="`${model.providerName} - ${model.modelName}`" 
+                    :label="`${model.provider_name} - ${model.model_name}`" 
                     :value="model.id" 
                   />
                 </el-select>
@@ -294,8 +321,8 @@
         <template v-if="selectedEdge">
           <div class="panel-header">连线配置</div>
           <div class="edge-info">
-            <p><strong>源节点:</strong> {{ getNodeById(selectedEdge.source)?.data.label }}</p>
-            <p><strong>目标节点:</strong> {{ getNodeById(selectedEdge.target)?.data.label }}</p>
+            <p><strong>源节点：</strong>{{ getNodeById(selectedEdge.source)?.data.label }}</p>
+            <p><strong>目标节点：</strong>{{ getNodeById(selectedEdge.target)?.data.label }}</p>
           </div>
           <el-button type="danger" size="small" @click="deleteSelectedEdge" style="width: 100%">
             删除连线
@@ -306,7 +333,6 @@
 
     <el-dialog v-model="executeDialog" title="执行工程图" width="900px" class="wechat-style-dialog">
       <div class="chat-container">
-        <!-- 聊天历史 -->
         <div class="chat-messages">
           <div
             v-for="(msg, index) in dialogHistory"
@@ -325,7 +351,6 @@
           </div>
         </div>
 
-        <!-- 输入区 -->
         <div class="chat-input-area">
           <el-input
             v-model="currentInput"
@@ -356,13 +381,12 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
-import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit } from '@element-plus/icons-vue'
+import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer';
 
-// 安全的 console 包装器
 const safeConsole = {
   log: function() {},
   error: function() {},
@@ -381,9 +405,7 @@ try {
       safeConsole.warn = console.warn.bind(console);
     }
   }
-} catch (e) {
-  // 静默忽略
-}
+} catch (e) {}
 
 const props = defineProps({
   workflowId: { type: [String, Number], default: null },
@@ -404,16 +426,16 @@ const executeDialog = ref(false);
 const executeInput = ref('{}');
 const executeResult = ref(null);
 const activeTab = ref('full');
-const realtimeSteps = ref([]); // 实时执行步骤
-const dialogHistory = ref([]); // 对话历史
-const currentInput = ref(''); // 当前输入
-const latestResponse = ref(''); // 最新回复
-const currentProcess = ref([]); // 当前执行过程（思考/行动/观察）
-const assistantMessage = ref(null); // 当前助手消息引用
-const currentAbortController = ref(null); // 当前中断控制器
+const realtimeSteps = ref([]);
+const dialogHistory = ref([]);
+const currentInput = ref('');
+const latestResponse = ref('');
+const currentProcess = ref([]);
+const assistantMessage = ref(null);
+const currentAbortController = ref(null);
 
-const typingDots = ref(''); // 打字省略号
-let typingInterval = null; // 打字动画定时器
+const typingDots = ref('');
+let typingInterval = null;
 
 const agents = ref([]);
 const skills = ref([]);
@@ -424,7 +446,11 @@ const edges = ref([]);
 const selectedNode = ref(null);
 const selectedEdge = ref(null);
 
-// 连线类型配置 - 使用全局配置
+const zoom = ref(1);
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.1;
+
 const edgeType = getDefaultEdgeType();
 
 const drawingEdge = ref(false);
@@ -434,6 +460,13 @@ const currentMousePos = ref({ x: 0, y: 0 });
 const draggingNode = ref(null);
 const dragOffset = ref({ x: 0, y: 0 });
 
+const canvasStyle = computed(() => {
+  return {
+    transform: `scale(${zoom.value})`,
+    transformOrigin: 'top left'
+  };
+});
+
 const tempEdgePath = computed(() => {
   if (!drawingEdge.value) return '';
   
@@ -442,7 +475,6 @@ const tempEdgePath = computed(() => {
   const endX = currentMousePos.value.x;
   const endY = currentMousePos.value.y;
   
-  // 使用全局配置的连线类型渲染临时连线
   return getEdgePathByType(edgeType, startX, startY, endX, endY, 0);
 });
 
@@ -493,6 +525,8 @@ const nodeCategories = [
   }
 ];
 
+const nodeTypes = nodeCategories.flatMap(category => category.nodes);
+
 const getNodeIcon = (type) => {
   const icons = {
     start: '▶️',
@@ -518,6 +552,13 @@ const getNodeIcon = (type) => {
   return icons[type] || '📦';
 };
 
+const getNodeStyle = (node) => {
+  return {
+    left: node.position.x + 'px',
+    top: node.position.y + 'px'
+  };
+};
+
 const getTraceStepType = (type) => {
   const types = {
     start: 'success',
@@ -535,12 +576,10 @@ const getTraceStepType = (type) => {
 const formatContent = (content) => {
   if (!content) return '';
   
-  // 如果内容包含HTML标签，直接返回以使用v-html渲染
   if (content.includes('<') && content.includes('>')) {
     return content;
   }
   
-  // 否则，处理换行等格式
   return content
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -551,7 +590,6 @@ const formatContent = (content) => {
 
 const getNodeById = (id) => nodes.value.find(n => n.id === id);
 
-// 实时执行步骤相关函数
 const getStepType = (type) => {
   const typeMap = {
     think: 'primary',
@@ -601,7 +639,6 @@ const getEdgePath = (edge) => {
   const targetX = targetNode.position.x;
   const targetY = targetNode.position.y + 30;
   
-  // 计算同一源节点和目标节点的连线索引，用于双向偏移
   const sourceEdges = edges.value.filter(e => e.source === edge.source);
   const targetEdges = edges.value.filter(e => e.target === edge.target);
   const edgeIndex = sourceEdges.findIndex(e => e.id === edge.id);
@@ -609,7 +646,6 @@ const getEdgePath = (edge) => {
   const totalEdgesFromSource = sourceEdges.length;
   const totalEdgesToTarget = targetEdges.length;
   
-  // 计算垂直偏移量，避免重叠
   let totalOffset = 0;
   if (totalEdgesFromSource > 1 || totalEdgesToTarget > 1) {
     const spacing = 30;
@@ -621,8 +657,29 @@ const getEdgePath = (edge) => {
     totalOffset = startOffset + avgIndex * spacing;
   }
   
-  // 使用全局配置的连线类型渲染
   return getEdgePathByType(edgeType, sourceX, sourceY, targetX, targetY, totalOffset);
+};
+
+const zoomIn = () => {
+  zoom.value = Math.min(MAX_ZOOM, zoom.value + ZOOM_STEP);
+};
+
+const zoomOut = () => {
+  zoom.value = Math.max(MIN_ZOOM, zoom.value - ZOOM_STEP);
+};
+
+const resetZoom = () => {
+  zoom.value = 1;
+};
+
+const onWheel = (event) => {
+  event.preventDefault();
+  const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+  const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.value + delta));
+  
+  if (newZoom !== zoom.value) {
+    zoom.value = newZoom;
+  }
 };
 
 const onDragStart = (event, nodeType) => {
@@ -642,8 +699,8 @@ const onDrop = (event) => {
   const canvasEl = event.currentTarget;
   const rect = canvasEl.getBoundingClientRect();
   const position = {
-    x: event.clientX - rect.left + canvasEl.scrollLeft - 75,
-    y: event.clientY - rect.top + canvasEl.scrollTop - 25
+    x: (event.clientX - rect.left + canvasEl.scrollLeft) / zoom.value - 75,
+    y: (event.clientY - rect.top + canvasEl.scrollTop) / zoom.value - 25
   };
   
   const nodeData = {
@@ -681,8 +738,8 @@ const onNodeMouseDown = (event, node) => {
   const canvasEl = canvas.value;
   const rect = canvasEl.getBoundingClientRect();
   dragOffset.value = {
-    x: event.clientX - rect.left - node.position.x,
-    y: event.clientY - rect.top - node.position.y
+    x: (event.clientX - rect.left) / zoom.value - node.position.x,
+    y: (event.clientY - rect.top) / zoom.value - node.position.y
   };
   event.preventDefault();
 };
@@ -734,8 +791,8 @@ const onMouseMove = (event) => {
     const canvasEl = canvas.value;
     const rect = canvasEl.getBoundingClientRect();
     currentMousePos.value = {
-      x: event.clientX - rect.left + canvasEl.scrollLeft,
-      y: event.clientY - rect.top + canvasEl.scrollTop
+      x: (event.clientX - rect.left + canvasEl.scrollLeft) / zoom.value,
+      y: (event.clientY - rect.top + canvasEl.scrollTop) / zoom.value
     };
   }
   
@@ -743,8 +800,8 @@ const onMouseMove = (event) => {
     const canvasEl = canvas.value;
     const rect = canvasEl.getBoundingClientRect();
     draggingNode.value.position = {
-      x: event.clientX - rect.left + canvasEl.scrollLeft - dragOffset.value.x,
-      y: event.clientY - rect.top + canvasEl.scrollTop - dragOffset.value.y
+      x: (event.clientX - rect.left + canvasEl.scrollLeft) / zoom.value - dragOffset.value.x,
+      y: (event.clientY - rect.top + canvasEl.scrollTop) / zoom.value - dragOffset.value.y
     };
   }
 };
@@ -813,10 +870,9 @@ const executeWorkflowDialog = () => {
   executeResult.value = null;
 };
 
-// 监听对话框打开，清空步骤
 watch(() => executeDialog.value, (newVal) => {
   if (newVal) {
-    realtimeSteps.value = []; // 打开时清空之前的步骤
+    realtimeSteps.value = [];
     executeResult.value = null;
     currentInput.value = '';
     latestResponse.value = '';
@@ -832,7 +888,6 @@ const clearDialogHistory = () => {
   ElMessage.success('对话历史已清空');
 };
 
-// 获取步骤图标
 const getStepIcon = (type) => {
   const iconMap = {
     info: 'ℹ️',
@@ -849,7 +904,6 @@ const getStepIcon = (type) => {
   return iconMap[type] || 'ℹ️';
 };
 
-// 启动打字省略号动画
 const startTypingAnimation = () => {
   const dots = ['.', '..', '...', '..', '.'];
   let index = 0;
@@ -859,7 +913,6 @@ const startTypingAnimation = () => {
   }, 350);
 };
 
-// 停止打字省略号动画
 const stopTypingAnimation = () => {
   if (typingInterval) {
     clearInterval(typingInterval);
@@ -879,15 +932,13 @@ const doExecute = async () => {
     return;
   }
   
-  realtimeSteps.value = []; // 清空旧步骤
-  currentProcess.value = []; // 清空执行过程
+  realtimeSteps.value = [];
+  currentProcess.value = [];
   executing.value = true;
   
-  // 启动打字动画
   startTypingAnimation();
   
   try {
-    // 添加用户输入到历史
     const userMessage = {
       role: 'user',
       content: currentInput.value,
@@ -895,7 +946,6 @@ const doExecute = async () => {
     };
     dialogHistory.value.push(userMessage);
     
-    // 创建并添加助手消息占位符
     assistantMessage.value = {
       role: 'assistant',
       content: '',
@@ -907,17 +957,14 @@ const doExecute = async () => {
     addRealtimeStep('info', '开始执行', `输入文本: ${currentInput.value.trim().substring(0, 100)}...`);
     markLastStepCompleted();
     
-    // 将普通文本转换为JSON格式，包含对话历史
     const input = {
       text: currentInput.value.trim(),
-      history: [...dialogHistory.value.slice(0, -1)] // 排除刚添加的助手占位符
+      history: [...dialogHistory.value.slice(0, -1)]
     };
     
-    // 清空输入框
     currentInput.value = '';
     
     if (props.agentId) {
-      // 立即获取并保存 controller（不使用 await）
       const controller = executeAgentGraphAuto(props.agentId, input, {
         onStart: () => {
           addRealtimeStep('info', '准备执行', '正在建立SSE连接...');
@@ -931,12 +978,10 @@ const doExecute = async () => {
           markLastStepCompleted();
           ElMessage.success('执行完成');
           
-          // 处理非SSE的结果（如果有）
           if (result) {
             handleNonSSEData(result);
           }
           
-          // 执行完成时清理状态
           stopTypingAnimation();
           executing.value = false;
           currentAbortController.value = null;
@@ -945,7 +990,6 @@ const doExecute = async () => {
           addRealtimeStep('error', '执行失败', error.message || '未知错误');
           markLastStepCompleted();
           ElMessage.error('执行失败: ' + (error.message || '未知错误'));
-          // 出错时清理状态
           stopTypingAnimation();
           executing.value = false;
           currentAbortController.value = null;
@@ -955,9 +999,7 @@ const doExecute = async () => {
     } else {
       const result = await apiExecuteWorkflow(props.workflowId, input);
       
-      // 处理非SSE的结果
       handleNonSSEData(result);
-      // 非SSE模式，完成后清理
       stopTypingAnimation();
       executing.value = false;
       currentAbortController.value = null;
@@ -967,7 +1009,6 @@ const doExecute = async () => {
   } catch (error) {
     safeConsole.error('执行失败:', error);
     
-    // 即使出错也要显示错误
     if (assistantMessage.value) {
       assistantMessage.value.content = '执行失败: ' + (error.message || '未知错误');
     } else {
@@ -985,14 +1026,12 @@ const doExecute = async () => {
     
     ElMessage.error('执行失败: ' + (error.message || '未知错误'));
     
-    // 出错时清理状态
     stopTypingAnimation();
     executing.value = false;
     currentAbortController.value = null;
   }
 };
 
-// 中断执行
 const abortExecution = () => {
   if (currentAbortController.value) {
     currentAbortController.value.abort();
@@ -1000,7 +1039,6 @@ const abortExecution = () => {
     executing.value = false;
     stopTypingAnimation();
     
-    // 添加中断提示
     addRealtimeStep('warning', '执行中断', '用户手动中断执行');
     markLastStepCompleted();
     
@@ -1012,7 +1050,6 @@ const abortExecution = () => {
   }
 };
 
-// 处理SSE数据
 const handleSSEData = (data) => {
   switch (data.type) {
     case 'start':
@@ -1026,13 +1063,11 @@ const handleSSEData = (data) => {
       break;
     
     case 'thinking':
-      // 普通思考 - 只添加到实时步骤，不显示在对话框
       addRealtimeStep('think', data.label || '思考', data.message || data.content || '');
       markLastStepCompleted();
       break;
     
     case 'thinkingStream':
-      // ✅ 流式思考！实时更新对话框和实时步骤
       const rawContent = data.fullContent || data.content || '';
       if (assistantMessage.value) {
         assistantMessage.value.content = rawContent;
@@ -1041,26 +1076,23 @@ const handleSSEData = (data) => {
       break;
     
     case 'thinkingResult':
-      // 思考结果 - 只添加到实时步骤，不显示在对话框
       const finalRawContent = data.fullContent || data.content || '';
       addRealtimeStep('think', '思考完成', finalRawContent);
       markLastStepCompleted();
       break;
     
     case 'action':
-      // 行动过程 - 只添加到实时步骤，不显示在对话框
       addRealtimeStep('act', data.label || '行动', data.message || data.content || '');
       markLastStepCompleted();
       break;
     
     case 'observation':
-      // 观察结果 - 只添加到实时步骤，不显示在对话框
       addRealtimeStep('observe', data.label || '观察', data.content || '');
       markLastStepCompleted();
       break;
     
     case 'nodeStart':
-      addRealtimeStep('info', `执行节点：${data.nodeLabel || data.nodeType}`, `步骤 ${data.step}`);
+      addRealtimeStep('info', `执行节点: ${data.nodeLabel || data.nodeType}`, `步骤 ${data.step}`);
       break;
     
     case 'nodeComplete':
@@ -1072,25 +1104,21 @@ const handleSSEData = (data) => {
       addRealtimeStep('warning', '执行中断', data.message || '执行被用户中断');
       markLastStepCompleted();
       
-      // 显示中断提示
       if (assistantMessage.value) {
         assistantMessage.value.content = (assistantMessage.value.content || '') + '\n\n[执行被用户中断]';
       }
       
-      // 清理状态
       stopTypingAnimation();
       executing.value = false;
       currentAbortController.value = null;
       break;
     
     case 'complete':
-      // 执行完成 - 添加结果
       executeResult.value = {
         result: data.result,
         variables: data.variables
       };
       
-      // 从结果中提取最终回复 - 直接使用原始内容，不JSON化
       let finalContent = '';
       if (data.variables) {
         finalContent = data.variables.finalReport || 
@@ -1098,7 +1126,6 @@ const handleSSEData = (data) => {
                       data.variables.text || 
                       data.variables.output || 
                       '';
-        // 如果没有提取到内容，尝试从 variables 中获取 llmOutput
         if (!finalContent && data.variables.llmOutput) {
           finalContent = data.variables.llmOutput.response || data.variables.llmOutput.text || '';
         }
@@ -1110,14 +1137,12 @@ const handleSSEData = (data) => {
         finalContent = '执行完成';
       }
       
-      // 更新助手消息 - 只设置内容，不设置 process
       if (assistantMessage.value) {
         assistantMessage.value.content = finalContent;
       }
       
       latestResponse.value = finalContent;
       
-      // 清理状态
       stopTypingAnimation();
       executing.value = false;
       currentAbortController.value = null;
@@ -1132,7 +1157,6 @@ const handleSSEData = (data) => {
       }
       latestResponse.value = '执行错误: ' + (data.message || '');
       
-      // 清理状态
       stopTypingAnimation();
       executing.value = false;
       currentAbortController.value = null;
@@ -1140,58 +1164,50 @@ const handleSSEData = (data) => {
   }
 };
 
-// 📝 格式化JSON为友好的显示内容
 const formatJsonToDisplay = (content, label) => {
   if (!content) return content;
   
-  // 先尝试解析JSON
   let jsonData = null;
   let textToParse = content;
   
   try {
-    // 1. 直接解析
     jsonData = JSON.parse(textToParse);
   } catch {
     try {
-      // 2. 如果不行，尝试从文本中提取JSON部分
       const jsonMatch = textToParse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         jsonData = JSON.parse(jsonMatch[0]);
       }
     } catch {
-      // 解析失败，就返回原样（可能还在流式生成中）
       return content;
     }
   }
   
   if (!jsonData) return content;
   
-  // 🔍 简单智能判断如何格式化！
   let result = '';
   
   if (label?.includes('需求')) {
-    // 需求分析的格式化
     result = '📊 需求分析结果\n';
-    if (jsonData.projectType) result += `• 项目类型：${jsonData.projectType}\n`;
-    if (jsonData.targetUsers) result += `• 目标用户：${jsonData.targetUsers}\n`;
-    if (jsonData.businessGoals) result += `• 业务目标：${jsonData.businessGoals}\n`;
+    if (jsonData.projectType) result += `• 项目类型: ${jsonData.projectType}\n`;
+    if (jsonData.targetUsers) result += `• 目标用户: ${jsonData.targetUsers}\n`;
+    if (jsonData.businessGoals) result += `• 业务目标: ${jsonData.businessGoals}\n`;
     if (Array.isArray(jsonData.coreFeatures) && jsonData.coreFeatures.length > 0) {
-      result += '• 核心功能：\n';
+      result += '• 核心功能:\n';
       jsonData.coreFeatures.forEach((f, i) => {
         result += `  ${i+1}. ${f}\n`;
       });
     }
   } else if (label?.includes('任务') || jsonData.totalTask || jsonData.subtasks) {
-    // 任务分解的格式化（兼容新旧字段）
     result = '📋 任务分解结果\n';
     if (jsonData.originalTask || jsonData.totalTask) {
-      result += `• 总任务：${jsonData.originalTask || jsonData.totalTask}\n`;
+      result += `• 总任务: ${jsonData.originalTask || jsonData.totalTask}\n`;
     }
     if (jsonData.totalHours) {
-      result += `• 总工时：${jsonData.totalHours} 小时\n`;
+      result += `• 总工时: ${jsonData.totalHours} 小时\n`;
     }
     if (Array.isArray(jsonData.subtasks) && jsonData.subtasks.length > 0) {
-      result += '• 子任务清单：\n';
+      result += '• 子任务清单:\n';
       jsonData.subtasks.forEach((task, i) => {
         const priorityIcon = task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢';
         const name = task.name || task.taskName || '';
@@ -1203,62 +1219,54 @@ const formatJsonToDisplay = (content, label) => {
       });
     }
     if (Array.isArray(jsonData.milestones) && jsonData.milestones.length > 0) {
-      result += '• 里程碑：\n';
+      result += '• 里程碑:\n';
       jsonData.milestones.forEach((m, i) => {
         const milestoneEstimate = m.estimatedHours ? ` (${m.estimatedHours}小时)` : '';
         result += `  ${i+1}. ${m.name}${milestoneEstimate}\n`;
       });
     }
   } else if (label?.includes('评估')) {
-    // 质量评估的格式化
     result = '✅ 质量评估结果\n';
     const score = jsonData.qualityScore != null ? jsonData.qualityScore : 'N/A';
-    if (score !== 'N/A') result += `• 质量评分：${score}/100\n`;
-    if (jsonData.feedback) result += `• 评估反馈：${jsonData.feedback}\n`;
+    if (score !== 'N/A') result += `• 质量评分: ${score}/100\n`;
+    if (jsonData.feedback) result += `• 评估反馈: ${jsonData.feedback}\n`;
     if (Array.isArray(jsonData.strengths) && jsonData.strengths.length > 0) {
-      result += '• 优点：\n';
+      result += '• 优点:\n';
       jsonData.strengths.forEach((s, i) => {
         result += `  ${i+1}. ${s}\n`;
       });
     }
     if (Array.isArray(jsonData.weaknesses) && jsonData.weaknesses.length > 0) {
-      result += '• 可改进：\n';
+      result += '• 可改进:\n';
       jsonData.weaknesses.forEach((w, i) => {
         result += `  ${i+1}. ${w}\n`;
       });
     }
   } else {
-    // 默认显示，但也尽量友好
-    result = '📄 内容：\n' + content;
+    result = '📄 内容:\n' + content;
   }
   
   return result || content;
 };
 
-// 更新助手消息
 const updateAssistantMessage = () => {
   if (assistantMessage.value) {
     assistantMessage.value.process = [...currentProcess.value];
-    // 如果已经有内容就保持，否则显示等待
     if (!assistantMessage.value.content) {
       assistantMessage.value.content = '思考中...';
     }
-    // 强制触发响应式更新
     const lastIndex = dialogHistory.value.length - 1;
     if (lastIndex >= 0 && dialogHistory.value[lastIndex] === assistantMessage.value) {
-      // 手动触发更新
       dialogHistory.value = [...dialogHistory.value];
     }
   }
 };
 
-// 处理非SSE数据（兼容性）
 const handleNonSSEData = (result) => {
   if (!result) return;
   
   executeResult.value = result;
   
-  // 解析执行结果 - 直接使用原始内容，不JSON化
   let assistantResponse = '';
   if (typeof result === 'string') {
     assistantResponse = result;
@@ -1267,7 +1275,6 @@ const handleNonSSEData = (result) => {
   } else if (result.variables) {
     const vars = result.variables;
     assistantResponse = vars.finalReport || vars.response || vars.text || vars.output || '';
-    // 如果没有提取到内容，尝试从 variables 中获取 llmOutput
     if (!assistantResponse && vars.llmOutput) {
       assistantResponse = vars.llmOutput.response || vars.llmOutput.text || '';
     }
@@ -1277,7 +1284,6 @@ const handleNonSSEData = (result) => {
     assistantResponse = '执行完成';
   }
   
-  // 更新助手消息 - 只设置内容，不设置 process
   if (assistantMessage.value) {
     assistantMessage.value.content = assistantResponse;
   }
@@ -1307,7 +1313,6 @@ const importWorkflow = () => {
 const transformNode = (node) => {
   if (!node) return null;
   
-  // 转换节点格式：模板格式 -> 系统格式
   const nodeType = node.type || 'default';
   const position = node.position || node.data?.position || { x: Math.random() * 500, y: Math.random() * 300 };
   
@@ -1321,7 +1326,6 @@ const transformNode = (node) => {
     }
   };
 
-  // 处理不同类型的节点
   if (nodeType === 'llm') {
     transformed.data.prompt = node.config?.prompt || node.data?.prompt || '';
     transformed.data.modelId = node.config?.model_id || node.data?.modelId || null;
@@ -1343,7 +1347,6 @@ const transformNode = (node) => {
 const transformEdge = (edge, index) => {
   if (!edge || !edge.source || !edge.target) return null;
   
-  // 转换边格式
   return {
     id: edge.id || `${edge.source}-${edge.target}-${index}`,
     source: edge.source,
@@ -1364,10 +1367,6 @@ const handleFileImport = (event) => {
     try {
       const data = JSON.parse(e.target.result);
       
-      // 支持多种格式：
-      // 1. 直接包含 nodes/edges
-      // 2. 包含 graph_definition
-      // 3. 包含 agent.graph_definition（完整模板格式）
       let importData = data;
       if (data.agent?.graph_definition) {
         importData = data.agent.graph_definition;
@@ -1375,17 +1374,14 @@ const handleFileImport = (event) => {
         importData = data.graph_definition;
       }
       
-      // 清空当前选择
       selectedNode.value = null;
       selectedEdge.value = null;
       
-      // 安全地更新节点和边
       if (importData.nodes) {
         const transformedNodes = importData.nodes.map(transformNode).filter(
           node => node && node.id && node.type
         );
         
-        // 先清空，再添加，避免直接替换导致的问题
         nodes.value.splice(0, nodes.value.length, ...transformedNodes);
       }
       
@@ -1447,7 +1443,6 @@ onMounted(() => {
   }
 });
 
-// 监听 initialNodes 变化
 watch(() => props.initialNodes, (newNodes) => {
   if (newNodes && newNodes.length > 0) {
     const clonedNodes = JSON.parse(JSON.stringify(newNodes)).filter(
@@ -1460,7 +1455,6 @@ watch(() => props.initialNodes, (newNodes) => {
   }
 }, { immediate: true, deep: true });
 
-// 监听 initialEdges 变化
 watch(() => props.initialEdges, (newEdges) => {
   if (newEdges && newEdges.length > 0) {
     const clonedEdges = JSON.parse(JSON.stringify(newEdges)).filter(
@@ -1476,7 +1470,7 @@ watch(() => props.initialEdges, (newEdges) => {
 
 <style scoped>
 .langgraph-editor {
-  height: calc(100vh - 120px);
+  height: calc(100vh - 100px);
   display: flex;
   flex-direction: column;
   background: #f5f7fa;
@@ -1500,7 +1494,34 @@ watch(() => props.initialEdges, (newEdges) => {
 .toolbar-right {
   margin-left: auto;
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.canvas-zoom-controls {
+  position: fixed;
+  bottom: 30px;
+  right: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  .el-button {
+    margin-left: 3px !important;
+  }
+}
+
+.canvas-zoom-value {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+  min-width: 40px;
+  text-align: center;
 }
 
 .editor-content {
@@ -1575,10 +1596,10 @@ watch(() => props.initialEdges, (newEdges) => {
 
 .canvas {
   position: relative;
-  min-width: 2000px;
-  min-height: 1500px;
-  width: 100%;
-  height: 100%;
+  width: 5000px;
+  height: 5000px;
+  min-width: 100%;
+  min-height: 100%;
   background: #fafafa;
   background-image: 
     linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
@@ -1771,7 +1792,6 @@ watch(() => props.initialEdges, (newEdges) => {
   font-size: 13px;
 }
 
-/* 微信风格对话框 */
 .wechat-style-dialog .el-dialog__body {
   padding: 0;
   height: 600px;
@@ -1786,7 +1806,6 @@ watch(() => props.initialEdges, (newEdges) => {
   overflow: hidden;
 }
 
-/* 聊天消息 */
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -1873,13 +1892,11 @@ watch(() => props.initialEdges, (newEdges) => {
   align-self: flex-end;
 }
 
-/* 流式消息样式 */
 .message-streaming {
   background: linear-gradient(135deg, #fdf6ec 0%, white 100%);
   border-left: 3px solid #e6a23c;
 }
 
-/* 打字机点效果 */
 .typing-dots {
   display: inline-block;
   margin-left: 4px;
@@ -1889,7 +1906,6 @@ watch(() => props.initialEdges, (newEdges) => {
   min-width: 20px;
 }
 
-/* 推理模式样式 */
 .message.assistant .message-content {
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.7;
@@ -1902,7 +1918,6 @@ watch(() => props.initialEdges, (newEdges) => {
   font-weight: 600;
 }
 
-/* 流式内容动画 */
 .message-streaming .message-content {
   animation: contentFadeIn 0.3s ease;
 }
@@ -1916,7 +1931,6 @@ watch(() => props.initialEdges, (newEdges) => {
   }
 }
 
-/* 处理过程 */
 .message-process {
   margin-top: 10px;
   padding: 10px;
@@ -1993,7 +2007,6 @@ watch(() => props.initialEdges, (newEdges) => {
   padding-top: 4px;
 }
 
-/* 实时步骤 */
 .realtime-steps {
   max-height: 150px;
   overflow-y: auto;
@@ -2042,7 +2055,6 @@ watch(() => props.initialEdges, (newEdges) => {
   line-height: 1.4;
 }
 
-/* 输入区 */
 .chat-input-area {
   padding-top: 20px;
   background: white;
@@ -2061,7 +2073,6 @@ watch(() => props.initialEdges, (newEdges) => {
   gap: 10px;
 }
 
-/* 动画 */
 @keyframes messageFadeIn {
   from {
     opacity: 0;
