@@ -37,7 +37,7 @@
                 <el-table-column prop="id" label="ID" width="80" />
                 <el-table-column prop="name" label="标签名称" min-width="120">
                     <template #default="{ row }">
-                        <el-tag :color="row.color">{{ row.name }}</el-tag>
+                        <el-tag>{{ row.name }}</el-tag>
                     </template>
                 </el-table-column>
                 <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />

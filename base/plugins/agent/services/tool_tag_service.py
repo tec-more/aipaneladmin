@@ -89,7 +89,10 @@ class ToolTagService:
         tags = await ToolTag.all()
         result = []
         for tag in tags:
-            count = await tag.tools.all().count()
+            try:
+                count = await tag.tools.all().count()
+            except Exception:
+                count = 0
             result.append({
                 "id": tag.id,
                 "name": tag.name,

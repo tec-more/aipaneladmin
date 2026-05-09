@@ -14,6 +14,12 @@ class Tool(BaseModel, TimestampMixin):
     parameters = fields.JSONField(null=True, description="Parameter configuration")
     enabled = fields.BooleanField(default=True, description="Is enabled")
     
+    tags = fields.ManyToManyField(
+        "models.ToolTag",
+        related_name="tools",
+        through="tool_tool_tag"
+    )
+    
     class Meta:
         table = "tool"
         ordering = ["name"]

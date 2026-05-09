@@ -133,15 +133,112 @@
         <el-button @click="viewDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="formDialogVisible"
+      :title="isEdit ? '编辑技能' : '创建技能'"
+      width="900px"
+      @close="resetForm"
+    >
+      <el-form :model="formData" :rules="rules" ref="formRef" label-width="120px">
+        <el-form-item label="技能名称" prop="name">
+          <el-input v-model="formData.name" placeholder="请输入技能名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="formData.description" type="textarea" :rows="2" placeholder="请输入描述" />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="formData.status" placeholder="请选择状态" style="width: 100%">
+            <el-option label="启用" value="active" />
+            <el-option label="禁用" value="inactive" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="formData.category_id" placeholder="请选择分类" style="width: 100%" clearable>
+            <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="技能内容">
+          <div class="skill-content-editor">
+            <div class="editor-tabs">
+              <el-button
+                :type="editorMode === 'markdown' ? 'primary' : ''"
+                @click="editorMode = 'markdown'"
+                size="small"
+              >
+                Markdown 编辑
+              </el-button>
+              <el-button
+                :type="editorMode === 'preview' ? 'primary' : ''"
+                @click="editorMode = 'preview'"
+                size="small"
+              >
+                预览
+              </el-button>
+            </div>
+            <div class="editor-content">
+              <el-input
+                v-if="editorMode === 'markdown'"
+                v-model="formData.implementation"
+                type="textarea"
+                :rows="15"
+                placeholder="请输入技能内容（Markdown格式）
+
+# 技能名称
+
+## 🎯 约束条件
+- 约束1
+- 约束2
+
+## 📝 规范流程
+步骤1 → 步骤2 → 步骤3
+
+## 💬 示例对话
+用户：...
+助手：..."
+              />
+              <div v-else class="preview-content">
+                <div v-if="formData.implementation" v-html="renderMarkdown(formData.implementation)" />
+                <div v-else class="empty-preview">点击编辑模式输入内容</div>
+              </div>
+            </div>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="formDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="saving">
+            {{ isEdit ? '保存' : '创建' }}
+          </el-button>
+          <el-button
+            type="warning"
+            @click="publishSkill"
+            v-if="isEdit && formData.status !== 'active'"
+          >
+            <el-icon><Check /></el-icon>
+            发布
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, Document, Folder } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Document, Folder, Check } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSkills, deleteSkill, getSkillContent, getActiveSkillCategories } from '@/api/agent'
+import {
+  getSkills,
+  deleteSkill,
+  getSkillContent,
+  getActiveSkillCategories,
+  getSkill,
+  createSkill,
+  updateSkill
+} from '@/api/agent'
 
 const router = useRouter()
 const loading = ref(false)
@@ -163,6 +260,27 @@ const pageInfo = reactive({
 const viewDialogVisible = ref(false)
 const currentSkill = ref(null)
 const skillContent = ref('')
+
+const formDialogVisible = ref(false)
+const formRef = ref(null)
+const saving = ref(false)
+const editorMode = ref('markdown')
+const currentSkillId = ref(null)
+
+const isEdit = computed(() => !!currentSkillId.value)
+
+const formData = reactive({
+  name: '',
+  description: '',
+  status: 'active',
+  category_id: null,
+  implementation: ''
+})
+
+const rules = {
+  name: [{ required: true, message: '请输入技能名称', trigger: 'blur' }],
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+}
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
@@ -224,15 +342,35 @@ const handleCurrentChange = (current) => {
 }
 
 const handleAdd = () => {
-  router.push('/panel/agent/skills/create')
+  currentSkillId.value = null
+  resetForm()
+  formDialogVisible.value = true
 }
 
-const goToCategory = () => {
-  router.push('/panel/agent/skills/category')
+const resetForm = () => {
+  formData.name = ''
+  formData.description = ''
+  formData.status = 'active'
+  formData.category_id = null
+  formData.implementation = ''
+  editorMode.value = 'markdown'
+  if (formRef.value) {
+    formRef.value.clearValidate()
+  }
 }
 
-const handleEdit = (row) => {
-  router.push(`/panel/agent/skills/edit/${row.id}`)
+const handleEdit = async (row) => {
+  currentSkillId.value = row.id
+  try {
+    const res = await getSkill(row.id)
+    if (res.data) {
+      Object.assign(formData, res.data)
+    }
+    formDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error('获取技能信息失败')
+    console.error(error)
+  }
 }
 
 const handleView = async (row) => {
@@ -261,6 +399,48 @@ const handleDelete = async (id) => {
   }
 }
 
+const handleSubmit = async () => {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      saving.value = true
+      try {
+        if (isEdit.value) {
+          await updateSkill(currentSkillId.value, formData)
+          ElMessage.success('更新成功')
+        } else {
+          await createSkill(formData)
+          ElMessage.success('创建成功')
+        }
+        formDialogVisible.value = false
+        fetchSkills()
+      } catch (error) {
+        ElMessage.error('保存失败')
+        console.error(error)
+      } finally {
+        saving.value = false
+      }
+    }
+  })
+}
+
+const publishSkill = async () => {
+  saving.value = true
+  try {
+    await updateSkill(currentSkillId.value, {
+      ...formData,
+      status: 'active'
+    })
+    formData.status = 'active'
+    ElMessage.success('发布成功')
+  } catch (error) {
+    ElMessage.error('发布失败')
+    console.error(error)
+  } finally {
+    saving.value = false
+  }
+}
+
 const fetchCategories = async () => {
   try {
     const res = await getActiveSkillCategories()
@@ -270,6 +450,10 @@ const fetchCategories = async () => {
   } catch (error) {
     console.error('获取分类列表失败', error)
   }
+}
+
+const goToCategory = () => {
+  router.push('/panel/agent/skills/category')
 }
 
 onMounted(() => {
@@ -377,5 +561,73 @@ onMounted(() => {
   text-align: center;
   color: #999;
   padding: 40px;
+}
+.skill-content-editor {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  width: 100%;
+  overflow: hidden;
+}
+.editor-tabs {
+  display: flex;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+  padding: 4px;
+  gap: 4px;
+}
+.editor-content {
+  padding: 8px;
+}
+.editor-content textarea {
+  width: 100%;
+  min-height: 300px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.preview-content {
+  min-height: 300px;
+  line-height: 1.8;
+  color: #333;
+  padding: 8px;
+}
+.preview-content h1 {
+  font-size: 20px;
+  margin: 16px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #409eff;
+}
+.preview-content h2 {
+  font-size: 18px;
+  margin: 14px 0 10px;
+  color: #409eff;
+}
+.preview-content h3 {
+  font-size: 16px;
+  margin: 12px 0 8px;
+}
+.preview-content strong {
+  font-weight: bold;
+  color: #333;
+}
+.preview-content em {
+  font-style: italic;
+  color: #666;
+}
+.preview-content ul, .preview-content ol {
+  padding-left: 24px;
+}
+.preview-content li {
+  margin: 6px 0;
+}
+.empty-preview {
+  text-align: center;
+  color: #999;
+  padding: 40px;
+}
+.dialog-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 </style>

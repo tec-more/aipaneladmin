@@ -19,6 +19,13 @@ class Agent(BaseModel, TimestampMixin):
     
     config = fields.JSONField(null=True, description="Agent configuration (tools, etc.)")
     
+    # 多对多关系 - Agent拥有的Skills
+    skills = fields.ManyToManyField(
+        "models.Skill",
+        related_name="agents",
+        through="agent_skill"
+    )
+    
     class Meta:
         table = "agent"
     

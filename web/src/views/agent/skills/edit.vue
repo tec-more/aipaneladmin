@@ -158,13 +158,17 @@ const handleSubmit = async () => {
           await updateSkill(skillId, formData)
           ElMessage.success('更新成功')
         } else {
+          console.log('Creating skill with data:', formData)
           const res = await createSkill(formData)
+          console.log('createSkill response:', res)
           ElMessage.success('创建成功')
-          router.push(`/panel/agent/skills/edit/${res.data.id}`)
+          const editUrl = `/panel/agent/skills/edit/${res.data.id}`
+          console.log('Redirecting to:', editUrl)
+          router.push(editUrl)
         }
       } catch (error) {
         ElMessage.error('保存失败')
-        console.error(error)
+        console.error('Error saving skill:', error)
       } finally {
         saving.value = false
       }

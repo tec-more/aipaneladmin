@@ -154,14 +154,19 @@ class SkillService:
         if not skill:
             return {"error": "Skill not found"}
 
-        agents = await skill.agents.all()
-        agent_count = len(agents)
+        try:
+            agents = await skill.agents.all()
+            agent_count = len(agents)
+            agent_names = [agent.name for agent in agents]
+        except Exception:
+            agent_count = 0
+            agent_names = []
 
         return {
             "skill_id": skill_id,
             "skill_name": skill.name,
             "agent_count": agent_count,
-            "agents": [agent.name for agent in agents]
+            "agents": agent_names
         }
 
     @staticmethod
@@ -190,7 +195,11 @@ class SkillService:
             if category:
                 category_name = category.name
 
-        agent_count = await skill.agents.count()
+        try:
+            agent_count = await skill.agents.count()
+        except Exception:
+            agent_count = 0
+
         bound_tools = SkillService.parse_bound_tools(skill.implementation)
 
         return {

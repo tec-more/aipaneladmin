@@ -20,6 +20,10 @@ class Skill(BaseModel, TimestampMixin):
         description="Skill category"
     )
     
+    # 多对多关系 - Skill关联的Agents
+    # Note: The related_name "agents" is already defined on the Agent side
+    # and will be accessible here as well
+    
     class Meta:
         table = "skill"
     

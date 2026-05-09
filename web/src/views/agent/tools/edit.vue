@@ -31,7 +31,7 @@
                     <el-select v-model="selectedTagIds" multiple placeholder="请选择标签" style="width: 100%">
                         <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id">
                             <div class="tag-option">
-                                <el-tag :color="tag.color" size="small">{{ tag.name }}</el-tag>
+                                <el-tag  size="middle">{{ tag.name }}</el-tag>
                             </div>
                         </el-option>
                     </el-select>
@@ -260,5 +260,8 @@ onMounted(() => {
 .tag-option {
     display: flex;
     align-items: center;
+}
+.el-select-dropdown__item{
+    padding:5px;
 }
 </style>
