@@ -158,6 +158,24 @@
             <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="绑定工具标签">
+          <el-select
+            v-model="formData.tool_tag_ids"
+            multiple
+            placeholder="请选择要绑定的工具标签"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="tag in toolTags"
+              :key="tag.id"
+              :label="tag.name"
+              :value="tag.id"
+            />
+          </el-select>
+          <div class="form-hint">
+            绑定工具标签后，技能将间接拥有该标签下的所有工具
+          </div>
+        </el-form-item>
         <el-form-item label="技能内容">
           <div class="skill-content-editor">
             <div class="editor-tabs">
@@ -182,20 +200,7 @@
                 v-model="formData.implementation"
                 type="textarea"
                 :rows="15"
-                placeholder="请输入技能内容（Markdown格式）
-
-# 技能名称
-
-## 🎯 约束条件
-- 约束1
-- 约束2
-
-## 📝 规范流程
-步骤1 → 步骤2 → 步骤3
-
-## 💬 示例对话
-用户：...
-助手：..."
+                placeholder="请输入技能内容（Markdown格式）"
               />
               <div v-else class="preview-content">
                 <div v-if="formData.implementation" v-html="renderMarkdown(formData.implementation)" />
@@ -237,13 +242,15 @@ import {
   getActiveSkillCategories,
   getSkill,
   createSkill,
-  updateSkill
+  updateSkill,
+  getToolTagsWithCount
 } from '@/api/agent'
 
 const router = useRouter()
 const loading = ref(false)
 const skills = ref([])
 const categories = ref([])
+const toolTags = ref([])
 
 const searchForm = reactive({
   name: '',
@@ -274,6 +281,7 @@ const formData = reactive({
   description: '',
   status: 'active',
   category_id: null,
+  tool_tag_ids: [],
   implementation: ''
 })
 
@@ -288,6 +296,7 @@ const formatDate = (dateStr) => {
 }
 
 const renderMarkdown = (content) => {
+  if (!content) return ''
   return content
     .replace(/^### (.*$)/gim, '<h3>$1</h3>')
     .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -352,6 +361,7 @@ const resetForm = () => {
   formData.description = ''
   formData.status = 'active'
   formData.category_id = null
+  formData.tool_tag_ids = []
   formData.implementation = ''
   editorMode.value = 'markdown'
   if (formRef.value) {
@@ -365,6 +375,9 @@ const handleEdit = async (row) => {
     const res = await getSkill(row.id)
     if (res.data) {
       Object.assign(formData, res.data)
+      if (!formData.tool_tag_ids) {
+        formData.tool_tag_ids = []
+      }
     }
     formDialogVisible.value = true
   } catch (error) {
@@ -452,12 +465,24 @@ const fetchCategories = async () => {
   }
 }
 
+const fetchToolTags = async () => {
+  try {
+    const res = await getToolTagsWithCount()
+    if (res.data) {
+      toolTags.value = res.data
+    }
+  } catch (error) {
+    console.error('获取工具标签列表失败', error)
+  }
+}
+
 const goToCategory = () => {
   router.push('/panel/agent/skills/category')
 }
 
 onMounted(() => {
   fetchCategories()
+  fetchToolTags()
   fetchSkills()
 })
 </script>
@@ -494,6 +519,11 @@ onMounted(() => {
 }
 .tool-tag {
   margin: 2px 0;
+}
+.form-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
 }
 .skill-content {
   max-height: 500px;

@@ -71,6 +71,10 @@ class SkillService:
             status=skill_data.status,
             category_id=skill_data.category_id
         )
+        
+        if skill_data.tool_tag_ids:
+            await skill.tool_tags.add(*skill_data.tool_tag_ids)
+        
         return skill
 
     @staticmethod
@@ -103,8 +107,16 @@ class SkillService:
             return None
 
         update_data = skill_data.model_dump(exclude_unset=True)
+        tool_tag_ids = update_data.pop('tool_tag_ids', None)
+        
         await skill.update_from_dict(update_data)
         await skill.save()
+        
+        if tool_tag_ids is not None:
+            await skill.tool_tags.clear()
+            if tool_tag_ids:
+                await skill.tool_tags.add(*tool_tag_ids)
+        
         return skill
 
     @staticmethod
@@ -200,7 +212,21 @@ class SkillService:
         except Exception:
             agent_count = 0
 
-        bound_tools = SkillService.parse_bound_tools(skill.implementation)
+        bound_tools = []
+        tool_tag_ids = []
+        try:
+            tool_tags = await skill.tool_tags.all()
+            tool_tag_ids = [tag.id for tag in tool_tags]
+            for tag in tool_tags:
+                try:
+                    tools = await tag.tools.all()
+                    for tool in tools:
+                        if tool.name not in bound_tools:
+                            bound_tools.append(tool.name)
+                except Exception:
+                    continue
+        except Exception:
+            pass
 
         return {
             "id": skill.id,
@@ -213,7 +239,8 @@ class SkillService:
             "created_at": skill.created_at,
             "updated_at": skill.updated_at,
             "agent_count": agent_count,
-            "bound_tools": bound_tools
+            "bound_tools": bound_tools,
+            "tool_tag_ids": tool_tag_ids
         }
 
     @staticmethod

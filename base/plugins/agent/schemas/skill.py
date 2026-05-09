@@ -17,7 +17,7 @@ class SkillBase(BaseModel):
 
 class SkillCreate(SkillBase):
     """Create skill schema"""
-    pass
+    tool_tag_ids: Optional[List[int]] = Field(None, description="List of tool tag IDs to bind")
 
 
 class SkillUpdate(BaseModel):
@@ -27,6 +27,7 @@ class SkillUpdate(BaseModel):
     implementation: Optional[str] = Field(None, description="Skill content (Markdown format)")
     status: Optional[str] = Field(None, description="Status: active/inactive")
     category_id: Optional[int] = Field(None, description="Skill category ID")
+    tool_tag_ids: Optional[List[int]] = Field(None, description="List of tool tag IDs to bind")
 
 
 class SkillResponse(BaseModel):

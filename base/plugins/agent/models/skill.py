@@ -24,6 +24,14 @@ class Skill(BaseModel, TimestampMixin):
     # Note: The related_name "agents" is already defined on the Agent side
     # and will be accessible here as well
     
+    # 多对多关系 - Skill关联的ToolTags
+    tool_tags = fields.ManyToManyField(
+        "models.ToolTag",
+        related_name="skills",
+        through="skill_tool_tag",
+        description="Tool tags bound to this skill"
+    )
+    
     class Meta:
         table = "skill"
     
