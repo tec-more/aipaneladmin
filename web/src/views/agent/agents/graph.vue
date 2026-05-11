@@ -16,7 +16,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import LangGraphEditor from '@/components/LangGraphEditor.vue'
-import { getAgent, getAgentGraph, updateAgentGraph, executeAgentGraph } from '@/api/agent'
+import { getAgent, getAgentGraph, updateAgentGraph } from '@/api/agent'
 
 const route = useRoute()
 const agentId = computed(() => route.params.id)

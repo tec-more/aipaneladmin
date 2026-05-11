@@ -398,7 +398,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraph, executeAgentGraphAuto } from '@/api/agent'
+import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraphAuto } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer';
 
