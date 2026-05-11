@@ -171,10 +171,10 @@ class LangGraphExecutor:
 
                 logger.debug(f"创建节点: {node_id} (类型: {node_type})")
 
-                def node_executor(state: AgentState):
-                    result = asyncio.run(LangGraphExecutor._execute_node_with_logging(
+                async def node_executor(state: AgentState):
+                    result = await LangGraphExecutor._execute_node_with_logging(
                         node, state, sse_yield_func=sse_yield_func
-                    ))
+                    )
                     return result
 
                 workflow.add_node(node_id, node_executor)
