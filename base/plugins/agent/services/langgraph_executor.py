@@ -243,7 +243,7 @@ class LangGraphExecutor:
 
             logger.info("调用 graph.ainvoke...")
             start_time = time.time()
-            final_state = await graph.ainvoke(initial_state, config, debug=True)
+            final_state = await graph.ainvoke(initial_state, config)
             elapsed = time.time() - start_time
             logger.info(f"LangGraph 执行完成，耗时: {elapsed:.2f}秒")
             logger.debug(f"最终状态: {json.dumps(final_state, ensure_ascii=False, default=str)[:500]}...")
