@@ -13,14 +13,10 @@ from typing import Dict, Any, List, Optional, TypedDict
 from tortoise.exceptions import DoesNotExist
 
 # LangGraph 和 LangChain 相关导入
-try:
-    from langchain_core.runnables import RunnableConfig
-    from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-    from langgraph.graph import StateGraph, END, START
-    from langgraph.checkpoint.memory import MemorySaver
-    LANGGRAPH_AVAILABLE = True
-except ImportError:
-    LANGGRAPH_AVAILABLE = False
+from langchain_core.runnables import RunnableConfig
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langgraph.graph import StateGraph, END, START
+from langgraph.checkpoint.memory import MemorySaver
 
 # 本地导入
 from base.plugins.agent.models.agent import Agent
@@ -141,20 +137,6 @@ class LangGraphExecutor:
                 logger.warning("结构图没有节点，回退到简单执行")
                 return await LangGraphExecutor._execute_simple(agent, input_data)
 
-            if not LANGGRAPH_AVAILABLE:
-                logger.warning("LangGraph 不可用，使用内置执行器")
-                return await LangGraphExecutor._execute_with_builtin_fallback(
-                    agent=agent,
-                    flow_data=flow_data,
-                    input_data=input_data,
-                    customer_id=customer_id,
-                    user_id=user_id,
-                    recent_memories=recent_memories,
-                    important_memories=important_memories,
-                    memory_list=memory_list,
-                    sse_yield_func=sse_yield_func
-                )
-
             workflow = StateGraph(AgentState)
             node_map = {node.get("id"): node for node in nodes}
             start_node = LangGraphExecutor._find_start_node(nodes)
@@ -231,36 +213,11 @@ class LangGraphExecutor:
                     if node_id:
                         workflow.add_edge(node_id, END)
 
-            try:
-                if start_node_id not in node_map:
-                    logger.warning(f"开始节点 {start_node_id} 不在节点映射中，回退到内置执行器")
-                    return await LangGraphExecutor._execute_with_builtin_fallback(
-                        agent=agent,
-                        flow_data=flow_data,
-                        input_data=input_data,
-                        customer_id=customer_id,
-                        user_id=user_id,
-                        recent_memories=recent_memories,
-                        important_memories=important_memories,
-                        memory_list=memory_list,
-                        sse_yield_func=sse_yield_func
-                    )
+            if start_node_id not in node_map:
+                raise ValueError(f"开始节点 {start_node_id} 不在节点映射中")
 
-                graph = workflow.compile()
-                logger.info("LangGraph 编译完成")
-            except Exception as e:
-                logger.warning(f"LangGraph 编译失败: {e}, 回退到内置执行器")
-                return await LangGraphExecutor._execute_with_builtin_fallback(
-                    agent=agent,
-                    flow_data=flow_data,
-                    input_data=input_data,
-                    customer_id=customer_id,
-                    user_id=user_id,
-                    recent_memories=recent_memories,
-                    important_memories=important_memories,
-                    memory_list=memory_list,
-                    sse_yield_func=sse_yield_func
-                )
+            graph = workflow.compile()
+            logger.info("LangGraph 编译完成")
 
             initial_state: AgentState = {
                 "input": input_data,
@@ -284,26 +241,12 @@ class LangGraphExecutor:
             config = {}
             logger.debug(f"配置: {json.dumps(config, ensure_ascii=False)}")
 
-            try:
-                logger.info("调用 graph.ainvoke...")
-                start_time = time.time()
-                final_state = await graph.ainvoke(initial_state, config, debug=True)
-                elapsed = time.time() - start_time
-                logger.info(f"LangGraph 执行完成，耗时: {elapsed:.2f}秒")
-                logger.debug(f"最终状态: {json.dumps(final_state, ensure_ascii=False, default=str)[:500]}...")
-            except asyncio.TimeoutError:
-                logger.error("LangGraph 执行超时，回退到内置执行器")
-                return await LangGraphExecutor._execute_with_builtin_fallback(
-                    agent=agent,
-                    flow_data=flow_data,
-                    input_data=input_data,
-                    customer_id=customer_id,
-                    user_id=user_id,
-                    recent_memories=recent_memories,
-                    important_memories=important_memories,
-                    memory_list=memory_list,
-                    sse_yield_func=sse_yield_func
-                )
+            logger.info("调用 graph.ainvoke...")
+            start_time = time.time()
+            final_state = await graph.ainvoke(initial_state, config, debug=True)
+            elapsed = time.time() - start_time
+            logger.info(f"LangGraph 执行完成，耗时: {elapsed:.2f}秒")
+            logger.debug(f"最终状态: {json.dumps(final_state, ensure_ascii=False, default=str)[:500]}...")
 
             await LangGraphExecutor._save_result_to_memory(
                 agent=agent,
@@ -340,151 +283,6 @@ class LangGraphExecutor:
                 "message": str(e),
                 "traceback": traceback.format_exc()
             }
-
-    @staticmethod
-    async def _execute_with_builtin_fallback(
-        agent: Agent,
-        flow_data: Dict[str, Any],
-        input_data: Dict[str, Any],
-        customer_id: Optional[int],
-        user_id: Optional[int],
-        recent_memories,
-        important_memories,
-        memory_list: List,
-        sse_yield_func=None
-    ) -> Dict[str, Any]:
-        """
-        降级的内置执行器（当 LangGraph 不可用时使用）
-        """
-        nodes = flow_data.get("nodes", [])
-        edges = flow_data.get("edges", [])
-
-        node_map = {node.get("id"): node for node in nodes}
-
-        start_node = LangGraphExecutor._find_start_node(nodes)
-        if not start_node:
-            logger.error("找不到开始节点")
-            return {
-                "success": False,
-                "message": "找不到开始节点"
-            }
-
-        state = {
-            "input": input_data,
-            "output": {},
-            "messages": [],
-            "variables": {
-                "recent_memories": memory_list,
-                "important_memories": [{"content": m.content, "importance": m.importance} for m in important_memories]
-            },
-            "node_results": {},
-            "execution_trace": [],
-            "current_node": None,
-            "error": None,
-            "agent": agent
-        }
-
-        current_node_id = start_node.get("id")
-        visited_nodes = set()
-        max_steps = 100
-        step_count = 0
-
-        while current_node_id and step_count < max_steps:
-            step_count += 1
-
-            visited_nodes.add(current_node_id)
-
-            current_node = node_map.get(current_node_id)
-            if not current_node:
-                logger.error(f"找不到节点: {current_node_id}")
-                break
-
-            node_type = current_node.get("type")
-            node_data = current_node.get("data", {})
-
-            state["execution_trace"].append({
-                "node_id": current_node_id,
-                "node_type": node_type,
-                "label": node_data.get("label", node_type),
-                "timestamp": datetime.now().isoformat()
-            })
-
-            if sse_yield_func:
-                try:
-                    node_label = node_data.get("label", node_type)
-                    await sse_yield_func({
-                        'type': 'node_start',
-                        'node_id': current_node_id,
-                        'node_type': node_type,
-                        'node_label': node_label,
-                        'step': step_count
-                    })
-                except Exception as e:
-                    logger.warning(f"推送 SSE 失败: {e}")
-
-            try:
-                state = await LangGraphExecutor._execute_node_with_logging(
-                    current_node,
-                    state,
-                    sse_yield_func=sse_yield_func
-                )
-
-                if node_type == "end":
-                    break
-
-            except Exception as e:
-                logger.exception(f"节点 {current_node_id} 执行失败: {e}")
-                state["error"] = str(e)
-                state["output"]["error"] = str(e)
-                break
-
-            if node_type == "condition":
-                condition_result = state.get("variables", {}).get("condition_result", {}).get("result", False)
-                outgoing_edges = [e for e in edges if e.get("source") == current_node_id]
-
-                if len(outgoing_edges) >= 2:
-                    target_index = 0 if condition_result else 1
-                    if target_index < len(outgoing_edges):
-                        current_node_id = outgoing_edges[target_index].get("target")
-                    else:
-                        current_node_id = None
-                elif outgoing_edges:
-                    current_node_id = outgoing_edges[0].get("target")
-                else:
-                    current_node_id = None
-            else:
-                outgoing_edges = [e for e in edges if e.get("source") == current_node_id]
-                if outgoing_edges:
-                    current_node_id = outgoing_edges[0].get("target")
-                else:
-                    current_node_id = None
-
-        await LangGraphExecutor._save_result_to_memory(
-            agent=agent,
-            state=state,
-            input_data=input_data,
-            customer_id=customer_id,
-            user_id=user_id
-        )
-
-        if state.get("error"):
-            return {
-                "success": False,
-                "message": state["error"],
-                "input": input_data,
-                "output": state.get("output", {}),
-                "variables": state.get("variables", {}),
-                "trace": state.get("execution_trace", [])
-            }
-
-        return {
-            "success": True,
-            "message": "执行成功",
-            "input": input_data,
-            "output": state.get("output", {}),
-            "variables": state.get("variables", {}),
-            "trace": state.get("execution_trace", [])
-        }
 
     @staticmethod
     async def _execute_node_with_logging(current_node, state, sse_yield_func=None):
@@ -749,18 +547,11 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_llm_node(current_node: Dict, state: AgentState) -> AgentState:
-        """执行LLM节点（非流式）"""
-        node_id = current_node.get("id", "")
-        node_data = current_node.get("data", {})
-        prompt = node_data.get("prompt", "")
-        model_id = node_data.get("model_id") or node_data.get("modelId")
-        model_name = node_data.get("model", "gpt-3.5-turbo")
-        node_label = node_data.get("label", "")
-        skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
-
+    async def _get_skills_and_tools(skill_ids: List[int], prompt: str) -> tuple:
+        """获取技能数据和绑定的工具"""
         skills_data = []
         bound_tools_set = set()
+        
         if skill_ids:
             try:
                 from base.plugins.agent.models.skill import Skill
@@ -807,6 +598,11 @@ class LangGraphExecutor:
             except Exception as e:
                 logger.exception(f"获取工具信息失败: {e}")
 
+        return prompt, tools, functions
+
+    @staticmethod
+    async def _build_messages(prompt: str, node_data: Dict, state: AgentState) -> tuple:
+        """构建消息列表（包含变量替换、记忆上下文）"""
         variables = state.get("variables", {})
         for key, value in variables.items():
             prompt = prompt.replace(f"{{{{{key}}}}}", str(value))
@@ -844,6 +640,11 @@ class LangGraphExecutor:
         else:
             messages.append({"role": "user", "content": input_text})
 
+        return prompt, messages, input_text
+
+    @staticmethod
+    async def _get_target_model(model_id: Optional[int], model_name: str) -> tuple:
+        """获取目标LLM模型"""
         target_model = None
         actual_model = model_name
 
@@ -864,92 +665,44 @@ class LangGraphExecutor:
         except Exception as e:
             logger.exception(f"获取模型信息失败: {e}")
 
-        llm_response = ""
+        return target_model, actual_model
+
+    @staticmethod
+    async def _prepare_chat_service(target_model, actual_model):
+        """准备聊天服务"""
         try:
-            if target_model:
-                from base.plugins.llm.services.chat_service import ChatService
-                from base.plugins.llm.models.provider import LLMProvider
-                from base.plugins.llm.models.api_key import LLMApiKey
-                from base.plugins.agent.tools.registry import ToolRegistry
+            from base.plugins.llm.services.chat_service import ChatService
+            from base.plugins.llm.models.provider import LLMProvider
+            from base.plugins.llm.models.api_key import LLMApiKey
 
-                provider = await LLMProvider.get_or_none(id=target_model.provider_id)
-                if provider:
-                    api_key = await LLMApiKey.filter(model_id=target_model.id).first()
-                    if api_key:
-                        endpoint_url = target_model.endpoint_url or provider.api_endpoint
-                        if endpoint_url:
-                            endpoint_url = endpoint_url.rstrip('/')
-                            if '/responses' in endpoint_url:
-                                endpoint_url = endpoint_url.split('/responses')[0]
-                            if endpoint_url.endswith('/chat/completions'):
-                                endpoint_url = endpoint_url[:-len('/chat/completions')]
+            provider = await LLMProvider.get_or_none(id=target_model.provider_id)
+            if provider:
+                api_key = await LLMApiKey.filter(model_id=target_model.id).first()
+                if api_key:
+                    endpoint_url = target_model.endpoint_url or provider.api_endpoint
+                    if endpoint_url:
+                        endpoint_url = endpoint_url.rstrip('/')
+                        if '/responses' in endpoint_url:
+                            endpoint_url = endpoint_url.split('/responses')[0]
+                        if endpoint_url.endswith('/chat/completions'):
+                            endpoint_url = endpoint_url[:-len('/chat/completions')]
 
-                        service = await ChatService.get_provider_service(
-                            provider_name_en=provider.name_en,
-                            api_key=api_key.api_key,
-                            endpoint_url=endpoint_url,
-                            api_secret=api_key.api_secret
-                        )
+                    service = await ChatService.get_provider_service(
+                        provider_name_en=provider.name_en,
+                        api_key=api_key.api_key,
+                        endpoint_url=endpoint_url,
+                        api_secret=api_key.api_secret
+                    )
 
-                        actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
-
-                        chat_kwargs = {
-                            "model": actual_model_for_call,
-                            "messages": messages,
-                            "temperature": 0.7,
-                            "max_tokens": 1000
-                        }
-
-                        if functions:
-                            chat_kwargs["functions"] = functions
-                            chat_kwargs["function_call"] = "auto"
-
-                        response = await service.chat(**chat_kwargs)
-
-                        if isinstance(response, dict) and response.get("choices"):
-                            message = response["choices"][0].get("message", {})
-
-                            if message.get("function_call"):
-                                function_call = message.get("function_call")
-                                function_name = function_call.get("name")
-                                function_args = function_call.get("arguments", {})
-
-                                logger.info(f"大模型请求调用工具: {function_name}")
-
-                                try:
-                                    tool_class = ToolRegistry.get_tool(function_name)
-                                    if tool_class:
-                                        tool_result = await tool_class.execute(**function_args)
-                                        logger.info(f"工具执行成功: {function_name}")
-
-                                        messages.append(message)
-                                        messages.append({
-                                            "role": "function",
-                                            "name": function_name,
-                                            "content": str(tool_result)
-                                        })
-
-                                        second_response = await service.chat(**chat_kwargs)
-                                        if isinstance(second_response, dict) and second_response.get("choices"):
-                                            llm_response = second_response["choices"][0].get("message", {}).get("content", "")
-                                        else:
-                                            llm_response = str(second_response)
-                                    else:
-                                        llm_response = f"工具 {function_name} 未找到"
-                                except Exception as tool_e:
-                                    logger.exception(f"工具执行失败: {tool_e}")
-                                    llm_response = f"工具执行失败: {str(tool_e)}"
-                            else:
-                                llm_response = message.get("content", "")
-                        else:
-                            llm_response = str(response)
+                    actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
+                    return service, actual_model_for_call, None
         except Exception as e:
-            logger.exception(f"调用大模型失败: {e}")
+            logger.exception(f"准备聊天服务失败: {e}")
+        return None, None, str(e)
 
-        if not llm_response:
-            logger.warning("使用模拟响应")
-            llm_response = await LangGraphExecutor._generate_mock_response(input_text, prompt, node_label)
-
+    @staticmethod
+    async def _parse_and_set_response(llm_response: str, node_data: Dict, state: AgentState, actual_model: str, prompt: str) -> AgentState:
+        """解析响应并设置变量"""
         parsed_response = None
         if llm_response:
             try:
@@ -975,6 +728,93 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
+    async def _execute_llm_node(current_node: Dict, state: AgentState) -> AgentState:
+        """执行LLM节点（非流式）"""
+        node_id = current_node.get("id", "")
+        node_data = current_node.get("data", {})
+        prompt = node_data.get("prompt", "")
+        model_id = node_data.get("model_id") or node_data.get("modelId")
+        model_name = node_data.get("model", "gpt-3.5-turbo")
+        node_label = node_data.get("label", "")
+        skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
+
+        prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt)
+        prompt, messages, input_text = await LangGraphExecutor._build_messages(prompt, node_data, state)
+        target_model, actual_model = await LangGraphExecutor._get_target_model(model_id, model_name)
+
+        llm_response = ""
+        try:
+            if target_model:
+                service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
+                if service:
+                    chat_kwargs = {
+                        "model": actual_model_for_call,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 1000
+                    }
+
+                    if functions:
+                        chat_kwargs["functions"] = functions
+                        chat_kwargs["function_call"] = "auto"
+
+                    llm_response = await LangGraphExecutor._call_llm_with_tool_handler(service, chat_kwargs, messages)
+        except Exception as e:
+            logger.exception(f"调用大模型失败: {e}")
+
+        if not llm_response:
+            logger.warning("使用模拟响应")
+            llm_response = await LangGraphExecutor._generate_mock_response(input_text, prompt, node_label)
+
+        state = await LangGraphExecutor._parse_and_set_response(llm_response, node_data, state, actual_model, prompt)
+        return state
+
+    @staticmethod
+    async def _call_llm_with_tool_handler(service, chat_kwargs: Dict, messages: List[Dict]) -> str:
+        """调用LLM并处理工具调用"""
+        from base.plugins.agent.tools.registry import ToolRegistry
+
+        response = await service.chat(**chat_kwargs)
+
+        if isinstance(response, dict) and response.get("choices"):
+            message = response["choices"][0].get("message", {})
+
+            if message.get("function_call"):
+                function_call = message.get("function_call")
+                function_name = function_call.get("name")
+                function_args = function_call.get("arguments", {})
+
+                logger.info(f"大模型请求调用工具: {function_name}")
+
+                try:
+                    tool_class = ToolRegistry.get_tool(function_name)
+                    if tool_class:
+                        tool_result = await tool_class.execute(**function_args)
+                        logger.info(f"工具执行成功: {function_name}")
+
+                        messages.append(message)
+                        messages.append({
+                            "role": "function",
+                            "name": function_name,
+                            "content": str(tool_result)
+                        })
+
+                        second_response = await service.chat(**chat_kwargs)
+                        if isinstance(second_response, dict) and second_response.get("choices"):
+                            return second_response["choices"][0].get("message", {}).get("content", "")
+                        else:
+                            return str(second_response)
+                    else:
+                        return f"工具 {function_name} 未找到"
+                except Exception as tool_e:
+                    logger.exception(f"工具执行失败: {tool_e}")
+                    return f"工具执行失败: {str(tool_e)}"
+            else:
+                return message.get("content", "")
+        else:
+            return str(response)
+
+    @staticmethod
     async def _execute_llm_node_streaming(
         current_node: Dict,
         state: AgentState,
@@ -989,145 +829,35 @@ class LangGraphExecutor:
         node_label = node_data.get("label", "")
         skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
 
-        skills_data = []
-        bound_tools_set = set()
-        if skill_ids:
-            try:
-                from base.plugins.agent.models.skill import Skill
-                from base.plugins.agent.services.skill_service import SkillService
-                for skill_id in skill_ids:
-                    skill = await Skill.get_or_none(id=skill_id, status="active")
-                    if skill:
-                        skills_data.append({
-                            "id": skill.id,
-                            "name": skill.name,
-                            "description": skill.description,
-                            "implementation": skill.implementation
-                        })
-                        bound_tools = SkillService.parse_bound_tools(skill.implementation)
-                        if bound_tools:
-                            for tool in bound_tools:
-                                bound_tools_set.add(tool)
-            except Exception as e:
-                logger.exception(f"获取技能信息失败: {e}")
-
-        if skills_data:
-            skill_context = "\n【可用技能】:\n"
-            for skill in skills_data:
-                skill_context += f"技能名称: {skill['name']}\n"
-                skill_context += f"技能描述: {skill['description']}\n"
-                skill_context += f"技能实现: {skill['implementation']}\n\n"
-
-            if prompt:
-                prompt = skill_context + "\n" + prompt
-            else:
-                prompt = skill_context
-
-        variables = state.get("variables", {})
-        for key, value in variables.items():
-            prompt = prompt.replace(f"{{{{{key}}}}}", str(value))
-
-        input_text = variables.get("input", {}).get("text", "")
-        system_prompt = node_data.get("system_prompt", "You are a helpful assistant.")
-
-        messages = [{"role": "system", "content": system_prompt}]
-
-        recent_memories = variables.get("recent_memories", [])
-        important_memories = variables.get("important_memories", [])
-
-        if recent_memories or important_memories:
-            memory_context = "\n"
-            if important_memories:
-                memory_context += "【重要历史记忆】:\n"
-                for idx, m in enumerate(important_memories):
-                    memory_content = m.get("content", m) if isinstance(m, dict) else str(m)
-                    memory_context += f"{idx+1}. {memory_content}\n"
-                memory_context += "\n"
-            if recent_memories:
-                memory_context += "【最近记忆】:\n"
-                for idx, m in enumerate(recent_memories):
-                    memory_content = m.get("content", m) if isinstance(m, dict) else str(m)
-                    memory_context += f"{idx+1}. {memory_content}\n"
-
-            if memory_context.strip():
-                messages.append({"role": "user", "content": f"历史记忆和上下文信息：\n{memory_context}\n"})
-
-        if prompt and input_text:
-            combined_content = prompt.replace("{{input}}", input_text) if "{{input}}" in prompt else f"{prompt}\n\n用户输入：{input_text}"
-            messages.append({"role": "user", "content": combined_content})
-        elif prompt:
-            messages.append({"role": "user", "content": prompt})
-        else:
-            messages.append({"role": "user", "content": input_text})
-
-        target_model = None
-        actual_model = model_name
-
-        try:
-            from base.plugins.llm.models.model import LLMModel
-            if model_id:
-                target_model = await LLMModel.filter(id=model_id, status="active").first()
-                if target_model:
-                    actual_model = target_model.model_name
-            if not target_model and model_name != "gpt-3.5-turbo":
-                target_model = await LLMModel.filter(model_name=model_name, status="active").first()
-                if target_model:
-                    actual_model = target_model.model_name
-            if not target_model:
-                target_model = await LLMModel.filter(status="active").first()
-                if target_model:
-                    actual_model = target_model.model_name
-        except Exception as e:
-            logger.exception(f"获取模型信息失败: {e}")
+        prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt)
+        prompt, messages, input_text = await LangGraphExecutor._build_messages(prompt, node_data, state)
+        target_model, actual_model = await LangGraphExecutor._get_target_model(model_id, model_name)
 
         llm_response = ""
         try:
             if target_model:
-                from base.plugins.llm.services.chat_service import ChatService
-                from base.plugins.llm.models.provider import LLMProvider
-                from base.plugins.llm.models.api_key import LLMApiKey
+                service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
+                if service:
+                    chat_kwargs = {
+                        "model": actual_model_for_call,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 1000
+                    }
 
-                provider = await LLMProvider.get_or_none(id=target_model.provider_id)
-                if provider:
-                    api_key = await LLMApiKey.filter(model_id=target_model.id).first()
-                    if api_key:
-                        endpoint_url = target_model.endpoint_url or provider.api_endpoint
-                        if endpoint_url:
-                            endpoint_url = endpoint_url.rstrip('/')
-                            if '/responses' in endpoint_url:
-                                endpoint_url = endpoint_url.split('/responses')[0]
-                            if endpoint_url.endswith('/chat/completions'):
-                                endpoint_url = endpoint_url[:-len('/chat/completions')]
-
-                        service = await ChatService.get_provider_service(
-                            provider_name_en=provider.name_en,
-                            api_key=api_key.api_key,
-                            endpoint_url=endpoint_url,
-                            api_secret=api_key.api_secret
-                        )
-
-                        actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
-
-                        chat_kwargs = {
-                            "model": actual_model_for_call,
-                            "messages": messages,
-                            "temperature": 0.7,
-                            "max_tokens": 1000
-                        }
-
-                        full_response = ""
-                        async for chunk in service.chat_stream(**chat_kwargs):
-                            if isinstance(chunk, dict) and chunk.get("choices"):
-                                delta = chunk["choices"][0].get("delta", {})
-                                content = delta.get("content", "")
-                                full_response += content
-                                if content and sse_yield_func:
-                                    await sse_yield_func({
-                                        'type': 'stream',
-                                        'content': content,
-                                        'node_id': node_id
-                                    })
-                        llm_response = full_response
+                    full_response = ""
+                    async for chunk in service.chat_stream(**chat_kwargs):
+                        if isinstance(chunk, dict) and chunk.get("choices"):
+                            delta = chunk["choices"][0].get("delta", {})
+                            content = delta.get("content", "")
+                            full_response += content
+                            if content and sse_yield_func:
+                                await sse_yield_func({
+                                    'type': 'stream',
+                                    'content': content,
+                                    'node_id': node_id
+                                })
+                    llm_response = full_response
         except Exception as e:
             logger.exception(f"调用大模型失败: {e}")
 
@@ -1135,28 +865,7 @@ class LangGraphExecutor:
             logger.warning("使用模拟响应")
             llm_response = await LangGraphExecutor._generate_mock_response(input_text, prompt, node_label)
 
-        parsed_response = None
-        if llm_response:
-            try:
-                json_start = llm_response.find("{")
-                json_end = llm_response.rfind("}") + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_str = llm_response[json_start:json_end]
-                    parsed_response = json.loads(json_str)
-                    logger.debug(f"成功解析 LLM 输出 JSON")
-            except Exception as e:
-                logger.warning(f"解析 JSON 失败: {e}")
-
-        output_variable = node_data.get("output_variable", "llm_output")
-        if parsed_response:
-            state["variables"][output_variable] = parsed_response
-        else:
-            state["variables"][output_variable] = {
-                "prompt": prompt,
-                "model": actual_model,
-                "response": llm_response
-            }
-
+        state = await LangGraphExecutor._parse_and_set_response(llm_response, node_data, state, actual_model, prompt)
         return state
 
     @staticmethod
