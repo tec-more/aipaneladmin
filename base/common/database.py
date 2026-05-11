@@ -56,9 +56,16 @@ async def init_data():
         print("Tortoise ORM 初始化完成")
         
         # 确保所有表都已创建（安全模式）
-        print("生成数据库表...")
-        await Tortoise.generate_schemas(safe=True)
-        print("数据库表生成完成")
+        # 只在单进程或主进程模式下执行，避免多 worker 死锁
+        import os
+        is_main_worker = os.environ.get("UVICORN_WORKER_ID") is None
+        if is_main_worker:
+            print("生成数据库表（主进程）...")
+            await Tortoise.generate_schemas(safe=True)
+            print("数据库表生成完成")
+        else:
+            worker_id = os.environ.get("UVICORN_WORKER_ID", "unknown")
+            print(f"跳过数据库表生成（worker {worker_id}，由主进程已完成）")
         
     except Exception as e:
         print(f"初始化 Tortoise ORM 时出错: {e}")

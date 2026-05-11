@@ -31,7 +31,7 @@
                     <el-select v-model="selectedTagIds" multiple placeholder="请选择标签" style="width: 100%">
                         <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id">
                             <div class="tag-option">
-                                <el-tag  size="middle">{{ tag.name }}</el-tag>
+                                <el-tag size="medium">{{ tag.name }}</el-tag>
                             </div>
                         </el-option>
                     </el-select>
@@ -50,30 +50,39 @@
                     <div class="params-container">
                         <div v-if="form.parameters && form.parameters.length > 0">
                             <el-table :data="form.parameters" style="width: 100%" border>
-                                <el-table-column prop="name" label="参数名" width="150" />
-                                <el-table-column prop="type" label="类型" width="100">
+                                <el-table-column label="参数名" width="150">
                                     <template #default="{ row }">
-                                        <el-select v-model="row.type">
+                                        <el-input v-model="row.name" size="small" placeholder="请输入参数名" />
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="类型" width="100">
+                                    <template #default="{ row }">
+                                        <el-select v-model="row.type" size="small">
                                             <el-option label="string" value="string" />
                                             <el-option label="integer" value="integer" />
                                             <el-option label="number" value="number" />
                                             <el-option label="boolean" value="boolean" />
+                                            <el-option label="date" value="date" />
                                             <el-option label="array" value="array" />
                                             <el-option label="object" value="object" />
                                         </el-select>
                                     </template>
                                 </el-table-column>
-                                <el-table-column prop="required" label="必填" width="80">
+                                <el-table-column label="必填" width="80">
                                     <template #default="{ row }">
                                         <el-switch v-model="row.required" />
                                     </template>
                                 </el-table-column>
-                                <el-table-column prop="default" label="默认值" width="120">
+                                <el-table-column label="默认值" width="120">
                                     <template #default="{ row }">
-                                        <el-input v-model="row.default" size="small" />
+                                        <el-input v-model="row.default" size="small" placeholder="默认值" />
                                     </template>
                                 </el-table-column>
-                                <el-table-column prop="description" label="描述" />
+                                <el-table-column label="描述" min-width="150">
+                                    <template #default="{ row }">
+                                        <el-input v-model="row.description" size="small" placeholder="参数描述" />
+                                    </template>
+                                </el-table-column>
                                 <el-table-column label="操作" width="80">
                                     <template #default="{ row, $index }">
                                         <el-button type="danger" size="small" @click="removeParam($index)">

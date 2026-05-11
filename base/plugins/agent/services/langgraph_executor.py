@@ -3,6 +3,8 @@ LangGraph 执行器 - 使用真正的 LangGraph 执行智能体结构图
 """
 import asyncio
 import json
+import threading
+import time
 from typing import Dict, Any, List, Optional, TypedDict, Annotated
 from datetime import datetime
 from operator import add
@@ -83,7 +85,10 @@ class LangGraphExecutor:
         try:
             # 检查是否有结构图配置
             print(f"1. 读取流程图数据")
-            logger.info("[1/6] 读取流程图数据...")
+            print(f"[1/6] 读取流程图数据...")
+            print(f"[DEBUG] graph_definition 类型: {type(agent.graph_definition)}")
+            if isinstance(agent.graph_definition, str):
+                print(f"[DEBUG] graph_definition 长度: {len(agent.graph_definition)}")
             flow_data = None
             if agent.graph_definition:
                 if isinstance(agent.graph_definition, str):
@@ -96,6 +101,8 @@ class LangGraphExecutor:
                     flow_data = agent.graph_definition
             
             if flow_data and isinstance(flow_data, dict) and flow_data.get("nodes"):
+                print(f"2. 使用 LangGraph 执行结构图")
+                print(f"[DEBUG] 节点数量: {len(flow_data.get('nodes', []))}, 边数量: {len(flow_data.get('edges', []))}")
                 logger.info("[2/6] 使用 LangGraph 执行结构图")
                 return await LangGraphExecutor._execute_with_langgraph(
                     agent=agent,
@@ -147,33 +154,28 @@ class LangGraphExecutor:
         logger = logging.getLogger(__name__)
         
         try:
+            print(f"3. 进入 _execute_with_langgraph")
             # 🔧 加载记忆
+            print(f"[DEBUG] 开始加载长期记忆...")
             logger.info("[加载长期记忆]")
-            recent_memories = await MemoryService.get_recent_memories(agent.id, limit=10, customer_id=customer_id, user_id=user_id)
-            important_memories = await MemoryService.get_important_memories(agent.id, limit=5, customer_id=customer_id, user_id=user_id)
+            import asyncio
             
             # 将记忆转换为可用的变量格式
             memory_list = []
-            for m in recent_memories:
-                memory_list.append({
-                    "content": m.content,
-                    "type": m.type,
-                    "importance": m.importance,
-                    "recall_count": m.recall_count
-                })
-            
+            recent_memories = []
+            important_memories = []
             nodes = flow_data.get("nodes", [])
             edges = flow_data.get("edges", [])
-            logger.info(f"节点数: {len(nodes)}, 边数: {len(edges)}")
-            logger.info(f"节点ID列表: {[n.get('id') for n in nodes]}")
+            print(f"4. 准备执行流程，节点数: {len(nodes)}, 边数: {len(edges)}")
+            print(f"[DEBUG] LANGGRAPH_AVAILABLE: {LANGGRAPH_AVAILABLE}")
             
             if not nodes:
-                logger.warning("结构图没有节点")
+                print(f"[DEBUG] 结构图没有节点，回退到简单执行")
                 return await LangGraphExecutor._execute_simple(agent, input_data)
             
             # 如果 LangGraph 不可用，回退到内置执行器
             if not LANGGRAPH_AVAILABLE:
-                logger.warning("LangGraph 不可用，使用内置执行器")
+                print(f"[DEBUG] LangGraph 不可用，使用内置执行器")
                 return await LangGraphExecutor._execute_with_builtin_fallback(
                     agent=agent,
                     flow_data=flow_data,
@@ -187,55 +189,74 @@ class LangGraphExecutor:
                 )
             
             # ===== 使用真正的 LangGraph =====
+            print(f"5. 开始构建 LangGraph")
             logger.info("[构建 LangGraph]")
             
             # 创建状态图
+            print(f"[DEBUG] 创建 StateGraph...")
             workflow = StateGraph(AgentState)
+            print(f"[DEBUG] StateGraph 创建完成")
             
             # 构建节点映射
             node_map = {node.get("id"): node for node in nodes}
             
             # 找到开始节点
+            print(f"[DEBUG] 查找开始节点...")
             start_node = LangGraphExecutor._find_start_node(nodes)
             start_node_id = start_node.get("id", "start") if start_node else "start"
+            print(f"[DEBUG] 开始节点: {start_node_id}")
             logger.info(f"开始节点: {start_node_id}")
             
             # 创建节点执行器
+            print(f"[DEBUG] 开始创建节点执行器，节点数: {len(nodes)}")
             for node in nodes:
                 node_id = node.get("id", "")
                 node_type = node.get("type", "")
                 if not node_id:
                     continue
                 
+                print(f"[DEBUG] 创建节点: {node_id} (类型: {node_type})")
                 logger.info(f"创建节点: {node_id} (类型: {node_type})")
                 
-                # 创建节点处理函数
-                def create_node_executor(current_node):
-                    async def node_executor(state: AgentState):
-                        return await LangGraphExecutor._execute_node_with_logging(
-                            current_node,
-                            state,
-                            sse_yield_func=sse_yield_func
-                        )
-                    return node_executor
+                # 创建节点处理函数 - 使用同步函数
+                def node_executor(state: AgentState):
+                    node_id = node.get("id", "")
+                    print(f"[DEBUG] 开始执行节点: {node_id}")
+                    logger.info(f"[执行节点] {node_id}")
+                    # 使用 asyncio.run 执行异步函数
+                    import asyncio
+                    result = asyncio.run(LangGraphExecutor._execute_node_with_logging(
+                        node,
+                        state,
+                        sse_yield_func=sse_yield_func
+                    ))
+                    print(f"[DEBUG] 节点完成: {node_id}, 结果类型: {type(result)}")
+                    logger.info(f"[节点完成] {node_id}")
+                    return result
                 
-                # 添加节点到工作流
-                workflow.add_node(node_id, create_node_executor(node))
+                # 添加节点到工作流 - 使用函数作为节点
+                print(f"[DEBUG] 添加节点到工作流: {node_id}")
+                workflow.add_node(node_id, node_executor)
+                print(f"[DEBUG] 节点 {node_id} 添加成功")
             
             # 添加边
-            logger.info("[添加边连接]")
+            print(f"6. 添加边连接")
+            print(f"[DEBUG] 边列表长度: {len(edges)}")
+            print(f"[DEBUG] 所有边: {edges}")
             edge_map = {}
             for edge in edges:
                 source = edge.get("source", "")
                 target = edge.get("target", "")
+                print(f"[DEBUG] 处理边: source={source}, target={target}")
                 if source and target:
                     edge_map[source] = target
-                    logger.info(f"添加边: {source} -> {target}")
+                    print(f"[DEBUG] 添加边: {source} -> {target}")
             
             # 设置入口点
+            print(f"[DEBUG] 设置入口点...")
             if start_node_id in node_map:
                 workflow.add_edge(START, start_node_id)
-                logger.info(f"设置入口点: {START} -> {start_node_id}")
+                print(f"[DEBUG] 设置入口点: {START} -> {start_node_id}")
             
             # 连接边
             condition_edges = {}
@@ -280,17 +301,54 @@ class LangGraphExecutor:
                     )
             
             # 找到结束节点，连接到 END
+            print(f"[DEBUG] 查找结束节点...")
             for node in nodes:
                 if node.get("type") == "end":
                     node_id = node.get("id", "")
                     if node_id:
+                        print(f"[DEBUG] 连接结束节点 {node_id} -> {END}")
                         logger.info(f"连接结束节点 {node_id} -> {END}")
                         workflow.add_edge(node_id, END)
             
-            # 编译图，带 checkpoint
-            logger.info("[编译 LangGraph]")
-            memory = MemorySaver()
-            graph = workflow.compile(checkpointer=memory)
+            # 编译图，不带 checkpoint（简化测试）
+            print(f"7. 编译 LangGraph")
+            
+            try:
+                # 验证图结构
+                print(f"[DEBUG] 验证图结构...")
+                if start_node_id not in node_map:
+                    print(f"[DEBUG] 开始节点 {start_node_id} 不在节点映射中")
+                    logger.warning(f"开始节点 {start_node_id} 不在节点映射中，回退到内置执行器")
+                    return await LangGraphExecutor._execute_with_builtin_fallback(
+                        agent=agent,
+                        flow_data=flow_data,
+                        input_data=input_data,
+                        customer_id=customer_id,
+                        user_id=user_id,
+                        recent_memories=recent_memories,
+                        important_memories=important_memories,
+                        memory_list=memory_list,
+                        sse_yield_func=sse_yield_func
+                    )
+                
+                print(f"[DEBUG] 开始编译图...")
+                graph = workflow.compile()  # 移除 checkpointer
+                print(f"[DEBUG] LangGraph 编译完成")
+                print(f"[DEBUG] graph 类型: {type(graph)}")
+                logger.info("LangGraph 编译完成")
+            except Exception as e:
+                logger.warning(f"LangGraph 编译失败: {e}, 回退到内置执行器")
+                return await LangGraphExecutor._execute_with_builtin_fallback(
+                    agent=agent,
+                    flow_data=flow_data,
+                    input_data=input_data,
+                    customer_id=customer_id,
+                    user_id=user_id,
+                    recent_memories=recent_memories,
+                    important_memories=important_memories,
+                    memory_list=memory_list,
+                    sse_yield_func=sse_yield_func
+                )
             
             # 初始化状态 - 不要在状态中放不可序列化的对象
             initial_state: AgentState = {
@@ -311,18 +369,39 @@ class LangGraphExecutor:
             
             # ===== 使用 graph.ainvoke 执行 =====
             logger.info("[使用 LangGraph 执行]")
+            logger.info(f"初始状态: {json.dumps(initial_state, ensure_ascii=False, default=str)[:500]}...")
             
-            # 配置参数
-            config = {
-                "configurable": {
-                    "thread_id": str(agent.id) + "_" + datetime.now().isoformat()
-                }
-            }
+            # 配置参数 - 简化，不使用 configurable
+            config = {}
+            logger.info(f"配置: {json.dumps(config, ensure_ascii=False)}")
             
             # 执行图
-            final_state = await graph.ainvoke(initial_state, config)
-            
-            logger.info("[LangGraph 执行完成]")
+            print(f"8. 开始执行图")
+            try:
+                print(f"[DEBUG] 准备调用 graph.ainvoke...")
+                print(f"[DEBUG] 初始状态键: {list(initial_state.keys())}")
+                logger.info("[开始调用 graph.ainvoke...]")
+                start_time = time.time()
+                logger.info(f"[执行中] 正在调用 graph.ainvoke，当前线程: {threading.current_thread().name}")
+                print(f"[DEBUG] 开始 await graph.ainvoke...")
+                final_state = await graph.ainvoke(initial_state, config,debug=True)
+                print(f"[DEBUG] graph.ainvoke 返回")
+                elapsed = time.time() - start_time
+                logger.info(f"[LangGraph 执行完成] 耗时: {elapsed:.2f}秒")
+                logger.info(f"最终状态: {json.dumps(final_state, ensure_ascii=False, default=str)[:500]}...")
+            except asyncio.TimeoutError:
+                logger.error("LangGraph 执行超时，回退到内置执行器")
+                return await LangGraphExecutor._execute_with_builtin_fallback(
+                    agent=agent,
+                    flow_data=flow_data,
+                    input_data=input_data,
+                    customer_id=customer_id,
+                    user_id=user_id,
+                    recent_memories=recent_memories,
+                    important_memories=important_memories,
+                    memory_list=memory_list,
+                    sse_yield_func=sse_yield_func
+                )
             
             # 保存结果到长期记忆
             await LangGraphExecutor._save_result_to_memory(

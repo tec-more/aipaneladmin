@@ -20,6 +20,7 @@ execution_manager = {
 }
 
 agent_router = APIRouter(prefix="/agents", tags=["agents"])
+execution_router = APIRouter(prefix="/executions", tags=["executions"])
 
 
 @agent_router.post("/")
@@ -350,8 +351,22 @@ async def sse_execution_generator(agent, input_data, execution_id: str) -> Async
         
         # 消费队列中的事件
         done = False
+        last_activity = asyncio.get_event_loop().time()
+        check_count = 0
+        import time
+        loop_start_time = time.time()
+        last_log_time = loop_start_time  # 日志时间戳初始化
         while not done or not sse_queue.empty():
             try:
+                check_count += 1
+                current_time = asyncio.get_event_loop().time()
+                
+                # 每30秒打印一次状态（降低频率）
+                current_elapsed = time.time() - loop_start_time
+                if current_elapsed - last_log_time >= 30.0:
+                    print(f"[SSE Loop] 循环中... elapsed={current_elapsed:.1f}s, task.done={task.done()}, queue.empty={sse_queue.empty()}")
+                    last_log_time = current_elapsed
+                
                 # 检查取消
                 if await check_cancelled():
                     print(f"[Execution] 检测到取消信号，停止执行")
@@ -359,23 +374,35 @@ async def sse_execution_generator(agent, input_data, execution_id: str) -> Async
                     task.cancel()
                     break
                 
+                # 检查超时 - 300秒无活动认为卡住
+                if current_time - last_activity > 300:
+                    print("[Execution] 检测到执行超时，强制结束")
+                    yield send_event({'type': 'error', 'message': '执行超时，请重试'})
+                    task.cancel()
+                    break
+                
                 # 尝试获取队列事件
                 try:
                     if not sse_queue.empty():
-                        event = await asyncio.wait_for(sse_queue.get(), timeout=0.01)
-                        logger.info(f"[agent API] 从队列获取事件: {event}")
+                        event = await asyncio.wait_for(sse_queue.get(), timeout=0.1)
+                        print(f"[agent API] 从队列获取事件: {event}")
                         yield send_event(event)
+                        last_activity = current_time
                 except asyncio.TimeoutError:
-                    pass
+                    # 短暂让出控制权，避免忙等
+                    await asyncio.sleep(0.01)
                 except Exception as e:
-                    logger.error(f"[agent API] 获取或发送事件失败: {e}")
+                    print(f"[agent API] 获取或发送事件失败: {e}")
                 
-                # 检查任务完成
-                if task.done():
+                # 检查任务完成 - 只有当任务完成且队列已空时才退出
+                if task.done() and sse_queue.empty():
                     done = True
+                    print("[Execution] 任务已完成，队列已空")
                     
             except Exception as e:
                 print(f"[SSE 推送失败] {e}")
+                import traceback
+                print(traceback.format_exc())
                 break
         
         # 获取执行结果
@@ -407,6 +434,12 @@ async def execute_agent_graph_sse(agent_id: int, input_data: dict):
         agent = await Agent.get_or_none(id=agent_id)
         if not agent:
             return fail_response(msg="智能体不存在", code=404)
+        
+        # 检查是否已有正在执行的任务
+        for exec_id, info in execution_manager.items():
+            if info.get('agent_id') == agent_id:
+                print(f"[API] 智能体 {agent_id} 已有执行任务: {exec_id}")
+                return fail_response(msg="智能体正在执行中，请稍后再试", code=409)
         
         # 生成执行ID
         execution_id = str(uuid.uuid4())
@@ -538,7 +571,7 @@ async def process_documents(directory_path: str = Query(..., description="文档
     except Exception as e:
         return fail_response(msg=str(e), code=500)
 
-@agent_router.post("/executions/{execution_id}/cancel")
+@execution_router.post("/{execution_id}/cancel")
 async def cancel_execution(execution_id: str):
     """取消执行中的任务"""
     try:
@@ -561,7 +594,7 @@ async def cancel_execution(execution_id: str):
         return fail_response(msg=str(e), code=500)
 
 
-@agent_router.get("/executions")
+@execution_router.get("/")
 async def list_executions():
     """列出所有正在执行的任务"""
     try:

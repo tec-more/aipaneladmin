@@ -19,6 +19,7 @@ def _setup_routes():
         return success_response(data={"message": "测试成功"}, msg="测试端点响应成功")
 
     router.include_router(agent.agent_router)
+    router.include_router(agent.execution_router)
     router.include_router(skill.skill_router)
     router.include_router(skill_category.skill_category_router)
     router.include_router(tool.tool_router)

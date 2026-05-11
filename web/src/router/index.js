@@ -232,10 +232,10 @@ router.beforeEach(async (to, from, next) => {
         console.error('加载菜单失败:', error)
       }
     } else if (menuStore.isLoaded) {
-      // 菜单已加载，直接放行
       next()
+    } else if (menuStore.loading) {
+      next(false)
     }
-    next()
   }
 })
 

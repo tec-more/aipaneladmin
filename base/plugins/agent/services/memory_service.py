@@ -21,6 +21,8 @@ except ImportError:
 # 向量存储目录
 VECTOR_STORE_DIR = "./vector_stores"
 
+import logging
+logger = logging.getLogger(__name__)
 
 class MemoryService:
     """Memory service class"""
@@ -228,20 +230,76 @@ class MemoryService:
         customer_id: Optional[int] = None,
         user_id: Optional[int] = None
     ) -> List[Memory]:
-        """Get recent memories with user filtering"""
-        from tortoise.expressions import Q
-        q_filter = Q(memory_mode="public")
-        if customer_id:
-            q_filter |= Q(memory_mode="private", customer_id=customer_id)
-        elif user_id:
-            q_filter |= Q(memory_mode="private", user_id=user_id)
+        """Get recent memories with user filtering - 使用原始SQL查询"""
+        import logging
+        logger = logging.getLogger(__name__)
         
-        memories = await Memory.filter(agent_id=agent_id)\
-            .filter(q_filter)\
-            .order_by("-created_at")\
-            .limit(limit)\
-            .all()
-        return memories
+        logger.info(f"获取最近记忆，agent_id={agent_id} (使用原始SQL)")
+        
+        try:
+            from tortoise import Tortoise
+            conn = Tortoise.get_connection("postgres")
+            logger.info(f"数据库连接状态: 已连接")
+            
+            # 构建 SQL 查询
+            if customer_id:
+                sql = """
+                    SELECT * FROM memory 
+                    WHERE agent_id = $1 AND (memory_mode = 'public' OR (memory_mode = 'private' AND customer_id = $2))
+                    ORDER BY created_at DESC 
+                    LIMIT $3
+                """
+                params = [agent_id, customer_id, limit]
+            elif user_id:
+                sql = """
+                    SELECT * FROM memory 
+                    WHERE agent_id = $1 AND (memory_mode = 'public' OR (memory_mode = 'private' AND user_id = $2))
+                    ORDER BY created_at DESC 
+                    LIMIT $3
+                """
+                params = [agent_id, user_id, limit]
+            else:
+                sql = """
+                    SELECT * FROM memory 
+                    WHERE agent_id = $1 AND memory_mode = 'public'
+                    ORDER BY created_at DESC 
+                    LIMIT $2
+                """
+                params = [agent_id, limit]
+            
+            logger.info(f"执行原始SQL查询")
+            # 执行原始 SQL 查询
+            results = await conn.execute_query_dict(sql, params)
+            
+            logger.info(f"原始SQL查询完成，获取到条记录")
+            
+            # 转换为 Memory 对象
+            memories = []
+            for row in results:
+                memory = Memory(
+                    id=row.get('id'),
+                    agent_id=row.get('agent_id'),
+                    content=row.get('content'),
+                    type=row.get('type'),
+                    importance=row.get('importance'),
+                    recall_count=row.get('recall_count', 0),
+                    memory_mode=row.get('memory_mode', 'public'),
+                    customer_id=row.get('customer_id'),
+                    user_id=row.get('user_id'),
+                    created_at=row.get('created_at'),
+                    updated_at=row.get('updated_at'),
+                    last_recalled_at=row.get('last_recalled_at')
+                )
+                memories.append(memory)
+            
+            logger.info(f"成功转换 {len(memories)} 条记忆")
+            return memories
+            
+        except Exception as e:
+            logger.error(f"原始SQL查询失败: {e}")
+            import traceback
+            logger.error(f"异常堆栈: {traceback.format_exc()}")
+            return []
 
     @staticmethod
     async def get_important_memories(
@@ -250,20 +308,75 @@ class MemoryService:
         customer_id: Optional[int] = None,
         user_id: Optional[int] = None
     ) -> List[Memory]:
-        """Get important memories with user filtering"""
-        from tortoise.expressions import Q
-        q_filter = Q(memory_mode="public")
-        if customer_id:
-            q_filter |= Q(memory_mode="private", customer_id=customer_id)
-        elif user_id:
-            q_filter |= Q(memory_mode="private", user_id=user_id)
+        """Get important memories with user filtering - 使用原始SQL查询"""
+        import logging
+        logger = logging.getLogger(__name__)
         
-        memories = await Memory.filter(agent_id=agent_id)\
-            .filter(q_filter)\
-            .order_by("-importance", "-created_at")\
-            .limit(limit)\
-            .all()
-        return memories
+        logger.info(f"获取重要记忆，agent_id={agent_id} (使用原始SQL)")
+        
+        try:
+            from tortoise import Tortoise
+            conn = Tortoise.get_connection("postgres")
+            
+            # 构建 SQL 查询
+            if customer_id:
+                sql = """
+                    SELECT * FROM memory 
+                    WHERE agent_id = $1 AND (memory_mode = 'public' OR (memory_mode = 'private' AND customer_id = $2))
+                    ORDER BY importance DESC, created_at DESC 
+                    LIMIT $3
+                """
+                params = [agent_id, customer_id, limit]
+            elif user_id:
+                sql = """
+                    SELECT * FROM memory 
+                    WHERE agent_id = $1 AND (memory_mode = 'public' OR (memory_mode = 'private' AND user_id = $2))
+                    ORDER BY importance DESC, created_at DESC 
+                    LIMIT $3
+                """
+                params = [agent_id, user_id, limit]
+            else:
+                sql = """
+                    SELECT * FROM memory 
+                    WHERE agent_id = $1 AND memory_mode = 'public'
+                    ORDER BY importance DESC, created_at DESC 
+                    LIMIT $2
+                """
+                params = [agent_id, limit]
+            
+            logger.info(f"执行原始SQL查询")
+            # 执行原始 SQL 查询
+            results = await conn.execute_query_dict(sql, params)
+            
+            logger.info(f"原始SQL查询完成，获取 条记录")
+            
+            # 转换为 Memory 对象
+            memories = []
+            for row in results:
+                memory = Memory(
+                    id=row.get('id'),
+                    agent_id=row.get('agent_id'),
+                    content=row.get('content'),
+                    type=row.get('type'),
+                    importance=row.get('importance'),
+                    recall_count=row.get('recall_count', 0),
+                    memory_mode=row.get('memory_mode', 'public'),
+                    customer_id=row.get('customer_id'),
+                    user_id=row.get('user_id'),
+                    created_at=row.get('created_at'),
+                    updated_at=row.get('updated_at'),
+                    last_recalled_at=row.get('last_recalled_at')
+                )
+                memories.append(memory)
+            
+            logger.info(f"成功转换 {len(memories)} 条重要记忆")
+            return memories
+            
+        except Exception as e:
+            logger.error(f"原始SQL查询失败: {e}")
+            import traceback
+            logger.error(f"异常堆栈: {traceback.format_exc()}")
+            return []
 
     @staticmethod
     async def search_memories(

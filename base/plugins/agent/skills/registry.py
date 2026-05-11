@@ -27,6 +27,19 @@ class SkillInfo:
             "description": self.description,
             "content": self.content
         }
+    
+    @staticmethod
+    def execute(params: dict) -> dict:
+        """
+        执行技能 - 占位方法
+        实际执行会在其他地方处理
+        """
+        input_text = params.get("input_text", "")
+        return {
+            "success": True,
+            "result": f"Processed: {input_text}",
+            "message": f"Skill executed successfully"
+        }
 
 
 class SkillRegistry:
@@ -106,8 +119,10 @@ class SkillRegistry:
             
             cls._skills.clear()
             for skill in skills:
+                # Use skill.id as skill_id, or convert name to a valid identifier
+                skill_id = str(skill.id)
                 cls.register(
-                    skill_id=skill.type,
+                    skill_id=skill_id,
                     name=skill.name,
                     description=skill.description or "",
                     content=skill.implementation or ""
