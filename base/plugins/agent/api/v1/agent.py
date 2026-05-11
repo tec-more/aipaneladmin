@@ -180,301 +180,73 @@ async def delete_agent(agent_id: int):
 
 
 @agent_router.post("/{agent_id}/execute")
-async def execute_agent(agent_id: int, input_data: dict):
-    """Execute agent"""
-    result = await AgentService.execute_agent(agent_id, input_data)
-    if result.get("success"):
-        return success_response(data=result, msg="智能体执行成功")
-    else:
-        return fail_response(msg=result.get("message", "执行失败"))
-
-
-@agent_router.post("/{agent_id}/graph/execute")
-async def execute_agent_graph(agent_id: int, input_data: dict):
-    """Execute agent graph diagram using LangGraph"""
-    print(f"=== 执行智能体结构图: agent_id={agent_id}, input_data={input_data} ===")
+async def execute_agent_unified(
+    agent_id: int, 
+    input_data: dict,
+    stream: Optional[bool] = Query(None, description="是否强制使用流式返回")
+):
+    """
+    统一智能体执行接口
+    根据智能体图结构自动判断使用普通模式还是SSE模式
+    
+    Args:
+        agent_id: 智能体ID
+        input_data: 输入数据
+        stream: 是否强制使用流式返回（可选）
+    
+    Returns:
+        普通响应或SSE流式响应
+    """
     try:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"执行智能体结构图: agent_id={agent_id}, input_data={input_data}")
-        
-        print(f"1. 导入LangGraphExecutor")
-        from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
-        
-        print(f"2. 获取智能体: agent_id={agent_id}")
         agent = await AgentService.get_agent_by_id(agent_id)
         if not agent:
-            print(f"智能体不存在: agent_id={agent_id}")
-            logger.error(f"智能体不存在: agent_id={agent_id}")
             return fail_response(msg="智能体不存在", code=404)
         
-        print(f"3. 智能体信息: id={agent.id}, name={agent.name}")
-        print(f"4. graph_definition类型: {type(agent.graph_definition)}")
-        print(f"5. graph_definition值: {agent.graph_definition}")
-        logger.info(f"智能体信息: id={agent.id}, name={agent.name}")
-        logger.info(f"graph_definition类型: {type(agent.graph_definition)}")
-        logger.info(f"graph_definition值: {agent.graph_definition}")
+        if agent.status != "active":
+            return fail_response(msg="智能体未激活", code=400)
         
-        print(f"6. 创建执行记录")
-        from base.plugins.agent.models.dialog_flow import DialogFlowExecution
-        execution_record = await DialogFlowExecution.create(
-            dialog_flow_id=0,  # 用0表示是智能体图执行
-            user_id=None,
-            input_data=input_data,
-            status="running",
-            execution_path=[]
-        )
-        logger.info(f"创建执行记录: id={execution_record.id}")
+        # 判断是否使用SSE模式
+        use_sse = stream if stream is not None else AgentService.should_use_sse(agent)
         
-        print(f"7. 执行智能体")
-        result = await LangGraphExecutor.execute_agent(agent, input_data)
-        
-        print(f"8. 执行结果: {result}")
-        logger.info(f"执行结果类型: {type(result)}")
-        logger.info(f"执行结果: {result}")
-        
-        print(f"9. 更新执行记录")
-        execution_record.output_data = result
-        
-        # 提取执行路径 - 从结果的多个位置尝试获取
-        execution_path = []
-        if isinstance(result, dict):
-            if result.get('variables') and result['variables'].get('execution_path'):
-                execution_path = result['variables']['execution_path']
-            elif result.get('execution_path'):
-                execution_path = result['execution_path']
-            elif result.get('trace'):
-                execution_path = result['trace']
-            elif result.get('execution_trace'):
-                execution_path = result['execution_trace']
-        
-        execution_record.execution_path = execution_path
-        logger.info(f"提取到的执行路径: {execution_path}")
-        
-        from datetime import datetime
-        execution_record.completed_at = datetime.now()
-        execution_record.status = "completed" if (isinstance(result, dict) and result.get("success")) else "failed"
-        
-        # 显式保存并检查
-        await execution_record.save()
-        
-        # 重新获取以确认保存成功
-        saved_record = await DialogFlowExecution.get(id=execution_record.id)
-        logger.info(f"保存后的执行记录: id={saved_record.id}, status={saved_record.status}")
-        logger.info(f"保存后的输出数据: {saved_record.output_data}")
-        logger.info(f"保存后的执行路径: {saved_record.execution_path}")
-        
-        if isinstance(result, dict) and result.get("success"):
-            print(f"10. 执行成功")
-            return success_response(data=result, msg="结构图执行成功")
-        else:
-            error_msg = result.get("message", "结构图执行失败") if isinstance(result, dict) else str(result)
-            print(f"10. 执行失败: {error_msg}")
-            return fail_response(msg=error_msg)
-    except Exception as e:
-        import traceback
-        print(f"=== 异常: {e} ===")
-        print(traceback.format_exc())
-        logger.exception(f"执行智能体结构图失败: {e}")
-        return fail_response(msg=f"结构图执行失败: {str(e)}", data={"traceback": traceback.format_exc()})
-
-
-async def sse_execution_generator(agent, input_data, execution_id: str) -> AsyncGenerator[str, None]:
-    """SSE事件生成器 - 实时推送执行过程（支持边思考边输出）"""
-    import json
-    from datetime import datetime
-    from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
-    
-    print(f"[Execution] 开始执行，execution_id: {execution_id}")
-    
-    # 创建SSE推送函数 - 直接return字符串，yield是主函数调用
-    def send_event(event_data):
-        """SSE数据推送helper"""
-        return f"data: {json.dumps({**event_data, 'timestamp': datetime.now().isoformat()}, ensure_ascii=False)}\n\n"
-    
-    # 检查是否被取消的辅助函数
-    async def check_cancelled():
-        exec_info = execution_manager.get(execution_id)
-        return exec_info and exec_info.get('is_cancelled', False)
-    
-    # 推送开始
-    yield send_event({'type': 'start', 'execution_id': execution_id, 'message': '开始执行智能体'})
-    
-    try:
-        import asyncio
-        
-        # 创建 SSE 队列供 LangGraph 使用
-        class SSEQueue:
-            def __init__(self):
-                self.queue = asyncio.Queue()
+        if use_sse:
+            # 检查是否已有正在执行的任务
+            for exec_id, info in execution_manager.items():
+                if info.get('agent_id') == agent_id:
+                    return fail_response(msg="智能体正在执行中，请稍后再试", code=409)
             
-            async def put(self, event):
-                await self.queue.put(event)
+            # 生成执行ID
+            execution_id = str(uuid.uuid4())
+            execution_manager[execution_id] = {'agent_id': agent_id, 'is_cancelled': False}
             
-            async def get(self):
-                return await self.queue.get()
-            
-            def empty(self):
-                return self.queue.empty()
-        
-        sse_queue = SSEQueue()
-        
-        # 创建包装后的 sse_yield_func，把数据推送到队列
-        async def wrapped_sse_yield(event):
-            print(f"[agent API] wrapped_sse_yield 收到事件: {event}")
-            await sse_queue.put(event)
-            print(f"[agent API] 事件已入队列")
-        
-        # 启动 LangGraph 执行任务
-        async def execute_task():
-            try:
-                return await LangGraphExecutor.execute_agent(
-                    agent=agent,
-                    input_data=input_data,
-                    sse_yield_func=wrapped_sse_yield
-                )
-            except Exception as e:
-                print(f"[LangGraph 执行失败] {e}")
-                import traceback
-                traceback.print_exc()
-                return {
-                    "success": False,
-                    "message": str(e),
-                    "traceback": traceback.format_exc()
-                }
-        
-        # 同时运行执行和队列消费
-        task = asyncio.create_task(execute_task())
-        
-        # 推送初始化信息
-        yield send_event({'type': 'info', 'label': '初始化', 'message': '初始化执行环境...'})
-        
-        # 消费队列中的事件
-        done = False
-        last_activity = asyncio.get_event_loop().time()
-        check_count = 0
-        import time
-        loop_start_time = time.time()
-        last_log_time = loop_start_time  # 日志时间戳初始化
-        while not done or not sse_queue.empty():
-            try:
-                check_count += 1
-                current_time = asyncio.get_event_loop().time()
-                
-                # 每30秒打印一次状态（降低频率）
-                current_elapsed = time.time() - loop_start_time
-                if current_elapsed - last_log_time >= 30.0:
-                    print(f"[SSE Loop] 循环中... elapsed={current_elapsed:.1f}s, task.done={task.done()}, queue.empty={sse_queue.empty()}")
-                    last_log_time = current_elapsed
-                
-                # 检查取消
-                if await check_cancelled():
-                    print(f"[Execution] 检测到取消信号，停止执行")
-                    yield send_event({'type': 'cancelled', 'message': '执行被用户中断'})
-                    task.cancel()
-                    break
-                
-                # 检查超时 - 300秒无活动认为卡住
-                if current_time - last_activity > 300:
-                    print("[Execution] 检测到执行超时，强制结束")
-                    yield send_event({'type': 'error', 'message': '执行超时，请重试'})
-                    task.cancel()
-                    break
-                
-                # 尝试获取队列事件
+            async def sse_generator():
                 try:
-                    if not sse_queue.empty():
-                        event = await asyncio.wait_for(sse_queue.get(), timeout=0.1)
-                        print(f"[agent API] 从队列获取事件: {event}")
-                        yield send_event(event)
-                        last_activity = current_time
-                except asyncio.TimeoutError:
-                    # 短暂让出控制权，避免忙等
-                    await asyncio.sleep(0.01)
-                except Exception as e:
-                    print(f"[agent API] 获取或发送事件失败: {e}")
-                
-                # 检查任务完成 - 只有当任务完成且队列已空时才退出
-                if task.done() and sse_queue.empty():
-                    done = True
-                    print("[Execution] 任务已完成，队列已空")
-                    
-            except Exception as e:
-                print(f"[SSE 推送失败] {e}")
-                import traceback
-                print(traceback.format_exc())
-                break
-        
-        # 获取执行结果
-        try:
-            if not task.cancelled():
-                result = await task
-                
-                # 推送完成事件
-                yield send_event({
-                    'type': 'complete',
-                    'result': result.get('output', {}),
-                    'variables': result.get('variables', {})
-                })
-        except Exception as e:
-            print(f"获取执行结果失败: {e}")
-            yield send_event({'type': 'error', 'message': str(e)})
-        
+                    async for data in AgentService.sse_execution_generator(agent, input_data, execution_id, execution_manager):
+                        yield data
+                finally:
+                    if execution_id in execution_manager:
+                        del execution_manager[execution_id]
+            
+            return StreamingResponse(
+                sse_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "X-Accel-Buffering": "no"
+                }
+            )
+        else:
+            # 普通模式执行
+            result = await AgentService.execute_agent(agent_id, input_data)
+            if result.get("success"):
+                return success_response(data=result, msg="智能体执行成功")
+            else:
+                return fail_response(msg=result.get("message", "执行失败"))
+    
     except Exception as e:
         import traceback
-        yield send_event({'type': 'error', 'message': str(e), 'traceback': traceback.format_exc()})
-
-
-@agent_router.post("/{agent_id}/graph/execute/sse")
-async def execute_agent_graph_sse(agent_id: int, input_data: dict):
-    """使用SSE实时执行智能体结构图 - 简化版本"""
-    try:
-        from base.plugins.agent.models.agent import Agent
-        
-        agent = await Agent.get_or_none(id=agent_id)
-        if not agent:
-            return fail_response(msg="智能体不存在", code=404)
-        
-        # 检查是否已有正在执行的任务
-        for exec_id, info in execution_manager.items():
-            if info.get('agent_id') == agent_id:
-                print(f"[API] 智能体 {agent_id} 已有执行任务: {exec_id}")
-                return fail_response(msg="智能体正在执行中，请稍后再试", code=409)
-        
-        # 生成执行ID
-        execution_id = str(uuid.uuid4())
-        print(f"[API] 创建执行任务，execution_id: {execution_id}")
-        
-        # 注册执行
-        execution_manager[execution_id] = {'agent_id': agent_id, 'is_cancelled': False}
-        
-        async def sse_generator():
-            """SSE事件生成器"""
-            try:
-                # 直接执行并yield事件
-                async for data in sse_execution_generator(agent, input_data, execution_id):
-                    yield data
-            finally:
-                # 清理
-                print(f"[API] 清理执行任务，execution_id: {execution_id}")
-                if execution_id in execution_manager:
-                    del execution_manager[execution_id]
-        
-        return StreamingResponse(
-            sse_generator(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive", 
-                "Access-Control-Allow-Origin": "*",
-                "X-Accel-Buffering": "no"
-            }
-        )
-    except Exception as e:
-        import traceback
-        print(f"SSE执行错误: {e}")
-        print(traceback.format_exc())
-        return fail_response(msg=str(e), code=500)
+        return fail_response(msg=str(e), data={"traceback": traceback.format_exc()}, code=500)
 
 
 @agent_router.get("/{agent_id}/graph")
