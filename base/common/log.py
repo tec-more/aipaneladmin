@@ -2,6 +2,7 @@ import logging
 import sys
 import atexit
 import json
+from pathlib import Path
 from typing_extensions import override
 from loguru import logger
 from base.common.setting import settings
@@ -98,7 +99,7 @@ def setup_logging():
     global _logger_handlers
     
     # 添加上下文信息
-    _ = logger.configure(extra={"app_name": settings.APP_NAME})
+    _ = logger.configure(extra={"app_name": settings.app_name})
     # 步骤1：移除默认处理器
     logger.remove()
 
@@ -130,7 +131,7 @@ def setup_logging():
     _logger_handlers.append(handler_id)
 
     # 步骤4：创建日志目录
-    log_dir = settings.LOG_DIR
+    log_dir = Path(settings.LOG_DIR)
     # 确保日志目录存在,如果不存在则创建
     log_dir.mkdir(parents=True, exist_ok=True)
 

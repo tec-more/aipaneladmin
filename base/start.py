@@ -15,11 +15,9 @@ from base.common.logging_config import register_exceptions_with_logging
 from base.plugins import plugin_manager
 import asyncio
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# 配置日志 - 使用 Loguru 进行完整的日志配置
+from base.common.log import setup_logging
+setup_logging()
 
 # 禁用websockets.client的调试日志
 logging.getLogger('websockets.client').setLevel(logging.WARNING)
