@@ -601,6 +601,37 @@ class LangGraphExecutor:
         return prompt, tools, functions
 
     @staticmethod
+    async def _build_chat_kwargs(
+        node_data: Dict,
+        actual_model_for_call: str,
+        messages: List[Dict],
+        functions: List = None
+    ) -> Dict[str, Any]:
+        """构建聊天参数，从节点配置中读取 temperature 和 max_tokens"""
+        temperature = node_data.get("temperature")
+        if temperature is None:
+            temperature = 0.7
+
+        max_tokens = node_data.get("max_tokens")
+        if max_tokens is None or max_tokens == 0 or max_tokens == "":
+            max_tokens = None
+
+        chat_kwargs = {
+            "model": actual_model_for_call,
+            "messages": messages,
+            "temperature": temperature
+        }
+
+        if max_tokens is not None:
+            chat_kwargs["max_tokens"] = max_tokens
+
+        if functions:
+            chat_kwargs["functions"] = functions
+            chat_kwargs["function_call"] = "auto"
+
+        return chat_kwargs
+
+    @staticmethod
     async def _build_messages(prompt: str, node_data: Dict, state: AgentState) -> tuple:
         """构建消息列表（包含变量替换、记忆上下文）"""
         variables = state.get("variables", {})
@@ -747,16 +778,12 @@ class LangGraphExecutor:
             if target_model:
                 service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
                 if service:
-                    chat_kwargs = {
-                        "model": actual_model_for_call,
-                        "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 1000
-                    }
-
-                    if functions:
-                        chat_kwargs["functions"] = functions
-                        chat_kwargs["function_call"] = "auto"
+                    chat_kwargs = await LangGraphExecutor._build_chat_kwargs(
+                        node_data,
+                        actual_model_for_call,
+                        messages,
+                        functions
+                    )
 
                     llm_response = await LangGraphExecutor._call_llm_with_tool_handler(service, chat_kwargs, messages)
         except Exception as e:
@@ -838,12 +865,11 @@ class LangGraphExecutor:
             if target_model:
                 service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
                 if service:
-                    chat_kwargs = {
-                        "model": actual_model_for_call,
-                        "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 1000
-                    }
+                    chat_kwargs = await LangGraphExecutor._build_chat_kwargs(
+                        node_data,
+                        actual_model_for_call,
+                        messages
+                    )
 
                     full_response = ""
                     async for chunk in service.chat_stream(**chat_kwargs):
