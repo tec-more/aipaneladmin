@@ -22,7 +22,7 @@ if ast_demo_protogen.exists():
     try:
         from products.understanding.ast.ast_service_pb2 import TranslateRequest, TranslateResponse
         from common.events_pb2 import Type
-        logger.info("[AST] 使用官方demo的protobuf定义")
+        # logger.info("[AST] 使用官方demo的protobuf定义")
         USE_OFFICIAL_PROTO = True
     except ImportError as e:
         logger.warning(f"[AST] 无法导入官方protobuf: {e}")

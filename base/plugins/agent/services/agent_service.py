@@ -8,6 +8,9 @@ from base.plugins.agent.schemas.agent import AgentCreate, AgentUpdate
 import json
 import asyncio
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AgentService:
@@ -16,7 +19,6 @@ class AgentService:
     @staticmethod
     async def create_agent(agent_data: AgentCreate) -> Agent:
         """Create agent"""
-        # Create agent
         agent = await Agent.create(
             name=agent_data.name,
             description=agent_data.description,
@@ -24,7 +26,7 @@ class AgentService:
             config=agent_data.config,
             memory_capacity=agent_data.memory_capacity
         )
-        
+
         return agent
 
     @staticmethod
@@ -55,10 +57,10 @@ class AgentService:
             return None
 
         update_data = agent_data.model_dump(exclude_unset=True)
-        
+
         await agent.update_from_dict(update_data)
         await agent.save()
-        
+
         return agent
 
     @staticmethod
@@ -83,17 +85,16 @@ class AgentService:
         agent = await AgentService.get_agent_by_id(agent_id)
         if not agent or agent.status != "active":
             return {"success": False, "message": "Agent not found or inactive"}
-        
+
         try:
-            # 使用新的 LangGraph 执行器
             from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
             result = await LangGraphExecutor.execute_agent(agent, input_data)
             return result
-        
+
         except Exception as e:
             import traceback
             return {"success": False, "message": str(e), "traceback": traceback.format_exc()}
-    
+
     @staticmethod
     def _transform_node(node: dict) -> dict:
         """转换节点格式：模板格式 -> 系统格式"""
@@ -106,7 +107,7 @@ class AgentService:
                 'description': node.get('data', {}).get('description', '')
             }
         }
-        
+
         node_type = node.get('type')
         if node_type == 'llm':
             config = node.get('config', {})
@@ -127,9 +128,9 @@ class AgentService:
             config = node.get('config', {})
             data = node.get('data', {})
             transformed['data']['condition'] = config.get('condition') or data.get('condition', '')
-        
+
         return transformed
-    
+
     @staticmethod
     def _transform_edge(edge: dict, index: int) -> dict:
         """转换边格式：模板格式 -> 系统格式"""
@@ -141,7 +142,7 @@ class AgentService:
             'targetHandle': edge.get('targetHandle'),
             'condition': edge.get('condition')
         }
-    
+
     @staticmethod
     async def import_agent(import_data: dict) -> Agent:
         """
@@ -155,10 +156,8 @@ class AgentService:
         }
         或直接传入 agent 配置
         """
-        # 提取 agent 数据
         agent_data = import_data.get('agent') or import_data
-        
-        # 转换 graph_definition 的格式
+
         graph_definition = agent_data.get('graph_definition', {'nodes': [], 'edges': []})
         if graph_definition and 'nodes' in graph_definition:
             graph_definition['nodes'] = [
@@ -170,8 +169,7 @@ class AgentService:
                 AgentService._transform_edge(edge, index)
                 for index, edge in enumerate(graph_definition['edges'])
             ]
-        
-        # 创建智能体
+
         agent = await Agent.create(
             name=agent_data.get('name', '导入的智能体'),
             description=agent_data.get('description', ''),
@@ -180,230 +178,241 @@ class AgentService:
             default_memory_mode=agent_data.get('default_memory_mode', 'public'),
             graph_definition=graph_definition
         )
-        
-        # TODO: 可以扩展导入 tools, skills, rag 等
-        # 这里先只导入智能体基本配置和结构图
-        
+
         return agent
 
     @staticmethod
     def should_use_sse(agent: Agent) -> bool:
         """
         判断智能体是否应该使用 SSE 模式执行
-        
+
         判断条件：
         1. 有流式 LLM 节点（stream=True）
         2. 有工具/HTTP/技能节点（可能需要等待外部响应）
         3. 有条件分支或循环节点（需要多轮执行）
-        
+
         Args:
             agent: 智能体对象
-            
+
         Returns:
             是否应该使用 SSE 模式
         """
         graph = agent.graph_definition
         if not graph or 'nodes' not in graph:
             return False
-        
+
         nodes = graph.get('nodes', [])
-        
-        # 检查是否有流式 LLM 节点
+
         for node in nodes:
             stream_val = node.get('data', {}).get('stream')
-            # 支持布尔值 True/False 和字符串 "true"/"false"
             is_streaming = stream_val is True or (isinstance(stream_val, str) and stream_val.lower() == 'true')
             if node.get('type') == 'llm' and is_streaming:
                 return True
-        
-        # 检查是否有工具调用节点
+
         for node in nodes:
             if node.get('type') in ('tool', 'http', 'skill'):
                 return True
-        
-        # 检查是否有控制流节点
+
         has_condition = any(n.get('type') == 'condition' for n in nodes)
         has_loop = any(n.get('type') in ('loop', 'iteration') for n in nodes)
         if has_condition or has_loop:
             return True
-        
+
         return False
 
     @staticmethod
     async def sse_execution_generator(
-        agent: Agent, 
-        input_data: Dict[str, Any], 
+        agent: Agent,
+        input_data: Dict[str, Any],
         execution_id: str,
         execution_manager: dict
     ) -> AsyncGenerator[str, None]:
         """
         SSE事件生成器 - 实时推送执行过程（支持边思考边输出）
-        
+
         Args:
             agent: 智能体对象
             input_data: 输入数据
             execution_id: 执行ID
             execution_manager: 执行管理器（用于检查取消状态）
-            
+
         Returns:
             SSE事件流
         """
         from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
-        
-        print(f"[Execution] 开始执行，execution_id: {execution_id}")
-        
+
+        logger.info(f"[Execution] 开始执行，execution_id: {execution_id}")
+
         def send_event(event_data):
             """SSE数据推送helper"""
             return f"data: {json.dumps({**event_data, 'timestamp': datetime.now().isoformat()}, ensure_ascii=False)}\n\n"
-        
+
         async def check_cancelled():
             """检查是否被取消"""
             exec_info = execution_manager.get(execution_id)
             return exec_info and exec_info.get('is_cancelled', False)
-        
+
         try:
             yield send_event({'type': 'start', 'execution_id': execution_id, 'message': '开始执行智能体'})
             class SSEQueue:
                 def __init__(self):
                     self.queue = asyncio.Queue()
-                
+
                 async def put(self, event):
                     await self.queue.put(event)
-                
+
                 async def get(self):
                     return await self.queue.get()
-                
+
                 def empty(self):
                     return self.queue.empty()
-            
-            print(f"[SSE生成器] 开始初始化，execution_id={execution_id}")
+
+            logger.info(f"[SSE生成器] 开始初始化，execution_id={execution_id}")
             sse_queue = SSEQueue()
-            
+
             async def wrapped_sse_yield(event):
-                print(f"[agent API] wrapped_sse_yield 收到事件: {event}")
+                logger.info(f"[agent API] wrapped_sse_yield 收到事件: {event}")
                 await sse_queue.put(event)
-                print(f"[agent API] 事件已入队列，队列大小: {sse_queue.queue.qsize()}")
-            
+                logger.info(f"[agent API] 事件已入队列，队列大小: {sse_queue.queue.qsize()}")
+
+            sse_yield_call_count = [0]
+
+            async def wrapped_sse_yield_with_counter(event):
+                sse_yield_call_count[0] += 1
+                count = sse_yield_call_count[0]
+                logger.info(f"[agent API] wrapped_sse_yield 调用 #{count}: {event}")
+                await sse_queue.put(event)
+                logger.info(f"[agent API] 事件已入队列 #{count}，队列大小: {sse_queue.queue.qsize()}")
+
             async def execute_task():
-                print(f"[SSE生成器] execute_task 开始执行")
+                logger.info(f"[SSE生成器] execute_task 开始执行")
                 try:
-                    # 从 execution_manager 获取预加载的资源
                     exec_info = execution_manager.get(execution_id, {})
                     llm_resources = exec_info.get('_llm_resources', {})
                     skill_resources = exec_info.get('_skill_resources', {})
-                    print(f"[SSE生成器] 获取预加载资源: LLM={len(llm_resources)}, 技能={len(skill_resources)}")
-                    
-                    print(f"[SSE生成器] 开始调用 LangGraphExecutor.execute_agent")
+                    logger.info(f"[SSE生成器] 获取预加载资源: LLM={len(llm_resources)}, 技能={len(skill_resources)}")
+
+                    logger.info(f"[SSE生成器] 开始调用 LangGraphExecutor.execute_agent")
+                    logger.info(f"[SSE生成器] 准备 await execute_agent...")
                     result = await LangGraphExecutor.execute_agent(
                         agent=agent,
                         input_data=input_data,
-                        sse_yield_func=wrapped_sse_yield,
+                        sse_yield_func=wrapped_sse_yield_with_counter,
                         execution_id=execution_id,
                         llm_resources=llm_resources,
                         skill_resources=skill_resources
                     )
-                    print(f"[SSE生成器] execute_task 执行完成，result={result}")
                     return result
                 except Exception as e:
-                    print(f"[SSE生成器] LangGraph 执行异常: {e}")
+                    logger.error(f"[SSE生成器] LangGraph 执行异常: {e}")
                     import traceback
-                    traceback.print_exc()
+                    logger.error(traceback.format_exc())
                     return {
                         "success": False,
                         "message": str(e),
                         "traceback": traceback.format_exc()
                     }
-            
-            print(f"[SSE生成器] 创建 asyncio task")
+
+            logger.info("=" * 50)
+            logger.info("[SSE生成器] ===== START =====")
+            logger.info("=" * 50)
             task = asyncio.create_task(execute_task())
-            print(f"[SSE生成器] task 创建成功: {task}")
-            
-            print(f"[SSE生成器] 发送初始化事件")
+            logger.info(f"[SSE生成器] task 创建: {task}")
+
             yield send_event({'type': 'info', 'label': '初始化', 'message': '初始化执行环境...'})
-            
-            print(f"[SSE生成器] 进入SSE循环")
+
             done = False
             last_activity = asyncio.get_event_loop().time()
             import time
             loop_start_time = time.time()
             last_log_time = loop_start_time
             loop_count = 0
-            
+
             while not done or not sse_queue.empty():
                 loop_count += 1
                 try:
                     current_time = asyncio.get_event_loop().time()
-                    
+
                     current_elapsed = time.time() - loop_start_time
-                    if current_elapsed - last_log_time >= 5.0:
-                        print(f"[SSE Loop] 循环 #{loop_count}, elapsed={current_elapsed:.1f}s, task.done={task.done()}, queue.empty={sse_queue.empty()}, task={task}")
-                        last_log_time = current_elapsed
                     
+                    if current_elapsed - last_log_time >= 5.0:
+                        last_log_time = current_elapsed
+
                     if await check_cancelled():
-                        print(f"[Execution] 检测到取消信号，停止执行")
                         yield send_event({'type': 'cancelled', 'message': '执行被用户中断'})
                         task.cancel()
                         break
-                    
+
                     if task.done():
-                        print(f"[SSE生成器] task 已完成，检查异常...")
                         task_exception = task.exception()
                         if task_exception:
-                            print(f"[Execution] 任务执行异常: {task_exception}")
                             yield send_event({'type': 'error', 'message': f'执行异常: {str(task_exception)}'})
                             break
-                        print(f"[SSE生成器] task 正常完成")
-                    
+
                     if current_time - last_activity > 300:
-                        print("[Execution] 检测到执行超时，强制结束")
                         yield send_event({'type': 'error', 'message': '执行超时，请重试'})
                         task.cancel()
                         break
-                    
+
                     try:
                         if not sse_queue.empty():
-                            print(f"[SSE生成器] 队列不为空，尝试获取事件...")
-                            try:
-                                event = await asyncio.wait_for(sse_queue.get(), timeout=1.0)
-                                print(f"[agent API] 从队列获取事件: {event}")
-                                yield send_event(event)
-                                last_activity = current_time
-                            except asyncio.TimeoutError:
-                                print(f"[SSE生成器] 获取事件超时，队列大小: {sse_queue.queue.qsize()}")
-                                await asyncio.sleep(0.01)
+                            event = await asyncio.wait_for(sse_queue.get(), timeout=1.0)
+                            logger.info(f"[SSE Loop] 从队列获取事件发送: {event}")
+                            yield send_event(event)
+                            last_activity = current_time
                         elif not task.done():
                             last_activity = current_time
                             await asyncio.sleep(0.01)
+                    except asyncio.TimeoutError:
+                        await asyncio.sleep(0.01)
                     except Exception as e:
-                        print(f"[agent API] 获取或发送事件异常: {e}")
-                        import traceback
-                        traceback.print_exc()
-                    
+                        pass
+
                     if task.done() and sse_queue.empty():
                         done = True
-                        print("[Execution] 任务已完成，队列已空，退出循环")
-                        
+                        logger.info(f"[SSE Loop] 循环 #{loop_count}, elapsed={current_elapsed:.1f}s, task.done={task.done()}, done={done}, queue.empty={sse_queue.empty()}")
+                        logger.info("[Execution] 任务已完成，队列已空，退出循环")
+
                 except Exception as e:
-                    print(f"[SSE 推送异常] {e}")
+                    logger.error(f"[SSE 推送异常] {e}")
                     import traceback
-                    print(traceback.format_exc())
+                    logger.error(traceback.format_exc())
                     break
-            
-            print(f"[SSE生成器] SSE循环结束，done={done}")
-            
+
+            logger.info("[Execution] while循环已退出，准备获取task结果")
             try:
+                logger.info(f"[Execution] 检查task状态: cancelled={task.cancelled()}, done={task.done()}")
                 if not task.cancelled():
+                    logger.info("[Execution] 开始 await task")
                     result = await task
-                    
+                    logger.info(f"[Execution] await task 完成，result.success={result.get('success')}")
+
+                    variables_summary = {}
+                    variables = result.get('variables', {})
+                    for key, value in list(variables.items())[:5]:
+                        if key == 'llm_output':
+                            llm_str = str(value)
+                            variables_summary[key] = {
+                                'type': 'large_text',
+                                'length': len(llm_str),
+                                'preview': llm_str[:100] + '...' if len(llm_str) > 100 else llm_str
+                            }
+                        else:
+                            variables_summary[key] = value
+
+                    logger.info("[Execution] 准备发送 complete 事件")
                     yield send_event({
                         'type': 'complete',
                         'result': result.get('output', {}),
-                        'variables': result.get('variables', {})
+                        'variables': variables_summary
                     })
+                    logger.info("[Execution] complete 事件已发送")
+                else:
+                    logger.warning("[Execution] task已被取消，跳过获取结果")
             except Exception as e:
-                print(f"获取执行结果失败: {e}")
+                logger.error(f"获取执行结果失败: {e}")
                 yield send_event({'type': 'error', 'message': str(e)})
-        
+
         except Exception as e:
             import traceback
             yield send_event({'type': 'error', 'message': str(e), 'traceback': traceback.format_exc()})

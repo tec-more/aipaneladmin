@@ -97,7 +97,7 @@ class LangGraphExecutor:
 
             if flow_data and isinstance(flow_data, dict) and flow_data.get("nodes"):
                 logger.info("使用 LangGraph 执行结构图")
-                return await LangGraphExecutor._execute_with_langgraph(
+                result = await LangGraphExecutor._execute_with_langgraph(
                     agent=agent,
                     flow_data=flow_data,
                     input_data=input_data,
@@ -108,6 +108,10 @@ class LangGraphExecutor:
                     llm_resources=llm_resources,
                     skill_resources=skill_resources
                 )
+                logger.info("=" * 50)
+                logger.info("[LangGraph] ===== RETURNING =====")
+                logger.info("=" * 50)
+                return result
             else:
                 logger.warning("没有配置流程图，使用简化执行方式")
                 return await LangGraphExecutor._execute_simple(agent, input_data)
@@ -115,11 +119,13 @@ class LangGraphExecutor:
         except Exception as e:
             logger.exception(f"执行智能体失败: {str(e)}")
             import traceback
-            return {
+            error_result = {
                 "success": False,
                 "message": str(e),
                 "traceback": traceback.format_exc()
             }
+            logger.info(f"[LangGraph] execute_agent 异常处理完成，准备返回错误结果")
+            return error_result
 
     @staticmethod
     async def _preload_llm_resources(nodes: List[Dict]) -> Dict[str, Any]:
@@ -468,7 +474,8 @@ class LangGraphExecutor:
                     "trace": final_state.get("execution_trace", [])
                 }
             logger.info("[LangGraph] 下一步返回结果")
-            return {
+            logger.info("[LangGraph] 准备返回执行结果")
+            result = {
                 "success": True,
                 "message": "执行成功",
                 "input": input_data,
@@ -476,6 +483,8 @@ class LangGraphExecutor:
                 "variables": final_state.get("variables", {}),
                 "trace": final_state.get("execution_trace", [])
             }
+            logger.info(f"[LangGraph] 返回结果: success={result['success']}, output_keys={list(result['output'].keys())}")
+            return result
 
         except Exception as e:
             logger.exception(f"LangGraph 执行失败: {e}")
@@ -680,8 +689,11 @@ class LangGraphExecutor:
             key_variables = ["wbs_result", "task_plan", "task_decomposition", "thinking_result",
                              "final_output", "output", "structured_output"]
 
+            logger.info(f"[保存记忆] 开始检查变量: {list(variables.keys())}")
+            
             for var_name in key_variables:
                 if var_name in variables:
+                    logger.info(f"[保存记忆] 处理变量: {var_name}")
                     value = variables[var_name]
 
                     content_str = ""
@@ -691,6 +703,8 @@ class LangGraphExecutor:
                         content_str = json.dumps(value, ensure_ascii=False)
                     else:
                         content_str = str(value)
+
+                    logger.info(f"[保存记忆] 变量 {var_name} 内容长度: {len(content_str)}")
 
                     if content_str and len(content_str.strip()) > 0:
                         try:
@@ -704,10 +718,13 @@ class LangGraphExecutor:
                                 customer_id=customer_id if memory_mode == "private" else None,
                                 user_id=user_id if memory_mode == "private" else None
                             )
+                            logger.info(f"[保存记忆] 准备保存 {var_name}")
                             await MemoryService.create_memory(memory_data)
                             logger.info(f"保存记忆: {var_name} 已保存")
                         except Exception as e:
                             logger.warning(f"保存记忆失败: {e}")
+                else:
+                    logger.debug(f"[保存记忆] 变量 {var_name} 不存在")
 
         except Exception as e:
             logger.warning(f"保存记忆时出错: {e}")

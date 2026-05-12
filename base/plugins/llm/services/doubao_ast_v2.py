@@ -21,7 +21,7 @@ if ast_demo_protogen.exists():
     sys.path.insert(0, str(ast_demo_protogen))
     from products.understanding.ast.ast_service_pb2 import TranslateRequest, TranslateResponse
     from common.events_pb2 import Type
-    logger.info("[AST] 使用官方demo的protobuf定义")
+    # logger.info("[AST] 使用官方demo的protobuf定义")
 else:
     logger.error(f"[AST] 官方protobuf不存在: {ast_demo_protogen}")
     raise ImportError("无法找到官方protobuf定义")
