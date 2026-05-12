@@ -17,11 +17,13 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, END, START
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph.message import add_messages
 
 # 本地导入
 from base.plugins.agent.models.agent import Agent
 from base.plugins.agent.utils.safe_eval import safe_eval
 from base.plugins.agent.services.memory_service import MemoryService
+from base.plugins.agent.services.checkpoint_service import CheckpointService
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,14 @@ class AgentState(TypedDict):
     agent: Optional[Agent]
 
 
+# 定义状态更新函数
+def update_state(state: AgentState, updates: Dict[str, Any]) -> AgentState:
+    """更新状态的辅助函数"""
+    new_state = state.copy()
+    new_state.update(updates)
+    return new_state
+
+
 class LangGraphExecutor:
     """LangGraph 执行器 - 使用真正的 LangGraph 执行智能体结构图"""
 
@@ -50,7 +60,8 @@ class LangGraphExecutor:
         input_data: Dict[str, Any],
         customer_id: Optional[int] = None,
         user_id: Optional[int] = None,
-        sse_yield_func=None
+        sse_yield_func=None,
+        execution_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         执行智能体
@@ -61,6 +72,7 @@ class LangGraphExecutor:
             customer_id: 客户ID（用于私有记忆）
             user_id: 用户ID（用于私有记忆）
             sse_yield_func: SSE推送回调函数
+            execution_id: 执行ID（用于追踪）
             
         Returns:
             执行结果
@@ -88,7 +100,8 @@ class LangGraphExecutor:
                     input_data=input_data,
                     customer_id=customer_id,
                     user_id=user_id,
-                    sse_yield_func=sse_yield_func
+                    sse_yield_func=sse_yield_func,
+                    execution_id=execution_id
                 )
             else:
                 logger.warning("没有配置流程图，使用简化执行方式")
@@ -110,7 +123,8 @@ class LangGraphExecutor:
         input_data: Dict[str, Any],
         customer_id: Optional[int] = None,
         user_id: Optional[int] = None,
-        sse_yield_func=None
+        sse_yield_func=None,
+        execution_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         使用真正的 LangGraph 执行智能体结构图
@@ -122,6 +136,7 @@ class LangGraphExecutor:
             customer_id: 客户ID（用于私有记忆）
             user_id: 用户ID（用于私有记忆）
             sse_yield_func: SSE推送回调函数
+            execution_id: 执行ID（用于追踪）
             
         Returns:
             执行结果
@@ -146,10 +161,14 @@ class LangGraphExecutor:
             logger.info(f"开始节点: {start_node_id}")
 
             def create_node_executor(node):
+                node_id = node.get("id", "")
+                node_type = node.get("type", "")
                 async def node_executor(state: AgentState):
+                    logger.info(f"节点执行器被调用: {node_id} ({node_type})")
                     result = await LangGraphExecutor._execute_node_with_logging(
                         node, state, sse_yield_func=sse_yield_func
                     )
+                    logger.debug(f"节点执行器返回状态: {list(result.keys()) if isinstance(result, dict) else type(result)}")
                     return result
                 return node_executor
 
@@ -171,9 +190,13 @@ class LangGraphExecutor:
                     edge_map[source] = target
 
             if start_node_id in node_map:
+                logger.info(f"添加起始边: START -> {start_node_id}")
                 workflow.add_edge(START, start_node_id)
+            else:
+                logger.error(f"开始节点 {start_node_id} 不在节点映射中")
 
             condition_edges = {}
+            logger.debug(f"边列表: {edges}")
             for edge in edges:
                 source = edge.get("source", "")
                 target = edge.get("target", "")
@@ -183,7 +206,9 @@ class LangGraphExecutor:
                         if source not in condition_edges:
                             condition_edges[source] = []
                         condition_edges[source].append(target)
+                        logger.debug(f"条件边: {source} -> {target}")
                     else:
+                        logger.info(f"添加边: {source} -> {target}")
                         workflow.add_edge(source, target)
 
             for condition_node_id, targets in condition_edges.items():
@@ -218,7 +243,6 @@ class LangGraphExecutor:
             if start_node_id not in node_map:
                 raise ValueError(f"开始节点 {start_node_id} 不在节点映射中")
 
-            graph = workflow.compile()
             logger.info("LangGraph 编译完成")
 
             initial_state: AgentState = {
@@ -239,15 +263,26 @@ class LangGraphExecutor:
 
             logger.info("使用 LangGraph 执行")
             logger.debug(f"初始状态: {json.dumps(initial_state, ensure_ascii=False, default=str)[:500]}...")
-
-            config = {}
+            checkpoint_service = CheckpointService.get_instance()
+            checkpointer = checkpoint_service.get_checkpointer()
+            config = checkpoint_service.build_config(
+                user_id=str(user_id),
+                agent_id=agent.id,
+                agent_name=agent.name,
+                execution_id=execution_id
+            )
+            graph_with_memory = workflow.compile(checkpointer=checkpointer)
+            
+            import uuid
+            thread_id = str(uuid.uuid4())
+            config = {"configurable": {"thread_id": thread_id}}
             logger.debug(f"配置: {json.dumps(config, ensure_ascii=False)}")
 
             logger.info("调用 graph.ainvoke...")
             start_time = time.time()
             
             try:
-                final_state = await asyncio.wait_for(graph.ainvoke(initial_state, config), timeout=120.0)
+                final_state = await asyncio.wait_for(graph_with_memory.ainvoke(initial_state, config), timeout=120.0)
             except asyncio.TimeoutError:
                 logger.error("LangGraph 执行超时（120秒）")
                 raise RuntimeError("LangGraph 执行超时")
@@ -310,6 +345,7 @@ class LangGraphExecutor:
 
         if sse_yield_func:
             try:
+                logger.debug(f"准备发送节点开始事件: {node_id}")
                 await sse_yield_func({
                     'type': 'node_start',
                     'node_id': node_id,
@@ -317,6 +353,7 @@ class LangGraphExecutor:
                     'node_label': node_label,
                     'step': step_count
                 })
+                logger.debug(f"节点开始事件发送成功: {node_id}")
             except Exception as e:
                 logger.warning(f"推送节点开始事件失败: {e}")
 

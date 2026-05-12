@@ -286,7 +286,8 @@ class AgentService:
                     return await LangGraphExecutor.execute_agent(
                         agent=agent,
                         input_data=input_data,
-                        sse_yield_func=wrapped_sse_yield
+                        sse_yield_func=wrapped_sse_yield,
+                        execution_id=execution_id
                     )
                 except Exception as e:
                     print(f"[LangGraph 执行失败] {e}")
