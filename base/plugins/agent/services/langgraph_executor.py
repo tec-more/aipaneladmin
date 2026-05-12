@@ -116,6 +116,77 @@ class LangGraphExecutor:
             }
 
     @staticmethod
+    async def _preload_llm_resources(nodes: List[Dict]) -> Dict[str, Any]:
+        """
+        预加载所有LLM节点所需的资源（模型信息、API密钥等）
+        
+        Args:
+            nodes: 节点列表
+            
+        Returns:
+            预加载的资源字典，key为节点ID
+        """
+        from base.plugins.llm.models.model import LLMModel
+        from base.plugins.llm.models.provider import LLMProvider
+        from base.plugins.llm.models.api_key import LLMApiKey
+        
+        llm_resources = {}
+        
+        for node in nodes:
+            if node.get("type") != "llm":
+                continue
+                
+            node_id = node.get("id", "")
+            node_data = node.get("data", {})
+            model_id = node_data.get("model_id") or node_data.get("modelId")
+            
+            if not model_id:
+                continue
+            
+            logger.info(f"[预加载] 节点 {node_id} 的模型资源, model_id={model_id}")
+            
+            try:
+                model = await LLMModel.get_or_none(id=model_id, status="active")
+                if not model:
+                    logger.warning(f"[预加载] 模型不存在: model_id={model_id}")
+                    continue
+                
+                provider = await LLMProvider.get_or_none(id=model.provider_id)
+                if not provider:
+                    logger.warning(f"[预加载] 提供者不存在: provider_id={model.provider_id}")
+                    continue
+                
+                api_key = await LLMApiKey.get_or_none(model_id=model.id)
+                if not api_key:
+                    logger.warning(f"[预加载] API密钥不存在: model_id={model.id}")
+                    continue
+                
+                endpoint_url = model.endpoint_url or provider.api_endpoint
+                if endpoint_url:
+                    endpoint_url = endpoint_url.rstrip('/')
+                    if '/responses' in endpoint_url:
+                        endpoint_url = endpoint_url.split('/responses')[0]
+                    if endpoint_url.endswith('/chat/completions'):
+                        endpoint_url = endpoint_url[:-len('/chat/completions')]
+                
+                llm_resources[node_id] = {
+                    "model": model,
+                    "provider": provider,
+                    "api_key": api_key,
+                    "endpoint_url": endpoint_url,
+                    "model_id_for_call": model.model_id if model.model_id else model.model_name,
+                    "model_name": model.model_name
+                }
+                
+                logger.info(f"[预加载] 节点 {node_id} 资源加载成功: {model.model_name}")
+                
+            except Exception as e:
+                logger.exception(f"[预加载] 节点 {node_id} 资源加载失败: {e}")
+        
+        logger.info(f"[预加载] 完成，共加载 {len(llm_resources)} 个LLM节点资源")
+        return llm_resources
+
+    @staticmethod
     async def _execute_with_langgraph(
         agent: Agent,
         flow_data: Dict[str, Any],
@@ -150,6 +221,11 @@ class LangGraphExecutor:
             if not nodes:
                 logger.warning("结构图没有节点，回退到简单执行")
                 return await LangGraphExecutor._execute_simple(agent, input_data)
+
+            # 预加载所有LLM节点所需的资源
+            logger.info("[预加载] 开始预加载LLM节点资源...")
+            llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
+            logger.info(f"[预加载] 预加载完成，资源数: {len(llm_resources)}")
 
             workflow = StateGraph(Dict[str, Any])
             node_map = {node.get("id"): node for node in nodes}
@@ -252,7 +328,8 @@ class LangGraphExecutor:
                     "agent_id": agent.id,
                     "agent_name": agent.name,
                     "recent_memories": memory_list,
-                    "important_memories": [{"content": m.content, "importance": m.importance} for m in important_memories]
+                    "important_memories": [{"content": m.content, "importance": m.importance} for m in important_memories],
+                    "_llm_resources": llm_resources  # 预加载的LLM资源
                 },
                 "node_results": {},
                 "execution_trace": [],
@@ -854,6 +931,50 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
+    async def _get_llm_resource(node_id: str, model_id: Optional[int], model_name: str, state: Dict[str, Any]) -> tuple:
+        """
+        获取LLM资源（优先使用预加载的资源）
+        
+        Args:
+            node_id: 节点ID
+            model_id: 模型ID
+            model_name: 模型名称
+            state: 当前状态
+            
+        Returns:
+            (service, model_id_for_call, error)
+        """
+        from base.plugins.llm.services.chat_service import ChatService
+        
+        # 优先使用预加载的资源
+        llm_resources = state.get("variables", {}).get("_llm_resources", {})
+        resource = llm_resources.get(node_id)
+        
+        if resource:
+            logger.info(f"[LLM资源] 使用预加载资源: node_id={node_id}, model={resource['model_name']}")
+            try:
+                service = await ChatService.get_provider_service(
+                    provider_name_en=resource["provider"].name_en,
+                    api_key=resource["api_key"].api_key,
+                    endpoint_url=resource["endpoint_url"],
+                    api_secret=resource["api_key"].api_secret
+                )
+                if service:
+                    return service, resource["model_id_for_call"], None
+            except Exception as e:
+                logger.warning(f"[LLM资源] 预加载资源创建服务失败: {e}")
+        
+        # 回退到数据库查询
+        logger.info(f"[LLM资源] 预加载资源不可用，回退到数据库查询: node_id={node_id}")
+        target_model, actual_model = await LangGraphExecutor._get_target_model(model_id, model_name)
+        
+        if not target_model:
+            return None, None, f"未找到可用的LLM模型。模型ID: {model_id}, 模型名称: {model_name}"
+        
+        service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
+        return service, actual_model_for_call, error
+
+    @staticmethod
     async def _execute_llm_node(current_node: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行LLM节点（非流式）"""
         node_id = current_node.get("id", "")
@@ -866,31 +987,27 @@ class LangGraphExecutor:
 
         prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt)
         prompt, messages, input_text = await LangGraphExecutor._build_messages(prompt, node_data, state)
-        target_model, actual_model = await LangGraphExecutor._get_target_model(model_id, model_name)
+        
+        # 使用新的资源获取方法
+        service, actual_model_for_call, error = await LangGraphExecutor._get_llm_resource(node_id, model_id, model_name, state)
+        actual_model = actual_model_for_call or model_name
 
         llm_response = ""
         try:
-            if not target_model:
-                error_msg = f"未找到可用的LLM模型。模型ID: {model_id}, 模型名称: {model_name}"
+            if not service:
+                error_msg = f"无法创建聊天服务。错误: {error}"
                 logger.error(error_msg)
                 state["error"] = error_msg
                 llm_response = f"错误：{error_msg}"
             else:
-                service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
-                if not service:
-                    error_msg = f"无法创建聊天服务。错误: {error}"
-                    logger.error(error_msg)
-                    state["error"] = error_msg
-                    llm_response = f"错误：{error_msg}"
-                else:
-                    chat_kwargs = await LangGraphExecutor._build_chat_kwargs(
-                        node_data,
-                        actual_model_for_call,
-                        messages,
-                        functions
-                    )
+                chat_kwargs = await LangGraphExecutor._build_chat_kwargs(
+                    node_data,
+                    actual_model_for_call,
+                    messages,
+                    functions
+                )
 
-                    llm_response = await LangGraphExecutor._call_llm_with_tool_handler(service, chat_kwargs, messages)
+                llm_response = await LangGraphExecutor._call_llm_with_tool_handler(service, chat_kwargs, messages)
         except Exception as e:
             logger.exception(f"调用大模型失败: {e}")
             llm_response = f"错误：调用大模型失败: {str(e)}"
@@ -969,68 +1086,59 @@ class LangGraphExecutor:
 
         prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt)
         prompt, messages, input_text = await LangGraphExecutor._build_messages(prompt, node_data, state)
-        target_model, actual_model = await LangGraphExecutor._get_target_model(model_id, model_name)
+        
+        # 使用新的资源获取方法
+        service, actual_model_for_call, error = await LangGraphExecutor._get_llm_resource(node_id, model_id, model_name, state)
+        actual_model = actual_model_for_call or model_name
 
         llm_response = ""
         try:
             logger.info(f"[LLM流式] 开始执行，node_id={node_id}, node_label={node_label}")
             
-            if not target_model:
-                error_msg = f"未找到可用的LLM模型。模型ID: {model_id}, 模型名称: {model_name}"
+            if not service:
+                error_msg = f"无法创建聊天服务。错误: {error}"
                 logger.error(error_msg)
                 state["error"] = error_msg
                 llm_response = f"错误：{error_msg}"
             else:
-                logger.info(f"[LLM流式] 找到目标模型: {target_model.model_name}")
+                logger.info(f"[LLM流式] 聊天服务创建成功，使用模型: {actual_model_for_call}")
                 
-                service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
-                logger.info(f"[LLM流式] 使用模型: {actual_model_for_call}")
+                chat_kwargs = await LangGraphExecutor._build_chat_kwargs(
+                    node_data,
+                    actual_model_for_call,
+                    messages
+                )
+                logger.info(f"[LLM流式] 构建聊天参数完成")
                 
-                if not service:
-                    error_msg = f"无法创建聊天服务。错误: {error}"
-                    logger.error(error_msg)
-                    state["error"] = error_msg
-                    llm_response = f"错误：{error_msg}"
-                else:
-                    logger.info(f"[LLM流式] 聊天服务创建成功，服务类型: {type(service).__name__}")
-                    
-                    chat_kwargs = await LangGraphExecutor._build_chat_kwargs(
-                        node_data,
-                        actual_model_for_call,
-                        messages
-                    )
-                    logger.info(f"[LLM流式] 构建聊天参数完成")
-                    logger.debug(f"[LLM流式] 聊天参数: {chat_kwargs}")
-                    
-                    full_response = ""
-                    chunk_count = 0
-                    logger.info(f"[LLM流式] 开始调用 chat_stream...")
-                    
-                    try:
-                        async for chunk in service.chat_stream(**chat_kwargs):
-                            chunk_count += 1
-                            logger.debug(f"[LLM流式] 收到第 {chunk_count} 个响应块")
+                full_response = ""
+                chunk_count = 0
+                logger.info(f"[LLM流式] 开始调用 chat_stream...")
+                
+                try:
+                    async for chunk in service.chat_stream(**chat_kwargs):
+                        chunk_count += 1
+                        logger.debug(f"[LLM流式] 收到第 {chunk_count} 个响应块")
+                        
+                        if isinstance(chunk, dict) and chunk.get("choices"):
+                            delta = chunk["choices"][0].get("delta", {})
+                            content = delta.get("content", "")
+                            full_response += content
+                            logger.debug(f"[LLM流式] 提取内容: {content[:50]}...")
                             
-                            if isinstance(chunk, dict) and chunk.get("choices"):
-                                delta = chunk["choices"][0].get("delta", {})
-                                content = delta.get("content", "")
-                                full_response += content
-                                logger.debug(f"[LLM流式] 提取内容: {content[:50]}...")
-                                
-                                if content and sse_yield_func:
-                                    logger.debug(f"[LLM流式] 推送SSE事件，内容长度: {len(content)}")
-                                    await sse_yield_func({
-                                        'type': 'stream',
-                                        'content': content,
-                                        'node_id': node_id
-                                    })
-                                    logger.debug(f"[LLM流式] SSE事件推送成功")
-                    except asyncio.TimeoutError:
-                        logger.error(f"[LLM流式] chat_stream 调用超时")
-                        raise
-                    
-                    logger.info(f"[LLM流式] chat_stream 调用完成，共收到 {chunk_count} 个块，响应长度: {len(full_response)}")
-                    llm_response = full_response
+                            if content and sse_yield_func:
+                                logger.debug(f"[LLM流式] 推送SSE事件，内容长度: {len(content)}")
+                                await sse_yield_func({
+                                    'type': 'stream',
+                                    'content': content,
+                                    'node_id': node_id
+                                })
+                                logger.debug(f"[LLM流式] SSE事件推送成功")
+                except asyncio.TimeoutError:
+                    logger.error(f"[LLM流式] chat_stream 调用超时")
+                    raise
+                
+                logger.info(f"[LLM流式] chat_stream 调用完成，共收到 {chunk_count} 个块，响应长度: {len(full_response)}")
+                llm_response = full_response
         except Exception as e:
             logger.exception(f"[LLM流式] 调用大模型失败: {e}")
 
