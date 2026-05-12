@@ -125,40 +125,46 @@ class LangGraphExecutor:
             
         Returns:
             预加载的资源字典，key为节点ID
+            
+        Raises:
+            ValueError: 如果资源加载失败
         """
         from base.plugins.llm.models.model import LLMModel
         from base.plugins.llm.models.provider import LLMProvider
         from base.plugins.llm.models.api_key import LLMApiKey
         
         llm_resources = {}
+        errors = []
         
         for node in nodes:
             if node.get("type") != "llm":
                 continue
                 
             node_id = node.get("id", "")
+            node_label = node.get("data", {}).get("label", node_id)
             node_data = node.get("data", {})
             model_id = node_data.get("model_id") or node_data.get("modelId")
             
             if not model_id:
+                errors.append(f"节点 [{node_label}] 未配置模型ID")
                 continue
             
-            logger.info(f"[预加载] 节点 {node_id} 的模型资源, model_id={model_id}")
+            logger.info(f"[预加载] 节点 [{node_label}] 的模型资源, model_id={model_id}")
             
             try:
                 model = await LLMModel.get_or_none(id=model_id, status="active")
                 if not model:
-                    logger.warning(f"[预加载] 模型不存在: model_id={model_id}")
+                    errors.append(f"节点 [{node_label}] 模型不存在或未激活: model_id={model_id}")
                     continue
                 
                 provider = await LLMProvider.get_or_none(id=model.provider_id)
                 if not provider:
-                    logger.warning(f"[预加载] 提供者不存在: provider_id={model.provider_id}")
+                    errors.append(f"节点 [{node_label}] 提供者不存在: provider_id={model.provider_id}")
                     continue
                 
                 api_key = await LLMApiKey.get_or_none(model_id=model.id)
                 if not api_key:
-                    logger.warning(f"[预加载] API密钥不存在: model_id={model.id}")
+                    errors.append(f"节点 [{node_label}] API密钥不存在: model_id={model.id}")
                     continue
                 
                 endpoint_url = model.endpoint_url or provider.api_endpoint
@@ -175,16 +181,74 @@ class LangGraphExecutor:
                     "api_key": api_key,
                     "endpoint_url": endpoint_url,
                     "model_id_for_call": model.model_id if model.model_id else model.model_name,
-                    "model_name": model.model_name
+                    "model_name": model.model_name,
+                    "node_label": node_label
                 }
                 
-                logger.info(f"[预加载] 节点 {node_id} 资源加载成功: {model.model_name}")
+                logger.info(f"[预加载] 节点 [{node_label}] 资源加载成功: {model.model_name}")
                 
             except Exception as e:
-                logger.exception(f"[预加载] 节点 {node_id} 资源加载失败: {e}")
+                errors.append(f"节点 [{node_label}] 资源加载异常: {str(e)}")
+                logger.exception(f"[预加载] 节点 [{node_label}] 资源加载失败: {e}")
+        
+        # 如果有错误，抛出异常
+        if errors:
+            error_msg = "LLM资源预加载失败:\n" + "\n".join(f"  - {e}" for e in errors)
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         
         logger.info(f"[预加载] 完成，共加载 {len(llm_resources)} 个LLM节点资源")
         return llm_resources
+
+    @staticmethod
+    async def _preload_skill_resources(nodes: List[Dict]) -> Dict[int, Any]:
+        """
+        预加载所有技能节点的技能信息
+        
+        Args:
+            nodes: 节点列表
+            
+        Returns:
+            预加载的技能字典，key为技能ID
+        """
+        from base.plugins.agent.models.skill import Skill
+        from base.plugins.agent.services.skill_service import SkillService
+        
+        skill_resources = {}
+        all_skill_ids = set()
+        
+        # 收集所有需要加载的技能ID
+        for node in nodes:
+            node_data = node.get("data", {})
+            skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
+            all_skill_ids.update(skill_ids)
+        
+        if not all_skill_ids:
+            logger.info("[预加载] 没有需要加载的技能")
+            return skill_resources
+        
+        logger.info(f"[预加载] 开始加载 {len(all_skill_ids)} 个技能资源...")
+        
+        for skill_id in all_skill_ids:
+            try:
+                skill = await Skill.get_or_none(id=skill_id, status="active")
+                if skill:
+                    bound_tools = SkillService.parse_bound_tools(skill.implementation)
+                    skill_resources[skill_id] = {
+                        "id": skill.id,
+                        "name": skill.name,
+                        "description": skill.description,
+                        "implementation": skill.implementation,
+                        "bound_tools": bound_tools
+                    }
+                    logger.info(f"[预加载] 技能加载成功: {skill.name} (ID: {skill.id})")
+                else:
+                    logger.warning(f"[预加载] 技能不存在或未激活: skill_id={skill_id}")
+            except Exception as e:
+                logger.exception(f"[预加载] 技能加载失败: skill_id={skill_id}, error={e}")
+        
+        logger.info(f"[预加载] 完成，共加载 {len(skill_resources)} 个技能资源")
+        return skill_resources
 
     @staticmethod
     async def _execute_with_langgraph(
@@ -225,7 +289,12 @@ class LangGraphExecutor:
             # 预加载所有LLM节点所需的资源
             logger.info("[预加载] 开始预加载LLM节点资源...")
             llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
-            logger.info(f"[预加载] 预加载完成，资源数: {len(llm_resources)}")
+            logger.info(f"[预加载] LLM资源预加载完成，资源数: {len(llm_resources)}")
+
+            # 预加载所有技能资源
+            logger.info("[预加载] 开始预加载技能资源...")
+            skill_resources = await LangGraphExecutor._preload_skill_resources(nodes)
+            logger.info(f"[预加载] 技能资源预加载完成，资源数: {len(skill_resources)}")
 
             workflow = StateGraph(Dict[str, Any])
             node_map = {node.get("id"): node for node in nodes}
@@ -329,7 +398,8 @@ class LangGraphExecutor:
                     "agent_name": agent.name,
                     "recent_memories": memory_list,
                     "important_memories": [{"content": m.content, "importance": m.importance} for m in important_memories],
-                    "_llm_resources": llm_resources  # 预加载的LLM资源
+                    "_llm_resources": llm_resources,  # 预加载的LLM资源
+                    "_skill_resources": skill_resources  # 预加载的技能资源
                 },
                 "node_results": {},
                 "execution_trace": [],
@@ -666,34 +736,56 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _get_skills_and_tools(skill_ids: List[int], prompt: str) -> tuple:
-        """获取技能数据和绑定的工具"""
+    async def _get_skills_and_tools(skill_ids: List[int], prompt: str, state: Dict[str, Any] = None) -> tuple:
+        """获取技能数据和绑定的工具（优先使用预加载资源）"""
         skills_data = []
         bound_tools_set = set()
         
         if skill_ids:
-            try:
-                from base.plugins.agent.models.skill import Skill
-                from base.plugins.agent.services.skill_service import SkillService
+            # 优先使用预加载的技能资源
+            skill_resources = {}
+            if state:
+                skill_resources = state.get("variables", {}).get("_skill_resources", {})
+            
+            for skill_id in skill_ids:
+                skill_data = skill_resources.get(skill_id)
                 
-                for skill_id in skill_ids:
-                    skill = await Skill.get_or_none(id=skill_id, status="active")
-                    if skill:
-                        logger.debug(f"找到技能: {skill.name} (ID: {skill.id})")
-                        skills_data.append({
-                            "id": skill.id,
-                            "name": skill.name,
-                            "description": skill.description,
-                            "implementation": skill.implementation
-                        })
-                        bound_tools = SkillService.parse_bound_tools(skill.implementation)
-                        if bound_tools:
-                            for tool in bound_tools:
-                                bound_tools_set.add(tool)
-                    else:
-                        logger.warning(f"技能不存在或未激活: skill_id={skill_id}")
-            except Exception as e:
-                logger.exception(f"获取技能信息失败: {e}")
+                if skill_data:
+                    # 使用预加载资源
+                    logger.info(f"[技能资源] 使用预加载资源: skill_id={skill_id}, name={skill_data['name']}")
+                    skills_data.append({
+                        "id": skill_data["id"],
+                        "name": skill_data["name"],
+                        "description": skill_data["description"],
+                        "implementation": skill_data["implementation"]
+                    })
+                    if skill_data.get("bound_tools"):
+                        for tool in skill_data["bound_tools"]:
+                            bound_tools_set.add(tool)
+                else:
+                    # 回退到数据库查询
+                    logger.info(f"[技能资源] 预加载资源不可用，回退到数据库查询: skill_id={skill_id}")
+                    try:
+                        from base.plugins.agent.models.skill import Skill
+                        from base.plugins.agent.services.skill_service import SkillService
+                        
+                        skill = await Skill.get_or_none(id=skill_id, status="active")
+                        if skill:
+                            logger.debug(f"找到技能: {skill.name} (ID: {skill.id})")
+                            skills_data.append({
+                                "id": skill.id,
+                                "name": skill.name,
+                                "description": skill.description,
+                                "implementation": skill.implementation
+                            })
+                            bound_tools = SkillService.parse_bound_tools(skill.implementation)
+                            if bound_tools:
+                                for tool in bound_tools:
+                                    bound_tools_set.add(tool)
+                        else:
+                            logger.warning(f"技能不存在或未激活: skill_id={skill_id}")
+                    except Exception as e:
+                        logger.exception(f"获取技能信息失败: {e}")
 
         if skills_data:
             skill_context = "\n【可用技能】:\n"
@@ -799,111 +891,6 @@ class LangGraphExecutor:
         return prompt, messages, input_text
 
     @staticmethod
-    async def _get_target_model(model_id: Optional[int], model_name: str) -> tuple:
-        """获取目标LLM模型"""
-        target_model = None
-        actual_model = model_name
-
-        logger.info(f"[获取目标模型] 开始查询，model_id={model_id}, model_name={model_name}")
-
-        try:
-            from base.plugins.llm.models.model import LLMModel
-            
-            logger.info(f"[获取目标模型] 直接执行查询，不使用wait_for")
-            if model_id:
-                logger.info(f"[获取目标模型] 按ID查询: model_id={model_id}")
-                try:
-                    logger.debug(f"[获取目标模型] 执行数据库查询...")
-                    result = await LLMModel.get_or_none(id=model_id, status="active")
-                    logger.debug(f"[获取目标模型] 数据库查询完成，result={result is not None}")
-                    if result:
-                        logger.info(f"[获取目标模型] 按ID找到模型: {result.model_name} (ID: {result.id})")
-                    else:
-                        logger.warning(f"[获取目标模型] 按ID未找到模型: model_id={model_id}")
-                    target_model = result
-                except Exception as e:
-                    logger.exception(f"[获取目标模型] 按ID查询异常: {e}")
-                    raise
-            elif model_name != "gpt-3.5-turbo":
-                logger.info(f"[获取目标模型] 按名称查询: model_name={model_name}")
-                result = await LLMModel.get_or_none(model_name=model_name, status="active")
-                if result:
-                    logger.info(f"[获取目标模型] 按名称找到模型: {result.model_name} (ID: {result.id})")
-                else:
-                    logger.warning(f"[获取目标模型] 按名称未找到模型: model_name={model_name}")
-                target_model = result
-            else:
-                logger.info(f"[获取目标模型] 查询任意活跃模型")
-                result = await LLMModel.filter(status="active").first()
-                if result:
-                    logger.info(f"[获取目标模型] 找到默认活跃模型: {result.model_name} (ID: {result.id})")
-                else:
-                    logger.error(f"[获取目标模型] 未找到任何活跃模型")
-                target_model = result
-            
-            logger.info(f"[获取目标模型] 查询完成，target_model={target_model is not None}")
-            
-            if target_model:
-                actual_model = target_model.model_name
-                logger.info(f"[获取目标模型] 实际使用模型: {actual_model}")
-                
-        except Exception as e:
-            logger.exception(f"[获取目标模型] 获取模型信息异常: {e}")
-
-        logger.info(f"[获取目标模型] 返回结果，target_model={target_model is not None}, actual_model={actual_model}")
-        return target_model, actual_model
-
-    @staticmethod
-    async def _prepare_chat_service(target_model, actual_model):
-        """准备聊天服务"""
-        try:
-            from base.plugins.llm.services.chat_service import ChatService
-            from base.plugins.llm.models.provider import LLMProvider
-            from base.plugins.llm.models.api_key import LLMApiKey
-
-            logger.info(f"[准备聊天服务] 开始获取提供者和API密钥...")
-            logger.debug(f"[准备聊天服务] 查询提供者: provider_id={target_model.provider_id}")
-            
-            provider = await LLMProvider.get_or_none(id=target_model.provider_id)
-            if not provider:
-                logger.debug(f"[准备聊天服务] 未找到提供者")
-                return None, None, "未找到提供者"
-            
-            logger.debug(f"[准备聊天服务] 找到提供者: {provider.name_en}")
-            logger.debug(f"[准备聊天服务] 查询API密钥: model_id={target_model.id}")
-            
-            api_key = await LLMApiKey.get_or_none(model_id=target_model.id)
-            logger.debug(f"[准备聊天服务] API密钥查询结果: {api_key is not None}")
-            
-            logger.info(f"[准备聊天服务] 获取完成: provider={provider is not None}, api_key={api_key is not None}")
-            
-            if not api_key:
-                return None, None, "未找到API密钥"
-            
-            endpoint_url = target_model.endpoint_url or provider.api_endpoint
-            if endpoint_url:
-                endpoint_url = endpoint_url.rstrip('/')
-                if '/responses' in endpoint_url:
-                    endpoint_url = endpoint_url.split('/responses')[0]
-                if endpoint_url.endswith('/chat/completions'):
-                    endpoint_url = endpoint_url[:-len('/chat/completions')]
-
-            logger.info(f"[准备聊天服务] 创建ChatService, provider={provider.name_en}, endpoint={endpoint_url}")
-            service = await ChatService.get_provider_service(
-                provider_name_en=provider.name_en,
-                api_key=api_key.api_key,
-                endpoint_url=endpoint_url,
-                api_secret=api_key.api_secret
-            )
-            logger.info(f"[准备聊天服务] ChatService创建成功: {service is not None}")
-
-            actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
-            return service, actual_model_for_call, None
-        except Exception as e:
-            logger.exception(f"准备聊天服务失败: {e}")
-            return None, None, str(e)
-
-    @staticmethod
     async def _parse_and_set_response(llm_response: str, node_data: Dict, state: Dict[str, Any], actual_model: str, prompt: str) -> Dict[str, Any]:
         """解析响应并设置变量"""
         parsed_response = None
@@ -931,14 +918,12 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _get_llm_resource(node_id: str, model_id: Optional[int], model_name: str, state: Dict[str, Any]) -> tuple:
+    async def _get_llm_resource(node_id: str, state: Dict[str, Any]) -> tuple:
         """
-        获取LLM资源（优先使用预加载的资源）
+        获取LLM资源（使用预加载的资源）
         
         Args:
             node_id: 节点ID
-            model_id: 模型ID
-            model_name: 模型名称
             state: 当前状态
             
         Returns:
@@ -946,33 +931,28 @@ class LangGraphExecutor:
         """
         from base.plugins.llm.services.chat_service import ChatService
         
-        # 优先使用预加载的资源
         llm_resources = state.get("variables", {}).get("_llm_resources", {})
         resource = llm_resources.get(node_id)
         
-        if resource:
-            logger.info(f"[LLM资源] 使用预加载资源: node_id={node_id}, model={resource['model_name']}")
-            try:
-                service = await ChatService.get_provider_service(
-                    provider_name_en=resource["provider"].name_en,
-                    api_key=resource["api_key"].api_key,
-                    endpoint_url=resource["endpoint_url"],
-                    api_secret=resource["api_key"].api_secret
-                )
-                if service:
-                    return service, resource["model_id_for_call"], None
-            except Exception as e:
-                logger.warning(f"[LLM资源] 预加载资源创建服务失败: {e}")
+        if not resource:
+            return None, None, f"节点资源未预加载: node_id={node_id}"
         
-        # 回退到数据库查询
-        logger.info(f"[LLM资源] 预加载资源不可用，回退到数据库查询: node_id={node_id}")
-        target_model, actual_model = await LangGraphExecutor._get_target_model(model_id, model_name)
+        node_label = resource.get("node_label", node_id)
+        logger.info(f"[LLM资源] 使用预加载资源: 节点 [{node_label}], model={resource['model_name']}")
         
-        if not target_model:
-            return None, None, f"未找到可用的LLM模型。模型ID: {model_id}, 模型名称: {model_name}"
-        
-        service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
-        return service, actual_model_for_call, error
+        try:
+            service = await ChatService.get_provider_service(
+                provider_name_en=resource["provider"].name_en,
+                api_key=resource["api_key"].api_key,
+                endpoint_url=resource["endpoint_url"],
+                api_secret=resource["api_key"].api_secret
+            )
+            if service:
+                return service, resource["model_id_for_call"], None
+            return None, None, f"节点 [{node_label}] 创建聊天服务失败"
+        except Exception as e:
+            logger.exception(f"[LLM资源] 创建服务失败: {e}")
+            return None, None, f"节点 [{node_label}] 创建服务异常: {str(e)}"
 
     @staticmethod
     async def _execute_llm_node(current_node: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -985,11 +965,11 @@ class LangGraphExecutor:
         node_label = node_data.get("label", "")
         skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
 
-        prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt)
+        prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt, state)
         prompt, messages, input_text = await LangGraphExecutor._build_messages(prompt, node_data, state)
         
-        # 使用新的资源获取方法
-        service, actual_model_for_call, error = await LangGraphExecutor._get_llm_resource(node_id, model_id, model_name, state)
+        # 使用预加载的资源
+        service, actual_model_for_call, error = await LangGraphExecutor._get_llm_resource(node_id, state)
         actual_model = actual_model_for_call or model_name
 
         llm_response = ""
@@ -1084,11 +1064,11 @@ class LangGraphExecutor:
         node_label = node_data.get("label", "")
         skill_ids = node_data.get("skill_ids", []) or node_data.get("skillIds", [])
 
-        prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt)
+        prompt, tools, functions = await LangGraphExecutor._get_skills_and_tools(skill_ids, prompt, state)
         prompt, messages, input_text = await LangGraphExecutor._build_messages(prompt, node_data, state)
         
-        # 使用新的资源获取方法
-        service, actual_model_for_call, error = await LangGraphExecutor._get_llm_resource(node_id, model_id, model_name, state)
+        # 使用预加载的资源
+        service, actual_model_for_call, error = await LangGraphExecutor._get_llm_resource(node_id, state)
         actual_model = actual_model_for_call or model_name
 
         llm_response = ""
