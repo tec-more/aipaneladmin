@@ -1131,22 +1131,22 @@ class LangGraphExecutor:
                 try:
                     async for chunk in service.chat_stream(**chat_kwargs):
                         chunk_count += 1
-                        logger.debug(f"[LLM流式] 收到第 {chunk_count} 个响应块")
+                        logger.info(f"[LLM流式] 收到第 {chunk_count} 个响应块")
                         
                         if isinstance(chunk, dict) and chunk.get("choices"):
                             delta = chunk["choices"][0].get("delta", {})
                             content = delta.get("content", "")
                             full_response += content
-                            logger.debug(f"[LLM流式] 提取内容: {content[:50]}...")
+                            logger.info(f"[LLM流式] 提取内容: {content[:50]}...")
                             
                             if content and sse_yield_func:
-                                logger.debug(f"[LLM流式] 推送SSE事件，内容长度: {len(content)}")
+                                logger.info(f"[LLM流式] 推送SSE事件，内容长度: {len(content)}, 内容: {content}")
                                 await sse_yield_func({
                                     'type': 'stream',
                                     'content': content,
                                     'node_id': node_id
                                 })
-                                logger.debug(f"[LLM流式] SSE事件推送成功")
+                                logger.info(f"[LLM流式] SSE事件推送成功")
                 except asyncio.TimeoutError:
                     logger.error(f"[LLM流式] chat_stream 调用超时")
                     raise
