@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any
 
 from base.plugins.agent.services.checkpoint_service import CheckpointService
-from base.common.auth import get_current_user
+from base.common.security import get_current_user_id
 
 router = APIRouter(prefix="/checkpoints", tags=["检查点管理"])
 
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/checkpoints", tags=["检查点管理"])
 @router.get("/user/{user_id}", response_model=List[Dict[str, Any]])
 async def get_user_checkpoints(
     user_id: str,
-    current_user=Depends(get_current_user)
+    current_user_id=Depends(get_current_user_id)
 ):
     """获取用户的所有检查点"""
     service = CheckpointService.get_instance()
@@ -22,7 +22,7 @@ async def get_user_checkpoints(
 async def get_session_checkpoints(
     user_id: str,
     session_id: str,
-    current_user=Depends(get_current_user)
+    current_user_id=Depends(get_current_user_id)
 ):
     """获取用户特定会话的检查点"""
     service = CheckpointService.get_instance()
@@ -33,7 +33,7 @@ async def get_session_checkpoints(
 async def get_checkpoint(
     user_id: str,
     checkpoint_id: str,
-    current_user=Depends(get_current_user)
+    current_user_id=Depends(get_current_user_id)
 ):
     """获取单个检查点详情"""
     service = CheckpointService.get_instance()
@@ -49,7 +49,7 @@ async def get_checkpoint(
 async def delete_checkpoint(
     user_id: str,
     checkpoint_id: str,
-    current_user=Depends(get_current_user)
+    current_user_id=Depends(get_current_user_id)
 ):
     """删除检查点"""
     service = CheckpointService.get_instance()
@@ -65,7 +65,7 @@ async def delete_checkpoint(
 async def delete_session_checkpoints(
     user_id: str,
     session_id: str,
-    current_user=Depends(get_current_user)
+    current_user_id=Depends(get_current_user_id)
 ):
     """删除会话的所有检查点"""
     service = CheckpointService.get_instance()
@@ -80,7 +80,7 @@ async def delete_session_checkpoints(
 @router.delete("/user/{user_id}", response_model=Dict[str, bool])
 async def delete_user_checkpoints(
     user_id: str,
-    current_user=Depends(get_current_user)
+    current_user_id=Depends(get_current_user_id)
 ):
     """删除用户的所有检查点"""
     service = CheckpointService.get_instance()

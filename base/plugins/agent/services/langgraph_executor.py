@@ -8,7 +8,7 @@ import threading
 import time
 from datetime import datetime
 from operator import add
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import Dict, Any, List, Optional
 
 from tortoise.exceptions import DoesNotExist
 
@@ -28,25 +28,24 @@ from base.plugins.agent.services.checkpoint_service import CheckpointService
 logger = logging.getLogger(__name__)
 
 
-class AgentState(TypedDict):
-    """智能体状态类型定义"""
-    input: Dict[str, Any]
-    output: Dict[str, Any]
-    messages: List[Dict[str, Any]]
-    variables: Dict[str, Any]
-    node_results: Dict[str, Any]
-    execution_trace: List[Dict[str, Any]]
-    current_node: Optional[str]
-    error: Optional[str]
-    agent: Optional[Agent]
-
-
-# 定义状态更新函数
-def update_state(state: AgentState, updates: Dict[str, Any]) -> AgentState:
-    """更新状态的辅助函数"""
-    new_state = state.copy()
-    new_state.update(updates)
-    return new_state
+def create_initial_state(input_data: Dict[str, Any], agent) -> Dict[str, Any]:
+    """创建初始状态"""
+    return {
+        "input": input_data,
+        "output": {},
+        "messages": [],
+        "variables": {
+            "agent_id": agent.id,
+            "agent_name": agent.name,
+            "recent_memories": [],
+            "important_memories": []
+        },
+        "node_results": {},
+        "execution_trace": [],
+        "current_node": None,
+        "error": None,
+        "agent": agent
+    }
 
 
 class LangGraphExecutor:
@@ -152,7 +151,7 @@ class LangGraphExecutor:
                 logger.warning("结构图没有节点，回退到简单执行")
                 return await LangGraphExecutor._execute_simple(agent, input_data)
 
-            workflow = StateGraph(AgentState)
+            workflow = StateGraph(Dict[str, Any])
             node_map = {node.get("id"): node for node in nodes}
             start_node = LangGraphExecutor._find_start_node(nodes)
             start_node_id = start_node.get("id", "start") if start_node else "start"
@@ -163,7 +162,7 @@ class LangGraphExecutor:
             def create_node_executor(node):
                 node_id = node.get("id", "")
                 node_type = node.get("type", "")
-                async def node_executor(state: AgentState):
+                async def node_executor(state: Dict[str, Any]):
                     logger.info(f"节点执行器被调用: {node_id} ({node_type})")
                     result = await LangGraphExecutor._execute_node_with_logging(
                         node, state, sse_yield_func=sse_yield_func
@@ -213,7 +212,7 @@ class LangGraphExecutor:
 
             for condition_node_id, targets in condition_edges.items():
                 def create_condition_router(node_id, target_list):
-                    async def condition_router(state: AgentState):
+                    async def condition_router(state: Dict[str, Any]):
                         variables = state.get("variables", {})
                         condition_result = variables.get("condition_result", {}).get("result", False)
                         logger.debug(f"条件路由节点 {node_id} 结果: {condition_result}")
@@ -245,7 +244,7 @@ class LangGraphExecutor:
 
             logger.info("LangGraph 编译完成")
 
-            initial_state: AgentState = {
+            initial_state: Dict[str, Any] = {
                 "input": input_data,
                 "output": {},
                 "messages": [],
@@ -487,7 +486,7 @@ class LangGraphExecutor:
         return None
 
     @staticmethod
-    async def _execute_start_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_start_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行开始节点"""
         state["variables"]["start_time"] = datetime.now().isoformat()
         return state
@@ -552,19 +551,19 @@ class LangGraphExecutor:
             logger.warning(f"保存记忆时出错: {e}")
 
     @staticmethod
-    async def _execute_end_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_end_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行结束节点"""
         state["output"]["end_time"] = datetime.now().isoformat()
         return state
 
     @staticmethod
-    async def _execute_input_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_input_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行输入节点"""
         state["variables"]["input"] = state["input"]
         return state
 
     @staticmethod
-    async def _execute_output_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_output_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行输出节点"""
         output_var = node_data.get("output_var", "result")
         output_content = node_data.get("output_content", "")
@@ -581,7 +580,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_agent_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_agent_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行智能体节点"""
         variables = state.get("variables", {})
         state["variables"]["agent_info"] = {
@@ -689,7 +688,7 @@ class LangGraphExecutor:
         return chat_kwargs
 
     @staticmethod
-    async def _build_messages(prompt: str, node_data: Dict, state: AgentState) -> tuple:
+    async def _build_messages(prompt: str, node_data: Dict, state: Dict[str, Any]) -> tuple:
         """构建消息列表（包含变量替换、记忆上下文）"""
         variables = state.get("variables", {})
         for key, value in variables.items():
@@ -821,7 +820,7 @@ class LangGraphExecutor:
         return None, None, "未找到提供者或API密钥"
 
     @staticmethod
-    async def _parse_and_set_response(llm_response: str, node_data: Dict, state: AgentState, actual_model: str, prompt: str) -> AgentState:
+    async def _parse_and_set_response(llm_response: str, node_data: Dict, state: Dict[str, Any], actual_model: str, prompt: str) -> Dict[str, Any]:
         """解析响应并设置变量"""
         parsed_response = None
         if llm_response:
@@ -848,7 +847,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_llm_node(current_node: Dict, state: AgentState) -> AgentState:
+    async def _execute_llm_node(current_node: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行LLM节点（非流式）"""
         node_id = current_node.get("id", "")
         node_data = current_node.get("data", {})
@@ -944,9 +943,9 @@ class LangGraphExecutor:
     @staticmethod
     async def _execute_llm_node_streaming(
         current_node: Dict,
-        state: AgentState,
+        state: Dict[str, Any],
         sse_yield_func=None
-    ) -> AgentState:
+    ) -> Dict[str, Any]:
         """执行LLM节点（流式）"""
         node_id = current_node.get("id", "")
         node_data = current_node.get("data", {})
@@ -1010,7 +1009,7 @@ class LangGraphExecutor:
         return f"模拟响应: {node_label} - 处理输入: {input_text[:50]}..."
 
     @staticmethod
-    async def _execute_skill_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_skill_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行技能节点"""
         skill_id = node_data.get("skill_id", "")
         variables = state.get("variables", {})
@@ -1040,7 +1039,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_tool_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_tool_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行工具节点"""
         tool_name = node_data.get("tool_name", "")
         tool_params = node_data.get("tool_params", {})
@@ -1078,7 +1077,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_condition_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_condition_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行条件节点"""
         condition = node_data.get("condition", "")
         variables = state.get("variables", {})
@@ -1100,7 +1099,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_loop_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_loop_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行循环节点"""
         loop_count = node_data.get("loop_count", 3)
         loop_var = node_data.get("loop_var", "loop_index")
@@ -1113,7 +1112,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_iteration_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_iteration_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行迭代节点"""
         iteration_var = node_data.get("iteration_var", "item")
         collection_var = node_data.get("collection_var", "items")
@@ -1132,7 +1131,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_http_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_http_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行HTTP请求节点"""
         url = node_data.get("url", "")
         method = node_data.get("method", "GET")
@@ -1166,7 +1165,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_code_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_code_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行代码节点"""
         code = node_data.get("code", "")
 
@@ -1182,7 +1181,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_template_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_template_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行模板节点"""
         template = node_data.get("template", "")
         output_var = node_data.get("output_var", "template_output")
@@ -1195,7 +1194,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_variable_aggregator_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_variable_aggregator_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行变量聚合器节点"""
         input_vars = node_data.get("input_vars", [])
         output_var = node_data.get("output_var", "aggregated")
@@ -1210,7 +1209,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_document_extractor_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_document_extractor_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行文档提取节点"""
         document_var = node_data.get("document_var", "document")
         extract_fields = node_data.get("extract_fields", [])
@@ -1225,7 +1224,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_variable_assigner_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_variable_assigner_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行变量赋值节点"""
         variable_name = node_data.get("variable_name", "")
         value = node_data.get("value", "")
@@ -1239,7 +1238,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_parameter_extractor_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_parameter_extractor_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行参数提取节点"""
         source_var = node_data.get("source_var", "")
         parameter_name = node_data.get("parameter_name", "")
@@ -1253,7 +1252,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_json_extractor_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_json_extractor_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行JSON提取节点"""
         source_var = node_data.get("source_var", "")
         json_path = node_data.get("json_path", "")
@@ -1285,7 +1284,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_default_node(node_data: Dict, state: AgentState) -> AgentState:
+    async def _execute_default_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行默认节点"""
         logger.warning(f"未知节点类型，跳过执行")
         return state

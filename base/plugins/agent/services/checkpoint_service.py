@@ -3,7 +3,7 @@ import logging
 import uuid
 from typing import Optional, List, Dict, Any
 
-from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 logger = logging.getLogger(__name__)
@@ -24,11 +24,8 @@ class CheckpointService:
     
     def __init__(self):
         """初始化检查点服务"""
-        from base.common.setting import settings
-        
-        db_url = f"postgresql://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
-        self._checkpointer = PostgresSaver.from_conn_string(db_url)
-        logger.info("检查点服务初始化完成，使用 PostgreSQL 存储")
+        self._checkpointer = MemorySaver()
+        logger.info("检查点服务初始化完成，使用内存存储（重启后会丢失）")
     
     def create_thread_id(self, user_id: str, session_id: Optional[str] = None) -> str:
         """
