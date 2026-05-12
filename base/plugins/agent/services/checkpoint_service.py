@@ -1,7 +1,7 @@
 # base/plugins/agent/services/checkpoint_service.py
 import logging
 import uuid
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -14,18 +14,46 @@ class CheckpointService:
     
     _instance = None
     _checkpointer: Optional[BaseCheckpointSaver] = None
+    _use_postgres: bool = False
     
     @classmethod
-    def get_instance(cls) -> 'CheckpointService':
+    def get_instance(cls, use_postgres: bool = False) -> 'CheckpointService':
         """获取单例实例"""
         if cls._instance is None:
-            cls._instance = cls()
+            cls._instance = cls(use_postgres=use_postgres)
         return cls._instance
     
-    def __init__(self):
+    def __init__(self, use_postgres: bool = False):
         """初始化检查点服务"""
-        self._checkpointer = MemorySaver()
-        logger.info("检查点服务初始化完成，使用内存存储（重启后会丢失）")
+        self._use_postgres = use_postgres
+        
+        if use_postgres:
+            try:
+                from langgraph.checkpoint.postgres import PostgresSaver
+                import psycopg
+                from base.common.setting import settings
+                
+                db_config = settings.TORTOISE_ORM['connections']['postgres']['credentials']
+                conn_string = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+                
+                self._checkpointer = PostgresSaver.from_conn_string(conn_string)
+                logger.info("检查点服务初始化完成，使用PostgreSQL存储")
+            except ImportError as e:
+                logger.warning(f"无法导入PostgreSQL依赖，降级到内存存储: {e}")
+                self._checkpointer = MemorySaver()
+                self._use_postgres = False
+            except Exception as e:
+                logger.error(f"PostgreSQL检查点初始化失败，降级到内存存储: {e}")
+                self._checkpointer = MemorySaver()
+                self._use_postgres = False
+        else:
+            self._checkpointer = MemorySaver()
+            logger.info("检查点服务初始化完成，使用内存存储（重启后会丢失）")
+    
+    @classmethod
+    def reset_instance(cls):
+        """重置单例实例（用于测试或切换存储后端）"""
+        cls._instance = None
     
     def create_thread_id(self, user_id: str, session_id: Optional[str] = None) -> str:
         """
@@ -55,7 +83,6 @@ class CheckpointService:
             for cp in all_checkpoints:
                 cp_thread_id = cp.get("configurable", {}).get("thread_id", "")
                 if cp_thread_id.startswith(f"{user_id}:"):
-                    # 提取会话ID
                     session_id = cp_thread_id.split(":", 1)[1] if ":" in cp_thread_id else ""
                     
                     user_checkpoints.append({
@@ -71,7 +98,6 @@ class CheckpointService:
                         }
                     })
             
-            # 按创建时间排序
             user_checkpoints.sort(key=lambda x: x.get("created_at", ""), reverse=True)
             return user_checkpoints
         
@@ -222,7 +248,6 @@ class CheckpointService:
         if checkpoint_id:
             config["configurable"]["checkpoint_id"] = checkpoint_id
         
-        # 添加元数据
         metadata = {
             "user_id": user_id,
             "session_id": thread_id.split(":", 1)[1] if ":" in thread_id else "",
