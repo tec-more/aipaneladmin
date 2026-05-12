@@ -177,7 +177,15 @@
                 <el-switch v-model="selectedNode.data.stream" active-text="开" inactive-text="关" />
               </el-form-item>
               <el-form-item label="提示词">
-                <el-input v-model="selectedNode.data.prompt" type="textarea" :rows="4" />
+                <el-input 
+                  v-model="selectedNode.data.prompt" 
+                  type="textarea" 
+                  :rows="4" 
+                  @input="onPromptInput"
+                />
+                <div style="margin-top: 8px; font-size: 12px; color: #909399;">
+                  当前长度: {{ selectedNode.data.prompt?.length || 0 }} 字符
+                </div>
               </el-form-item>
               <el-form-item label="输出变量">
                 <el-input v-model="selectedNode.data.outputVar" placeholder="例如: llm_output" />
@@ -734,6 +742,8 @@ const onDrop = (event) => {
     nodeData.skillIds = [];
     nodeData.enableReact = true;
     nodeData.maxIterations = 5;
+    nodeData.prompt = '';
+    nodeData.outputVar = '';
   }
   
   const newNode = {
@@ -747,7 +757,57 @@ const onDrop = (event) => {
 
 const onNodeClick = (node) => {
   selectedEdge.value = null;
+  
+  // 直接在原节点上确保数据结构完整（避免创建副本导致的问题）
+  if (!node.data) {
+    node.data = {};
+  }
+  if (!node.data.label) {
+    node.data.label = nodeTypes.find(n => n.type === node.type)?.label || node.type;
+  }
+  if (node.data.description === undefined || node.data.description === null) {
+    node.data.description = '';
+  }
+  
+  // 确保 LLM 节点有完整的数据结构
+  if (node.type === 'llm') {
+    if (node.data.prompt === undefined || node.data.prompt === null) {
+      node.data.prompt = '';
+    }
+    if (node.data.outputVar === undefined || node.data.outputVar === null) {
+      node.data.outputVar = '';
+    }
+    if (node.data.temperature === undefined || node.data.temperature === null) {
+      node.data.temperature = 0.7;
+    }
+    if (node.data.maxTokens === undefined || node.data.maxTokens === null) {
+      node.data.maxTokens = 1024;
+    }
+    if (node.data.stream === undefined || node.data.stream === null) {
+      node.data.stream = false;
+    }
+    if (!node.data.skillIds) {
+      node.data.skillIds = [];
+    }
+  }
+  
   selectedNode.value = node;
+  console.log('=== onNodeClick 触发 ===');
+  console.log('选中的节点:', node);
+  if (node.type === 'llm') {
+    console.log('LLM节点的prompt:', node.data.prompt);
+    console.log('LLM节点的完整data:', node.data);
+  }
+};
+
+const onPromptInput = (event) => {
+  console.log('=== onPromptInput 触发 ===');
+  console.log('当前 selectedNode:', selectedNode.value);
+  if (selectedNode.value?.type === 'llm') {
+    console.log('输入的内容:', event);
+    console.log('当前 prompt 值:', selectedNode.value.data.prompt);
+    console.log('当前 prompt 长度:', selectedNode.value.data.prompt?.length);
+  }
 };
 
 const onNodeMouseDown = (event, node) => {
@@ -858,6 +918,14 @@ const deleteSelectedEdge = () => {
 };
 
 const saveWorkflow = async () => {
+  console.log('=== saveWorkflow 触发 ===');
+  console.log('props.workflowId:', props.workflowId);
+  console.log('当前 nodes.value:', nodes.value);
+  
+  // 打印llm节点的完整数据，方便调试
+  const llmNodes = nodes.value.filter(n => n.type === 'llm');
+  console.log('LLM节点数据:', llmNodes);
+  
   if (props.workflowId) {
     saving.value = true;
     try {
@@ -865,6 +933,8 @@ const saveWorkflow = async () => {
         nodes: JSON.parse(JSON.stringify(nodes.value)),
         edges: JSON.parse(JSON.stringify(edges.value))
       };
+      
+      console.log('准备保存的 definition:', definition);
       
       await updateWorkflow(props.workflowId, {
         definition
@@ -1330,6 +1400,11 @@ const importWorkflow = () => {
 };
 
 const transformNode = (node) => {
+  console.log('=== transformNode 被调用 ===');
+  console.log('原始 node:', node);
+  console.log('node.data:', node.data);
+  console.log('node.config:', node.config);
+  
   if (!node) return null;
   
   const nodeType = node.type || 'default';
@@ -1346,21 +1421,72 @@ const transformNode = (node) => {
   };
 
   if (nodeType === 'llm') {
-    transformed.data.prompt = node.config?.prompt || node.data?.prompt || '';
-    transformed.data.modelId = node.config?.model_id || node.data?.modelId || null;
+    console.log('处理 LLM 节点');
+    // 优先从 node.data 获取，其次从 node.config 获取
+    let prompt = node.data?.prompt || node.config?.prompt || '';
+    // 如果是单个字符但实际应该是长文本，检查是否有其他来源
+    if (prompt && prompt.length === 1 && node.data?.config?.prompt) {
+      prompt = node.data.config.prompt;
+    }
+    console.log('最终使用的 prompt:', prompt);
+    
+    transformed.data.prompt = prompt;
+    transformed.data.modelId = node.data?.modelId || node.config?.model_id || null;
     transformed.data.temperature = node.data?.temperature ?? 0.7;
     transformed.data.maxTokens = node.data?.maxTokens ?? 1024;
     transformed.data.stream = node.data?.stream ?? false;
     transformed.data.skillIds = node.data?.skillIds || node.data?.skill_ids || [];
     transformed.data.outputVar = node.data?.outputVar || '';
+    
+    console.log('转换后的 prompt:', transformed.data.prompt);
+    console.log('转换后的 prompt 长度:', transformed.data.prompt?.length);
   } else if (nodeType === 'tool') {
     transformed.data.toolName = node.config?.tool_name || node.data?.toolName || '';
     transformed.data.description = node.config?.description || node.data?.description || '';
   } else if (nodeType === 'decision' || nodeType === 'condition') {
     transformed.type = 'condition';
     transformed.data.condition = node.config?.condition || node.data?.condition || '';
+  } else if (nodeType === 'loop') {
+    transformed.data.condition = node.data?.condition || 'i < 5';
+    transformed.data.loopMax = node.data?.loopMax ?? 10;
+    transformed.data.loopVariable = node.data?.loopVariable || 'i';
+  } else if (nodeType === 'iteration') {
+    transformed.data.iterationList = node.data?.iterationList || '';
+    transformed.data.iterationVariable = node.data?.iterationVariable || 'item';
+  } else if (nodeType === 'output') {
+    transformed.data.outputVar = node.data?.outputVar || '';
+    transformed.data.outputContent = node.data?.outputContent || '';
+  } else if (nodeType === 'http') {
+    transformed.data.method = node.data?.method || 'GET';
+    transformed.data.url = node.data?.url || '';
+    transformed.data.body = node.data?.body || '';
+  } else if (nodeType === 'code') {
+    transformed.data.language = node.data?.language || 'python';
+    transformed.data.code = node.data?.code || '';
+  } else if (nodeType === 'template') {
+    transformed.data.template = node.data?.template || '';
+    transformed.data.outputVar = node.data?.outputVar || '';
+  } else if (nodeType === 'variable_aggregator') {
+    transformed.data.inputVars = node.data?.inputVars || '';
+    transformed.data.outputVar = node.data?.outputVar || '';
+  } else if (nodeType === 'document_extractor') {
+    transformed.data.documentVar = node.data?.documentVar || '';
+    transformed.data.extractRules = node.data?.extractRules || '';
+    transformed.data.outputVar = node.data?.outputVar || '';
+  } else if (nodeType === 'variable_assigner') {
+    transformed.data.varName = node.data?.varName || '';
+    transformed.data.varValue = node.data?.varValue || '';
+    transformed.data.outputVar = node.data?.outputVar || '';
+  } else if (nodeType === 'parameter_extractor') {
+    transformed.data.inputVariable = node.data?.inputVariable || '';
+    transformed.data.parameters = node.data?.parameters || '';
+    transformed.data.outputVar = node.data?.outputVar || '';
+  } else if (nodeType === 'json_extractor') {
+    transformed.data.inputVariable = node.data?.inputVariable || '';
+    transformed.data.outputVariable = node.data?.outputVariable || '';
   }
 
+  console.log('转换后的完整节点:', transformed);
   return transformed;
 };
 
@@ -1464,19 +1590,27 @@ onMounted(() => {
 });
 
 watch(() => props.initialNodes, (newNodes) => {
-  if (newNodes && newNodes.length > 0) {
-    const clonedNodes = JSON.parse(JSON.stringify(newNodes)).filter(
+  console.log('=== watch initialNodes 触发 ===');
+  console.log('newNodes:', newNodes);
+  
+  if (newNodes && newNodes.length > 0 && nodes.value.length === 0) {
+    // 使用 transformNode 转换所有节点，确保数据格式正确
+    const transformedNodes = newNodes.map(transformNode).filter(
       node => node && node.id && node.type
     );
-    if (clonedNodes.length > 0) {
+    
+    console.log('转换后的 transformedNodes:', transformedNodes);
+    
+    if (transformedNodes.length > 0) {
       selectedNode.value = null;
-      nodes.value.splice(0, nodes.value.length, ...clonedNodes);
+      nodes.value.splice(0, nodes.value.length, ...transformedNodes);
+      console.log('nodes.value 已更新:', nodes.value);
     }
   }
-}, { immediate: true, deep: true });
+}, { immediate: true });
 
 watch(() => props.initialEdges, (newEdges) => {
-  if (newEdges && newEdges.length > 0) {
+  if (newEdges && newEdges.length > 0 && edges.value.length === 0) {
     const clonedEdges = JSON.parse(JSON.stringify(newEdges)).filter(
       edge => edge && edge.source && edge.target
     );
@@ -1485,7 +1619,7 @@ watch(() => props.initialEdges, (newEdges) => {
       edges.value.splice(0, edges.value.length, ...clonedEdges);
     }
   }
-}, { immediate: true, deep: true });
+}, { immediate: true });
 </script>
 
 <style scoped>
