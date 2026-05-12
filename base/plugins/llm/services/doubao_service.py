@@ -211,53 +211,77 @@ class DoubaoService:
             try:
                 logger.info(f"[DoubaoService] 使用官方 SDK 流式调用")
                 import asyncio
-                from typing import AsyncGenerator
+                import queue
+                import threading
                 
-                # 使用 to_thread 和异步生成器包装同步调用
-                def get_sync_stream():
-                    return self.client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
-                    stream=True,
-                    stop=stop)
-
-
-                stream = await asyncio.to_thread(get_sync_stream)
+                thread_queue = queue.Queue()
+                error_holder = [None]
+                done_holder = [False]
                 
-                async def async_stream_wrapper():
-                    """将同步迭代器包装为异步生成器"""
-                    import threading
-                    queue = asyncio.Queue(maxsize=100)
-                    done = threading.Event()
-                    
-                    def sync_producer():
-                        try:
-                            for chunk in stream:
-                                queue.put_nowait(('data', chunk))
-                        except Exception as e:
-                            queue.put_nowait(('error', e))
-                        finally:
-                            done.set()
-                    
-                    # 在后台线程运行同步迭代
-                    thread = threading.Thread(target=sync_producer, daemon=True)
-                    thread.start()
-                    
-                    # 从队列获取数据
-                    while not done.is_set() or not queue.empty():
-                        try:
-                            msg_type, data = await asyncio.wait_for(queue.get(), timeout=0.1)
-                            if msg_type == 'error':
-                                raise data
-                            yield data
-                        except asyncio.TimeoutError:
-                            continue
+                def sync_stream_producer():
+                    try:
+                        logger.info(f"[DoubaoService] 开始创建流式请求...")
+                        stream = self.client.chat.completions.create(
+                            model=model,
+                            messages=messages,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            top_p=top_p,
+                            stream=True,
+                            stop=stop
+                        )
+                        logger.info(f"[DoubaoService] 流式请求创建成功，开始迭代...")
+                        
+                        count = 0
+                        for chunk in stream:
+                            count += 1
+                            thread_queue.put(('data', chunk))
+                            if count <= 5 or count % 50 == 0:
+                                logger.info(f"[DoubaoService] 后台线程: put chunk #{count}")
+                        
+                        logger.info(f"[DoubaoService] 流式迭代完成，共 {count} 个 chunk")
+                    except Exception as e:
+                        logger.exception(f"[DoubaoService] 流式迭代异常: {e}")
+                        error_holder[0] = e
+                    finally:
+                        done_holder[0] = True
+                        thread_queue.put(('done', None))
+                        logger.info(f"[DoubaoService] 后台线程结束")
                 
-                async for chunk in async_stream_wrapper():
-                    logger.info(f"[DoubaoService] 收到流式chunk: {chunk}")
+                thread = threading.Thread(target=sync_stream_producer, daemon=True)
+                thread.start()
+                logger.info(f"[DoubaoService] 后台线程已启动，开始等待 chunks...")
+                
+                chunk_count = 0
+                last_yield_time = asyncio.get_event_loop().time()
+                yield_timeout = 300.0
+                
+                while True:
+                    if done_holder[0] and thread_queue.empty():
+                        logger.info(f"[DoubaoService] 检测到完成标志且队列为空，退出循环")
+                        break
+                    
+                    try:
+                        msg_type, data = thread_queue.get_nowait()
+                    except queue.Empty:
+                        if done_holder[0]:
+                            logger.info(f"[DoubaoService] 后台线程已完成，队列为空，退出循环")
+                            break
+                        await asyncio.sleep(0.01)
+                        continue
+                    
+                    logger.debug(f"[DoubaoService] 从队列获取: msg_type={msg_type}")
+                    
+                    if msg_type == 'done':
+                        logger.info(f"[DoubaoService] 收到 done 消息，退出循环")
+                        break
+                    if msg_type == 'error':
+                        logger.error(f"[DoubaoService] 收到 error 消息: {data}")
+                        raise data
+                    
+                    chunk = data
+                    chunk_count += 1
+                    
                     result = {
                         "id": chunk.id,
                         "choices": [],
@@ -270,7 +294,8 @@ class DoubaoService:
                             delta["role"] = choice.delta.role
                         if choice.delta.content:
                             delta["content"] = choice.delta.content
-                        logger.info(f"[DoubaoService] delta内容: {delta}")
+                            if chunk_count <= 3 or chunk_count % 50 == 0:
+                                logger.info(f"[DoubaoService] chunk #{chunk_count}: {delta['content'][:30]}...")
                         
                         result["choices"].append({
                             "delta": delta,
@@ -284,8 +309,21 @@ class DoubaoService:
                             "total_tokens": chunk.usage.total_tokens
                         }
                     
-                    logger.info(f"[DoubaoService] yield结果: {result}")
-                    yield result
+                    try:
+                        current_time = asyncio.get_event_loop().time()
+                        if current_time - last_yield_time > yield_timeout:
+                            logger.warning(f"[DoubaoService] yield 超时 ({yield_timeout}s)，可能消费者卡住")
+                        yield result
+                        last_yield_time = current_time
+                    except Exception as yield_error:
+                        logger.error(f"[DoubaoService] yield 异常: {yield_error}")
+                        raise
+                
+                if error_holder[0]:
+                    raise error_holder[0]
+                
+                logger.info(f"[DoubaoService] 流式处理完成，共 {chunk_count} 个 chunk")
+                return
                     
             except Exception as e:
                 logger.warning(f"[DoubaoService] SDK流式调用失败，尝试HTTP方式: {str(e)}")

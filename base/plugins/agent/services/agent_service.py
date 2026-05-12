@@ -363,14 +363,17 @@ class AgentService:
                     try:
                         if not sse_queue.empty():
                             print(f"[SSE生成器] 队列不为空，尝试获取事件...")
-                            event = await asyncio.wait_for(sse_queue.get(), timeout=0.1)
-                            print(f"[agent API] 从队列获取事件: {event}")
-                            yield send_event(event)
-                            last_activity = current_time
+                            try:
+                                event = await asyncio.wait_for(sse_queue.get(), timeout=1.0)
+                                print(f"[agent API] 从队列获取事件: {event}")
+                                yield send_event(event)
+                                last_activity = current_time
+                            except asyncio.TimeoutError:
+                                print(f"[SSE生成器] 获取事件超时，队列大小: {sse_queue.queue.qsize()}")
+                                await asyncio.sleep(0.01)
                         elif not task.done():
                             last_activity = current_time
-                    except asyncio.TimeoutError:
-                        await asyncio.sleep(0.01)
+                            await asyncio.sleep(0.01)
                     except Exception as e:
                         print(f"[agent API] 获取或发送事件异常: {e}")
                         import traceback
