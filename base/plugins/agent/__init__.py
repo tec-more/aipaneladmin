@@ -9,7 +9,7 @@ router = APIRouter(prefix="/v1/agent")
 
 def _setup_routes():
     """延迟设置路由，避免提前导入模型"""
-    from .api.v1 import dialog_flow, workflow, agent, skill, skill_category, tool, tool_tag, memory, joke, rag
+    from .api.v1 import dialog_flow, workflow, agent, skill, skill_category, tool, tool_tag, memory, joke, rag, checkpoint
     
     @router.get("/test")
     async def test_endpoint():
@@ -30,6 +30,7 @@ def _setup_routes():
     router.include_router(dialog_flow.dialog_flow_router)
     router.include_router(joke.joke_router)
     router.include_router(rag.rag_router)
+    router.include_router(checkpoint.router)
 
 
 async def on_enable(app):
