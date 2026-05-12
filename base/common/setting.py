@@ -91,7 +91,10 @@ db_name: str = config.config.get("db", "name", fallback="aipaneladmin")
 db_user: str = config.config.get("db", "user", fallback="admin")
 db_password: str = config.config.get("db", "password", fallback="123456")
 db_port: int = config.config.getint("db", "port", fallback=5432)
-
+minsize: int = config.config.getint("db", "minsize", fallback=5)
+maxsize: int = config.config.getint("db", "maxsize", fallback=20)
+timeout: int = config.config.getint("db", "timeout", fallback=30)
+command_timeout: int = config.config.getint("db", "command_timeout", fallback=30)
 # 模块级别的TORTOISE_ORM配置，用于aerich命令
 TORTOISE_ORM: dict = {
 	"connections": {
@@ -123,6 +126,11 @@ TORTOISE_ORM: dict = {
 				"password": db_password,  # Database password
 				"database": db_name,  # Database name
 				"ssl": False,  # Disable SSL
+				# 连接池配置
+				"minsize": minsize,       # 最小连接数（默认1）
+				"maxsize": maxsize,      # 最大连接数（默认10）
+				"timeout": timeout,      # 连接获取超时（秒）
+				"command_timeout": command_timeout,  # 查询执行超时（秒）
 			},
 		},
 		# MSSQL/Oracle configuration

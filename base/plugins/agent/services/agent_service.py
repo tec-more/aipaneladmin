@@ -323,6 +323,13 @@ class AgentService:
                         task.cancel()
                         break
                     
+                    if task.done():
+                        task_exception = task.exception()
+                        if task_exception:
+                            print(f"[Execution] 任务执行异常: {task_exception}")
+                            yield send_event({'type': 'error', 'message': f'执行异常: {str(task_exception)}'})
+                            break
+                    
                     if current_time - last_activity > 300:
                         print("[Execution] 检测到执行超时，强制结束")
                         yield send_event({'type': 'error', 'message': '执行超时，请重试'})
@@ -334,6 +341,8 @@ class AgentService:
                             event = await asyncio.wait_for(sse_queue.get(), timeout=0.1)
                             print(f"[agent API] 从队列获取事件: {event}")
                             yield send_event(event)
+                            last_activity = current_time
+                        elif not task.done():
                             last_activity = current_time
                     except asyncio.TimeoutError:
                         await asyncio.sleep(0.01)
