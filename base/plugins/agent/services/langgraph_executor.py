@@ -467,7 +467,7 @@ class LangGraphExecutor:
                     "variables": final_state.get("variables", {}),
                     "trace": final_state.get("execution_trace", [])
                 }
-
+            logger.info("[LangGraph] 下一步返回结果")
             return {
                 "success": True,
                 "message": "执行成功",
