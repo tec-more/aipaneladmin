@@ -456,6 +456,7 @@ class LangGraphExecutor:
                 customer_id=customer_id,
                 user_id=user_id
             )
+            logger.info("[LangGraph] 记忆保存完成，准备返回结果")
 
             if final_state.get("error"):
                 return {
