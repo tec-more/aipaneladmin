@@ -181,10 +181,11 @@ class LangGraphExecutor:
                     if endpoint_url.endswith('/chat/completions'):
                         endpoint_url = endpoint_url[:-len('/chat/completions')]
                 
+                # 只存储需要的数据，而不是完整的 ORM 对象
                 llm_resources[node_id] = {
-                    "model": model,
-                    "provider": provider,
-                    "api_key": api_key,
+                    "provider_name": provider.name_en,
+                    "api_key_str": api_key.api_key,
+                    "api_secret": api_key.api_secret,
                     "endpoint_url": endpoint_url,
                     "model_id_for_call": model.model_id if model.model_id else model.model_name,
                     "model_name": model.model_name,
@@ -957,10 +958,10 @@ class LangGraphExecutor:
         
         try:
             service = await ChatService.get_provider_service(
-                provider_name_en=resource["provider"].name_en,
-                api_key=resource["api_key"].api_key,
+                provider_name_en=resource["provider_name"],
+                api_key=resource["api_key_str"],
                 endpoint_url=resource["endpoint_url"],
-                api_secret=resource["api_key"].api_secret
+                api_secret=resource["api_secret"]
             )
             if service:
                 return service, resource["model_id_for_call"], None
