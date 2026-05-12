@@ -287,22 +287,6 @@ class AgentService:
             async def execute_task():
                 print(f"[SSE生成器] execute_task 开始执行")
                 try:
-                    # 先测试一个简单的数据库查询
-                    print(f"[SSE生成器] 测试数据库连接...")
-                    try:
-                        from base.plugins.llm.models.model import LLMModel
-                        test_count = await LLMModel.filter(status="active").limit(1).count()
-                        print(f"[SSE生成器] 数据库连接正常，活跃模型数: {test_count}")
-                    except Exception as db_err:
-                        print(f"[SSE生成器] 数据库连接测试失败: {db_err}")
-                        import traceback
-                        traceback.print_exc()
-                        return {
-                            "success": False,
-                            "message": f"数据库连接失败: {db_err}",
-                            "traceback": traceback.format_exc()
-                        }
-                    
                     print(f"[SSE生成器] 开始调用 LangGraphExecutor.execute_agent")
                     result = await LangGraphExecutor.execute_agent(
                         agent=agent,

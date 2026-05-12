@@ -737,7 +737,7 @@ class LangGraphExecutor:
                 logger.info(f"[获取目标模型] 按ID查询: model_id={model_id}")
                 try:
                     logger.debug(f"[获取目标模型] 执行数据库查询...")
-                    result = await LLMModel.filter(id=model_id, status="active").first()
+                    result = await LLMModel.get_or_none(id=model_id, status="active")
                     logger.debug(f"[获取目标模型] 数据库查询完成，result={result is not None}")
                     if result:
                         logger.info(f"[获取目标模型] 按ID找到模型: {result.model_name} (ID: {result.id})")
@@ -749,7 +749,7 @@ class LangGraphExecutor:
                     raise
             elif model_name != "gpt-3.5-turbo":
                 logger.info(f"[获取目标模型] 按名称查询: model_name={model_name}")
-                result = await LLMModel.filter(model_name=model_name, status="active").first()
+                result = await LLMModel.get_or_none(model_name=model_name, status="active")
                 if result:
                     logger.info(f"[获取目标模型] 按名称找到模型: {result.model_name} (ID: {result.id})")
                 else:
@@ -795,7 +795,7 @@ class LangGraphExecutor:
             logger.debug(f"[准备聊天服务] 找到提供者: {provider.name_en}")
             logger.debug(f"[准备聊天服务] 查询API密钥: model_id={target_model.id}")
             
-            api_key = await LLMApiKey.filter(model_id=target_model.id).first()
+            api_key = await LLMApiKey.get_or_none(model_id=target_model.id)
             logger.debug(f"[准备聊天服务] API密钥查询结果: {api_key is not None}")
             
             logger.info(f"[准备聊天服务] 获取完成: provider={provider is not None}, api_key={api_key is not None}")
