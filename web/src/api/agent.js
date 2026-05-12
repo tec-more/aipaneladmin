@@ -105,6 +105,7 @@ export function executeAgentGraphAuto(id, params, callbacks = {}) {
                   if (data.type === 'start' && data.execution_id) {
                     executionId = data.execution_id
                   }
+                  console.log('[SSE Stream] Received data:', data)
                   safeOnData(data)
                 } catch (e) {
                   // 忽略解析错误

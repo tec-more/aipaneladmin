@@ -456,6 +456,8 @@ const latestResponse = ref('');
 const currentProcess = ref([]);
 const assistantMessage = ref(null);
 const currentAbortController = ref(null);
+let streamStepIndex = -1;
+let accumulatedStreamContent = '';
 
 const typingDots = ref('');
 let typingInterval = null;
@@ -1023,6 +1025,8 @@ const doExecute = async () => {
   
   realtimeSteps.value = [];
   currentProcess.value = [];
+  streamStepIndex = -1;
+  accumulatedStreamContent = '';
   executing.value = true;
   
   startTypingAnimation();
@@ -1140,6 +1144,7 @@ const abortExecution = () => {
 };
 
 const handleSSEData = (data) => {
+  console.log('[LangGraphEditor] handleSSEData called with:', data)
   switch (data.type) {
     case 'start':
       addRealtimeStep('info', data.label || '开始', data.message || '执行开始');
@@ -1170,6 +1175,19 @@ const handleSSEData = (data) => {
       markLastStepCompleted();
       break;
     
+    case 'stream':
+      accumulatedStreamContent += data.content || '';
+      if (assistantMessage.value) {
+        assistantMessage.value.content = accumulatedStreamContent;
+      }
+      if (streamStepIndex === -1) {
+        addRealtimeStep('info', '生成中', accumulatedStreamContent);
+        streamStepIndex = realtimeSteps.value.length - 1;
+      } else if (streamStepIndex < realtimeSteps.value.length) {
+        realtimeSteps.value[streamStepIndex].content = accumulatedStreamContent;
+      }
+      break;
+    
     case 'action':
       addRealtimeStep('act', data.label || '行动', data.message || data.content || '');
       markLastStepCompleted();
@@ -1190,6 +1208,9 @@ const handleSSEData = (data) => {
       break;
     
     case 'cancelled':
+      if (streamStepIndex !== -1 && streamStepIndex < realtimeSteps.value.length) {
+        realtimeSteps.value[streamStepIndex].completed = true;
+      }
       addRealtimeStep('warning', '执行中断', data.message || '执行被用户中断');
       markLastStepCompleted();
       
@@ -1203,6 +1224,9 @@ const handleSSEData = (data) => {
       break;
     
     case 'complete':
+      if (streamStepIndex !== -1 && streamStepIndex < realtimeSteps.value.length) {
+        realtimeSteps.value[streamStepIndex].completed = true;
+      }
       executeResult.value = {
         result: data.result,
         variables: data.variables
@@ -1222,11 +1246,12 @@ const handleSSEData = (data) => {
         finalContent = data.result.output || data.result.text || '';
       }
       
-      if (!finalContent) {
-        finalContent = '执行完成';
-      }
-      
       if (assistantMessage.value) {
+        if (accumulatedStreamContent) {
+          finalContent = accumulatedStreamContent;
+        } else if (!finalContent) {
+          finalContent = '执行完成';
+        }
         assistantMessage.value.content = finalContent;
       }
       
@@ -1238,6 +1263,9 @@ const handleSSEData = (data) => {
       break;
     
     case 'error':
+      if (streamStepIndex !== -1 && streamStepIndex < realtimeSteps.value.length) {
+        realtimeSteps.value[streamStepIndex].completed = true;
+      }
       addRealtimeStep('error', data.label || '错误', data.message || '');
       markLastStepCompleted();
       
