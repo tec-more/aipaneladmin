@@ -210,7 +210,10 @@ class AgentService:
         
         # 检查是否有流式 LLM 节点
         for node in nodes:
-            if node.get('type') == 'llm' and node.get('data', {}).get('stream'):
+            stream_val = node.get('data', {}).get('stream')
+            # 支持布尔值 True/False 和字符串 "true"/"false"
+            is_streaming = stream_val is True or (isinstance(stream_val, str) and stream_val.lower() == 'true')
+            if node.get('type') == 'llm' and is_streaming:
                 return True
         
         # 检查是否有工具调用节点
@@ -258,9 +261,8 @@ class AgentService:
             exec_info = execution_manager.get(execution_id)
             return exec_info and exec_info.get('is_cancelled', False)
         
-        yield send_event({'type': 'start', 'execution_id': execution_id, 'message': '开始执行智能体'})
-        
         try:
+            yield send_event({'type': 'start', 'execution_id': execution_id, 'message': '开始执行智能体'})
             class SSEQueue:
                 def __init__(self):
                     self.queue = asyncio.Queue()
@@ -274,23 +276,44 @@ class AgentService:
                 def empty(self):
                     return self.queue.empty()
             
+            print(f"[SSE生成器] 开始初始化，execution_id={execution_id}")
             sse_queue = SSEQueue()
             
             async def wrapped_sse_yield(event):
                 print(f"[agent API] wrapped_sse_yield 收到事件: {event}")
                 await sse_queue.put(event)
-                print(f"[agent API] 事件已入队列")
+                print(f"[agent API] 事件已入队列，队列大小: {sse_queue.queue.qsize()}")
             
             async def execute_task():
+                print(f"[SSE生成器] execute_task 开始执行")
                 try:
-                    return await LangGraphExecutor.execute_agent(
+                    # 先测试一个简单的数据库查询
+                    print(f"[SSE生成器] 测试数据库连接...")
+                    try:
+                        from base.plugins.llm.models.model import LLMModel
+                        test_count = await LLMModel.filter(status="active").limit(1).count()
+                        print(f"[SSE生成器] 数据库连接正常，活跃模型数: {test_count}")
+                    except Exception as db_err:
+                        print(f"[SSE生成器] 数据库连接测试失败: {db_err}")
+                        import traceback
+                        traceback.print_exc()
+                        return {
+                            "success": False,
+                            "message": f"数据库连接失败: {db_err}",
+                            "traceback": traceback.format_exc()
+                        }
+                    
+                    print(f"[SSE生成器] 开始调用 LangGraphExecutor.execute_agent")
+                    result = await LangGraphExecutor.execute_agent(
                         agent=agent,
                         input_data=input_data,
                         sse_yield_func=wrapped_sse_yield,
                         execution_id=execution_id
                     )
+                    print(f"[SSE生成器] execute_task 执行完成，result={result}")
+                    return result
                 except Exception as e:
-                    print(f"[LangGraph 执行失败] {e}")
+                    print(f"[SSE生成器] LangGraph 执行异常: {e}")
                     import traceback
                     traceback.print_exc()
                     return {
@@ -299,23 +322,29 @@ class AgentService:
                         "traceback": traceback.format_exc()
                     }
             
+            print(f"[SSE生成器] 创建 asyncio task")
             task = asyncio.create_task(execute_task())
+            print(f"[SSE生成器] task 创建成功: {task}")
             
+            print(f"[SSE生成器] 发送初始化事件")
             yield send_event({'type': 'info', 'label': '初始化', 'message': '初始化执行环境...'})
             
+            print(f"[SSE生成器] 进入SSE循环")
             done = False
             last_activity = asyncio.get_event_loop().time()
             import time
             loop_start_time = time.time()
             last_log_time = loop_start_time
+            loop_count = 0
             
             while not done or not sse_queue.empty():
+                loop_count += 1
                 try:
                     current_time = asyncio.get_event_loop().time()
                     
                     current_elapsed = time.time() - loop_start_time
-                    if current_elapsed - last_log_time >= 30.0:
-                        print(f"[SSE Loop] 循环中... elapsed={current_elapsed:.1f}s, task.done={task.done()}, queue.empty={sse_queue.empty()}")
+                    if current_elapsed - last_log_time >= 5.0:
+                        print(f"[SSE Loop] 循环 #{loop_count}, elapsed={current_elapsed:.1f}s, task.done={task.done()}, queue.empty={sse_queue.empty()}, task={task}")
                         last_log_time = current_elapsed
                     
                     if await check_cancelled():
@@ -325,11 +354,13 @@ class AgentService:
                         break
                     
                     if task.done():
+                        print(f"[SSE生成器] task 已完成，检查异常...")
                         task_exception = task.exception()
                         if task_exception:
                             print(f"[Execution] 任务执行异常: {task_exception}")
                             yield send_event({'type': 'error', 'message': f'执行异常: {str(task_exception)}'})
                             break
+                        print(f"[SSE生成器] task 正常完成")
                     
                     if current_time - last_activity > 300:
                         print("[Execution] 检测到执行超时，强制结束")
@@ -339,6 +370,7 @@ class AgentService:
                     
                     try:
                         if not sse_queue.empty():
+                            print(f"[SSE生成器] 队列不为空，尝试获取事件...")
                             event = await asyncio.wait_for(sse_queue.get(), timeout=0.1)
                             print(f"[agent API] 从队列获取事件: {event}")
                             yield send_event(event)
@@ -348,17 +380,21 @@ class AgentService:
                     except asyncio.TimeoutError:
                         await asyncio.sleep(0.01)
                     except Exception as e:
-                        print(f"[agent API] 获取或发送事件失败: {e}")
+                        print(f"[agent API] 获取或发送事件异常: {e}")
+                        import traceback
+                        traceback.print_exc()
                     
                     if task.done() and sse_queue.empty():
                         done = True
-                        print("[Execution] 任务已完成，队列已空")
+                        print("[Execution] 任务已完成，队列已空，退出循环")
                         
                 except Exception as e:
-                    print(f"[SSE 推送失败] {e}")
+                    print(f"[SSE 推送异常] {e}")
                     import traceback
                     print(traceback.format_exc())
                     break
+            
+            print(f"[SSE生成器] SSE循环结束，done={done}")
             
             try:
                 if not task.cancelled():

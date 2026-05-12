@@ -280,11 +280,7 @@ class LangGraphExecutor:
             logger.info("调用 graph.ainvoke...")
             start_time = time.time()
             
-            try:
-                final_state = await asyncio.wait_for(graph_with_memory.ainvoke(initial_state, config), timeout=120.0)
-            except asyncio.TimeoutError:
-                logger.error("LangGraph 执行超时（120秒）")
-                raise RuntimeError("LangGraph 执行超时")
+            final_state = await graph_with_memory.ainvoke(initial_state, config)
             
             elapsed = time.time() - start_time
             logger.info(f"LangGraph 执行完成，耗时: {elapsed:.2f}秒")
@@ -373,7 +369,9 @@ class LangGraphExecutor:
                 state = await LangGraphExecutor._execute_agent_node(node_data, state)
             elif node_type == "llm":
                 node_data = current_node.get("data", {})
-                is_streaming = node_data.get("stream", False)
+                stream_val = node_data.get("stream", False)
+                # 支持布尔值 True/False 和字符串 "true"/"false"
+                is_streaming = stream_val is True or (isinstance(stream_val, str) and stream_val.lower() == 'true')
                 if sse_yield_func:
                     await sse_yield_func({'type': 'thinking', 'label': node_label, 'message': '正在调用大模型...'})
                 if is_streaming and sse_yield_func:
@@ -598,31 +596,25 @@ class LangGraphExecutor:
         
         if skill_ids:
             try:
-                async def query_skills():
-                    from base.plugins.agent.models.skill import Skill
-                    from base.plugins.agent.services.skill_service import SkillService
-                    results = []
-                    for skill_id in skill_ids:
-                        skill = await Skill.get_or_none(id=skill_id, status="active")
-                        if skill:
-                            logger.debug(f"找到技能: {skill.name} (ID: {skill.id})")
-                            results.append({
-                                "id": skill.id,
-                                "name": skill.name,
-                                "description": skill.description,
-                                "implementation": skill.implementation
-                            })
-                            bound_tools = SkillService.parse_bound_tools(skill.implementation)
-                            if bound_tools:
-                                for tool in bound_tools:
-                                    bound_tools_set.add(tool)
-                        else:
-                            logger.warning(f"技能不存在或未激活: skill_id={skill_id}")
-                    return results
+                from base.plugins.agent.models.skill import Skill
+                from base.plugins.agent.services.skill_service import SkillService
                 
-                skills_data = await asyncio.wait_for(query_skills(), timeout=10.0)
-            except asyncio.TimeoutError:
-                logger.error("获取技能信息超时")
+                for skill_id in skill_ids:
+                    skill = await Skill.get_or_none(id=skill_id, status="active")
+                    if skill:
+                        logger.debug(f"找到技能: {skill.name} (ID: {skill.id})")
+                        skills_data.append({
+                            "id": skill.id,
+                            "name": skill.name,
+                            "description": skill.description,
+                            "implementation": skill.implementation
+                        })
+                        bound_tools = SkillService.parse_bound_tools(skill.implementation)
+                        if bound_tools:
+                            for tool in bound_tools:
+                                bound_tools_set.add(tool)
+                    else:
+                        logger.warning(f"技能不存在或未激活: skill_id={skill_id}")
             except Exception as e:
                 logger.exception(f"获取技能信息失败: {e}")
 
@@ -735,45 +727,53 @@ class LangGraphExecutor:
         target_model = None
         actual_model = model_name
 
+        logger.info(f"[获取目标模型] 开始查询，model_id={model_id}, model_name={model_name}")
+
         try:
             from base.plugins.llm.models.model import LLMModel
             
-            async def query_model():
-                if model_id:
-                    logger.debug(f"按ID查询模型: model_id={model_id}")
+            logger.info(f"[获取目标模型] 直接执行查询，不使用wait_for")
+            if model_id:
+                logger.info(f"[获取目标模型] 按ID查询: model_id={model_id}")
+                try:
+                    logger.debug(f"[获取目标模型] 执行数据库查询...")
                     result = await LLMModel.filter(id=model_id, status="active").first()
+                    logger.debug(f"[获取目标模型] 数据库查询完成，result={result is not None}")
                     if result:
-                        logger.info(f"按ID找到模型: {result.model_name} (ID: {result.id})")
+                        logger.info(f"[获取目标模型] 按ID找到模型: {result.model_name} (ID: {result.id})")
                     else:
-                        logger.warning(f"按ID未找到模型: model_id={model_id}")
-                    return result
-                
-                if model_name != "gpt-3.5-turbo":
-                    logger.debug(f"按名称查询模型: model_name={model_name}")
-                    result = await LLMModel.filter(model_name=model_name, status="active").first()
-                    if result:
-                        logger.info(f"按名称找到模型: {result.model_name} (ID: {result.id})")
-                    else:
-                        logger.warning(f"按名称未找到模型: model_name={model_name}")
-                    return result
-                
-                logger.debug("查询任意活跃模型")
+                        logger.warning(f"[获取目标模型] 按ID未找到模型: model_id={model_id}")
+                    target_model = result
+                except Exception as e:
+                    logger.exception(f"[获取目标模型] 按ID查询异常: {e}")
+                    raise
+            elif model_name != "gpt-3.5-turbo":
+                logger.info(f"[获取目标模型] 按名称查询: model_name={model_name}")
+                result = await LLMModel.filter(model_name=model_name, status="active").first()
+                if result:
+                    logger.info(f"[获取目标模型] 按名称找到模型: {result.model_name} (ID: {result.id})")
+                else:
+                    logger.warning(f"[获取目标模型] 按名称未找到模型: model_name={model_name}")
+                target_model = result
+            else:
+                logger.info(f"[获取目标模型] 查询任意活跃模型")
                 result = await LLMModel.filter(status="active").first()
                 if result:
-                    logger.info(f"找到默认活跃模型: {result.model_name} (ID: {result.id})")
+                    logger.info(f"[获取目标模型] 找到默认活跃模型: {result.model_name} (ID: {result.id})")
                 else:
-                    logger.error("未找到任何活跃模型")
-                return result
+                    logger.error(f"[获取目标模型] 未找到任何活跃模型")
+                target_model = result
             
-            target_model = await asyncio.wait_for(query_model(), timeout=10.0)
+            logger.info(f"[获取目标模型] 查询完成，target_model={target_model is not None}")
+            
             if target_model:
                 actual_model = target_model.model_name
+                logger.info(f"[获取目标模型] 实际使用模型: {actual_model}")
                 
-        except asyncio.TimeoutError:
-            logger.error("获取模型信息超时 - 数据库查询超过10秒")
         except Exception as e:
-            logger.exception(f"获取模型信息失败: {e}")
+            logger.exception(f"[获取目标模型] 获取模型信息异常: {e}")
 
+        logger.info(f"[获取目标模型] 返回结果，target_model={target_model is not None}, actual_model={actual_model}")
         return target_model, actual_model
 
     @staticmethod
@@ -784,40 +784,47 @@ class LangGraphExecutor:
             from base.plugins.llm.models.provider import LLMProvider
             from base.plugins.llm.models.api_key import LLMApiKey
 
-            async def get_provider_and_key():
-                provider = await LLMProvider.get_or_none(id=target_model.provider_id)
-                if provider:
-                    api_key = await LLMApiKey.filter(model_id=target_model.id).first()
-                    return provider, api_key
-                return None, None
+            logger.info(f"[准备聊天服务] 开始获取提供者和API密钥...")
+            logger.debug(f"[准备聊天服务] 查询提供者: provider_id={target_model.provider_id}")
             
-            provider, api_key = await asyncio.wait_for(get_provider_and_key(), timeout=10.0)
+            provider = await LLMProvider.get_or_none(id=target_model.provider_id)
+            if not provider:
+                logger.debug(f"[准备聊天服务] 未找到提供者")
+                return None, None, "未找到提供者"
             
-            if provider and api_key:
-                endpoint_url = target_model.endpoint_url or provider.api_endpoint
-                if endpoint_url:
-                    endpoint_url = endpoint_url.rstrip('/')
-                    if '/responses' in endpoint_url:
-                        endpoint_url = endpoint_url.split('/responses')[0]
-                    if endpoint_url.endswith('/chat/completions'):
-                        endpoint_url = endpoint_url[:-len('/chat/completions')]
+            logger.debug(f"[准备聊天服务] 找到提供者: {provider.name_en}")
+            logger.debug(f"[准备聊天服务] 查询API密钥: model_id={target_model.id}")
+            
+            api_key = await LLMApiKey.filter(model_id=target_model.id).first()
+            logger.debug(f"[准备聊天服务] API密钥查询结果: {api_key is not None}")
+            
+            logger.info(f"[准备聊天服务] 获取完成: provider={provider is not None}, api_key={api_key is not None}")
+            
+            if not api_key:
+                return None, None, "未找到API密钥"
+            
+            endpoint_url = target_model.endpoint_url or provider.api_endpoint
+            if endpoint_url:
+                endpoint_url = endpoint_url.rstrip('/')
+                if '/responses' in endpoint_url:
+                    endpoint_url = endpoint_url.split('/responses')[0]
+                if endpoint_url.endswith('/chat/completions'):
+                    endpoint_url = endpoint_url[:-len('/chat/completions')]
 
-                service = await ChatService.get_provider_service(
-                    provider_name_en=provider.name_en,
-                    api_key=api_key.api_key,
-                    endpoint_url=endpoint_url,
-                    api_secret=api_key.api_secret
-                )
+            logger.info(f"[准备聊天服务] 创建ChatService, provider={provider.name_en}, endpoint={endpoint_url}")
+            service = await ChatService.get_provider_service(
+                provider_name_en=provider.name_en,
+                api_key=api_key.api_key,
+                endpoint_url=endpoint_url,
+                api_secret=api_key.api_secret
+            )
+            logger.info(f"[准备聊天服务] ChatService创建成功: {service is not None}")
 
-                actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
-                return service, actual_model_for_call, None
-        except asyncio.TimeoutError:
-            logger.error("获取提供者或API密钥超时")
-            return None, None, "获取提供者或API密钥超时"
+            actual_model_for_call = target_model.model_id if target_model.model_id else actual_model
+            return service, actual_model_for_call, None
         except Exception as e:
             logger.exception(f"准备聊天服务失败: {e}")
             return None, None, str(e)
-        return None, None, "未找到提供者或API密钥"
 
     @staticmethod
     async def _parse_and_set_response(llm_response: str, node_data: Dict, state: Dict[str, Any], actual_model: str, prompt: str) -> Dict[str, Any]:
@@ -900,7 +907,11 @@ class LangGraphExecutor:
         """调用LLM并处理工具调用"""
         from base.plugins.agent.tools.registry import ToolRegistry
 
-        response = await service.chat(**chat_kwargs)
+        try:
+            response = await service.chat(**chat_kwargs)
+        except Exception as e:
+            logger.exception(f"LLM调用异常: {e}")
+            return f"错误：大模型调用失败: {str(e)}"
 
         if isinstance(response, dict) and response.get("choices"):
             message = response["choices"][0].get("message", {})
@@ -926,6 +937,7 @@ class LangGraphExecutor:
                         })
 
                         second_response = await service.chat(**chat_kwargs)
+                        
                         if isinstance(second_response, dict) and second_response.get("choices"):
                             return second_response["choices"][0].get("message", {}).get("content", "")
                         else:
@@ -961,40 +973,66 @@ class LangGraphExecutor:
 
         llm_response = ""
         try:
+            logger.info(f"[LLM流式] 开始执行，node_id={node_id}, node_label={node_label}")
+            
             if not target_model:
                 error_msg = f"未找到可用的LLM模型。模型ID: {model_id}, 模型名称: {model_name}"
                 logger.error(error_msg)
                 state["error"] = error_msg
                 llm_response = f"错误：{error_msg}"
             else:
+                logger.info(f"[LLM流式] 找到目标模型: {target_model.model_name}")
+                
                 service, actual_model_for_call, error = await LangGraphExecutor._prepare_chat_service(target_model, actual_model)
+                logger.info(f"[LLM流式] 使用模型: {actual_model_for_call}")
+                
                 if not service:
                     error_msg = f"无法创建聊天服务。错误: {error}"
                     logger.error(error_msg)
                     state["error"] = error_msg
                     llm_response = f"错误：{error_msg}"
                 else:
+                    logger.info(f"[LLM流式] 聊天服务创建成功，服务类型: {type(service).__name__}")
+                    
                     chat_kwargs = await LangGraphExecutor._build_chat_kwargs(
                         node_data,
                         actual_model_for_call,
                         messages
                     )
-
+                    logger.info(f"[LLM流式] 构建聊天参数完成")
+                    logger.debug(f"[LLM流式] 聊天参数: {chat_kwargs}")
+                    
                     full_response = ""
-                    async for chunk in service.chat_stream(**chat_kwargs):
-                        if isinstance(chunk, dict) and chunk.get("choices"):
-                            delta = chunk["choices"][0].get("delta", {})
-                            content = delta.get("content", "")
-                            full_response += content
-                            if content and sse_yield_func:
-                                await sse_yield_func({
-                                    'type': 'stream',
-                                    'content': content,
-                                    'node_id': node_id
-                                })
+                    chunk_count = 0
+                    logger.info(f"[LLM流式] 开始调用 chat_stream...")
+                    
+                    try:
+                        async for chunk in service.chat_stream(**chat_kwargs):
+                            chunk_count += 1
+                            logger.debug(f"[LLM流式] 收到第 {chunk_count} 个响应块")
+                            
+                            if isinstance(chunk, dict) and chunk.get("choices"):
+                                delta = chunk["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                full_response += content
+                                logger.debug(f"[LLM流式] 提取内容: {content[:50]}...")
+                                
+                                if content and sse_yield_func:
+                                    logger.debug(f"[LLM流式] 推送SSE事件，内容长度: {len(content)}")
+                                    await sse_yield_func({
+                                        'type': 'stream',
+                                        'content': content,
+                                        'node_id': node_id
+                                    })
+                                    logger.debug(f"[LLM流式] SSE事件推送成功")
+                    except asyncio.TimeoutError:
+                        logger.error(f"[LLM流式] chat_stream 调用超时")
+                        raise
+                    
+                    logger.info(f"[LLM流式] chat_stream 调用完成，共收到 {chunk_count} 个块，响应长度: {len(full_response)}")
                     llm_response = full_response
         except Exception as e:
-            logger.exception(f"调用大模型失败: {e}")
+            logger.exception(f"[LLM流式] 调用大模型失败: {e}")
 
         if not llm_response:
             logger.warning("使用模拟响应")
@@ -1015,23 +1053,17 @@ class LangGraphExecutor:
         variables = state.get("variables", {})
 
         try:
-            async def get_skill_and_execute():
-                from base.plugins.agent.models.skill import Skill
-                from base.plugins.agent.services.skill_service import SkillService
+            from base.plugins.agent.models.skill import Skill
+            from base.plugins.agent.services.skill_service import SkillService
 
-                skill = await Skill.get_or_none(id=skill_id, status="active")
-                if skill:
-                    logger.debug(f"执行技能: {skill.name} (ID: {skill.id})")
-                    return await SkillService.execute_skill(skill, variables)
-                else:
-                    logger.warning(f"技能不存在或未激活: skill_id={skill_id}")
-                    return {"error": f"技能不存在或未激活: {skill_id}"}
-            
-            result = await asyncio.wait_for(get_skill_and_execute(), timeout=30.0)
-            state["variables"]["skill_result"] = result
-        except asyncio.TimeoutError:
-            logger.error(f"执行技能超时: skill_id={skill_id}")
-            state["variables"]["skill_result"] = {"error": f"执行技能超时"}
+            skill = await Skill.get_or_none(id=skill_id, status="active")
+            if skill:
+                logger.debug(f"执行技能: {skill.name} (ID: {skill.id})")
+                result = await SkillService.execute_skill(skill, variables)
+                state["variables"]["skill_result"] = result
+            else:
+                logger.warning(f"技能不存在或未激活: skill_id={skill_id}")
+                state["variables"]["skill_result"] = {"error": f"技能不存在或未激活: {skill_id}"}
         except Exception as e:
             logger.exception(f"执行技能失败: {e}")
             state["variables"]["skill_result"] = {"error": str(e)}
@@ -1045,31 +1077,25 @@ class LangGraphExecutor:
         tool_params = node_data.get("tool_params", {})
 
         try:
-            async def execute_tool():
-                from base.plugins.agent.tools.registry import ToolRegistry
+            from base.plugins.agent.tools.registry import ToolRegistry
 
-                variables = state.get("variables", {})
-                params = {}
-                for key, value in tool_params.items():
-                    if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
-                        var_name = value[2:-2]
-                        params[key] = variables.get(var_name, value)
-                    else:
-                        params[key] = value
-
-                tool_class = ToolRegistry.get_tool(tool_name)
-                if tool_class:
-                    logger.debug(f"执行工具: {tool_name}")
-                    return await tool_class.execute(**params)
+            variables = state.get("variables", {})
+            params = {}
+            for key, value in tool_params.items():
+                if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
+                    var_name = value[2:-2]
+                    params[key] = variables.get(var_name, value)
                 else:
-                    logger.warning(f"工具不存在: {tool_name}")
-                    return {"error": f"工具不存在: {tool_name}"}
-            
-            result = await asyncio.wait_for(execute_tool(), timeout=60.0)
-            state["variables"]["tool_result"] = result
-        except asyncio.TimeoutError:
-            logger.error(f"执行工具超时: {tool_name}")
-            state["variables"]["tool_result"] = {"error": f"执行工具超时"}
+                    params[key] = value
+
+            tool_class = ToolRegistry.get_tool(tool_name)
+            if tool_class:
+                logger.debug(f"执行工具: {tool_name}")
+                result = await tool_class.execute(**params)
+                state["variables"]["tool_result"] = result
+            else:
+                logger.warning(f"工具不存在: {tool_name}")
+                state["variables"]["tool_result"] = {"error": f"工具不存在: {tool_name}"}
         except Exception as e:
             logger.exception(f"执行工具失败: {e}")
             state["variables"]["tool_result"] = {"error": str(e)}
