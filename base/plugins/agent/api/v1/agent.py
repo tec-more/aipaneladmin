@@ -214,9 +214,33 @@ async def execute_agent_unified(
                 if info.get('agent_id') == agent_id:
                     return fail_response(msg="智能体正在执行中，请稍后再试", code=409)
             
+            # 在进入SSE生成器之前，先执行预加载
+            from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
+            flow_data = agent.graph_definition or {}
+            nodes = flow_data.get("nodes", [])
+            
+            print(f"[API] 开始预加载资源...")
+            try:
+                llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
+                skill_resources = await LangGraphExecutor._preload_skill_resources(nodes)
+                print(f"[API] 预加载成功，LLM资源: {len(llm_resources)}, 技能资源: {len(skill_resources)}")
+            except ValueError as e:
+                print(f"[API] 预加载失败: {e}")
+                return fail_response(msg=str(e), code=400)
+            except Exception as e:
+                print(f"[API] 预加载异常: {e}")
+                import traceback
+                traceback.print_exc()
+                return fail_response(msg=f"资源预加载失败: {str(e)}", code=500)
+            
             # 生成执行ID
             execution_id = str(uuid.uuid4())
-            execution_manager[execution_id] = {'agent_id': agent_id, 'is_cancelled': False}
+            execution_manager[execution_id] = {
+                'agent_id': agent_id, 
+                'is_cancelled': False,
+                '_llm_resources': llm_resources,
+                '_skill_resources': skill_resources
+            }
             
             async def sse_generator():
                 try:

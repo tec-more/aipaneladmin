@@ -60,7 +60,9 @@ class LangGraphExecutor:
         customer_id: Optional[int] = None,
         user_id: Optional[int] = None,
         sse_yield_func=None,
-        execution_id: Optional[str] = None
+        execution_id: Optional[str] = None,
+        llm_resources: Optional[Dict] = None,
+        skill_resources: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         执行智能体
@@ -72,6 +74,8 @@ class LangGraphExecutor:
             user_id: 用户ID（用于私有记忆）
             sse_yield_func: SSE推送回调函数
             execution_id: 执行ID（用于追踪）
+            llm_resources: 预加载的LLM资源
+            skill_resources: 预加载的技能资源
             
         Returns:
             执行结果
@@ -100,7 +104,9 @@ class LangGraphExecutor:
                     customer_id=customer_id,
                     user_id=user_id,
                     sse_yield_func=sse_yield_func,
-                    execution_id=execution_id
+                    execution_id=execution_id,
+                    llm_resources=llm_resources,
+                    skill_resources=skill_resources
                 )
             else:
                 logger.warning("没有配置流程图，使用简化执行方式")
@@ -258,7 +264,9 @@ class LangGraphExecutor:
         customer_id: Optional[int] = None,
         user_id: Optional[int] = None,
         sse_yield_func=None,
-        execution_id: Optional[str] = None
+        execution_id: Optional[str] = None,
+        llm_resources: Optional[Dict] = None,
+        skill_resources: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         使用真正的 LangGraph 执行智能体结构图
@@ -271,6 +279,8 @@ class LangGraphExecutor:
             user_id: 用户ID（用于私有记忆）
             sse_yield_func: SSE推送回调函数
             execution_id: 执行ID（用于追踪）
+            llm_resources: 预加载的LLM资源
+            skill_resources: 预加载的技能资源
             
         Returns:
             执行结果
@@ -286,15 +296,20 @@ class LangGraphExecutor:
                 logger.warning("结构图没有节点，回退到简单执行")
                 return await LangGraphExecutor._execute_simple(agent, input_data)
 
-            # 预加载所有LLM节点所需的资源
-            logger.info("[预加载] 开始预加载LLM节点资源...")
-            llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
-            logger.info(f"[预加载] LLM资源预加载完成，资源数: {len(llm_resources)}")
+            # 使用传入的预加载资源，如果没有则执行预加载
+            if llm_resources is None:
+                logger.info("[预加载] 开始预加载LLM节点资源...")
+                llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
+                logger.info(f"[预加载] LLM资源预加载完成，资源数: {len(llm_resources)}")
+            else:
+                logger.info(f"[预加载] 使用传入的LLM资源，资源数: {len(llm_resources)}")
 
-            # 预加载所有技能资源
-            logger.info("[预加载] 开始预加载技能资源...")
-            skill_resources = await LangGraphExecutor._preload_skill_resources(nodes)
-            logger.info(f"[预加载] 技能资源预加载完成，资源数: {len(skill_resources)}")
+            if skill_resources is None:
+                logger.info("[预加载] 开始预加载技能资源...")
+                skill_resources = await LangGraphExecutor._preload_skill_resources(nodes)
+                logger.info(f"[预加载] 技能资源预加载完成，资源数: {len(skill_resources)}")
+            else:
+                logger.info(f"[预加载] 使用传入的技能资源，资源数: {len(skill_resources)}")
 
             workflow = StateGraph(Dict[str, Any])
             node_map = {node.get("id"): node for node in nodes}

@@ -287,12 +287,20 @@ class AgentService:
             async def execute_task():
                 print(f"[SSE生成器] execute_task 开始执行")
                 try:
+                    # 从 execution_manager 获取预加载的资源
+                    exec_info = execution_manager.get(execution_id, {})
+                    llm_resources = exec_info.get('_llm_resources', {})
+                    skill_resources = exec_info.get('_skill_resources', {})
+                    print(f"[SSE生成器] 获取预加载资源: LLM={len(llm_resources)}, 技能={len(skill_resources)}")
+                    
                     print(f"[SSE生成器] 开始调用 LangGraphExecutor.execute_agent")
                     result = await LangGraphExecutor.execute_agent(
                         agent=agent,
                         input_data=input_data,
                         sse_yield_func=wrapped_sse_yield,
-                        execution_id=execution_id
+                        execution_id=execution_id,
+                        llm_resources=llm_resources,
+                        skill_resources=skill_resources
                     )
                     print(f"[SSE生成器] execute_task 执行完成，result={result}")
                     return result
