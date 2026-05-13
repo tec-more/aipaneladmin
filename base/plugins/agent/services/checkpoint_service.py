@@ -229,17 +229,17 @@ class CheckpointService:
             logger.error(f"删除用户检查点失败: {e}")
             return False
     
-    def build_config(self, user_id: str, session_id: Optional[str] = None, 
+    def build_config(self, user_id: str, execution_id: Optional[str] = None, 
                      checkpoint_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """
         构建执行配置
         :param user_id: 用户ID
-        :param session_id: 会话ID（可选）
+        :param execution_id: 会话ID（可选）
         :param checkpoint_id: 检查点ID（可选，用于恢复）
         :param kwargs: 额外的元数据
         :return: 配置字典
         """
-        thread_id = self.create_thread_id(user_id, session_id)
+        thread_id = self.create_thread_id(user_id, execution_id)
         
         config: Dict[str, Any] = {
             "configurable": {"thread_id": thread_id}
@@ -250,7 +250,7 @@ class CheckpointService:
         
         metadata = {
             "user_id": user_id,
-            "session_id": thread_id.split(":", 1)[1] if ":" in thread_id else "",
+            "execution_id": execution_id or thread_id.split(":", 1)[1] if ":" in thread_id else "",
             **kwargs
         }
         config["metadata"] = metadata

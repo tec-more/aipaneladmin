@@ -8,16 +8,19 @@ import threading
 import time
 from datetime import datetime
 from operator import add
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Annotated, TypedDict
 
 from tortoise.exceptions import DoesNotExist
+
 
 # LangGraph 和 LangChain 相关导入
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langgraph.graph import StateGraph, END, START
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.message import add_messages
+from langgraph.graph import StateGraph, END, START, MessagesState
+from langgraph.channels import NamedBarrierValue, Topic, LastValue
+from langgraph.types import Command, interrupt
 
 # 本地导入
 from base.plugins.agent.models.agent import Agent
@@ -27,6 +30,25 @@ from base.plugins.agent.services.checkpoint_service import CheckpointService
 
 logger = logging.getLogger(__name__)
 
+
+def dict_merge_reducer(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
+    """字典合并reducer，支持并发更新"""
+    result = left.copy()
+    result.update(right)
+    return result
+
+
+class AgentState(TypedDict):
+    """智能体执行状态，支持并发更新"""
+    input: Dict[str, Any]
+    output: Dict[str, Any]
+    messages: List[Dict[str, Any]]
+    variables: Dict[str, Any]
+    node_results: Dict[str, Any]
+    execution_trace: List[Dict[str, Any]]
+    current_node: Optional[str]
+    error: Optional[str]
+    __interrupt__: Any
 
 def create_initial_state(input_data: Dict[str, Any], agent) -> Dict[str, Any]:
     """创建初始状态"""
@@ -115,7 +137,6 @@ class LangGraphExecutor:
             else:
                 logger.warning("没有配置流程图，使用简化执行方式")
                 return await LangGraphExecutor._execute_simple(agent, input_data)
-
         except Exception as e:
             logger.exception(f"执行智能体失败: {str(e)}")
             import traceback
@@ -318,7 +339,7 @@ class LangGraphExecutor:
             else:
                 logger.info(f"[预加载] 使用传入的技能资源，资源数: {len(skill_resources)}")
 
-            workflow = StateGraph(Dict[str, Any])
+            workflow = StateGraph(AgentState)
             node_map = {node.get("id"): node for node in nodes}
             start_node = LangGraphExecutor._find_start_node(nodes)
             start_node_id = start_node.get("id", "start") if start_node else "start"
@@ -448,9 +469,23 @@ class LangGraphExecutor:
 
             logger.info("调用 graph.ainvoke...")
             start_time = time.time()
-            
-            final_state = await graph_with_memory.ainvoke(initial_state, config)
-            
+            try:
+                current_state = await graph_with_memory.aget_state(config)
+                is_paused = current_state and current_state.values.get("__interrupt__") is not None
+            except:
+                is_paused = False
+            if is_paused:
+                # ✅ 恢复暂停：用户输入
+                user_input = input_data.get("text", "")
+                logger.info(f"[恢复执行] 从暂停点继续，用户输入: {user_input}")
+                final_state = await graph_with_memory.ainvoke(
+                    Command(resume=user_input),
+                    config=config
+                )
+            else:
+                # ✅ 首次执行
+                final_state = await graph_with_memory.ainvoke(initial_state, config)
+
             elapsed = time.time() - start_time
             logger.info(f"LangGraph 执行完成，耗时: {elapsed:.2f}秒")
             logger.debug(f"最终状态: {json.dumps(final_state, ensure_ascii=False, default=str)[:500]}...")
@@ -507,6 +542,14 @@ class LangGraphExecutor:
             return result
 
         except Exception as e:
+            if hasattr(e, "__class__") and e.__class__.__name__ == "GraphInterrupt":
+                logger.info("[LangGraph] 执行暂停，等待用户输入")
+                return {
+                    "success": True,
+                    "status": "waiting_for_user",
+                    "execution_id": execution_id,
+                    "message": "等待用户输入"
+                }
             logger.exception(f"LangGraph 执行失败: {e}")
             import traceback
             return {
@@ -514,7 +557,6 @@ class LangGraphExecutor:
                 "message": str(e),
                 "traceback": traceback.format_exc()
             }
-
     @staticmethod
     async def _execute_node_with_logging(current_node, state, sse_yield_func=None):
         """执行节点，带日志记录和 SSE 推送"""
@@ -757,8 +799,18 @@ class LangGraphExecutor:
 
     @staticmethod
     async def _execute_input_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行输入节点"""
-        state["variables"]["input"] = state["input"]
+        """
+        执行输入节点 - 自动保存检查点并暂停，等待用户输入
+        恢复后会把用户输入写入 variables["user_input"]
+        """
+        # 暂停在这里，自动 checkpoint，等待外部 Command(resume=xxx)
+        user_input = interrupt("等待用户输入")
+
+        # 恢复执行后，把用户输入存入状态
+        state["variables"]["user_input"] = user_input
+        state["variables"]["user_input_received"] = True
+
+        logger.info(f"[input节点] 收到用户输入: {user_input}")
         return state
 
     @staticmethod
@@ -1217,29 +1269,35 @@ class LangGraphExecutor:
         """执行工具节点"""
         tool_name = node_data.get("tool_name", "")
         tool_params = node_data.get("tool_params", {})
+        params = node_data.get("params", {})
 
         try:
             from base.plugins.agent.tools.registry import ToolRegistry
 
             variables = state.get("variables", {})
-            params = {}
-            for key, value in tool_params.items():
+            
+            final_params = {}
+            all_params = {**tool_params, **params}
+            for key, value in all_params.items():
                 if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
                     var_name = value[2:-2]
-                    params[key] = variables.get(var_name, value)
+                    final_params[key] = variables.get(var_name, value)
                 else:
-                    params[key] = value
+                    final_params[key] = value
 
             tool_class = ToolRegistry.get_tool(tool_name)
             if tool_class:
                 logger.debug(f"执行工具: {tool_name}")
-                result = await tool_class.execute(**params)
+                result = await tool_class.execute(**final_params)
+                state["variables"][tool_name] = result
                 state["variables"]["tool_result"] = result
             else:
                 logger.warning(f"工具不存在: {tool_name}")
+                state["variables"][tool_name] = {"error": f"工具不存在: {tool_name}"}
                 state["variables"]["tool_result"] = {"error": f"工具不存在: {tool_name}"}
         except Exception as e:
             logger.exception(f"执行工具失败: {e}")
+            state["variables"][tool_name] = {"error": str(e)}
             state["variables"]["tool_result"] = {"error": str(e)}
 
         return state

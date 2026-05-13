@@ -1,0 +1,100 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "position": {"x": 50, "y": 100},
+      "data": {"label": "开始"}
+    },
+    {
+      "id": "extract_params",
+      "data": {
+        "label": "参数提取",
+        "prompt": "你是一个严格的参数提取器。从用户输入中提取旅行参数，严格输出JSON格式。\n\n用户输入：{{input}}\n\n参数提取规则：\n- destination: 目的地，如'去佛山'取'佛山'\n- from_city: 出发地，如'从广州出发'取'广州'\n- checkin: 入住日期，格式YYYY-MM-DD\n- checkout: 退房日期，格式YYYY-MM-DD\n- travel_date: 出发日期，格式YYYY-MM-DD\n- guests: 人数，数字\n- budget: 预算金额，数字\n- needs_more: 是否需要追问(true/false)\n- question: 追问问题，无则空\n\n日期解析规则：\n- '26年5月23-25日' → checkin='2026-05-23', checkout='2026-05-25', travel_date='2026-05-23'\n- '5月23-25日' → checkin='2026-05-23', checkout='2026-05-25', travel_date='2026-05-23'\n- '5月23日' → travel_date='2026-05-23'\n- '住3天' → checkout = checkin + 3天\n\n输出格式：\n{\"destination\":\"\",\"from_city\":\"\",\"checkin\":\"\",\"checkout\":\"\",\"travel_date\":\"\",\"guests\":0,\"budget\":0,\"needs_more\":false,\"question\":\"\"}",
+        "stream": false,
+        "modelId": 1,
+        "maxTokens": 1024,
+        "outputVar": "params",
+        "description": "从用户输入中提取旅行参数",
+        "temperature": 0.1
+      },
+      "type": "llm",
+      "position": {"x": 250, "y": 100}
+    },
+    {
+      "id": "check_params",
+      "data": {
+        "label": "检查参数",
+        "condition": "{{params.needs_more}} == true || {{params.destination}} == '' || {{params.checkin}} == '' || {{params.checkout}} == '' || {{params.travel_date}} == '' || {{params.guests}} == 0",
+        "description": "判断参数是否完整"
+      },
+      "type": "condition",
+      "position": {"x": 450, "y": 100}
+    },
+    {
+      "id": "ask_user",
+      "data": {
+        "label": "追问用户",
+        "prompt": "{{params.question}}",
+        "stream": false,
+        "modelId": 1,
+        "maxTokens": 512,
+        "outputVar": "question",
+        "description": "输出追问问题",
+        "temperature": 0.7
+      },
+      "type": "llm",
+      "position": {"x": 650, "y": 50}
+    },
+    {
+      "id": "wait_input",
+      "type": "input",
+      "position": {"x": 650, "y": 150},
+      "data": {
+        "label": "等待用户输入",
+        "description": "暂停执行，等待用户回复"
+      }
+    },
+    {
+      "id": "final_plan",
+      "data": {
+        "label": "生成方案",
+        "prompt": "请根据用户的旅行需求，生成详细的旅行方案。\n\n用户需求：\n- 目的地：{{params.destination}}\n- 出发地：{{params.from_city}}\n- 入住日期：{{params.checkin}}\n- 退房日期：{{params.checkout}}\n- 出发日期：{{params.travel_date}}\n- 人数：{{params.guests}}人\n- 预算：{{params.budget}}元\n\n请用友好、结构化的格式输出完整旅行方案，包括：\n1. 行程概览\n2. 每日行程安排\n3. 交通建议\n4. 住宿建议\n5. 景点推荐\n6. 预算估算\n7. 出行提示",
+        "stream": true,
+        "modelId": 1,
+        "maxTokens": 2048,
+        "outputVar": "final_plan",
+        "description": "生成最终旅行方案",
+        "temperature": 0.7
+      },
+      "type": "llm",
+      "position": {"x": 650, "y": 250}
+    },
+    {
+      "id": "output_plan",
+      "type": "output",
+      "position": {"x": 650, "y": 350},
+      "data": {
+        "label": "输出方案",
+        "outputVar": "final_plan",
+        "outputContent": "{{final_plan}}"
+      }
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "position": {"x": 650, "y": 450},
+      "data": {"label": "结束"}
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "start", "target": "extract_params"},
+    {"id": "e2", "source": "extract_params", "target": "check_params"},
+    {"id": "e3", "source": "check_params", "target": "ask_user", "condition": "true"},
+    {"id": "e4", "source": "ask_user", "target": "wait_input"},
+    {"id": "e5", "source": "wait_input", "target": "extract_params"},
+    {"id": "e6", "source": "check_params", "target": "final_plan", "condition": "false"},
+    {"id": "e7", "source": "final_plan", "target": "output_plan"},
+    {"id": "e8", "source": "output_plan", "target": "end"}
+  ]
+}

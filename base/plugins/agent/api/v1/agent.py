@@ -183,7 +183,8 @@ async def delete_agent(agent_id: int):
 async def execute_agent_unified(
     agent_id: int, 
     input_data: dict,
-    stream: Optional[bool] = Query(None, description="是否强制使用流式返回")
+    stream: Optional[bool] = Query(None, description="是否强制使用流式返回"),
+    execution_id: Optional[str] = None   # 前端传回来
 ):
     """
     统一智能体执行接口
@@ -234,7 +235,7 @@ async def execute_agent_unified(
                 return fail_response(msg=f"资源预加载失败: {str(e)}", code=500)
             
             # 生成执行ID
-            execution_id = str(uuid.uuid4())
+            execution_id = execution_id or str(uuid.uuid4())
             execution_manager[execution_id] = {
                 'agent_id': agent_id, 
                 'is_cancelled': False,
