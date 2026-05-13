@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from base.plugins.agent.schemas.agent import AgentCreate, AgentUpdate, AgentResponse
 from base.plugins.agent.services.agent_service import AgentService
+from base.plugins.agent.services.checkpoint_service import CheckpointService
+from base.common.security import get_current_actor
 from base.common.response import success_response, fail_response
 import uuid
 import asyncio
@@ -184,7 +186,8 @@ async def execute_agent_unified(
     agent_id: int, 
     input_data: dict,
     stream: Optional[bool] = Query(None, description="是否强制使用流式返回"),
-    execution_id: Optional[str] = None   # 前端传回来
+    execution_id: Optional[str] = None ,  # 前端传回来
+    actor: dict = Depends(get_current_actor)  # 统一接收
 ):
     """
     统一智能体执行接口
@@ -205,7 +208,7 @@ async def execute_agent_unified(
         
         if agent.status != "active":
             return fail_response(msg="智能体未激活", code=400)
-        
+        checkpoint_service = CheckpointService.get_instance()
         # 判断是否使用SSE模式
         use_sse = stream if stream is not None else AgentService.should_use_sse(agent)
         
@@ -235,7 +238,7 @@ async def execute_agent_unified(
                 return fail_response(msg=f"资源预加载失败: {str(e)}", code=500)
             
             # 生成执行ID
-            execution_id = execution_id or str(uuid.uuid4())
+            execution_id = execution_id or checkpoint_service.create_thread_id(actor, execution_id)
             execution_manager[execution_id] = {
                 'agent_id': agent_id, 
                 'is_cancelled': False,
@@ -245,7 +248,7 @@ async def execute_agent_unified(
             
             async def sse_generator():
                 try:
-                    async for data in AgentService.sse_execution_generator(agent, input_data, execution_id, execution_manager):
+                    async for data in AgentService.sse_execution_generator(agent, input_data, execution_id, execution_manager, actor):
                         yield data
                 finally:
                     if execution_id in execution_manager:

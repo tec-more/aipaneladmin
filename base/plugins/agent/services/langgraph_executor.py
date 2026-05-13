@@ -79,8 +79,7 @@ class LangGraphExecutor:
     async def execute_agent(
         agent: Agent,
         input_data: Dict[str, Any],
-        customer_id: Optional[int] = None,
-        user_id: Optional[int] = None,
+        actor: dict,
         sse_yield_func=None,
         execution_id: Optional[str] = None,
         llm_resources: Optional[Dict] = None,
@@ -92,8 +91,7 @@ class LangGraphExecutor:
         Args:
             agent: 智能体对象
             input_data: 输入数据
-            customer_id: 客户ID（用于私有记忆）
-            user_id: 用户ID（用于私有记忆）
+            actor: 智能体体（客户或用户）
             sse_yield_func: SSE推送回调函数
             execution_id: 执行ID（用于追踪）
             llm_resources: 预加载的LLM资源
@@ -123,8 +121,7 @@ class LangGraphExecutor:
                     agent=agent,
                     flow_data=flow_data,
                     input_data=input_data,
-                    customer_id=customer_id,
-                    user_id=user_id,
+                    actor=actor,
                     sse_yield_func=sse_yield_func,
                     execution_id=execution_id,
                     llm_resources=llm_resources,
@@ -289,8 +286,7 @@ class LangGraphExecutor:
         agent: Agent,
         flow_data: Dict[str, Any],
         input_data: Dict[str, Any],
-        customer_id: Optional[int] = None,
-        user_id: Optional[int] = None,
+        actor: dict,
         sse_yield_func=None,
         execution_id: Optional[str] = None,
         llm_resources: Optional[Dict] = None,
@@ -303,8 +299,7 @@ class LangGraphExecutor:
             agent: 智能体对象
             flow_data: 结构图数据
             input_data: 输入数据
-            customer_id: 客户ID（用于私有记忆）
-            user_id: 用户ID（用于私有记忆）
+            actor: 智能体执行上下文
             sse_yield_func: SSE推送回调函数
             execution_id: 执行ID（用于追踪）
             llm_resources: 预加载的LLM资源
@@ -455,17 +450,17 @@ class LangGraphExecutor:
             checkpoint_service = CheckpointService.get_instance()
             checkpointer = checkpoint_service.get_checkpointer()
             config = checkpoint_service.build_config(
-                user_id=str(user_id),
+                actor=actor,
                 agent_id=agent.id,
                 agent_name=agent.name,
                 execution_id=execution_id
             )
             graph_with_memory = workflow.compile(checkpointer=checkpointer)
             
-            import uuid
-            thread_id = str(uuid.uuid4())
-            config = {"configurable": {"thread_id": thread_id}}
-            logger.debug(f"配置: {json.dumps(config, ensure_ascii=False)}")
+            # import uuid
+            # thread_id = str(uuid.uuid4())
+            # config = {"configurable": {"thread_id": thread_id}}
+            # logger.debug(f"配置: {json.dumps(config, ensure_ascii=False)}")
 
             logger.info("调用 graph.ainvoke...")
             start_time = time.time()
@@ -494,8 +489,7 @@ class LangGraphExecutor:
                 agent=agent,
                 state=final_state,
                 input_data=input_data,
-                customer_id=customer_id,
-                user_id=user_id
+                actor=actor
             )
             logger.info("[LangGraph] 记忆保存完成，准备返回结果")
 
@@ -725,7 +719,7 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _save_result_to_memory(agent, state, input_data, customer_id=None, user_id=None):
+    async def _save_result_to_memory(agent, state, input_data, actor=None):
         """保存执行结果到长期记忆"""
         try:
             from base.plugins.agent.schemas.memory import MemoryCreate
@@ -742,8 +736,8 @@ class LangGraphExecutor:
                     type="short_term",
                     importance=0.8,
                     memory_mode=memory_mode,
-                    customer_id=customer_id if memory_mode == "private" else None,
-                    user_id=user_id if memory_mode == "private" else None
+                    customer_id=actor.get('id')if memory_mode == "private" and actor.get('type') =='cus' else None,
+                    user_id=actor.get('id') if memory_mode == "private" and actor.get('type') =='usr' else None
                 )
                 await MemoryService.create_memory(input_memory_data)
                 logger.info("保存记忆: 输入内容已保存")
@@ -777,8 +771,8 @@ class LangGraphExecutor:
                                 type="long_term",
                                 importance=importance,
                                 memory_mode=memory_mode,
-                                customer_id=customer_id if memory_mode == "private" else None,
-                                user_id=user_id if memory_mode == "private" else None
+                                customer_id=actor.get('id')if memory_mode == "private" and actor.get('type') =='cus' else None,
+                                user_id=actor.get('id') if memory_mode == "private" and actor.get('type') =='usr' else None
                             )
                             logger.info(f"[保存记忆] 准备保存 {var_name}")
                             await MemoryService.create_memory(memory_data)

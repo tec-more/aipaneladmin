@@ -157,6 +157,26 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return user
 
 
+async def get_current_actor(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    token = credentials.credentials
+    payload = decode_access_token(token)
+
+    if not payload:
+        raise HTTPException(status_code=401)
+
+    # 现在这两个都有值了！
+    user_id = payload.get("sub")
+    user_type = payload.get("typ")
+
+    if not user_id or not user_type:
+        raise HTTPException(status_code=401, detail="请重新登录")
+
+    return {
+        "type": user_type,
+        "id": user_id
+    }
 async def get_current_user_id_ws(token: str = None) -> Optional[int]:
     """
     从JWT令牌中获取当前用户ID（WebSocket专用）

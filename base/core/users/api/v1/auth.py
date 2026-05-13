@@ -124,7 +124,7 @@ async def login(login_data: UserLogin, request: Request):
     # 创建访问令牌 - sub 必须是字符串
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(user.id), "username": user.username},
+        data={"sub": str(user.id), "typ": "usr", "username": user.username},
         expires_delta=access_token_expires
     )
 

@@ -55,25 +55,25 @@ class CheckpointService:
         """重置单例实例（用于测试或切换存储后端）"""
         cls._instance = None
     
-    def create_thread_id(self, user_id: str, session_id: Optional[str] = None) -> str:
+    def create_thread_id(self, actor: dict, execution_id: Optional[str] = None) -> str:
         """
         创建线程ID
-        :param user_id: 用户ID
-        :param session_id: 会话ID（可选，不提供则自动生成）
-        :return: thread_id 格式: user_id:session_id
+        :param actor: 用户信息
+        :param execution_id: 会话ID（可选，不提供则自动生成）
+        :return: thread_id 格式: typ_sub:execution_id
         """
-        if not session_id:
-            session_id = str(uuid.uuid4())
-        return f"{user_id}:{session_id}"
+        if not execution_id:
+            execution_id = str(uuid.uuid4())
+        return f"{actor.get('type')}_{actor.get('id')}:{execution_id}"
     
     def get_checkpointer(self) -> BaseCheckpointSaver:
         """获取检查点存储实例"""
         return self._checkpointer
     
-    def get_user_checkpoints(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_checkpoints(self, actor: dict) -> List[Dict[str, Any]]:
         """
         获取用户的所有检查点
-        :param user_id: 用户ID
+        :param actor: 用户信息
         :return: 检查点列表
         """
         try:
@@ -82,14 +82,14 @@ class CheckpointService:
             
             for cp in all_checkpoints:
                 cp_thread_id = cp.get("configurable", {}).get("thread_id", "")
-                if cp_thread_id.startswith(f"{user_id}:"):
-                    session_id = cp_thread_id.split(":", 1)[1] if ":" in cp_thread_id else ""
+                if cp_thread_id.startswith(f"{actor.get('type')}_{actor.get('id')}:"):
+                    execution_id = cp_thread_id.split(":", 1)[1] if ":" in cp_thread_id else ""
                     
                     user_checkpoints.append({
                         "checkpoint_id": cp.get("checkpoint_id", ""),
                         "thread_id": cp_thread_id,
-                        "session_id": session_id,
-                        "user_id": user_id,
+                        "execution_id": execution_id,
+                        "user_id": actor.get('id'),
                         "metadata": cp.get("metadata", {}),
                         "created_at": cp.get("created_at"),
                         "state_summary": {
@@ -105,14 +105,14 @@ class CheckpointService:
             logger.error(f"获取用户检查点失败: {e}")
             return []
     
-    def get_session_checkpoints(self, user_id: str, session_id: str) -> List[Dict[str, Any]]:
+    def get_session_checkpoints(self, actor: dict, execution_id: str) -> List[Dict[str, Any]]:
         """
         获取用户特定会话的检查点
-        :param user_id: 用户ID
-        :param session_id: 会话ID
+        :param actor: 用户信息
+        :param execution_id: 会话ID
         :return: 检查点列表
         """
-        thread_id = self.create_thread_id(user_id, session_id)
+        thread_id = self.create_thread_id(actor, execution_id)
         
         try:
             checkpoints = list(self._checkpointer.list_checkpoints(
@@ -122,8 +122,8 @@ class CheckpointService:
             return [{
                 "checkpoint_id": cp.get("checkpoint_id", ""),
                 "thread_id": thread_id,
-                "session_id": session_id,
-                "user_id": user_id,
+                "execution_id": execution_id,
+                "user_id": actor.get('id'),
                 "metadata": cp.get("metadata", {}),
                 "created_at": cp.get("created_at"),
                 "parent_checkpoint_id": cp.get("parent_checkpoint_id")
@@ -133,7 +133,7 @@ class CheckpointService:
             logger.error(f"获取会话检查点失败: {e}")
             return []
     
-    def get_checkpoint(self, user_id: str, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+    def get_checkpoint(self, actor: dict, checkpoint_id: str) -> Optional[Dict[str, Any]]:
         """
         获取单个检查点详情
         :param user_id: 用户ID
@@ -146,12 +146,12 @@ class CheckpointService:
             for cp in all_checkpoints:
                 if cp.get("checkpoint_id") == checkpoint_id:
                     cp_thread_id = cp.get("configurable", {}).get("thread_id", "")
-                    if cp_thread_id.startswith(f"{user_id}:"):
+                    if cp_thread_id.startswith(f"{actor.get('type')}_{actor.get('id')}:"):
                         return {
                             "checkpoint_id": cp.get("checkpoint_id", ""),
                             "thread_id": cp_thread_id,
-                            "user_id": user_id,
-                            "session_id": cp_thread_id.split(":", 1)[1] if ":" in cp_thread_id else "",
+                            "user_id": actor.get('id'),
+                            "execution_id": cp_thread_id.split(":", 1)[1] if ":" in cp_thread_id else "",
                             "metadata": cp.get("metadata", {}),
                             "state": cp.get("state", {}),
                             "created_at": cp.get("created_at"),
@@ -164,15 +164,15 @@ class CheckpointService:
             logger.error(f"获取检查点详情失败: {e}")
             return None
     
-    def delete_checkpoint(self, user_id: str, checkpoint_id: str) -> bool:
+    def delete_checkpoint(self, actor: dict, checkpoint_id: str) -> bool:
         """
         删除检查点
-        :param user_id: 用户ID
+        :param actor: 用户信息
         :param checkpoint_id: 检查点ID
         :return: 是否删除成功
         """
         try:
-            checkpoint = self.get_checkpoint(user_id, checkpoint_id)
+            checkpoint = self.get_checkpoint(actor, checkpoint_id)
             if not checkpoint:
                 logger.warning(f"检查点不存在: {checkpoint_id}")
                 return False
@@ -190,15 +190,15 @@ class CheckpointService:
             logger.error(f"删除检查点失败: {e}")
             return False
     
-    def delete_session_checkpoints(self, user_id: str, session_id: str) -> bool:
+    def delete_session_checkpoints(self, actor: dict, execution_id: str) -> bool:
         """
         删除会话的所有检查点
         :param user_id: 用户ID
-        :param session_id: 会话ID
+        :param execution_id: 会话ID
         :return: 是否删除成功
         """
         try:
-            thread_id = self.create_thread_id(user_id, session_id)
+            thread_id = self.create_thread_id(actor, execution_id)
             self._checkpointer.delete_checkpoint({"configurable": {"thread_id": thread_id}})
             logger.info(f"会话检查点已删除: {thread_id}")
             return True
@@ -207,14 +207,14 @@ class CheckpointService:
             logger.error(f"删除会话检查点失败: {e}")
             return False
     
-    def delete_user_checkpoints(self, user_id: str) -> bool:
+    def delete_user_checkpoints(self, actor: dict) -> bool:
         """
         删除用户的所有检查点
         :param user_id: 用户ID
         :return: 是否删除成功
         """
         try:
-            checkpoints = self.get_user_checkpoints(user_id)
+            checkpoints = self.get_user_checkpoints(actor)
             for cp in checkpoints:
                 self._checkpointer.delete_checkpoint({
                     "configurable": {
@@ -222,24 +222,24 @@ class CheckpointService:
                         "checkpoint_id": cp["checkpoint_id"]
                     }
                 })
-            logger.info(f"用户所有检查点已删除: {user_id}")
+            logger.info(f"用户所有检查点已删除: {actor.get('id')}_{actor.get('type')}")
             return True
         
         except Exception as e:
             logger.error(f"删除用户检查点失败: {e}")
             return False
     
-    def build_config(self, user_id: str, execution_id: Optional[str] = None, 
+    def build_config(self, actor: dict, execution_id: Optional[str] = None, 
                      checkpoint_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """
         构建执行配置
-        :param user_id: 用户ID
+        :param actor: 用户信息
         :param execution_id: 会话ID（可选）
         :param checkpoint_id: 检查点ID（可选，用于恢复）
         :param kwargs: 额外的元数据
         :return: 配置字典
         """
-        thread_id = self.create_thread_id(user_id, execution_id)
+        thread_id = self.create_thread_id(actor, execution_id)
         
         config: Dict[str, Any] = {
             "configurable": {"thread_id": thread_id}
@@ -249,7 +249,8 @@ class CheckpointService:
             config["configurable"]["checkpoint_id"] = checkpoint_id
         
         metadata = {
-            "user_id": user_id,
+            "user_id": actor.get('id'),
+            "user_type": actor.get('type'),
             "execution_id": execution_id or thread_id.split(":", 1)[1] if ":" in thread_id else "",
             **kwargs
         }

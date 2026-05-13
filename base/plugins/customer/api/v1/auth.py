@@ -199,7 +199,7 @@ async def customer_login_with_password(login_data: CustomerPasswordLoginSchema):
     user_id = customer.system_user_id if customer.system_user_id else customer.id
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(user_id), "email": customer.email},
+        data={"sub": str(user_id), "typ": "cus", "email": customer.email},
         expires_delta=access_token_expires
     )
 

@@ -76,7 +76,7 @@ class AgentService:
 
 
     @staticmethod
-    async def execute_agent(agent_id: int, input_data: dict) -> dict:
+    async def execute_agent(agent_id: int, input_data: dict, actor: dict) -> dict:
         """
         执行智能体
         使用结构图（LangGraph的具现化）来实现智能体内部的逻辑控制
@@ -88,7 +88,7 @@ class AgentService:
 
         try:
             from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
-            result = await LangGraphExecutor.execute_agent(agent, input_data)
+            result = await LangGraphExecutor.execute_agent(agent, input_data, actor)
             return result
 
         except Exception as e:
@@ -225,7 +225,8 @@ class AgentService:
         agent: Agent,
         input_data: Dict[str, Any],
         execution_id: str,
-        execution_manager: dict
+        execution_manager: dict,
+        actor: dict
     ) -> AsyncGenerator[str, None]:
         """
         SSE事件生成器 - 实时推送执行过程（支持边思考边输出）
@@ -297,10 +298,11 @@ class AgentService:
                     result = await LangGraphExecutor.execute_agent(
                         agent=agent,
                         input_data=input_data,
+                        actor=actor,
                         sse_yield_func=wrapped_sse_yield_with_counter,
                         execution_id=execution_id,
                         llm_resources=llm_resources,
-                        skill_resources=skill_resources
+                        skill_resources=skill_resources,
                     )
                     return result
                 except Exception as e:
