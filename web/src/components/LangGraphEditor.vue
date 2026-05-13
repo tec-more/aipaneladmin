@@ -1249,6 +1249,8 @@ const handleSSEData = (data) => {
       if (assistantMessage.value) {
         if (accumulatedStreamContent) {
           finalContent = accumulatedStreamContent;
+        } else if (!finalContent && data.variables && data.variables.llm_output) {
+          finalContent = data.variables.llm_output.response || data.variables.llm_output.text || '';
         } else if (!finalContent) {
           finalContent = '执行完成';
         }
@@ -1387,13 +1389,39 @@ const handleNonSSEData = (result) => {
   let assistantResponse = '';
   if (typeof result === 'string') {
     assistantResponse = result;
-  } else if (result.output || result.result || result.text || result.response) {
-    assistantResponse = result.output || result.result || result.text || result.response;
+  } else if (result.output) {
+    if (typeof result.output === 'string') {
+      assistantResponse = result.output;
+    } else if (result.output.text) {
+      assistantResponse = result.output.text;
+    } else if (result.output.response) {
+      assistantResponse = result.output.response;
+    } else {
+      assistantResponse = JSON.stringify(result.output, null, 2);
+    }
+  } else if (result.result) {
+    if (typeof result.result === 'string') {
+      assistantResponse = result.result;
+    } else if (result.result.output || result.result.text) {
+      assistantResponse = result.result.output || result.result.text;
+    }
+  } else if (result.text || result.response) {
+    assistantResponse = result.text || result.response;
+  } else if (result.data && (result.data.output || result.data.result)) {
+    const dataOutput = result.data.output || result.data.result;
+    if (typeof dataOutput === 'string') {
+      assistantResponse = dataOutput;
+    } else if (dataOutput.text) {
+      assistantResponse = dataOutput.text;
+    }
   } else if (result.variables) {
     const vars = result.variables;
     assistantResponse = vars.finalReport || vars.response || vars.text || vars.output || '';
     if (!assistantResponse && vars.llmOutput) {
       assistantResponse = vars.llmOutput.response || vars.llmOutput.text || '';
+    }
+    if (!assistantResponse && vars.llm_output) {
+      assistantResponse = vars.llm_output.response || vars.llm_output.text || '';
     }
   }
   

@@ -475,12 +475,32 @@ class LangGraphExecutor:
                 }
             logger.info("[LangGraph] 下一步返回结果")
             logger.info("[LangGraph] 准备返回执行结果")
+            
+            output = final_state.get("output", {})
+            variables = final_state.get("variables", {})
+            
+            logger.info(f"[LangGraph] 最终状态 - output: {json.dumps(output, ensure_ascii=False)}")
+            logger.info(f"[LangGraph] 最终状态 - variables.keys: {list(variables.keys())}")
+            
+            if "llm_output" in variables:
+                llm_output = variables["llm_output"]
+                logger.info(f"[LangGraph] llm_output 内容: {json.dumps(llm_output, ensure_ascii=False)[:500]}...")
+            
+            output_keys = list(output.keys())
+            if len(output_keys) == 1 and "end_time" in output_keys:
+                logger.info("[LangGraph] output 只有 end_time，尝试从 variables 提取内容")
+                if variables.get("llm_output"):
+                    llm_response = variables["llm_output"].get("response", "")
+                    if llm_response:
+                        output["text"] = llm_response
+                        logger.info(f"[LangGraph] 已从 llm_output.response 提取内容，长度: {len(llm_response)}")
+            
             result = {
                 "success": True,
                 "message": "执行成功",
                 "input": input_data,
-                "output": final_state.get("output", {}),
-                "variables": final_state.get("variables", {}),
+                "output": output,
+                "variables": variables,
                 "trace": final_state.get("execution_trace", [])
             }
             logger.info(f"[LangGraph] 返回结果: success={result['success']}, output_keys={list(result['output'].keys())}")
