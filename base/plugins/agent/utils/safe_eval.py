@@ -130,6 +130,11 @@ class SafeEval:
         local_vars = variables.copy()
         local_vars.update(functions)
         
+        # 支持 JavaScript 风格的布尔值（true/false）
+        import re
+        expression = re.sub(r'\btrue\b', 'True', expression)
+        expression = re.sub(r'\bfalse\b', 'False', expression)
+        
         return eval(expression, safe_globals, local_vars)
     
     @staticmethod
