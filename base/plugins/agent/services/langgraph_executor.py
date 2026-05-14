@@ -1081,7 +1081,7 @@ class LangGraphExecutor:
             except Exception as e:
                 logger.warning(f"解析 JSON 失败: {e}")
 
-        output_variable = node_data.get("output_variable", "llm_output")
+        output_variable = node_data.get("output_var", node_data.get("output_variable", "llm_output"))
         if parsed_response:
             state["variables"][output_variable] = parsed_response
         else:
