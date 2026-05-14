@@ -1237,7 +1237,7 @@ class LangGraphExecutor:
 
         llm_response = ""
         try:
-            logger.info(f"[LLM流式] 开始执行，node_id={node_id}, node_label={node_label}")
+            # logger.info(f"[LLM流式] 开始执行，node_id={node_id}, node_label={node_label}")
             
             if not service:
                 error_msg = f"无法创建聊天服务。错误: {error}"
@@ -1252,36 +1252,36 @@ class LangGraphExecutor:
                     actual_model_for_call,
                     messages
                 )
-                logger.info(f"[LLM流式] 构建聊天参数完成")
+                # logger.info(f"[LLM流式] 构建聊天参数完成")
                 
                 full_response = ""
                 chunk_count = 0
-                logger.info(f"[LLM流式] 开始调用 chat_stream...")
+                # logger.info(f"[LLM流式] 开始调用 chat_stream...")
                 
                 try:
                     async for chunk in service.chat_stream(**chat_kwargs):
                         chunk_count += 1
-                        logger.info(f"[LLM流式] 收到第 {chunk_count} 个响应块")
+                        # logger.info(f"[LLM流式] 收到第 {chunk_count} 个响应块")
                         
                         if isinstance(chunk, dict) and chunk.get("choices"):
                             delta = chunk["choices"][0].get("delta", {})
                             content = delta.get("content", "")
                             full_response += content
-                            logger.info(f"[LLM流式] 提取内容: {content[:50]}...")
+                            # logger.info(f"[LLM流式] 提取内容: {content[:50]}...")
                             
                             if content and sse_yield_func:
-                                logger.info(f"[LLM流式] 推送SSE事件，内容长度: {len(content)}, 内容: {content}")
+                                # logger.info(f"[LLM流式] 推送SSE事件，内容长度: {len(content)}, 内容: {content}")
                                 await sse_yield_func({
                                     'type': 'stream',
                                     'content': content,
                                     'node_id': node_id
                                 })
-                                logger.info(f"[LLM流式] SSE事件推送成功")
+                                # logger.info(f"[LLM流式] SSE事件推送成功")
                 except asyncio.TimeoutError:
-                    logger.error(f"[LLM流式] chat_stream 调用超时")
+                    # logger.error(f"[LLM流式] chat_stream 调用超时")
                     raise
                 
-                logger.info(f"[LLM流式] chat_stream 调用完成，共收到 {chunk_count} 个块，响应长度: {len(full_response)}")
+                # logger.info(f"[LLM流式] chat_stream 调用完成，共收到 {chunk_count} 个块，响应长度: {len(full_response)}")
                 llm_response = full_response
         except Exception as e:
             logger.exception(f"[LLM流式] 调用大模型失败: {e}")
