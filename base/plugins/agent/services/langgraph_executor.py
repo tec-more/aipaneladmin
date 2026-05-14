@@ -386,33 +386,61 @@ class LangGraphExecutor:
                     if source_node and source_node.get("type") == "condition":
                         if source not in condition_edges:
                             condition_edges[source] = []
-                        condition_edges[source].append(target)
-                        logger.debug(f"条件边: {source} -> {target}")
+                        condition_edges[source].append(edge)  # 保存完整的边信息
+                        logger.debug(f"条件边: {source} -> {target}, 条件: {edge.get('condition', '')}")
                     else:
                         logger.info(f"添加边: {source} -> {target}")
                         workflow.add_edge(source, target)
 
-            for condition_node_id, targets in condition_edges.items():
-                def create_condition_router(node_id, target_list):
+            for condition_node_id, edge_list in condition_edges.items():
+                def create_condition_router(node_id, edges):
                     async def condition_router(state: Dict[str, Any]):
                         variables = state.get("variables", {})
-                        condition_result = variables.get("condition_result", {}).get("result", False)
-                        logger.debug(f"条件路由节点 {node_id} 结果: {condition_result}")
-                        if condition_result and len(target_list) > 0:
-                            return target_list[0]
-                        elif len(target_list) > 1:
-                            return target_list[1]
-                        elif len(target_list) > 0:
-                            return target_list[0]
-                        else:
-                            return END
+                        
+                        # 分离条件边和默认边
+                        conditional_edges = []
+                        default_edge = None
+                        
+                        for edge in edges:
+                            condition = edge.get("condition", "")
+                            if condition and condition != "":
+                                conditional_edges.append(edge)
+                            else:
+                                default_edge = edge
+                        
+                        # 按优先级排序条件边
+                        conditional_edges.sort(key=lambda x: x.get("priority", 0))
+                        
+                        # 依次检查条件边
+                        for edge in conditional_edges:
+                            if not edge.get("enabled", True):
+                                continue
+                                
+                            condition = edge.get("condition", "")
+                            edge_target = edge.get("target", "")
+                            
+                            try:
+                                if safe_eval(condition, variables):
+                                    logger.info(f"条件边匹配: {edge.get('id')} -> {edge_target}")
+                                    return edge_target
+                            except Exception as e:
+                                logger.warning(f"条件表达式执行失败 [{edge.get('id')}]: {e}")
+                        
+                        # 如果没有条件匹配，使用默认边
+                        if default_edge:
+                            default_target = default_edge.get("target")
+                            logger.info(f"使用默认路由: {default_edge.get('id')} -> {default_target}")
+                            return default_target
+                        
+                        logger.warning(f"没有找到匹配的边，返回 END")
+                        return END
                     return condition_router
 
-                if len(targets) > 0:
+                if len(edge_list) > 0:
                     workflow.add_conditional_edges(
                         condition_node_id,
-                        create_condition_router(condition_node_id, targets),
-                        targets
+                        create_condition_router(condition_node_id, edge_list),
+                        [e.get("target") for e in edge_list]
                     )
 
             for node in nodes:

@@ -50,7 +50,13 @@ const fetchAgentGraph = async () => {
       console.log('graph_definition.edges:', res.data.graph_definition.edges)
       
       initialNodes.value = res.data.graph_definition.nodes || []
-      initialEdges.value = res.data.graph_definition.edges || []
+      initialEdges.value = (res.data.graph_definition.edges || []).map(edge => ({
+        ...edge,
+        enabled: edge.enabled !== false,
+        priority: edge.priority || 0,
+        condition: edge.condition || '',
+        description: edge.description || ''
+      }))
       
       console.log('设置后的 initialNodes:', initialNodes.value)
       console.log('设置后的 initialEdges:', initialEdges.value)

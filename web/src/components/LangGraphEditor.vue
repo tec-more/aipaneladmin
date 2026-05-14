@@ -347,6 +347,19 @@
             <p><strong>源节点：</strong>{{ getNodeById(selectedEdge.source)?.data.label }}</p>
             <p><strong>目标节点：</strong>{{ getNodeById(selectedEdge.target)?.data.label }}</p>
           </div>
+          <el-divider content-position="left">属性配置</el-divider>
+          <el-form-item label="启用">
+            <el-switch v-model="selectedEdge.enabled" @change="updateEdgeData" />
+          </el-form-item>
+          <el-form-item label="优先级">
+            <el-input-number v-model="selectedEdge.priority" :min="0" :max="100" @change="updateEdgeData" />
+          </el-form-item>
+          <el-form-item label="条件表达式">
+            <el-input v-model="selectedEdge.condition" type="textarea" :rows="2" @change="updateEdgeData" placeholder="如: {{params.budget}} > 5000" />
+          </el-form-item>
+          <el-form-item label="条件描述">
+            <el-input v-model="selectedEdge.description" @change="updateEdgeData" placeholder="条件的简要描述" />
+          </el-form-item>
           <el-button type="danger" size="small" @click="deleteSelectedEdge" style="width: 100%">
             删除连线
           </el-button>
@@ -854,7 +867,11 @@ const onInputPointMouseUp = (event, node) => {
       const newEdge = {
         id: `edge-${Date.now()}`,
         source: edgeStartNode.value.id,
-        target: node.id
+        target: node.id,
+        enabled: true,
+        priority: 0,
+        condition: '',
+        description: ''
       };
       edges.value.push(newEdge);
       ElMessage.success('连线创建成功');
@@ -916,6 +933,14 @@ const deleteSelectedEdge = () => {
     }
     selectedEdge.value = null;
     ElMessage.success('连线已删除');
+  }
+};
+
+const updateEdgeData = () => {
+  if (selectedEdge.value) {
+    selectedEdge.value.enabled = selectedEdge.value.enabled !== false;
+    selectedEdge.value.priority = selectedEdge.value.priority || 0;
+    console.log('边的属性已更新:', selectedEdge.value);
   }
 };
 
@@ -1556,7 +1581,10 @@ const transformEdge = (edge, index) => {
     sourceHandle: edge.sourceHandle || null,
     targetHandle: edge.targetHandle || null,
     condition: edge.condition || null,
-    type: edge.type || 'default'
+    type: edge.type || 'default',
+    enabled: edge.enabled !== false,
+    priority: edge.priority || 0,
+    description: edge.description || ''
   };
 };
 
@@ -1641,7 +1669,13 @@ onMounted(() => {
     nodes.value = props.initialNodes;
   }
   if (props.initialEdges.length > 0) {
-    edges.value = props.initialEdges;
+    edges.value = props.initialEdges.map(edge => ({
+      ...edge,
+      enabled: edge.enabled !== false,
+      priority: edge.priority || 0,
+      condition: edge.condition || '',
+      description: edge.description || ''
+    }));
   }
 });
 
@@ -1671,8 +1705,16 @@ watch(() => props.initialEdges, (newEdges) => {
       edge => edge && edge.source && edge.target
     );
     if (clonedEdges.length > 0) {
+      // 确保新属性有默认值
+      const edgesWithDefaults = clonedEdges.map(edge => ({
+        ...edge,
+        enabled: edge.enabled !== false,
+        priority: edge.priority || 0,
+        condition: edge.condition || '',
+        description: edge.description || ''
+      }));
       selectedEdge.value = null;
-      edges.value.splice(0, edges.value.length, ...clonedEdges);
+      edges.value.splice(0, edges.value.length, ...edgesWithDefaults);
     }
   }
 }, { immediate: true });

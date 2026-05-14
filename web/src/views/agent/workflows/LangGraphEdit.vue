@@ -70,7 +70,11 @@ const fetchWorkflow = async () => {
           source: edge.source,
           target: edge.target,
           animated: true,
-          style: { stroke: '#409EFF' }
+          style: { stroke: '#409EFF' },
+          enabled: edge.enabled !== false,
+          priority: edge.priority || 0,
+          condition: edge.condition || '',
+          description: edge.description || ''
         }))
       }
     }

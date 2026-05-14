@@ -567,6 +567,19 @@
             <p><strong>源节点：</strong>{{ getNodeById(selectedEdge.source)?.data.label }}</p>
             <p><strong>目标节点：</strong>{{ getNodeById(selectedEdge.target)?.data.label }}</p>
           </div>
+          <el-divider content-position="left">属性配置</el-divider>
+          <el-form-item label="启用">
+            <el-switch v-model="selectedEdge.enabled" @change="updateEdgeData" />
+          </el-form-item>
+          <el-form-item label="优先级">
+            <el-input-number v-model="selectedEdge.priority" :min="0" :max="100" @change="updateEdgeData" />
+          </el-form-item>
+          <el-form-item label="条件表达式">
+            <el-input v-model="selectedEdge.condition" type="textarea" :rows="2" @change="updateEdgeData" placeholder="如: {{params.budget}} > 5000" />
+          </el-form-item>
+          <el-form-item label="条件描述">
+            <el-input v-model="selectedEdge.description" @change="updateEdgeData" placeholder="条件的简要描述" />
+          </el-form-item>
           <el-button type="danger" size="small" @click="deleteSelectedEdge" style="width: 100%">
             删除连线
           </el-button>
@@ -854,7 +867,13 @@ const fetchWorkflow = async () => {
     workflow.value = res.data
     if (res.data.definition) {
       nodes.value = res.data.definition.nodes || []
-      edges.value = res.data.definition.edges || []
+      edges.value = (res.data.definition.edges || []).map(edge => ({
+        ...edge,
+        enabled: edge.enabled !== false,
+        priority: edge.priority || 0,
+        condition: edge.condition || '',
+        description: edge.description || ''
+      }))
     }
   } catch (error) {
     ElMessage.error('获取工作流失败')
@@ -1013,7 +1032,11 @@ const onInputPointMouseUp = (event, node) => {
       const newEdge = {
         id: `edge-${Date.now()}`,
         source: edgeStartNode.value.id,
-        target: node.id
+        target: node.id,
+        enabled: true,
+        priority: 0,
+        condition: '',
+        description: ''
       }
       edges.value.push(newEdge)
       ElMessage.success('连线创建成功')
@@ -1082,6 +1105,14 @@ const updateNodeData = () => {
       output_type: nodeConfig.output_type,
       output_content: nodeConfig.output_content
     }
+  }
+}
+
+const updateEdgeData = () => {
+  if (selectedEdge.value) {
+    selectedEdge.value.enabled = selectedEdge.value.enabled !== false
+    selectedEdge.value.priority = selectedEdge.value.priority || 0
+    console.log('边的属性已更新:', selectedEdge.value)
   }
 }
 
