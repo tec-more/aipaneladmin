@@ -392,6 +392,8 @@ class LangGraphExecutor:
                         logger.info(f"添加边: {source} -> {target}")
                         workflow.add_edge(source, target)
 
+            import re
+            
             for condition_node_id, edge_list in condition_edges.items():
                 def create_condition_router(node_id, edges):
                     async def condition_router(state: Dict[str, Any]):
@@ -424,20 +426,26 @@ class LangGraphExecutor:
                             
                             try:
                                 # 将模板语法转换为可执行表达式
-                                import re
-                                expr = condition
-                                # 替换 {{xxx}} 或 {{xxx.yyy}} 为 variables.get('xxx', {}).get('yyy', '')
                                 def replace_template(match):
                                     path = match.group(1)
                                     parts = path.split('.')
-                                    result = "variables"
+                                    result = "get_var(variables"
                                     for part in parts:
-                                        result += f".get('{part}', {{}})"
+                                        result += f", '{part}'"
+                                    result += ")"
                                     return result
                                 expr = re.sub(r'\{\{(\w+(\.\w+)*)\}\}', replace_template, condition)
                                 
+                                # 定义安全的变量获取函数
+                                def get_var(data, *keys):
+                                    for key in keys:
+                                        if data is None or not isinstance(data, dict):
+                                            return None
+                                        data = data.get(key, None)
+                                    return data
+                                
                                 logger.debug(f"计算条件表达式: {condition} -> {expr}")
-                                result = safe_eval(expr, {"variables": variables})
+                                result = safe_eval(expr, {"variables": variables, "get_var": get_var})
                                 
                                 if result:
                                     logger.info(f"条件边匹配成功: {edge.get('id')} -> {edge_target}, 条件: {condition}")

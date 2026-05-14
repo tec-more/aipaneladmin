@@ -49,7 +49,7 @@ class SafeEval:
         else:
             logger.warning("simpleeval 不可用，使用受限的 eval()")
             return SafeEval._evaluate_with_limited_eval(
-                expression, variables
+                expression, variables, functions
             )
     
     @staticmethod
@@ -96,7 +96,8 @@ class SafeEval:
     @staticmethod
     def _evaluate_with_limited_eval(
         expression: str,
-        variables: Dict[str, Any]
+        variables: Dict[str, Any],
+        functions: Optional[Dict[str, Any]] = None
     ) -> Any:
         """
         使用受限的 eval() 求值（备选方案）
@@ -104,10 +105,13 @@ class SafeEval:
         Args:
             expression: 表达式字符串
             variables: 变量字典
+            functions: 函数字典
             
         Returns:
             求值结果
         """
+        functions = functions or {}
+        
         # 限制 globals
         safe_globals = {
             "__builtins__": {
@@ -122,7 +126,11 @@ class SafeEval:
             }
         }
         
-        return eval(expression, safe_globals, variables)
+        # 将函数合并到变量中，供 eval 使用
+        local_vars = variables.copy()
+        local_vars.update(functions)
+        
+        return eval(expression, safe_globals, local_vars)
     
     @staticmethod
     def evaluate_condition(
