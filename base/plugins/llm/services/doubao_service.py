@@ -270,7 +270,7 @@ class DoubaoService:
                         await asyncio.sleep(0.01)
                         continue
                     
-                    logger.debug(f"[DoubaoService] 从队列获取: msg_type={msg_type}")
+                    # logger.debug(f"[DoubaoService] 从队列获取: msg_type={msg_type}")
                     
                     if msg_type == 'done':
                         logger.info(f"[DoubaoService] 收到 done 消息，退出循环")

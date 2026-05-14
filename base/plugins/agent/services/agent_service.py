@@ -272,18 +272,18 @@ class AgentService:
             sse_queue = SSEQueue()
 
             async def wrapped_sse_yield(event):
-                logger.info(f"[agent API] wrapped_sse_yield 收到事件: {event}")
+                # logger.info(f"[agent API] wrapped_sse_yield 收到事件: {event}")
                 await sse_queue.put(event)
-                logger.info(f"[agent API] 事件已入队列，队列大小: {sse_queue.queue.qsize()}")
+                # logger.info(f"[agent API] 事件已入队列，队列大小: {sse_queue.queue.qsize()}")
 
             sse_yield_call_count = [0]
 
             async def wrapped_sse_yield_with_counter(event):
                 sse_yield_call_count[0] += 1
                 count = sse_yield_call_count[0]
-                logger.info(f"[agent API] wrapped_sse_yield 调用 #{count}: {event}")
+                # logger.info(f"[agent API] wrapped_sse_yield 调用 #{count}: {event}")
                 await sse_queue.put(event)
-                logger.info(f"[agent API] 事件已入队列 #{count}，队列大小: {sse_queue.queue.qsize()}")
+                # logger.info(f"[agent API] 事件已入队列 #{count}，队列大小: {sse_queue.queue.qsize()}")
 
             async def execute_task():
                 logger.info(f"[SSE生成器] execute_task 开始执行")
@@ -359,7 +359,7 @@ class AgentService:
                     try:
                         if not sse_queue.empty():
                             event = await asyncio.wait_for(sse_queue.get(), timeout=1.0)
-                            logger.info(f"[SSE Loop] 从队列获取事件发送: {event}")
+                            # logger.info(f"[SSE Loop] 从队列获取事件发送: {event}")
                             yield send_event(event)
                             last_activity = current_time
                         elif not task.done():
@@ -372,7 +372,7 @@ class AgentService:
 
                     if task.done() and sse_queue.empty():
                         done = True
-                        logger.info(f"[SSE Loop] 循环 #{loop_count}, elapsed={current_elapsed:.1f}s, task.done={task.done()}, done={done}, queue.empty={sse_queue.empty()}")
+                        # logger.info(f"[SSE Loop] 循环 #{loop_count}, elapsed={current_elapsed:.1f}s, task.done={task.done()}, done={done}, queue.empty={sse_queue.empty()}")
                         logger.info("[Execution] 任务已完成，队列已空，退出循环")
 
                 except Exception as e:
