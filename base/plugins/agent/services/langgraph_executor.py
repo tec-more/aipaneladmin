@@ -886,7 +886,7 @@ class LangGraphExecutor:
     @staticmethod
     async def _execute_output_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行输出节点"""
-        output_var = node_data.get("output_var", "result")
+        output_var = node_data.get("outputVar", "result")
         output_content = node_data.get("output_content", "")
 
         variables = state.get("variables", {})
@@ -1081,7 +1081,7 @@ class LangGraphExecutor:
             except Exception as e:
                 logger.warning(f"解析 JSON 失败: {e}")
 
-        output_variable = node_data.get("output_var", node_data.get("output_variable", "llm_output"))
+        output_variable = node_data.get("outputVar", "llm_output")
         if parsed_response:
             state["variables"][output_variable] = parsed_response
         else:
@@ -1503,7 +1503,7 @@ class LangGraphExecutor:
     async def _execute_template_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行模板节点"""
         template = node_data.get("template", "")
-        output_var = node_data.get("output_var", "template_output")
+        output_var = node_data.get("outputVar", "template_output")
 
         variables = state.get("variables", {})
         for key, value in variables.items():
@@ -1516,7 +1516,7 @@ class LangGraphExecutor:
     async def _execute_variable_aggregator_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行变量聚合器节点"""
         input_vars = node_data.get("input_vars", [])
-        output_var = node_data.get("output_var", "aggregated")
+        output_var = node_data.get("outputVar", "aggregated")
 
         aggregated = {}
         variables = state.get("variables", {})
@@ -1573,9 +1573,8 @@ class LangGraphExecutor:
     @staticmethod
     async def _execute_json_extractor_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行JSON提取节点"""
-        source_var = node_data.get("source_var", "")
-        json_path = node_data.get("json_path", "")
-        output_var = node_data.get("output_var", "extracted_json")
+        source_var = node_data.get("inputVariable", "")
+        output_var = node_data.get("outputVar", "extracted_json")
 
         source = state.get("variables", {}).get(source_var, "")
 
@@ -1583,19 +1582,7 @@ class LangGraphExecutor:
             if isinstance(source, str):
                 source = json.loads(source)
 
-            if isinstance(source, dict):
-                keys = json_path.split(".")
-                result = source
-                for key in keys:
-                    if isinstance(result, dict) and key in result:
-                        result = result[key]
-                    else:
-                        result = None
-                        break
-            else:
-                result = None
-
-            state["variables"][output_var] = result
+            state["variables"][output_var] = source
         except Exception as e:
             logger.exception(f"JSON提取失败: {e}")
             state["variables"][output_var] = None

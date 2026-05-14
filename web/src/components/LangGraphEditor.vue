@@ -328,7 +328,7 @@
                 <el-input v-model="selectedNode.data.inputVariable" placeholder="包含JSON的变量名（如: llm_output, thinking_process）" />
               </el-form-item>
               <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.outputVariable" placeholder="例如: task_plan, structured_output" />
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: task_plan, structured_output" />
               </el-form-item>
               <el-form-item label="描述">
                 <el-input v-model="selectedNode.data.description" type="textarea" :rows="2" placeholder="节点描述（可选）" />
@@ -1564,7 +1564,7 @@ const transformNode = (node) => {
     transformed.data.outputVar = node.data?.outputVar || '';
   } else if (nodeType === 'json_extractor') {
     transformed.data.inputVariable = node.data?.inputVariable || '';
-    transformed.data.outputVariable = node.data?.outputVariable || '';
+    transformed.data.outputVar = node.data?.outputVar || '';
   }
 
   console.log('转换后的完整节点:', transformed);
