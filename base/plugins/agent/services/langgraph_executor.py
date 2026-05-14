@@ -377,7 +377,7 @@ class LangGraphExecutor:
                 logger.error(f"开始节点 {start_node_id} 不在节点映射中")
 
             condition_edges = {}
-            logger.debug(f"边列表: {edges}")
+            logger.info(f"边列表: {edges}")
             for edge in edges:
                 source = edge.get("source", "")
                 target = edge.get("target", "")
@@ -387,7 +387,7 @@ class LangGraphExecutor:
                         if source not in condition_edges:
                             condition_edges[source] = []
                         condition_edges[source].append(edge)
-                        logger.debug(f"条件边: {source} -> {target}, 条件: {edge.get('condition', '')}, 优先级: {edge.get('priority', 0)}")
+                        logger.info(f"条件边: {source} -> {target}, 条件: {edge.get('condition', '')}, 优先级: {edge.get('priority', 0)}")
                     else:
                         logger.info(f"添加边: {source} -> {target}")
                         workflow.add_edge(source, target)
@@ -418,13 +418,27 @@ class LangGraphExecutor:
                         # 依次检查条件边
                         for edge in conditional_edges:
                             if not edge.get("enabled", True):
-                                logger.debug(f"边 {edge.get('id')} 已禁用，跳过")
+                                logger.info(f"边 {edge.get('id')} 已禁用，跳过")
                                 continue
                                 
                             condition = edge.get("condition", "")
                             edge_target = edge.get("target", "")
                             
                             try:
+                                # 定义安全的变量获取函数
+                                def get_var(data, *keys):
+                                    for key in keys:
+                                        if data is None or not isinstance(data, dict):
+                                            return None
+                                        data = data.get(key, None)
+                                    return data
+                                
+                                # 打印 params 变量内容用于调试
+                                params_value = variables.get("params", {})
+                                logger.info(f"[条件判断] params 变量内容: {json.dumps(params_value, ensure_ascii=False)}")
+                                logger.info(f"[条件判断] condition_result 变量内容: {json.dumps(variables.get('condition_result', {}), ensure_ascii=False)}")
+                                logger.info(f"[条件判断] 原始条件表达式: {condition}")
+                                
                                 # 将模板语法转换为可执行表达式
                                 def replace_template(match):
                                     path = match.group(1)
@@ -434,17 +448,15 @@ class LangGraphExecutor:
                                         result += f", '{part}'"
                                     result += ")"
                                     return result
+                                
+                                import re
+                                # 调试：检查正则匹配
+                                matches = re.findall(r'\{\{(\w+(\.\w+)*)\}\}', condition)
+                                logger.info(f"[条件判断] 正则匹配结果: {matches}")
+                                
                                 expr = re.sub(r'\{\{(\w+(\.\w+)*)\}\}', replace_template, condition)
+                                logger.info(f"[条件判断] 转换后的表达式: {expr}")
                                 
-                                # 定义安全的变量获取函数
-                                def get_var(data, *keys):
-                                    for key in keys:
-                                        if data is None or not isinstance(data, dict):
-                                            return None
-                                        data = data.get(key, None)
-                                    return data
-                                
-                                logger.debug(f"计算条件表达式: {condition} -> {expr}")
                                 result = safe_eval(expr, {"variables": variables, "get_var": get_var})
                                 
                                 if result:
@@ -1367,7 +1379,30 @@ class LangGraphExecutor:
         variables = state.get("variables", {})
 
         try:
-            result = safe_eval(condition, variables)
+            # 将模板语法转换为可执行表达式
+            import re
+            
+            def replace_template(match):
+                path = match.group(1)
+                parts = path.split('.')
+                result = "get_var(variables"
+                for part in parts:
+                    result += f", '{part}'"
+                result += ")"
+                return result
+            
+            expr = re.sub(r'\{\{(\w+(\.\w+)*)\}\}', replace_template, condition)
+            
+            # 定义安全的变量获取函数
+            def get_var(data, *keys):
+                for key in keys:
+                    if data is None or not isinstance(data, dict):
+                        return None
+                    data = data.get(key, None)
+                return data
+            
+            logger.debug(f"条件节点执行: {condition} -> {expr}")
+            result = safe_eval(expr, {"variables": variables, "get_var": get_var})
             state["variables"]["condition_result"] = {
                 "condition": condition,
                 "result": bool(result)
