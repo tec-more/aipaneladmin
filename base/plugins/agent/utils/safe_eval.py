@@ -130,10 +130,17 @@ class SafeEval:
         local_vars = variables.copy()
         local_vars.update(functions)
         
-        # 支持 JavaScript 风格的布尔值（true/false）
+        # 支持 JavaScript 风格的布尔值（true/false）和运算符（||, &&, !）
         import re
         expression = re.sub(r'\btrue\b', 'True', expression)
         expression = re.sub(r'\bfalse\b', 'False', expression)
+        
+        # 转换 JavaScript 逻辑运算符
+        expression = expression.replace('||', ' or ')
+        expression = expression.replace('&&', ' and ')
+        
+        # 转换 JavaScript 取反运算符（注意空格处理）
+        expression = re.sub(r'(!)(\w+)', r' not \2', expression)
         
         return eval(expression, safe_globals, local_vars)
     
