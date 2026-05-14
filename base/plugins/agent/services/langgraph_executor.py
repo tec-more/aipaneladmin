@@ -21,6 +21,7 @@ from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, END, START, MessagesState
 from langgraph.channels import NamedBarrierValue, Topic, LastValue
 from langgraph.types import Command, interrupt
+from langgraph.errors import GraphInterrupt
 
 # 本地导入
 from base.plugins.agent.models.agent import Agent
@@ -608,15 +609,15 @@ class LangGraphExecutor:
             logger.info(f"[LangGraph] 返回结果: success={result['success']}, output_keys={list(result['output'].keys())}")
             return result
 
+        except GraphInterrupt as e:
+            logger.info(f"[LangGraph] 执行暂停，等待用户输入: {e}")
+            return {
+                "success": True,
+                "status": "waiting_for_user",
+                "execution_id": execution_id,
+                "message": "等待用户输入"
+            }
         except Exception as e:
-            if hasattr(e, "__class__") and e.__class__.__name__ == "GraphInterrupt":
-                logger.info("[LangGraph] 执行暂停，等待用户输入")
-                return {
-                    "success": True,
-                    "status": "waiting_for_user",
-                    "execution_id": execution_id,
-                    "message": "等待用户输入"
-                }
             logger.exception(f"LangGraph 执行失败: {e}")
             import traceback
             return {
@@ -742,6 +743,8 @@ class LangGraphExecutor:
                 except Exception as e:
                     logger.warning(f"推送节点完成事件失败: {e}")
 
+        except GraphInterrupt:
+            raise
         except Exception as e:
             logger.exception(f"节点执行失败: {e}")
             state["error"] = str(e)
