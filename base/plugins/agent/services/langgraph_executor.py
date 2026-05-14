@@ -798,13 +798,16 @@ class LangGraphExecutor:
         恢复后会把用户输入写入 variables["user_input"]
         """
         # 暂停在这里，自动 checkpoint，等待外部 Command(resume=xxx)
-        user_input = interrupt("等待用户输入")
-
-        # 恢复执行后，把用户输入存入状态
-        state["variables"]["user_input"] = user_input
-        state["variables"]["user_input_received"] = True
-
-        logger.info(f"[input节点] 收到用户输入: {user_input}")
+        interrupt("等待用户输入")
+        # 注意：interrupt() 会抛出异常暂停执行，下面的代码在恢复后执行
+        
+        # 恢复执行后，检查是否有用户输入
+        user_input = state.get("input", {}).get("text", "")
+        if user_input:
+            state["variables"]["user_input"] = user_input
+            state["variables"]["user_input_received"] = True
+            logger.info(f"[input节点] 收到用户输入: {user_input}")
+        
         return state
 
     @staticmethod
