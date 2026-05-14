@@ -386,8 +386,8 @@ class LangGraphExecutor:
                     if source_node and source_node.get("type") == "condition":
                         if source not in condition_edges:
                             condition_edges[source] = []
-                        condition_edges[source].append(edge)  # 保存完整的边信息
-                        logger.debug(f"条件边: {source} -> {target}, 条件: {edge.get('condition', '')}")
+                        condition_edges[source].append(edge)
+                        logger.debug(f"条件边: {source} -> {target}, 条件: {edge.get('condition', '')}, 优先级: {edge.get('priority', 0)}")
                     else:
                         logger.info(f"添加边: {source} -> {target}")
                         workflow.add_edge(source, target)
@@ -399,40 +399,66 @@ class LangGraphExecutor:
                         
                         # 分离条件边和默认边
                         conditional_edges = []
-                        default_edge = None
+                        default_edges = []
                         
                         for edge in edges:
-                            condition = edge.get("condition", "")
-                            if condition and condition != "":
+                            condition = edge.get("condition", "").strip()
+                            if condition:
                                 conditional_edges.append(edge)
                             else:
-                                default_edge = edge
+                                default_edges.append(edge)
                         
                         # 按优先级排序条件边
                         conditional_edges.sort(key=lambda x: x.get("priority", 0))
                         
+                        logger.info(f"条件节点 {node_id}: {len(conditional_edges)} 条条件边, {len(default_edges)} 条默认边")
+                        
                         # 依次检查条件边
                         for edge in conditional_edges:
                             if not edge.get("enabled", True):
+                                logger.debug(f"边 {edge.get('id')} 已禁用，跳过")
                                 continue
                                 
                             condition = edge.get("condition", "")
                             edge_target = edge.get("target", "")
                             
                             try:
-                                if safe_eval(condition, variables):
-                                    logger.info(f"条件边匹配: {edge.get('id')} -> {edge_target}")
+                                # 将模板语法转换为可执行表达式
+                                import re
+                                expr = condition
+                                # 替换 {{xxx}} 或 {{xxx.yyy}} 为 variables.get('xxx', {}).get('yyy', '')
+                                def replace_template(match):
+                                    path = match.group(1)
+                                    parts = path.split('.')
+                                    result = "variables"
+                                    for part in parts:
+                                        result += f".get('{part}', {{}})"
+                                    return result
+                                expr = re.sub(r'\{\{(\w+(\.\w+)*)\}\}', replace_template, condition)
+                                
+                                logger.debug(f"计算条件表达式: {condition} -> {expr}")
+                                result = safe_eval(expr, {"variables": variables})
+                                
+                                if result:
+                                    logger.info(f"条件边匹配成功: {edge.get('id')} -> {edge_target}, 条件: {condition}")
                                     return edge_target
                             except Exception as e:
-                                logger.warning(f"条件表达式执行失败 [{edge.get('id')}]: {e}")
+                                logger.warning(f"条件表达式执行失败 [{edge.get('id')}]: {e}, 条件: {condition}")
                         
-                        # 如果没有条件匹配，使用默认边
-                        if default_edge:
+                        # 如果没有条件匹配，处理默认边
+                        if default_edges:
+                            # 检查是否有多个默认边
+                            if len(default_edges) > 1:
+                                logger.warning(f"条件节点 {node_id} 有 {len(default_edges)} 条默认边（condition为空的边），建议每个条件节点只保留一条默认边")
+                            
+                            # 按优先级排序默认边
+                            default_edges.sort(key=lambda x: x.get("priority", 0))
+                            default_edge = default_edges[0]
                             default_target = default_edge.get("target")
                             logger.info(f"使用默认路由: {default_edge.get('id')} -> {default_target}")
                             return default_target
                         
-                        logger.warning(f"没有找到匹配的边，返回 END")
+                        logger.warning(f"条件节点 {node_id} 没有找到匹配的边，返回 END")
                         return END
                     return condition_router
 
