@@ -59,9 +59,13 @@ export function executeAgentGraphAuto(id, params, callbacks = {}) {
 
   queueMicrotask(async () => {
     try {
+      const token = localStorage.getItem('token')
       const response = await fetch(`/api/v1/agent/agents/${id}/execute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
         body: JSON.stringify(params),
         signal: abortController.signal,
       })

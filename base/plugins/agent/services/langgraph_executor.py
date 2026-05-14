@@ -48,7 +48,6 @@ class AgentState(TypedDict):
     execution_trace: List[Dict[str, Any]]
     current_node: Optional[str]
     error: Optional[str]
-    __interrupt__: Any
 
 def create_initial_state(input_data: Dict[str, Any], agent) -> Dict[str, Any]:
     """创建初始状态"""
