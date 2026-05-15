@@ -1169,6 +1169,23 @@ class LangGraphExecutor:
             if memory_context.strip():
                 messages.append({"role": "user", "content": f"历史记忆和上下文信息：\n{memory_context}\n"})
 
+        # 如果已有提取的参数，将其添加到提示词中
+        # 支持多种可能的参数存储变量名
+        param_variables = ["params", "llm_output", "output", "result"]
+        params = {}
+        for var_name in param_variables:
+            var_value = variables.get(var_name, {})
+            if isinstance(var_value, dict) and var_value:
+                params.update(var_value)
+        
+        if params:
+            params_str = "\n【已有参数】:\n"
+            for key, value in params.items():
+                if value and key not in ["prompt", "model", "response"]:  # 只显示非空参数，排除内部字段
+                    params_str += f"- {key}: {value}\n"
+            prompt = params_str + "\n" + prompt
+            logger.info(f"[构建消息] 合并已有参数后的提示词: {prompt[:200]}...")
+
         if prompt and input_text:
             combined_content = prompt.replace("{{input}}", input_text) if "{{input}}" in prompt else f"{prompt}\n\n用户输入：{input_text}"
             messages.append({"role": "user", "content": combined_content})
@@ -1197,6 +1214,12 @@ class LangGraphExecutor:
         output_variable = node_data.get("outputVar", "llm_output")
         if parsed_response:
             state["variables"][output_variable] = parsed_response
+            
+            # 将解析出的参数合并到持久化的 params 变量中
+            if "params" not in state["variables"]:
+                state["variables"]["params"] = {}
+            state["variables"]["params"].update(parsed_response)
+            logger.info(f"[参数合并] 更新后的 params: {json.dumps(state['variables']['params'], ensure_ascii=False)}")
         else:
             state["variables"][output_variable] = {
                 "prompt": prompt,
