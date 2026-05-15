@@ -1140,7 +1140,7 @@ class LangGraphExecutor:
             input_text = input_data
         else:
             input_text = variables.get("input", {}).get("text", "")
-        system_prompt = node_data.get("system_prompt", "You are a helpful assistant.")
+        system_prompt = node_data.get("system_prompt", "你是个强大的助手，能够根据用户输入提供详细的信息。")
 
         messages = [{"role": "system", "content": system_prompt}]
 
