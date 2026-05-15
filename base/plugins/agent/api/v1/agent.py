@@ -11,7 +11,8 @@ from base.common.security import get_current_actor
 from base.common.response import success_response, fail_response
 import uuid
 import asyncio
-
+import logging
+logger = logging.getLogger(__name__)
 # 执行管理器 - 跟踪所有执行的任务
 execution_manager = {
     # execution_id: {
@@ -185,8 +186,7 @@ async def delete_agent(agent_id: int):
 async def execute_agent_unified(
     agent_id: int, 
     input_data: dict,
-    stream: Optional[bool] = Query(None, description="是否强制使用流式返回"),
-    execution_id: Optional[str] = None ,  # 前端传回来
+    stream: Optional[bool] = Query(None, description="是否强制使用流式返回"), # 前端传回来
     actor: dict = Depends(get_current_actor)  # 统一接收
 ):
     """
@@ -196,6 +196,8 @@ async def execute_agent_unified(
     Args:
         agent_id: 智能体ID
         input_data: 输入数据
+        execution_id: 执行ID（可选）
+        actor: 当前用户（从依赖注入获取）
         stream: 是否强制使用流式返回（可选）
     
     Returns:
@@ -237,8 +239,12 @@ async def execute_agent_unified(
                 traceback.print_exc()
                 return fail_response(msg=f"资源预加载失败: {str(e)}", code=500)
             
-            # 生成执行ID
+            logger.info(f"[API] input_data: {input_data.get('text', '')}")
+            # logger.info(f"[API] execution_id: {input_data.get('execution_id', '') or None}") 
+            execution_id = input_data.get('execution_id', '')         # 生成执行ID
             execution_id = execution_id or checkpoint_service.create_thread_id(actor, execution_id)
+            # logger.info(f"[API] 生成执行ID: {execution_id}")
+            
             execution_manager[execution_id] = {
                 'agent_id': agent_id, 
                 'is_cancelled': False,
@@ -266,7 +272,7 @@ async def execute_agent_unified(
             )
         else:
             # 普通模式执行
-            result = await AgentService.execute_agent(agent_id, input_data)
+            result = await AgentService.execute_agent(agent_id, input_data,actor, execution_id)
             if result.get("success"):
                 return success_response(data=result, msg="智能体执行成功")
             else:

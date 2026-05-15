@@ -466,6 +466,7 @@ const realtimeSteps = ref([]);
 const dialogHistory = ref([]);
 const currentInput = ref('');
 const latestResponse = ref('');
+const executionId = ref('');
 const currentProcess = ref([]);
 const assistantMessage = ref(null);
 const currentAbortController = ref(null);
@@ -992,6 +993,7 @@ watch(() => executeDialog.value, (newVal) => {
     executeResult.value = null;
     currentInput.value = '';
     latestResponse.value = '';
+    executionId.value = '';
   }
 });
 
@@ -999,6 +1001,7 @@ const clearDialogHistory = () => {
   dialogHistory.value = [];
   currentInput.value = '';
   latestResponse.value = '';
+  executionId.value = '';
   realtimeSteps.value = [];
   executeResult.value = null;
   ElMessage.success('对话历史已清空');
@@ -1077,12 +1080,14 @@ const doExecute = async () => {
     
     const input = {
       text: currentInput.value.trim(),
+      execution_id : executionId.value.trim(),
       history: [...dialogHistory.value.slice(0, -1)]
     };
-    
     currentInput.value = '';
     
     if (props.agentId) {
+      console.log('执行智能体:', props.agentId);
+      console.log('执行输入:', input);
       const controller = executeAgentGraphAuto(props.agentId, input, {
         onStart: () => {
           addRealtimeStep('info', '准备执行', '正在建立SSE连接...');
@@ -1275,6 +1280,8 @@ const handleSSEData = (data) => {
       }
       
       latestResponse.value = finalContent;
+      executionId.value = data.variables.execution_id || '';
+      console.log('[LangGraphEditor] executionId.value:', executionId.value)
       
       stopTypingAnimation();
       executing.value = false;

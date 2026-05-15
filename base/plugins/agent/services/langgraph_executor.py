@@ -508,6 +508,7 @@ class LangGraphExecutor:
                 "variables": {
                     "agent_id": agent.id,
                     "agent_name": agent.name,
+                    "execution_id": execution_id,
                     "recent_memories": memory_list,
                     "important_memories": [{"content": m.content, "importance": m.importance} for m in important_memories],
                     "_llm_resources": llm_resources,  # 预加载的LLM资源
@@ -529,6 +530,9 @@ class LangGraphExecutor:
                 agent_name=agent.name,
                 execution_id=execution_id
             )
+            logger.info(f"[编译图] 配置: {json.dumps(config, ensure_ascii=False)}")
+            logger.info(f"[编译图] execution_id: {execution_id}")
+
             graph_with_memory = workflow.compile(checkpointer=checkpointer)
             
             # import uuid
@@ -541,8 +545,11 @@ class LangGraphExecutor:
             try:
                 current_state = await graph_with_memory.aget_state(config)
                 is_paused = current_state and current_state.values.get("__interrupt__") is not None
-            except:
+            except Exception as e:
+                logger.warning(f"获取当前状态失败: {e}")
+                current_state = None
                 is_paused = False
+            
             if is_paused:
                 # ✅ 恢复暂停：用户输入
                 user_input = input_data.get("text", "")
@@ -551,8 +558,14 @@ class LangGraphExecutor:
                     Command(resume=user_input),
                     config=config
                 )
+            elif current_state and current_state.values:
+                # ✅ 继续对话：合并新输入到已有状态（保留历史消息和参数）
+                logger.info(f"[继续对话] 从检查点恢复状态并合并新输入")
+                merged_state = {**current_state.values, "input": input_data}
+                final_state = await graph_with_memory.ainvoke(merged_state, config)
             else:
                 # ✅ 首次执行
+                logger.info(f"[首次执行] 初始状态: {json.dumps(initial_state, ensure_ascii=False, default=str)[:500]}...")
                 final_state = await graph_with_memory.ainvoke(initial_state, config)
 
             elapsed = time.time() - start_time
@@ -1140,7 +1153,7 @@ class LangGraphExecutor:
             input_text = input_data
         else:
             input_text = variables.get("input", {}).get("text", "")
-        system_prompt = node_data.get("system_prompt", "你是个强大的助手，能够根据用户输入提供详细的信息。")
+        system_prompt = node_data.get("system_prompt", "")
 
         messages = [{"role": "system", "content": system_prompt}]
 
@@ -1173,16 +1186,38 @@ class LangGraphExecutor:
         # 支持多种可能的参数存储变量名
         param_variables = ["params", "llm_output", "output", "result"]
         params = {}
+        
+        # 从 variables 中读取参数
         for var_name in param_variables:
             var_value = variables.get(var_name, {})
             if isinstance(var_value, dict) and var_value:
                 params.update(var_value)
+        
+        # 从对话历史中提取之前的参数（处理 JSON 格式的响应）
+        existing_messages = state.get("messages", [])
+        for msg in existing_messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", "")
+                if content:
+                    try:
+                        # 尝试解析 JSON
+                        json_start = content.find("{")
+                        json_end = content.rfind("}") + 1
+                        if json_start >= 0 and json_end > json_start:
+                            json_str = content[json_start:json_end]
+                            parsed = json.loads(json_str)
+                            if isinstance(parsed, dict):
+                                params.update(parsed)
+                                logger.info(f"[构建消息] 从对话历史中提取参数: {list(parsed.keys())}")
+                    except:
+                        pass  # 不是有效的 JSON，跳过
         
         if params:
             params_str = "\n【已有参数】:\n"
             for key, value in params.items():
                 if value and key not in ["prompt", "model", "response"]:  # 只显示非空参数，排除内部字段
                     params_str += f"- {key}: {value}\n"
+            
             prompt = params_str + "\n" + prompt
             logger.info(f"[构建消息] 合并已有参数后的提示词: {prompt[:200]}...")
 
@@ -1193,7 +1228,8 @@ class LangGraphExecutor:
             messages.append({"role": "user", "content": prompt})
         else:
             messages.append({"role": "user", "content": input_text})
-
+        logger.info(f"[构建消息] 最终消息列表: {messages}")
+        
         return prompt, messages, input_text
 
     @staticmethod
@@ -1207,7 +1243,7 @@ class LangGraphExecutor:
                 if json_start >= 0 and json_end > json_start:
                     json_str = llm_response[json_start:json_end]
                     parsed_response = json.loads(json_str)
-                    logger.debug(f"成功解析 LLM 输出 JSON")
+                    logger.debug(f"成功解析 LLM 输出 JSON: {parsed_response}")
             except Exception as e:
                 logger.warning(f"解析 JSON 失败: {e}")
 
@@ -1215,11 +1251,14 @@ class LangGraphExecutor:
         if parsed_response:
             state["variables"][output_variable] = parsed_response
             
-            # 将解析出的参数合并到持久化的 params 变量中
-            if "params" not in state["variables"]:
-                state["variables"]["params"] = {}
-            state["variables"]["params"].update(parsed_response)
-            logger.info(f"[参数合并] 更新后的 params: {json.dumps(state['variables']['params'], ensure_ascii=False)}")
+            # 将解析出的参数合并到节点指定的输出变量中（支持持久化）
+            # 如果 outputVar 不是默认的 llm_output，则直接使用它作为持久化变量
+            persist_var = output_variable if output_variable != "llm_output" else "params"
+            
+            if persist_var not in state["variables"]:
+                state["variables"][persist_var] = {}
+            state["variables"][persist_var].update(parsed_response)
+            logger.info(f"[参数合并] 更新后的 {persist_var}: {json.dumps(state['variables'][persist_var], ensure_ascii=False)}")
         else:
             state["variables"][output_variable] = {
                 "prompt": prompt,
@@ -1240,13 +1279,16 @@ class LangGraphExecutor:
         else:
             input_text = state.get("variables", {}).get("input", {}).get("text", "")
         
+        logger.info(f"[构建消息] 大模型响应后的输入文本: {input_text}")
+        
         # 添加用户输入到对话历史（如果有输入）
         if input_text:
             state["messages"].append({"role": "user", "content": input_text})
         
         # 添加AI响应到对话历史
         state["messages"].append({"role": "assistant", "content": llm_response})
-
+        logger.info(f"[构建消息] 大模型响应后的消息列表: {state['messages']}")
+        
         return state
 
     @staticmethod
@@ -1337,7 +1379,10 @@ class LangGraphExecutor:
         from base.plugins.agent.tools.registry import ToolRegistry
 
         try:
+            logger.info(f"调用大模型: {chat_kwargs}")
+            logger.info(f"messages: {messages}")
             response = await service.chat(**chat_kwargs)
+            logger.info(f"大模型响应: {response}")
         except Exception as e:
             logger.exception(f"LLM调用异常: {e}")
             return f"错误：大模型调用失败: {str(e)}"

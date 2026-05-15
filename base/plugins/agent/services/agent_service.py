@@ -76,7 +76,7 @@ class AgentService:
 
 
     @staticmethod
-    async def execute_agent(agent_id: int, input_data: dict, actor: dict) -> dict:
+    async def execute_agent(agent_id: int, input_data: dict, actor: dict, execution_id: str = None) -> dict:
         """
         执行智能体
         使用结构图（LangGraph的具现化）来实现智能体内部的逻辑控制
@@ -88,7 +88,7 @@ class AgentService:
 
         try:
             from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
-            result = await LangGraphExecutor.execute_agent(agent, input_data, actor)
+            result = await LangGraphExecutor.execute_agent(agent, input_data, actor,execution_id=execution_id)
             return result
 
         except Exception as e:
