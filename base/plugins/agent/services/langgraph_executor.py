@@ -1132,7 +1132,14 @@ class LangGraphExecutor:
         for key, value in variables.items():
             prompt = prompt.replace(f"{{{{{key}}}}}", str(value))
 
-        input_text = variables.get("input", {}).get("text", "")
+        # 优先从 state["input"] 获取输入数据，其次从 variables["input"] 获取
+        input_data = state.get("input", {})
+        if isinstance(input_data, dict):
+            input_text = input_data.get("text", "")
+        elif isinstance(input_data, str):
+            input_text = input_data
+        else:
+            input_text = variables.get("input", {}).get("text", "")
         system_prompt = node_data.get("system_prompt", "You are a helpful assistant.")
 
         messages = [{"role": "system", "content": system_prompt}]
