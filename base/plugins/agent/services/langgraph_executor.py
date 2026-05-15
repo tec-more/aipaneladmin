@@ -1144,6 +1144,11 @@ class LangGraphExecutor:
 
         messages = [{"role": "system", "content": system_prompt}]
 
+        # 添加之前的对话历史
+        existing_messages = state.get("messages", [])
+        if existing_messages:
+            messages.extend(existing_messages)
+
         recent_memories = variables.get("recent_memories", [])
         important_memories = variables.get("important_memories", [])
 
@@ -1198,6 +1203,26 @@ class LangGraphExecutor:
                 "model": actual_model,
                 "response": llm_response
             }
+
+        # 保存对话历史到状态中，以便后续节点使用
+        if "messages" not in state:
+            state["messages"] = []
+        
+        # 获取当前输入文本
+        input_data = state.get("input", {})
+        if isinstance(input_data, dict):
+            input_text = input_data.get("text", "")
+        elif isinstance(input_data, str):
+            input_text = input_data
+        else:
+            input_text = state.get("variables", {}).get("input", {}).get("text", "")
+        
+        # 添加用户输入到对话历史（如果有输入）
+        if input_text:
+            state["messages"].append({"role": "user", "content": input_text})
+        
+        # 添加AI响应到对话历史
+        state["messages"].append({"role": "assistant", "content": llm_response})
 
         return state
 
