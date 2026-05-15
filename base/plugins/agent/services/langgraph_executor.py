@@ -589,21 +589,62 @@ class LangGraphExecutor:
                 llm_output = variables["llm_output"]
                 logger.info(f"[LangGraph] llm_output 内容: {json.dumps(llm_output, ensure_ascii=False)[:500]}...")
             
-            output_keys = list(output.keys())
-            if len(output_keys) == 1 and "end_time" in output_keys:
-                logger.info("[LangGraph] output 只有 end_time，尝试从 variables 提取内容")
-                if variables.get("llm_output"):
-                    llm_response = variables["llm_output"].get("response", "")
-                    if llm_response:
-                        output["text"] = llm_response
-                        logger.info(f"[LangGraph] 已从 llm_output.response 提取内容，长度: {len(llm_response)}")
+            # 查找输出节点设置的内容
+            extracted_text = ""
+            for key in list(output.keys()):
+                if key != "end_time":
+                    value = output[key]
+                    if isinstance(value, dict):
+                        if "text" in value:
+                            extracted_text = value["text"]
+                            output["text"] = extracted_text
+                            logger.info(f"[LangGraph] 已从 output.{key}.text 提取内容")
+                            break
+                        elif "response" in value:
+                            extracted_text = value["response"]
+                            output["text"] = extracted_text
+                            logger.info(f"[LangGraph] 已从 output.{key}.response 提取内容")
+                            break
+            
+            # 如果没有从 output 中提取到内容，尝试从 variables 中获取
+            if not extracted_text:
+                llm_output = variables.get("llm_output", variables.get("llmOutput", {}))
+                if isinstance(llm_output, dict):
+                    extracted_text = llm_output.get("response", llm_output.get("text", ""))
+                elif isinstance(llm_output, str):
+                    extracted_text = llm_output
+                
+                if extracted_text:
+                    output["text"] = extracted_text
+                    logger.info(f"[LangGraph] 已从 variables.llm_output 提取内容")
+            
+            # 如果仍然没有内容，尝试其他常见变量
+            if not extracted_text:
+                for var_name in ["finalReport", "final_report", "result", "response"]:
+                    if var_name in variables:
+                        value = variables[var_name]
+                        if isinstance(value, dict):
+                            extracted_text = value.get("text", value.get("response", str(value)))
+                        else:
+                            extracted_text = str(value)
+                        if extracted_text:
+                            output["text"] = extracted_text
+                            logger.info(f"[LangGraph] 已从 variables.{var_name} 提取内容")
+                            break
+            
+            # 过滤敏感数据，不向前端暴露 API 密钥等敏感信息
+            safe_variables = variables.copy()
+            sensitive_keys = ["_llm_resources", "_skill_resources"]
+            for key in sensitive_keys:
+                if key in safe_variables:
+                    del safe_variables[key]
             
             result = {
                 "success": True,
                 "message": "执行成功",
                 "input": input_data,
                 "output": output,
-                "variables": variables,
+                "variables": safe_variables,
                 "trace": final_state.get("execution_trace", [])
             }
             logger.info(f"[LangGraph] 返回结果: success={result['success']}, output_keys={list(result['output'].keys())}")
@@ -890,17 +931,74 @@ class LangGraphExecutor:
     async def _execute_output_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行输出节点"""
         output_var = node_data.get("outputVar", "result")
-        output_content = node_data.get("output_content", "")
+        output_content = node_data.get("outputContent", "")
 
         variables = state.get("variables", {})
 
-        if output_content:
-            for key, value in variables.items():
-                output_content = output_content.replace(f"{{{{{key}}}}}", str(value))
-            state["output"][output_var] = output_content
-        else:
-            state["output"][output_var] = variables
+        # 调试日志
+        logger.info(f"[输出节点] 开始执行")
+        logger.info(f"[输出节点] outputVar: {output_var}")
+        logger.info(f"[输出节点] output_content: {output_content}")
+        logger.info(f"[输出节点] 可用变量: {list(variables.keys())}")
+        
+        # 打印关键变量内容
+        if "params" in variables:
+            logger.info(f"[输出节点] params 变量内容: {json.dumps(variables['params'], ensure_ascii=False)}")
+        if "final_report" in variables:
+            logger.info(f"[输出节点] final_report 变量内容: {variables['final_report']}")
+        if "llm_output" in variables:
+            logger.info(f"[输出节点] llm_output 变量内容: {json.dumps(variables['llm_output'], ensure_ascii=False)}")
 
+        if output_content:
+            logger.info(f"[输出节点] 使用自定义输出内容模板")
+            import re
+            
+            def replace_var(match):
+                path = match.group(1)
+                parts = path.split('.')
+                value = variables
+                for part in parts:
+                    if isinstance(value, dict) and part in value:
+                        value = value[part]
+                    else:
+                        value = ""
+                        break
+                
+                # 如果值为 None，返回空字符串
+                if value is None:
+                    return ""
+                
+                return str(value)
+            
+            output_content = re.sub(r'\{\{(\w+(\.\w+)*)\}\}', replace_var, output_content)
+            state["output"][output_var] = {"text": output_content}
+            logger.info(f"[输出节点] 输出结果: {output_content}")
+        else:
+            # 检查是否有最终报告变量
+            final_report = variables.get("finalReport", variables.get("final_report", ""))
+            if final_report:
+                logger.info(f"[输出节点] 使用 finalReport/final_report 变量")
+                state["output"][output_var] = {"text": final_report}
+                logger.info(f"[输出节点] 输出结果: {final_report}")
+            else:
+                # 尝试获取LLM输出
+                llm_output = variables.get("llm_output", variables.get("llmOutput", {}))
+                if isinstance(llm_output, dict):
+                    llm_text = llm_output.get("response", llm_output.get("text", ""))
+                    if llm_text:
+                        logger.info(f"[输出节点] 使用 llm_output.response/text")
+                        state["output"][output_var] = {"text": llm_text}
+                        logger.info(f"[输出节点] 输出结果: {llm_text[:100]}...")
+                    else:
+                        logger.info(f"[输出节点] llm_output 中没有 response/text，使用所有变量")
+                        state["output"][output_var] = {"text": str(variables)}
+                        logger.info(f"[输出节点] 输出结果: {str(variables)[:100]}...")
+                else:
+                    logger.info(f"[输出节点] llm_output 不是字典，使用所有变量")
+                    state["output"][output_var] = {"text": str(variables)}
+                    logger.info(f"[输出节点] 输出结果: {str(variables)[:100]}...")
+
+        logger.info(f"[输出节点] state['output']: {json.dumps(state.get('output', {}), ensure_ascii=False)}")
         return state
 
     @staticmethod

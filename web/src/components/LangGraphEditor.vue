@@ -1258,19 +1258,11 @@ const handleSSEData = (data) => {
       };
       
       let finalContent = '';
-      if (data.variables) {
-        finalContent = data.variables.finalReport || 
-                      data.variables.response || 
-                      data.variables.text || 
-                      data.variables.output || 
-                      '';
-        if (!finalContent && data.variables.llmOutput) {
-          finalContent = data.variables.llmOutput.response || data.variables.llmOutput.text || '';
-        }
-      } else if (data.result) {
+      if (data.result) {
         finalContent = data.result.output || data.result.text || '';
       }
-      
+      console.log('[LangGraphEditor] finalContent:', finalContent)
+      console.log('[LangGraphEditor] assistantMessage.value:', assistantMessage.value)
       if (assistantMessage.value) {
         if (accumulatedStreamContent) {
           finalContent = accumulatedStreamContent;
@@ -1409,30 +1401,43 @@ const updateAssistantMessage = () => {
 const handleNonSSEData = (result) => {
   if (!result) return;
   
+  console.log('[前端调试] handleNonSSEData 收到结果:', result);
+  
   executeResult.value = result;
   
   let assistantResponse = '';
   if (typeof result === 'string') {
+    console.log('[前端调试] 结果是字符串:', result);
     assistantResponse = result;
   } else if (result.output) {
+    console.log('[前端调试] 结果有 output 字段:', result.output);
+    console.log('[前端调试] output 类型:', typeof result.output);
+    
     if (typeof result.output === 'string') {
+      console.log('[前端调试] output 是字符串');
       assistantResponse = result.output;
     } else if (result.output.text) {
+      console.log('[前端调试] 使用 output.text:', result.output.text);
       assistantResponse = result.output.text;
     } else if (result.output.response) {
+      console.log('[前端调试] 使用 output.response:', result.output.response);
       assistantResponse = result.output.response;
     } else {
+      console.log('[前端调试] output 是对象，序列化输出');
       assistantResponse = JSON.stringify(result.output, null, 2);
     }
   } else if (result.result) {
+    console.log('[前端调试] 结果有 result 字段:', result.result);
     if (typeof result.result === 'string') {
       assistantResponse = result.result;
     } else if (result.result.output || result.result.text) {
       assistantResponse = result.result.output || result.result.text;
     }
   } else if (result.text || result.response) {
+    console.log('[前端调试] 使用 result.text 或 result.response');
     assistantResponse = result.text || result.response;
   } else if (result.data && (result.data.output || result.data.result)) {
+    console.log('[前端调试] 使用 result.data.output/result');
     const dataOutput = result.data.output || result.data.result;
     if (typeof dataOutput === 'string') {
       assistantResponse = dataOutput;
@@ -1440,6 +1445,7 @@ const handleNonSSEData = (result) => {
       assistantResponse = dataOutput.text;
     }
   } else if (result.variables) {
+    console.log('[前端调试] 使用 result.variables');
     const vars = result.variables;
     assistantResponse = vars.finalReport || vars.response || vars.text || vars.output || '';
     if (!assistantResponse && vars.llmOutput) {
@@ -1451,8 +1457,11 @@ const handleNonSSEData = (result) => {
   }
   
   if (!assistantResponse) {
+    console.log('[前端调试] 没有找到任何输出内容，显示默认值');
     assistantResponse = '执行完成';
   }
+  
+  console.log('[前端调试] 最终显示内容:', assistantResponse);
   
   if (assistantMessage.value) {
     assistantMessage.value.content = assistantResponse;

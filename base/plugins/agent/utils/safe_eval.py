@@ -132,6 +132,12 @@ class SafeEval:
         
         # 支持 JavaScript 风格的布尔值（true/false）和运算符（||, &&, !）
         import re
+        original_expression = expression
+        
+        # 移除换行符和多余空格，避免语法错误
+        expression = expression.replace('\n', ' ').replace('\r', ' ')
+        expression = re.sub(r'\s+', ' ', expression).strip()
+        
         expression = re.sub(r'\btrue\b', 'True', expression)
         expression = re.sub(r'\bfalse\b', 'False', expression)
         
@@ -142,7 +148,19 @@ class SafeEval:
         # 转换 JavaScript 取反运算符（注意空格处理）
         expression = re.sub(r'(!)(\w+)', r' not \2', expression)
         
-        return eval(expression, safe_globals, local_vars)
+        # 添加调试信息
+        logger.debug(f"[safe_eval] 原始表达式: {original_expression}")
+        logger.debug(f"[safe_eval] 转换后表达式: {expression}")
+        logger.debug(f"[safe_eval] 可用变量: {list(local_vars.keys())}")
+        
+        try:
+            return eval(expression, safe_globals, local_vars)
+        except SyntaxError as e:
+            logger.error(f"[safe_eval] 语法错误: {e}, 表达式: {expression}")
+            raise
+        except Exception as e:
+            logger.error(f"[safe_eval] 执行错误: {e}, 表达式: {expression}")
+            raise
     
     @staticmethod
     def evaluate_condition(
