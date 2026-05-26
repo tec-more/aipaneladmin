@@ -272,7 +272,8 @@ async def execute_agent_unified(
             )
         else:
             # 普通模式执行
-            result = await AgentService.execute_agent(agent_id, input_data,actor, execution_id)
+            execution_id = input_data.get('execution_id', '') or checkpoint_service.create_thread_id(actor, '')
+            result = await AgentService.execute_agent(agent_id, input_data, actor, execution_id)
             if result.get("success"):
                 return success_response(data=result, msg="智能体执行成功")
             else:
