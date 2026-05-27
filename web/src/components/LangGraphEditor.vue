@@ -1280,7 +1280,7 @@ const handleSSEData = (data) => {
       }
       
       latestResponse.value = finalContent;
-      executionId.value = data.variables.execution_id || '';
+      executionId.value = data.variables?.execution_id || '';
       console.log('[LangGraphEditor] executionId.value:', executionId.value)
       
       stopTypingAnimation();
