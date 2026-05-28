@@ -1831,31 +1831,58 @@ class LangGraphExecutor:
         """执行并行节点 - 同时执行多个分支任务"""
         branches = node_data.get("branches", [])
         output_var = node_data.get("outputVar", "parallel_results")
+        logger.info(f"[并行节点] 开始执行，分支数: {len(branches)}")
 
         async def execute_branch(branch_name: str, branch_nodes: List[Dict]) -> Dict[str, Any]:
             """执行单个分支"""
-            branch_state = state.copy()
-            branch_state["variables"] = state["variables"].copy()
-            branch_state["node_results"] = {}
+            logger.debug(f"[并行节点] 开始执行分支: {branch_name}")
             
-            for node in branch_nodes:
-                node_type = node.get("type", "")
-                node_data = node.get("data", {})
+            branch_state = {
+                "variables": state["variables"].copy(),
+                "node_results": {},
+                "messages": [],
+                "input": state.get("input", {}).copy() if isinstance(state.get("input"), dict) else state.get("input"),
+                "output": {},
+                "execution_trace": [],
+                "current_node": None,
+                "error": None
+            }
+            
+            try:
+                for node in branch_nodes:
+                    node_type = node.get("type", "")
+                    node_data_item = node.get("data", {})
+                    node_id = node.get("id", f"{branch_name}_node_{len(branch_state['execution_trace'])}")
+                    
+                    logger.debug(f"[并行节点] 分支 {branch_name} 执行节点: {node_id} ({node_type})")
+                    
+                    if node_type == "llm":
+                        branch_state = await LangGraphExecutor._execute_llm_node(node, branch_state)
+                    elif node_type == "tool":
+                        branch_state = await LangGraphExecutor._execute_tool_node(node_data_item, branch_state)
+                    elif node_type == "http":
+                        branch_state = await LangGraphExecutor._execute_http_node(node_data_item, branch_state)
+                    elif node_type == "code":
+                        branch_state = await LangGraphExecutor._execute_code_node(node_data_item, branch_state)
+                    elif node_type == "skill":
+                        branch_state = await LangGraphExecutor._execute_skill_node(node_data_item, branch_state)
+                    elif node_type == "template":
+                        branch_state = await LangGraphExecutor._execute_template_node(node_data_item, branch_state)
+                    else:
+                        logger.warning(f"[并行节点] 分支 {branch_name} 遇到未知节点类型: {node_type}")
+                    
+                    branch_state["execution_trace"].append({
+                        "node_id": node_id,
+                        "node_type": node_type,
+                        "timestamp": datetime.now().isoformat()
+                    })
                 
-                if node_type == "llm":
-                    branch_state = await LangGraphExecutor._execute_llm_node(node, branch_state)
-                elif node_type == "tool":
-                    branch_state = await LangGraphExecutor._execute_tool_node(node_data, branch_state)
-                elif node_type == "http":
-                    branch_state = await LangGraphExecutor._execute_http_node(node_data, branch_state)
-                elif node_type == "code":
-                    branch_state = await LangGraphExecutor._execute_code_node(node_data, branch_state)
-                elif node_type == "skill":
-                    branch_state = await LangGraphExecutor._execute_skill_node(node_data, branch_state)
-                elif node_type == "template":
-                    branch_state = await LangGraphExecutor._execute_template_node(node_data, branch_state)
+                logger.debug(f"[并行节点] 分支 {branch_name} 执行完成")
+                return {branch_name: branch_state["variables"]}
             
-            return {branch_name: branch_state["variables"]}
+            except Exception as e:
+                logger.exception(f"[并行节点] 分支 {branch_name} 执行失败: {e}")
+                return {branch_name: {"error": str(e), "success": False}}
 
         if branches:
             tasks = []
@@ -1864,13 +1891,40 @@ class LangGraphExecutor:
                 branch_nodes = branch.get("nodes", [])
                 if branch_nodes:
                     tasks.append(execute_branch(branch_name, branch_nodes))
+                    logger.debug(f"[并行节点] 添加分支任务: {branch_name}")
             
             if tasks:
-                results = await asyncio.gather(*tasks)
-                merged_results = {}
-                for result in results:
-                    merged_results.update(result)
-                state["variables"][output_var] = merged_results
+                logger.info(f"[并行节点] 开始并发执行 {len(tasks)} 个分支任务")
+                try:
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    
+                    merged_results = {}
+                    success_count = 0
+                    fail_count = 0
+                    
+                    for result in results:
+                        if isinstance(result, Exception):
+                            logger.error(f"[并行节点] 分支执行异常: {result}")
+                            fail_count += 1
+                        else:
+                            merged_results.update(result)
+                            success_count += 1
+                    
+                    state["variables"][output_var] = merged_results
+                    state["variables"][f"{output_var}_summary"] = {
+                        "total_branches": len(tasks),
+                        "success_count": success_count,
+                        "fail_count": fail_count,
+                        "completed_at": datetime.now().isoformat()
+                    }
+                    
+                    logger.info(f"[并行节点] 执行完成，成功: {success_count}, 失败: {fail_count}")
+                except Exception as e:
+                    logger.exception(f"[并行节点] 并发执行失败: {e}")
+                    state["variables"][output_var] = {"error": str(e)}
+        
+        else:
+            logger.warning(f"[并行节点] 没有配置任何分支")
         
         return state
 
