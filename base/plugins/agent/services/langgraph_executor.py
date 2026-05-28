@@ -1677,9 +1677,20 @@ class LangGraphExecutor:
 
             async with aiohttp.ClientSession() as session:
                 async with session.request(method, url, headers=headers, data=body) as response:
-                    response_data = await response.json()
+                    content_type = response.headers.get("Content-Type", "")
+                    response_text = await response.text()
+                    
+                    response_data = response_text
+                    if "application/json" in content_type or "application/javascript" in content_type:
+                        try:
+                            import json
+                            response_data = json.loads(response_text)
+                        except json.JSONDecodeError:
+                            pass
+                    
                     state["variables"]["http_response"] = {
                         "status": response.status,
+                        "content_type": content_type,
                         "data": response_data
                     }
         except Exception as e:
