@@ -758,6 +758,10 @@ class LangGraphExecutor:
                 state = await LangGraphExecutor._execute_loop_node(node_data, state)
             elif node_type == "iteration":
                 state = await LangGraphExecutor._execute_iteration_node(node_data, state)
+            elif node_type == "parallel":
+                if sse_yield_func:
+                    await sse_yield_func({'type': 'action', 'label': node_label, 'message': '并行执行分支任务...'})
+                state = await LangGraphExecutor._execute_parallel_node(node_data, state)
             elif node_type == "http":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'action', 'label': node_label, 'message': '发送HTTP请求'})
@@ -1788,6 +1792,54 @@ class LangGraphExecutor:
             logger.exception(f"JSON提取失败: {e}")
             state["variables"][output_var] = None
 
+        return state
+
+    @staticmethod
+    async def _execute_parallel_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
+        """执行并行节点 - 同时执行多个分支任务"""
+        branches = node_data.get("branches", [])
+        output_var = node_data.get("outputVar", "parallel_results")
+
+        async def execute_branch(branch_name: str, branch_nodes: List[Dict]) -> Dict[str, Any]:
+            """执行单个分支"""
+            branch_state = state.copy()
+            branch_state["variables"] = state["variables"].copy()
+            branch_state["node_results"] = {}
+            
+            for node in branch_nodes:
+                node_type = node.get("type", "")
+                node_data = node.get("data", {})
+                
+                if node_type == "llm":
+                    branch_state = await LangGraphExecutor._execute_llm_node(node, branch_state)
+                elif node_type == "tool":
+                    branch_state = await LangGraphExecutor._execute_tool_node(node_data, branch_state)
+                elif node_type == "http":
+                    branch_state = await LangGraphExecutor._execute_http_node(node_data, branch_state)
+                elif node_type == "code":
+                    branch_state = await LangGraphExecutor._execute_code_node(node_data, branch_state)
+                elif node_type == "skill":
+                    branch_state = await LangGraphExecutor._execute_skill_node(node_data, branch_state)
+                elif node_type == "template":
+                    branch_state = await LangGraphExecutor._execute_template_node(node_data, branch_state)
+            
+            return {branch_name: branch_state["variables"]}
+
+        if branches:
+            tasks = []
+            for branch in branches:
+                branch_name = branch.get("name", f"branch_{len(tasks)}")
+                branch_nodes = branch.get("nodes", [])
+                if branch_nodes:
+                    tasks.append(execute_branch(branch_name, branch_nodes))
+            
+            if tasks:
+                results = await asyncio.gather(*tasks)
+                merged_results = {}
+                for result in results:
+                    merged_results.update(result)
+                state["variables"][output_var] = merged_results
+        
         return state
 
     @staticmethod
