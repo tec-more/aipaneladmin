@@ -39,16 +39,20 @@ def dict_merge_reducer(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str,
     return result
 
 
+def last_value_reducer(left, right):
+    """最后值reducer，保留最后一个值"""
+    return right if right is not None else left
+
 class AgentState(TypedDict):
     """智能体执行状态，支持并发更新"""
-    input: Dict[str, Any]
-    output: Dict[str, Any]
-    messages: List[Dict[str, Any]]
-    variables: Dict[str, Any]
-    node_results: Dict[str, Any]
-    execution_trace: List[Dict[str, Any]]
-    current_node: Optional[str]
-    error: Optional[str]
+    input: Annotated[Dict[str, Any], dict_merge_reducer]
+    output: Annotated[Dict[str, Any], dict_merge_reducer]
+    messages: Annotated[List[Dict[str, Any]], add]
+    variables: Annotated[Dict[str, Any], dict_merge_reducer]
+    node_results: Annotated[Dict[str, Any], dict_merge_reducer]
+    execution_trace: Annotated[List[Dict[str, Any]], add]
+    current_node: Annotated[Optional[str], last_value_reducer]
+    error: Annotated[Optional[str], last_value_reducer]
 
 def create_initial_state(input_data: Dict[str, Any], agent) -> Dict[str, Any]:
     """创建初始状态"""
@@ -765,6 +769,7 @@ class LangGraphExecutor:
             elif node_type == "http":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'action', 'label': node_label, 'message': '发送HTTP请求'})
+                logger.info(f"http节点类型: {node_type}")
                 state = await LangGraphExecutor._execute_http_node(node_data, state)
             elif node_type == "code":
                 state = await LangGraphExecutor._execute_code_node(node_data, state)
@@ -1659,9 +1664,24 @@ class LangGraphExecutor:
         """执行HTTP请求节点"""
         url = node_data.get("url", "")
         method = node_data.get("method", "GET")
-        headers = node_data.get("headers", {})
+        headers = node_data.get("headers", "")
         body = node_data.get("body", "")
-
+        output_var = node_data.get("outputVar", "http_response")
+        logger.info(f"进入http节点,请求: {method} {url} {headers} {body}")
+        
+        try:
+            import json
+            if isinstance(headers, str) and headers.strip():
+                try:
+                    headers = json.loads(headers)
+                except json.JSONDecodeError:
+                    headers = {}
+            elif not isinstance(headers, dict):
+                headers = {}
+        except Exception as e:
+            logger.warning(f"解析headers失败: {e}")
+            headers = {}
+            
         try:
             import aiohttp
 
@@ -1688,14 +1708,15 @@ class LangGraphExecutor:
                         except json.JSONDecodeError:
                             pass
                     
-                    state["variables"]["http_response"] = {
+                    state["variables"][output_var] = {
                         "status": response.status,
                         "content_type": content_type,
                         "data": response_data
                     }
+                    logger.info(f"HTTP响应: {content_type}, 输出变量: {output_var}")
         except Exception as e:
             logger.exception(f"HTTP请求失败: {e}")
-            state["variables"]["http_response"] = {"error": str(e)}
+            state["variables"][output_var] = {"error": str(e)}
 
         return state
 

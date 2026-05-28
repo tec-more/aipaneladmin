@@ -245,8 +245,14 @@
               <el-form-item label="URL">
                 <el-input v-model="selectedNode.data.url" />
               </el-form-item>
+              <el-form-item label="请求头">
+                <el-input v-model="selectedNode.data.headers" type="textarea" :rows="2" placeholder='JSON格式，例如: {"Content-Type": "application/json"}' />
+              </el-form-item>
               <el-form-item label="请求体">
                 <el-input v-model="selectedNode.data.body" type="textarea" :rows="3" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: http_response" />
               </el-form-item>
             </template>
 
@@ -1556,7 +1562,9 @@ const transformNode = (node) => {
   } else if (nodeType === 'http') {
     transformed.data.method = node.data?.method || 'GET';
     transformed.data.url = node.data?.url || '';
+    transformed.data.headers = node.data?.headers || '';
     transformed.data.body = node.data?.body || '';
+    transformed.data.outputVar = node.data?.outputVar || '';
   } else if (nodeType === 'code') {
     transformed.data.language = node.data?.language || 'python';
     transformed.data.code = node.data?.code || '';
