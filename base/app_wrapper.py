@@ -31,7 +31,7 @@ class ASGIAppWithPrefix:
                 scope["root_path"] = self.prefix
 
             # 打印日志
-            print(f'INFO:     ({client}, -) "WebSocket {original_path}"', flush=True)
+            # print(f'INFO:     ({client}, -) "WebSocket {original_path}"', flush=True)
 
             await self.app(scope, receive, send)
             return
@@ -43,7 +43,7 @@ class ASGIAppWithPrefix:
             client = scope.get("client", ["", ""])[0] if scope.get("client") else ""
 
             # 打印访问日志
-            print(f'INFO:     {client} - "{method} {original_path} HTTP/1.1"', flush=True)
+            # print(f'INFO:     {client} - "{method} {original_path} HTTP/1.1"', flush=True)
 
             # OPTIONS 请求（CORS 预检）直接透传
             if method == "OPTIONS":
