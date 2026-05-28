@@ -222,6 +222,13 @@
               </el-form-item>
             </template>
             
+            <template v-if="selectedNode.type === 'parallel'">
+              <el-divider content-position="left">并行配置</el-divider>
+              <el-form-item label="输出变量">
+                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: parallel_results" />
+              </el-form-item>
+            </template>
+            
             <template v-if="selectedNode.type === 'output'">
               <el-divider content-position="left">输出配置</el-divider>
               <el-form-item label="输出变量">

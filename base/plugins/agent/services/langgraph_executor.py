@@ -521,7 +521,8 @@ class LangGraphExecutor:
                 "node_results": {},
                 "execution_trace": [],
                 "current_node": None,
-                "error": None
+                "error": None,
+                "flow_data": flow_data  # 新增：将图结构存入状态，供并行节点使用
             }
 
             logger.info("使用 LangGraph 执行")
