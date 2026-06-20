@@ -766,7 +766,7 @@ class LangGraphExecutor:
             elif node_type == "parallel":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'action', 'label': node_label, 'message': '并行执行分支任务...'})
-                state = await LangGraphExecutor._execute_parallel_node(node_data, state)
+                state = await LangGraphExecutor._execute_parallel_node(current_node, state)
             elif node_type == "http":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'action', 'label': node_label, 'message': '发送HTTP请求'})
@@ -1828,10 +1828,11 @@ class LangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_parallel_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_parallel_node(current_node: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行并行节点 - 自动将后续节点作为并行分支"""
+        node_data = current_node.get("data", {})
         output_var = node_data.get("outputVar", "parallel_results")
-        current_node_id = node_data.get("id", "")
+        current_node_id = current_node.get("id", "")
         logger.info(f"[并行节点] 开始执行，节点ID: {current_node_id}")
         
         # 从状态中获取图结构

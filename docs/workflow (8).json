@@ -1,0 +1,179 @@
+{
+  "nodes": [
+    {
+      "id": "start-1779786844443",
+      "type": "start",
+      "position": {
+        "x": 55,
+        "y": 184
+      },
+      "data": {
+        "label": "开始",
+        "description": ""
+      }
+    },
+    {
+      "id": "end-1779846054517",
+      "type": "end",
+      "position": {
+        "x": 1045.25,
+        "y": 320.5
+      },
+      "data": {
+        "label": "结束",
+        "description": ""
+      }
+    },
+    {
+      "id": "http-1779933888092",
+      "type": "http",
+      "position": {
+        "x": 514.75,
+        "y": 59.75
+      },
+      "data": {
+        "label": "HTTP 请求",
+        "description": "",
+        "method": "GET",
+        "url": "http://www.baidu.com",
+        "headers": "",
+        "body": "",
+        "outputVar": "http1"
+      }
+    },
+    {
+      "id": "output-1779936883041",
+      "type": "output",
+      "position": {
+        "x": 799.25,
+        "y": 322.5
+      },
+      "data": {
+        "label": "输出",
+        "description": "",
+        "outputVar": "",
+        "outputContent": "{{http1.data}}\n{{http2.data}}\n{{http3.data}}"
+      }
+    },
+    {
+      "id": "parallel-1779941600416",
+      "type": "parallel",
+      "position": {
+        "x": 256.5,
+        "y": 339.5
+      },
+      "data": {
+        "label": "并行",
+        "description": ""
+      }
+    },
+    {
+      "id": "http-1779941624485",
+      "type": "http",
+      "position": {
+        "x": 512,
+        "y": 343
+      },
+      "data": {
+        "label": "HTTP 请求",
+        "description": "",
+        "method": "GET",
+        "url": "http://www.hao123.com",
+        "headers": "",
+        "body": "",
+        "outputVar": "http2"
+      }
+    },
+    {
+      "id": "http-1779941626531",
+      "type": "http",
+      "position": {
+        "x": 506.25,
+        "y": 523
+      },
+      "data": {
+        "label": "HTTP 请求",
+        "description": "",
+        "method": "GET",
+        "url": "http://sina.com.cn",
+        "headers": "",
+        "body": "",
+        "outputVar": "http3"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1779936886535",
+      "source": "http-1779933888092",
+      "target": "output-1779936883041",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1779936895428",
+      "source": "output-1779936883041",
+      "target": "end-1779846054517",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1779941612159",
+      "source": "start-1779786844443",
+      "target": "parallel-1779941600416",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1779941616435",
+      "source": "parallel-1779941600416",
+      "target": "http-1779933888092",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1779941628668",
+      "source": "parallel-1779941600416",
+      "target": "http-1779941624485",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1779941631344",
+      "source": "parallel-1779941600416",
+      "target": "http-1779941626531",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1779941650492",
+      "source": "http-1779941624485",
+      "target": "output-1779936883041",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1779941653746",
+      "source": "http-1779941626531",
+      "target": "output-1779936883041",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    }
+  ]
+}
