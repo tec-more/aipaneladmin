@@ -1829,10 +1829,46 @@ class LangGraphExecutor:
 
     @staticmethod
     async def _execute_parallel_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行并行节点 - 同时执行多个分支任务"""
-        branches = node_data.get("branches", [])
+        """执行并行节点 - 自动将后续节点作为并行分支"""
         output_var = node_data.get("outputVar", "parallel_results")
-        logger.info(f"[并行节点] 开始执行，分支数: {len(branches)}")
+        current_node_id = node_data.get("id", "")
+        logger.info(f"[并行节点] 开始执行，节点ID: {current_node_id}")
+        
+        # 从状态中获取图结构
+        flow_data = state.get("flow_data", {})
+        edges = flow_data.get("edges", [])
+        nodes_map = {node.get("id"): node for node in flow_data.get("nodes", [])}
+        logger.info(f"[并行节点] 图结构 - 边数: {len(edges)}, 节点数: {len(nodes_map)}")
+        
+        # 获取分支配置（支持JSON字符串和列表）
+        branches = node_data.get("branches", [])
+        if isinstance(branches, str) and branches.strip():
+            try:
+                import json
+                branches = json.loads(branches)
+            except json.JSONDecodeError as e:
+                logger.error(f"[并行节点] 解析 branches JSON 失败: {e}")
+                branches = []
+        
+        # 如果没有手动配置分支，自动从边构建分支
+        if not branches and current_node_id and edges:
+            outgoing_edges = [edge for edge in edges if edge.get("source") == current_node_id]
+            logger.info(f"[并行节点] 出边数: {len(outgoing_edges)}")
+            
+            if outgoing_edges:
+                branches = []
+                for edge in outgoing_edges:
+                    target_node_id = edge.get("target", "")
+                    target_node = nodes_map.get(target_node_id)
+                    if target_node:
+                        branch_name = target_node.get("data", {}).get("label", target_node_id)
+                        branches.append({
+                            "name": branch_name,
+                            "nodes": [target_node]
+                        })
+                logger.info(f"[并行节点] 自动构建 {len(branches)} 个分支")
+        
+        logger.info(f"[并行节点] 最终分支数: {len(branches)}")
 
         async def execute_branch(branch_name: str, branch_nodes: List[Dict]) -> Dict[str, Any]:
             """执行单个分支"""
