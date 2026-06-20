@@ -53,6 +53,7 @@ class AgentState(TypedDict):
     execution_trace: Annotated[List[Dict[str, Any]], add]
     current_node: Annotated[Optional[str], last_value_reducer]
     error: Annotated[Optional[str], last_value_reducer]
+    flow_data: Annotated[Dict[str, Any], dict_merge_reducer]  # 图结构数据（nodes, edges）
 
 def create_initial_state(input_data: Dict[str, Any], agent) -> Dict[str, Any]:
     """创建初始状态"""
