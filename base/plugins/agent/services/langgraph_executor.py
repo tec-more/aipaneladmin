@@ -1598,6 +1598,14 @@ class LangGraphExecutor:
         variables = state.get("variables", {})
 
         try:
+            # 如果条件为空，直接返回False，条件节点的判断应该由边的条件表达式决定
+            if not condition or condition.strip() == "":
+                state["variables"]["condition_result"] = {
+                    "condition": condition,
+                    "result": False
+                }
+                return state
+            
             # 将模板语法转换为可执行表达式
             import re
             
@@ -1652,19 +1660,50 @@ class LangGraphExecutor:
     @staticmethod
     async def _execute_iteration_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行迭代节点"""
-        iteration_var = node_data.get("iteration_var", "item")
-        collection_var = node_data.get("collection_var", "items")
+        # 兼容前端字段名（iterationVariable）和后端字段名（iteration_var）
+        iteration_var = node_data.get("iteration_var", node_data.get("iterationVariable", "item"))
+        # 兼容前端字段名（iterationList）和后端字段名（collection_var）
+        collection_var = node_data.get("collection_var", node_data.get("iterationList", "items"))
 
         collection = state.get("variables", {}).get(collection_var, [])
         if not isinstance(collection, list):
             collection = []
 
-        state["variables"]["iteration_index"] = 0
-        state["variables"]["iteration_count"] = len(collection)
-        state["variables"]["iteration_total"] = len(collection)
+        total = len(collection)
+        
+        # 获取当前索引，如果不存在则从0开始，否则递增
+        current_index = state.get("variables", {}).get("iteration_index", -1)
+        
+        # 检查是否已完成一轮迭代
+        completed = state.get("variables", {}).get("iteration_completed", False)
+        
+        if current_index < 0 or completed:
+            # 首次执行或已完成一轮，重新开始
+            current_index = 0
+            state["variables"]["iteration_results"] = []
+            state["variables"]["iteration_completed"] = False
+        else:
+            # 继续下一个元素
+            current_index += 1
+        
+        # 检查是否完成迭代
+        if current_index >= total:
+            state["variables"]["iteration_completed"] = True
+            current_index = total  # 设置为total，用于条件判断
+        
+        state["variables"]["iteration_index"] = current_index
+        state["variables"]["iteration_count"] = min(current_index + 1, total)
+        state["variables"]["iteration_total"] = total
 
-        if collection:
-            state["variables"][iteration_var] = collection[0]
+        # 设置当前迭代元素
+        if collection and current_index < total:
+            state["variables"][iteration_var] = collection[current_index]
+            # 将当前元素添加到结果列表
+            results = state.get("variables", {}).get("iteration_results", [])
+            results.append(collection[current_index])
+            state["variables"]["iteration_results"] = results
+        else:
+            state["variables"][iteration_var] = ""
 
         return state
 
@@ -1791,13 +1830,23 @@ class LangGraphExecutor:
     @staticmethod
     async def _execute_variable_assigner_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行变量赋值节点"""
-        variable_name = node_data.get("variable_name", "")
-        value = node_data.get("value", "")
+        # 兼容前端字段名（varName）和后端字段名（variable_name）
+        variable_name = node_data.get("variable_name", node_data.get("varName", ""))
+        # 兼容前端字段名（varValue）和后端字段名（value）
+        value = node_data.get("value", node_data.get("varValue", ""))
 
         variables = state.get("variables", {})
         if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
             var_name = value[2:-2]
             value = variables.get(var_name, value)
+        
+        # 尝试解析JSON字符串
+        if isinstance(value, str) and (value.startswith("[") or value.startswith("{")):
+            try:
+                import json
+                value = json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                pass
 
         state["variables"][variable_name] = value
         return state

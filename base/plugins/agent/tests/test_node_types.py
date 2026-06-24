@@ -137,8 +137,8 @@ class TestNodeTypes:
         assert result["variables"]["i"] == 4  # 最后一个索引
 
     @pytest.mark.asyncio
-    async def test_iteration_node(self):
-        """测试迭代节点 - 应设置迭代变量"""
+    async def test_iteration_node_first_element(self):
+        """测试迭代节点 - 首次执行返回第一个元素"""
         node_data = {"iteration_var": "item", "collection_var": "items"}
         state = {
             "variables": {"items": ["a", "b", "c"]},
@@ -151,7 +151,63 @@ class TestNodeTypes:
         result = await LangGraphExecutor._execute_iteration_node(node_data, state)
 
         assert result["variables"]["item"] == "a"
+        assert result["variables"]["iteration_index"] == 0
+        assert result["variables"]["iteration_count"] == 1
+        assert result["variables"]["iteration_total"] == 3
+
+    @pytest.mark.asyncio
+    async def test_iteration_node_next_element(self):
+        """测试迭代节点 - 第二次执行返回第二个元素"""
+        node_data = {"iteration_var": "item", "collection_var": "items"}
+        state = {
+            "variables": {"items": ["a", "b", "c"], "iteration_index": 0},
+            "input": {},
+            "output": {},
+            "messages": [],
+            "execution_trace": []
+        }
+
+        result = await LangGraphExecutor._execute_iteration_node(node_data, state)
+
+        assert result["variables"]["item"] == "b"
+        assert result["variables"]["iteration_index"] == 1
+        assert result["variables"]["iteration_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_iteration_node_third_element(self):
+        """测试迭代节点 - 第三次执行返回第三个元素"""
+        node_data = {"iteration_var": "item", "collection_var": "items"}
+        state = {
+            "variables": {"items": ["a", "b", "c"], "iteration_index": 1},
+            "input": {},
+            "output": {},
+            "messages": [],
+            "execution_trace": []
+        }
+
+        result = await LangGraphExecutor._execute_iteration_node(node_data, state)
+
+        assert result["variables"]["item"] == "c"
+        assert result["variables"]["iteration_index"] == 2
         assert result["variables"]["iteration_count"] == 3
+
+    @pytest.mark.asyncio
+    async def test_iteration_node_loop_back(self):
+        """测试迭代节点 - 完成迭代后重新开始"""
+        node_data = {"iteration_var": "item", "collection_var": "items"}
+        state = {
+            "variables": {"items": ["a", "b", "c"], "iteration_index": 2},
+            "input": {},
+            "output": {},
+            "messages": [],
+            "execution_trace": []
+        }
+
+        result = await LangGraphExecutor._execute_iteration_node(node_data, state)
+
+        assert result["variables"]["item"] == "a"
+        assert result["variables"]["iteration_index"] == 0
+        assert result["variables"]["iteration_count"] == 1
 
     @pytest.mark.asyncio
     async def test_iteration_node_empty_collection(self):
@@ -168,7 +224,8 @@ class TestNodeTypes:
         result = await LangGraphExecutor._execute_iteration_node(node_data, state)
 
         assert result["variables"]["iteration_count"] == 0
-        assert result["variables"]["item"] == ""  # 默认空字符串
+        assert result["variables"]["iteration_index"] == 0
+        assert result["variables"]["item"] == ""
 
     @pytest.mark.asyncio
     async def test_parallel_node_with_branches(self):

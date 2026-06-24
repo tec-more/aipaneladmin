@@ -22,40 +22,30 @@
       "data": {
         "label": "迭代",
         "description": "",
-        "iterationList": "",
+        "iterationList": "fruits",
         "iterationVariable": "item"
-      }
-    },
-    {
-      "id": "condition-1782268188268",
-      "type": "condition",
-      "position": {
-        "x": 400,
-        "y": 336.6666666666667
-      },
-      "data": {
-        "label": "条件判断",
-        "description": ""
       }
     },
     {
       "id": "output-1782268194514",
       "type": "output",
       "position": {
-        "x": 592.2222222222223,
-        "y": 460.7777777777778
+        "x": 419.2222222222223,
+        "y": 286.7777777777778
       },
       "data": {
         "label": "输出",
-        "description": ""
+        "description": "",
+        "outputVar": "",
+        "outputContent": "当前元素: {{item}}\n索引: {{iteration_index}}\n总数: {{iteration_total}}\n已处理: {{iteration_results}}"
       }
     },
     {
       "id": "end-1782268196757",
       "type": "end",
       "position": {
-        "x": 653.8888888888889,
-        "y": 605.1111111111111
+        "x": 687.8888888888889,
+        "y": 625.1111111111111
       },
       "data": {
         "label": "结束",
@@ -71,38 +61,25 @@
       },
       "data": {
         "label": "变量赋值",
+        "description": "",
+        "varName": "fruits",
+        "varValue": "[\"apple\", \"banana\", \"orange\"]"
+      }
+    },
+    {
+      "id": "condition-1782280624086",
+      "type": "condition",
+      "position": {
+        "x": 628,
+        "y": 346
+      },
+      "data": {
+        "label": "条件判断",
         "description": ""
       }
     }
   ],
   "edges": [
-    {
-      "id": "edge-1782268206371",
-      "source": "iteration-1782268183538",
-      "target": "condition-1782268188268",
-      "enabled": true,
-      "priority": 0,
-      "condition": "",
-      "description": ""
-    },
-    {
-      "id": "edge-1782268216415",
-      "source": "condition-1782268188268",
-      "target": "output-1782268194514",
-      "enabled": true,
-      "priority": 0,
-      "condition": "",
-      "description": ""
-    },
-    {
-      "id": "edge-1782268224281",
-      "source": "output-1782268194514",
-      "target": "end-1782268196757",
-      "enabled": true,
-      "priority": 0,
-      "condition": "",
-      "description": ""
-    },
     {
       "id": "edge-1782268314640",
       "source": "start-1782268173711",
@@ -119,6 +96,42 @@
       "enabled": true,
       "priority": 0,
       "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782280607958",
+      "source": "iteration-1782268183538",
+      "target": "output-1782268194514",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782280627504",
+      "source": "output-1782268194514",
+      "target": "condition-1782280624086",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782280631870",
+      "source": "condition-1782280624086",
+      "target": "iteration-1782268183538",
+      "enabled": true,
+      "priority": 0,
+      "condition": "{{iteration_index}} < {{iteration_total}}",
+      "description": ""
+    },
+    {
+      "id": "edge-1782280635124",
+      "source": "condition-1782280624086",
+      "target": "end-1782268196757",
+      "enabled": true,
+      "priority": 0,
+      "condition": "{{iteration_index}} >= {{iteration_total}}",
       "description": ""
     }
   ]
