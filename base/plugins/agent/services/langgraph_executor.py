@@ -1855,17 +1855,58 @@ class LangGraphExecutor:
 
     @staticmethod
     async def _execute_document_extractor_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行文档提取节点"""
+        """执行文档提取节点
+        
+        支持两种模式：
+        1. 简单模式：使用 extract_fields 指定字段名，从文档中提取前100字符
+        2. 正则模式：使用 patterns 指定正则表达式，提取匹配内容
+        """
         document_var = node_data.get("document_var", "document")
         extract_fields = node_data.get("extract_fields", [])
+        output_var = node_data.get("outputVar", "extracted_data")
+        patterns = node_data.get("patterns", [])
 
         document = state.get("variables", {}).get(document_var, "")
-        extracted = {}
+        
+        # 调试日志
+        logger.info(f"[文档提取] document_var: {document_var}, document长度: {len(document) if document else 0}")
+        logger.info(f"[文档提取] extract_fields: {extract_fields}")
+        logger.info(f"[文档提取] patterns: {patterns}")
 
-        for field in extract_fields:
-            extracted[field] = document[:100]
+        # 使用正则表达式提取
+        if patterns and isinstance(patterns, list):
+            import re
+            extracted = {}
+            for i, pattern in enumerate(patterns):
+                try:
+                    # 使用 DOTALL 模式使 . 匹配换行符
+                    matches = re.findall(pattern, document, re.DOTALL)
+                    if matches:
+                        # 如果匹配到多个结果，保存为列表；否则保存单个值
+                        extracted_value = matches if len(matches) > 1 else matches[0]
+                    else:
+                        extracted_value = ""
+                    
+                    # 使用字段名或默认名称
+                    field_name = extract_fields[i] if i < len(extract_fields) else f"field_{i}"
+                    extracted[field_name] = extracted_value
+                    logger.info(f"[文档提取] 字段 '{field_name}' 提取结果: {repr(extracted_value)[:100]}")
+                except re.error as e:
+                    logger.error(f"[文档提取] 正则表达式错误: {pattern}, {e}")
+                    field_name = extract_fields[i] if i < len(extract_fields) else f"field_{i}"
+                    extracted[field_name] = ""
+            
+            state["variables"][output_var] = extracted
+            logger.info(f"[文档提取] 正则模式提取结果: {extracted}")
+        else:
+            # 兼容原有简单模式：每个字段取前100字符
+            extracted = {}
+            for field in extract_fields:
+                extracted[field] = document[:100] if document else ""
+            
+            state["variables"][output_var] = extracted
+            logger.info(f"[文档提取] 简单模式提取结果: {extracted}")
 
-        state["variables"]["extracted_data"] = extracted
         return state
 
     @staticmethod

@@ -1,0 +1,118 @@
+{
+  "nodes": [
+    {
+      "id": "start-001",
+      "type": "start",
+      "position": {"x": 50, "y": 100},
+      "data": {
+        "label": "开始",
+        "description": ""
+      }
+    },
+    {
+      "id": "end-001",
+      "type": "end",
+      "position": {"x": 800, "y": 300},
+      "data": {
+        "label": "结束",
+        "description": ""
+      }
+    },
+    {
+      "id": "var-assign-001",
+      "type": "variable_assigner",
+      "position": {"x": 200, "y": 150},
+      "data": {
+        "label": "设置文档内容",
+        "description": "",
+        "varName": "doc_content",
+        "varValue": "{\"title\":\"Python编程指南\",\"author\":\"张三\",\"date\":\"2024-01-01\",\"content\":\"本书详细介绍Python编程的基础知识和高级技巧。\"}"
+      }
+    },
+    {
+      "id": "doc-extractor-001",
+      "type": "document_extractor",
+      "position": {"x": 400, "y": 150},
+      "data": {
+        "label": "文档提取-正则模式",
+        "description": "使用正则表达式提取文档中的特定内容",
+        "document_var": "doc_content",
+        "extract_fields": ["标题", "作者", "日期"],
+        "patterns": [
+          "\"title\":\"([^\"]+)\"",
+          "\"author\":\"([^\"]+)\"",
+          "\"date\":\"([^\"]+)\""
+        ],
+        "outputVar": "extracted_info"
+      }
+    },
+    {
+      "id": "template-001",
+      "type": "template",
+      "position": {"x": 600, "y": 150},
+      "data": {
+        "label": "模板转换",
+        "description": "",
+        "template": "提取的信息：\\n标题：{{extracted_info.标题}}\\n作者：{{extracted_info.作者}}\\n日期：{{extracted_info.日期}}",
+        "outputVar": "result"
+      }
+    },
+    {
+      "id": "output-001",
+      "type": "output",
+      "position": {"x": 700, "y": 150},
+      "data": {
+        "label": "输出",
+        "description": "",
+        "outputContent": "{{result}}"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-001",
+      "source": "start-001",
+      "target": "var-assign-001",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-002",
+      "source": "var-assign-001",
+      "target": "doc-extractor-001",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-003",
+      "source": "doc-extractor-001",
+      "target": "template-001",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-004",
+      "source": "template-001",
+      "target": "output-001",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-005",
+      "source": "output-001",
+      "target": "end-001",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    }
+  ]
+}
