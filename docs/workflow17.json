@@ -1,0 +1,108 @@
+{
+  "nodes": [
+    {
+      "id": "start-1782311116632",
+      "type": "start",
+      "position": {
+        "x": 42,
+        "y": 108
+      },
+      "data": {
+        "label": "开始",
+        "description": ""
+      }
+    },
+    {
+      "id": "end-1782311118196",
+      "type": "end",
+      "position": {
+        "x": 797,
+        "y": 492
+      },
+      "data": {
+        "label": "结束",
+        "description": ""
+      }
+    },
+    {
+      "id": "output-1782311120525",
+      "type": "output",
+      "position": {
+        "x": 570,
+        "y": 315
+      },
+      "data": {
+        "label": "输出",
+        "description": "",
+        "outputContent": "{{qq1}}"
+      }
+    },
+    {
+      "id": "parameter_extractor-1782311124788",
+      "type": "parameter_extractor",
+      "position": {
+        "x": 331,
+        "y": 169
+      },
+      "data": {
+        "label": "参数提取",
+        "description": "",
+        "inputVariable": "q1",
+        "parameters": "wer",
+        "outputVar": "qq1"
+      }
+    },
+    {
+      "id": "variable_assigner-1782313265367",
+      "type": "variable_assigner",
+      "position": {
+        "x": 206.25,
+        "y": 322.5
+      },
+      "data": {
+        "label": "变量赋值",
+        "description": "",
+        "varName": "q1",
+        "varValue": "测试"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1782311130066",
+      "source": "parameter_extractor-1782311124788",
+      "target": "output-1782311120525",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782311132965",
+      "source": "output-1782311120525",
+      "target": "end-1782311118196",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782313268500",
+      "source": "start-1782311116632",
+      "target": "variable_assigner-1782313265367",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782313270773",
+      "source": "variable_assigner-1782313265367",
+      "target": "parameter_extractor-1782311124788",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    }
+  ]
+}

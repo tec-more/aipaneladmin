@@ -1972,15 +1972,45 @@ class LangGraphExecutor:
 
     @staticmethod
     async def _execute_parameter_extractor_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行参数提取节点"""
-        source_var = node_data.get("source_var", "")
-        parameter_name = node_data.get("parameter_name", "")
+        """执行参数提取节点
+        
+        从输入变量（字典类型）中提取指定的参数字段
+        """
+        # 兼容前端字段名
+        source_var = node_data.get("source_var", node_data.get("inputVariable", ""))
+        parameter_name = node_data.get("parameter_name", node_data.get("parameters", ""))
+        output_var = node_data.get("outputVar", "")
+        
+        # 如果没有指定输出变量，使用parameter_name作为输出变量名
+        if not output_var:
+            output_var = parameter_name
 
         source = state.get("variables", {}).get(source_var, "")
+        
+        # 调试日志
+        logger.info(f"[参数提取] source_var: {source_var}, parameter_name: {parameter_name}, output_var: {output_var}")
+        logger.info(f"[参数提取] source值: {source}, 类型: {type(source)}")
+        
         if isinstance(source, dict):
-            state["variables"][parameter_name] = source.get(parameter_name, "")
+            state["variables"][output_var] = source.get(parameter_name, "")
+            logger.info(f"[参数提取] 提取成功: {state['variables'][output_var]}")
         else:
-            state["variables"][parameter_name] = ""
+            # 如果源不是字典，尝试解析为JSON
+            if isinstance(source, str):
+                try:
+                    import json
+                    source = json.loads(source)
+                    if isinstance(source, dict):
+                        state["variables"][output_var] = source.get(parameter_name, "")
+                        logger.info(f"[参数提取] JSON解析后提取成功: {state['variables'][output_var]}")
+                    else:
+                        state["variables"][output_var] = ""
+                except (json.JSONDecodeError, ValueError):
+                    state["variables"][output_var] = ""
+            else:
+                state["variables"][output_var] = ""
+            
+            logger.info(f"[参数提取] 提取结果: {state['variables'][output_var]}")
 
         return state
 
