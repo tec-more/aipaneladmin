@@ -317,9 +317,6 @@
               <el-form-item label="变量值">
                 <el-input v-model="selectedNode.data.varValue" type="textarea" :rows="3" placeholder="变量值（支持 {{变量名}}）" />
               </el-form-item>
-              <el-form-item label="输出变量">
-                <el-input v-model="selectedNode.data.outputVar" placeholder="例如: assigned_var" />
-              </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'parameter_extractor'">
@@ -1588,7 +1585,6 @@ const transformNode = (node) => {
   } else if (nodeType === 'variable_assigner') {
     transformed.data.varName = node.data?.varName || '';
     transformed.data.varValue = node.data?.varValue || '';
-    transformed.data.outputVar = node.data?.outputVar || '';
   } else if (nodeType === 'parameter_extractor') {
     transformed.data.inputVariable = node.data?.inputVariable || '';
     transformed.data.parameters = node.data?.parameters || '';
