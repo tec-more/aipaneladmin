@@ -1826,14 +1826,29 @@ class LangGraphExecutor:
     @staticmethod
     async def _execute_variable_aggregator_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行变量聚合器节点"""
-        input_vars = node_data.get("input_vars", [])
+        input_vars = node_data.get("input_vars", node_data.get("inputVars", []))
         output_var = node_data.get("outputVar", "aggregated")
 
         aggregated = {}
         variables = state.get("variables", {})
-        for var_name in input_vars:
-            if var_name in variables:
-                aggregated[var_name] = variables[var_name]
+
+        # 支持多种输入格式
+        if isinstance(input_vars, str):
+            # 逗号分隔的字符串: "name, age, city"
+            input_vars = [v.strip() for v in input_vars.split(",") if v.strip()]
+        elif isinstance(input_vars, dict):
+            # 重命名映射: {"name": "user_name", "age": "user_age"}
+            for source_var, target_name in input_vars.items():
+                if source_var in variables:
+                    aggregated[target_name] = variables[source_var]
+            state["variables"][output_var] = aggregated
+            return state
+
+        # 列表格式: ["name", "age"]
+        if isinstance(input_vars, list):
+            for var_name in input_vars:
+                if var_name in variables:
+                    aggregated[var_name] = variables[var_name]
 
         state["variables"][output_var] = aggregated
         return state
