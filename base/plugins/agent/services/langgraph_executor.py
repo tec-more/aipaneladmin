@@ -694,6 +694,9 @@ class LangGraphExecutor:
         node_label = node_data.get("label", node_type)
 
         logger.info(f"执行节点 [{node_id}]: {node_type}")
+        
+        # 保存原始 flow_data，确保在状态传递过程中不会丢失
+        original_flow_data = state.get("flow_data")
 
         state["current_node"] = node_label
 
@@ -815,6 +818,10 @@ class LangGraphExecutor:
             state["error"] = str(e)
             if sse_yield_func:
                 await sse_yield_func({'type': 'error', 'node_id': node_id, 'message': str(e)})
+
+        # 确保 flow_data 在状态传递过程中不会丢失
+        if original_flow_data is not None and "flow_data" not in state:
+            state["flow_data"] = original_flow_data
 
         return state
 
