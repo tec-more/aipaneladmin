@@ -1791,8 +1791,34 @@ class LangGraphExecutor:
         output_var = node_data.get("outputVar", "template_output")
 
         variables = state.get("variables", {})
-        for key, value in variables.items():
-            template = template.replace(f"{{{{{key}}}}}", str(value))
+        
+        # 调试日志
+        logger.info(f"[模板节点] 开始执行")
+        logger.info(f"[模板节点] template: {template}")
+        logger.info(f"[模板节点] outputVar: {output_var}")
+        logger.info(f"[模板节点] 可用变量: {list(variables.keys())}")
+        if "result" in variables:
+            logger.info(f"[模板节点] result 变量类型: {type(variables['result'])}")
+            logger.info(f"[模板节点] result 变量值: {variables['result']}")
+        
+        # 支持嵌套属性访问，如 {{result.name}}
+        import re
+        
+        def replace_template(match):
+            path = match.group(1)
+            parts = path.split('.')
+            value = variables
+            for part in parts:
+                if isinstance(value, dict):
+                    value = value.get(part, None)
+                elif isinstance(value, object) and hasattr(value, part):
+                    value = getattr(value, part)
+                else:
+                    value = None
+                    break
+            return str(value) if value is not None else match.group(0)
+        
+        template = re.sub(r'\{\{(\w+(\.\w+)*)\}\}', replace_template, template)
 
         state["variables"][output_var] = template
         return state
@@ -1834,6 +1860,9 @@ class LangGraphExecutor:
         variable_name = node_data.get("variable_name", node_data.get("varName", ""))
         # 兼容前端字段名（varValue）和后端字段名（value）
         value = node_data.get("value", node_data.get("varValue", ""))
+        
+        # 调试日志
+        logger.info(f"[变量赋值] varName: {variable_name}, varValue: {repr(value)}, 类型: {type(value)}")
 
         variables = state.get("variables", {})
         if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
@@ -1845,8 +1874,17 @@ class LangGraphExecutor:
             try:
                 import json
                 value = json.loads(value)
-            except (json.JSONDecodeError, ValueError):
-                pass
+                logger.info(f"[变量赋值] JSON解析成功: {value}, 类型: {type(value)}")
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.info(f"[变量赋值] 首次JSON解析失败: {e}")
+                # 尝试处理转义的引号
+                if '\\"' in value:
+                    try:
+                        value = value.replace('\\"', '"')
+                        value = json.loads(value)
+                        logger.info(f"[变量赋值] 处理转义引号后解析成功: {value}, 类型: {type(value)}")
+                    except (json.JSONDecodeError, ValueError) as e2:
+                        logger.info(f"[变量赋值] 处理转义引号后仍然失败: {e2}")
 
         state["variables"][variable_name] = value
         return state

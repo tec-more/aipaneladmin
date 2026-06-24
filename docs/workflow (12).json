@@ -1,0 +1,81 @@
+{
+  "nodes": [
+    {
+      "id": "start-1782304183527",
+      "type": "start",
+      "position": {
+        "x": 79,
+        "y": 269
+      },
+      "data": {
+        "label": "开始",
+        "description": ""
+      }
+    },
+    {
+      "id": "end-1782304184992",
+      "type": "end",
+      "position": {
+        "x": 627,
+        "y": 471
+      },
+      "data": {
+        "label": "结束",
+        "description": ""
+      }
+    },
+    {
+      "id": "output-1782304186615",
+      "type": "output",
+      "position": {
+        "x": 581,
+        "y": 317
+      },
+      "data": {
+        "label": "输出",
+        "description": ""
+      }
+    },
+    {
+      "id": "variable_aggregator-1782304190268",
+      "type": "variable_aggregator",
+      "position": {
+        "x": 389,
+        "y": 169
+      },
+      "data": {
+        "label": "变量聚合器",
+        "description": ""
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1782304192972",
+      "source": "start-1782304183527",
+      "target": "variable_aggregator-1782304190268",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782304195387",
+      "source": "variable_aggregator-1782304190268",
+      "target": "output-1782304186615",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782304197983",
+      "source": "output-1782304186615",
+      "target": "end-1782304184992",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    }
+  ]
+}

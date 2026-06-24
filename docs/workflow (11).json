@@ -1,0 +1,108 @@
+{
+  "nodes": [
+    {
+      "id": "start-1782288287473",
+      "type": "start",
+      "position": {
+        "x": 70,
+        "y": 175
+      },
+      "data": {
+        "label": "开始",
+        "description": ""
+      }
+    },
+    {
+      "id": "end-1782288288718",
+      "type": "end",
+      "position": {
+        "x": 585,
+        "y": 426
+      },
+      "data": {
+        "label": "结束",
+        "description": ""
+      }
+    },
+    {
+      "id": "output-1782288292997",
+      "type": "output",
+      "position": {
+        "x": 503,
+        "y": 290
+      },
+      "data": {
+        "label": "输出",
+        "description": "",
+        "outputVar": "",
+        "outputContent": "{{greeting}}"
+      }
+    },
+    {
+      "id": "template-1782288296466",
+      "type": "template",
+      "position": {
+        "x": 385,
+        "y": 143
+      },
+      "data": {
+        "label": "模板转换",
+        "description": "",
+        "template": "你好，{{result.name}}",
+        "outputVar": "greeting"
+      }
+    },
+    {
+      "id": "variable_assigner-1782288879534",
+      "type": "variable_assigner",
+      "position": {
+        "x": 191,
+        "y": 333
+      },
+      "data": {
+        "label": "变量赋值",
+        "description": "",
+        "varName": "result",
+        "varValue": "{\"name\":\"123\"}"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1782288302762",
+      "source": "template-1782288296466",
+      "target": "output-1782288292997",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782288305094",
+      "source": "output-1782288292997",
+      "target": "end-1782288288718",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782288888620",
+      "source": "start-1782288287473",
+      "target": "variable_assigner-1782288879534",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    },
+    {
+      "id": "edge-1782288890875",
+      "source": "variable_assigner-1782288879534",
+      "target": "template-1782288296466",
+      "enabled": true,
+      "priority": 0,
+      "condition": "",
+      "description": ""
+    }
+  ]
+}
