@@ -1834,8 +1834,11 @@ class LangGraphExecutor:
 
         # 支持多种输入格式
         if isinstance(input_vars, str):
-            # 逗号分隔的字符串: "name, age, city"
-            input_vars = [v.strip() for v in input_vars.split(",") if v.strip()]
+            # 支持逗号分隔或换行分隔
+            if ',' in input_vars:
+                input_vars = [v.strip() for v in input_vars.split(",") if v.strip()]
+            else:
+                input_vars = [v.strip() for v in input_vars.split('\n') if v.strip()]
         elif isinstance(input_vars, dict):
             # 重命名映射: {"name": "user_name", "age": "user_age"}
             for source_var, target_name in input_vars.items():
@@ -1861,17 +1864,39 @@ class LangGraphExecutor:
         1. 简单模式：使用 extract_fields 指定字段名，从文档中提取前100字符
         2. 正则模式：使用 patterns 指定正则表达式，提取匹配内容
         """
-        document_var = node_data.get("document_var", "document")
-        extract_fields = node_data.get("extract_fields", [])
+        # 兼容前端字段名
+        document_var = node_data.get("document_var", node_data.get("documentVar", "document"))
+        extract_fields = node_data.get("extract_fields", node_data.get("extractFields", []))
         output_var = node_data.get("outputVar", "extracted_data")
-        patterns = node_data.get("patterns", [])
+        patterns = node_data.get("patterns", node_data.get("rules", []))
+        
+        # 兼容前端 extractRules 字段（可能是字符串或数组）
+        extract_rules = node_data.get("extractRules", None)
+        if extract_rules and not patterns:
+            if isinstance(extract_rules, list):
+                patterns = extract_rules
+            elif isinstance(extract_rules, str):
+                # 尝试解析JSON数组
+                try:
+                    import json
+                    patterns = json.loads(extract_rules)
+                except (json.JSONDecodeError, ValueError):
+                    # 按行分割
+                    patterns = [line.strip() for line in extract_rules.split('\n') if line.strip()]
 
         document = state.get("variables", {}).get(document_var, "")
+        
+        # 如果文档是字典或其他非字符串类型，转换为字符串
+        if not isinstance(document, str):
+            import json
+            document = json.dumps(document, ensure_ascii=False)
         
         # 调试日志
         logger.info(f"[文档提取] document_var: {document_var}, document长度: {len(document) if document else 0}")
         logger.info(f"[文档提取] extract_fields: {extract_fields}")
         logger.info(f"[文档提取] patterns: {patterns}")
+        logger.info(f"[文档提取] extractRules: {extract_rules}")
+        logger.info(f"[文档提取] document[:200]: {document[:200] if document else ''}")
 
         # 使用正则表达式提取
         if patterns and isinstance(patterns, list):

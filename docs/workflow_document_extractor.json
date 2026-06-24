@@ -36,13 +36,8 @@
       "data": {
         "label": "文档提取-正则模式",
         "description": "使用正则表达式提取文档中的特定内容",
-        "document_var": "doc_content",
-        "extract_fields": ["标题", "作者", "日期"],
-        "patterns": [
-          "\"title\":\"([^\"]+)\"",
-          "\"author\":\"([^\"]+)\"",
-          "\"date\":\"([^\"]+)\""
-        ],
+        "documentVar": "doc_content",
+        "extractRules": "\"title\"\\s*:\\s*\"([^\"]+)\"\n\"author\"\\s*:\\s*\"([^\"]+)\"\n\"date\"\\s*:\\s*\"([^\"]+)\"",
         "outputVar": "extracted_info"
       }
     },
@@ -53,7 +48,7 @@
       "data": {
         "label": "模板转换",
         "description": "",
-        "template": "提取的信息：\\n标题：{{extracted_info.标题}}\\n作者：{{extracted_info.作者}}\\n日期：{{extracted_info.日期}}",
+        "template": "提取的信息：\n标题：{{extracted_info.field_0}}\n作者：{{extracted_info.field_1}}\n日期：{{extracted_info.field_2}}",
         "outputVar": "result"
       }
     },
