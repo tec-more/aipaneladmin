@@ -367,7 +367,7 @@
           <div
             v-for="(msg, index) in dialogHistory"
             :key="index"
-            :class="['message', msg.role]"
+            :class="['message', msg.role, { 'message-streaming': msg.role === 'assistant' && msg.isStreaming }]"
           >
             <div class="message-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
             <div class="message-content-wrapper">
@@ -990,13 +990,26 @@ const doExecute = async () => {
       history: [...dialogHistory.value]
     }
     
-    const assistantMessage = {
+    const msgIndex = dialogHistory.value.length
+    dialogHistory.value.push({
       role: 'assistant',
       content: '',
       time: new Date().toLocaleTimeString('zh-CN'),
       isStreaming: true
+    })
+    
+    const getAssistantMsg = () => dialogHistory.value[msgIndex]
+    const setAssistantContent = (content) => {
+      dialogHistory.value[msgIndex].content = content
+      latestResponse.value = content
     }
-    dialogHistory.value.push(assistantMessage)
+    const appendAssistantContent = (content) => {
+      dialogHistory.value[msgIndex].content += content
+      latestResponse.value = dialogHistory.value[msgIndex].content
+    }
+    const setAssistantStreaming = (streaming) => {
+      dialogHistory.value[msgIndex].isStreaming = streaming
+    }
     
     const executionResults = []
     
@@ -1008,50 +1021,43 @@ const doExecute = async () => {
         executionResults.push(data)
         
         if (data.type === 'stream') {
-          if (data.full_content) {
-            assistantMessage.content = data.full_content
-            latestResponse.value = data.full_content
+          if (data.full_content !== undefined) {
+            setAssistantContent(data.full_content)
           }
         } else if (data.type === 'message') {
           if (data.content) {
-            assistantMessage.content += data.content + '\n'
-            latestResponse.value = assistantMessage.content
+            appendAssistantContent(data.content + '\n')
           }
         } else if (data.type === 'llm_complete') {
           if (data.content) {
-            assistantMessage.content += data.content + '\n'
-            latestResponse.value = assistantMessage.content
+            appendAssistantContent(data.content + '\n')
           }
         } else if (data.type === 'knowledge_result') {
           if (data.results) {
             const contexts = data.results.map(r => r.content).join('\n')
-            assistantMessage.content += `[知识检索结果]\n${contexts}\n`
-            latestResponse.value = assistantMessage.content
+            appendAssistantContent(`[知识检索结果]\n${contexts}\n`)
           }
         } else if (data.type === 'api_result') {
           if (data.result) {
-            assistantMessage.content += `[API响应]\n${JSON.stringify(data.result, null, 2)}\n`
-            latestResponse.value = assistantMessage.content
+            appendAssistantContent(`[API响应]\n${JSON.stringify(data.result, null, 2)}\n`)
           }
         } else if (data.type === 'complete') {
-          assistantMessage.isStreaming = false
+          setAssistantStreaming(false)
         } else if (data.type === 'error') {
-          assistantMessage.isStreaming = false
-          assistantMessage.content = '执行失败: ' + (data.message || '未知错误')
-          latestResponse.value = assistantMessage.content
+          setAssistantStreaming(false)
+          setAssistantContent('执行失败: ' + (data.message || '未知错误'))
         }
       },
       onComplete: () => {
-        assistantMessage.isStreaming = false
+        setAssistantStreaming(false)
         currentInput.value = ''
         executeResult.value = JSON.stringify(executionResults, null, 2)
         ElMessage.success('执行完成')
         executing.value = false
       },
       onError: (error) => {
-        assistantMessage.isStreaming = false
-        assistantMessage.content = '执行失败: ' + (error.message || '未知错误')
-        latestResponse.value = assistantMessage.content
+        setAssistantStreaming(false)
+        setAssistantContent('执行失败: ' + (error.message || '未知错误'))
         executeResult.value = error.message || '执行失败'
         ElMessage.error('执行失败')
         executing.value = false
@@ -1635,6 +1641,20 @@ onMounted(() => {
   color: #303133;
   border-bottom-left-radius: 4px;
   border: 1px solid #e4e7ed;
+}
+
+.message.message-streaming .message-content::after {
+  content: '▋';
+  display: inline-block;
+  margin-left: 2px;
+  animation: typingCursor 1s infinite;
+  color: #409eff;
+  font-weight: bold;
+}
+
+@keyframes typingCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .message-time {
