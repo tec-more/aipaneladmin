@@ -372,6 +372,14 @@
             <div class="message-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
             <div class="message-content-wrapper">
               <div class="message-role">{{ msg.role === 'user' ? '用户' : 'AI' }}</div>
+              <div v-if="msg.images && msg.images.length > 0" class="message-images">
+                <img
+                  v-for="(img, imgIdx) in msg.images"
+                  :key="imgIdx"
+                  :src="img"
+                  class="msg-image"
+                />
+              </div>
               <div class="message-content">{{ msg.content }}</div>
               <div class="message-time">{{ msg.time }}</div>
               
@@ -396,6 +404,12 @@
 
         <!-- 输入区 -->
         <div class="chat-input-area">
+          <div v-if="uploadedImages.length > 0" class="image-preview-list">
+            <div v-for="(img, idx) in uploadedImages" :key="idx" class="image-preview-item">
+              <img :src="img.url" class="preview-thumb" />
+              <el-icon class="remove-image" @click="removeImage(idx)"><Close /></el-icon>
+            </div>
+          </div>
           <el-input
             v-model="currentInput"
             type="textarea"
@@ -405,6 +419,18 @@
             class="input-textarea"
           />
           <div class="input-actions">
+            <el-upload
+              :show-file-list="false"
+              :before-upload="beforeImageUpload"
+              accept="image/*"
+              multiple
+              class="upload-btn"
+            >
+              <el-button>
+                <el-icon><Picture /></el-icon>
+                图片
+              </el-button>
+            </el-upload>
             <el-button @click="clearDialogHistory" :disabled="dialogHistory.length === 0">清空历史</el-button>
             <el-button @click="executeDialogVisible = false">关闭</el-button>
             <el-button type="primary" @click="doExecute" :loading="executing">发送</el-button>
@@ -421,7 +447,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { 
   ArrowLeft, Check, VideoPlay, ChatDotRound, QuestionFilled, 
   Share, User, Connection, VideoPlay as Play, CircleCheck, 
-  Document, Mic, Upload, Download, Picture, Cpu
+  Document, Mic, Upload, Download, Picture, Cpu, Close
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getDialogFlow, updateDialogFlow, executeDialogFlow, executeDialogFlowAuto } from '@/api/agent'
@@ -515,6 +541,7 @@ const executeResult = ref('')
 const dialogHistory = ref([])
 const currentInput = ref('')
 const latestResponse = ref('')
+const uploadedImages = ref([])
 
 const drawingEdge = ref(false)
 const edgeStartNode = ref(null)
@@ -967,28 +994,81 @@ const clearDialogHistory = () => {
   dialogHistory.value = []
   currentInput.value = ''
   latestResponse.value = ''
+  uploadedImages.value = []
   ElMessage.success('对话历史已清空')
 }
 
+const beforeImageUpload = async (file) => {
+  const isImage = file.type.startsWith('image/')
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件!')
+    return false
+  }
+  const isLt10M = file.size / 1024 / 1024 < 10
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过 10MB!')
+    return false
+  }
+  
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const token = localStorage.getItem('token')
+    const response = await fetch('/api/v1/upload/image', {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData
+    })
+    
+    const result = await response.json()
+    if (result.success && result.data) {
+      const baseUrl = window.location.origin
+      const imageUrl = result.data.url.startsWith('http') 
+        ? result.data.url 
+        : baseUrl + result.data.url
+      uploadedImages.value.push({
+        url: imageUrl,
+        name: file.name
+      })
+    } else {
+      ElMessage.error(result.message || '上传失败')
+    }
+  } catch (error) {
+    ElMessage.error('上传失败: ' + error.message)
+  }
+  
+  return false
+}
+
+const removeImage = (index) => {
+  uploadedImages.value.splice(index, 1)
+}
+
 const doExecute = async () => {
-  if (!currentInput.value.trim()) {
-    ElMessage.warning('请输入内容')
+  if (!currentInput.value.trim() && uploadedImages.value.length === 0) {
+    ElMessage.warning('请输入内容或上传图片')
     return
   }
   
   executing.value = true
   try {
+    const userContent = currentInput.value || '请描述这张图片'
     const userMessage = {
       role: 'user',
-      content: currentInput.value,
+      content: userContent,
+      images: uploadedImages.value.map(img => img.url),
       time: new Date().toLocaleTimeString('zh-CN')
     }
     dialogHistory.value.push(userMessage)
     
     const input = {
-      text: currentInput.value,
+      text: userContent,
+      image_urls: uploadedImages.value.map(img => img.url),
       history: [...dialogHistory.value]
     }
+    
+    uploadedImages.value = []
     
     const msgIndex = dialogHistory.value.length
     dialogHistory.value.push({
@@ -1662,6 +1742,67 @@ onMounted(() => {
   color: #c0c4cc;
   margin-top: 4px;
   align-self: flex-end;
+}
+
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.msg-image {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.msg-image:hover {
+  transform: scale(1.02);
+}
+
+.image-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.remove-image {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  background: #f56c6c;
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-btn {
+  margin-right: auto;
 }
 
 /* 处理过程 */

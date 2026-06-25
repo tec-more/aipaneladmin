@@ -303,14 +303,7 @@ class DialogFlowService:
 
         prompt = DialogFlowService._replace_variables(prompt, variables)
 
-        messages = []
-        if input_data.get("history"):
-            for msg in input_data["history"]:
-                messages.append({
-                    "role": msg.get("role"),
-                    "content": msg.get("content")
-                })
-        messages.append({"role": "user", "content": prompt})
+        image_urls = DialogFlowService._extract_image_urls(variables, input_data)
 
         if not model_id:
             return {output_var: "请先配置大模型"}
@@ -355,6 +348,26 @@ class DialogFlowService:
                 api_secret=credentials.get("api_secret", ""),
                 call_mode=credentials.get("call_mode", "vendor_sdk"),
             )
+
+            messages = []
+            if input_data.get("history"):
+                for msg in input_data["history"]:
+                    msg_content = msg.get("content")
+                    if isinstance(msg_content, list):
+                        messages.append({"role": msg.get("role"), "content": msg_content})
+                    else:
+                        messages.append({"role": msg.get("role"), "content": msg_content})
+
+            if image_urls and model.supports_vision:
+                content = [{"type": "text", "text": prompt}]
+                for img_url in image_urls:
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {"url": img_url}
+                    })
+                messages.append({"role": "user", "content": content})
+            else:
+                messages.append({"role": "user", "content": prompt})
 
             if stream and sse_yield_func:
                 full_response = ""
@@ -506,6 +519,34 @@ class DialogFlowService:
             placeholder = f"{{{{{key}}}}}"
             text = text.replace(placeholder, str(value))
         return text
+
+    @staticmethod
+    def _extract_image_urls(variables: Dict[str, Any], input_data: Dict[str, Any]) -> List[str]:
+        """从变量和输入数据中提取图片URL列表"""
+        image_urls = []
+        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg')
+        
+        for key, value in variables.items():
+            if isinstance(value, str) and value:
+                lower_val = value.lower()
+                if key in ('image_url', 'image', 'img', 'picture', 'photo') or \
+                   any(lower_val.endswith(ext) for ext in image_extensions) or \
+                   ('http' in lower_val and any(ext in lower_val for ext in image_extensions)):
+                    image_urls.append(value)
+        
+        if input_data:
+            if isinstance(input_data.get('image_url'), str):
+                image_urls.append(input_data['image_url'])
+            elif isinstance(input_data.get('image_urls'), list):
+                image_urls.extend([u for u in input_data['image_urls'] if isinstance(u, str)])
+        
+        seen = set()
+        unique_urls = []
+        for url in image_urls:
+            if url and url not in seen:
+                seen.add(url)
+                unique_urls.append(url)
+        return unique_urls
 
     @staticmethod
     def _evaluate_condition(edge: Dict, variables: Dict[str, Any]) -> bool:
