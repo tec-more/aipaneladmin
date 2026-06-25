@@ -1035,16 +1035,6 @@ const doExecute = async () => {
           }
         } else if (data.type === 'complete') {
           assistantMessage.isStreaming = false
-          if (data.variables) {
-            const outputVars = Object.keys(data.variables).filter(k => 
-              k !== 'text' && k !== 'history' && k !== 'agent_id' && k !== 'agent_name'
-            )
-            if (outputVars.length > 0) {
-              const outputStr = outputVars.map(k => `${k}: ${data.variables[k]}`).join('\n')
-              assistantMessage.content += `\n[输出变量]\n${outputStr}`
-              latestResponse.value = assistantMessage.content
-            }
-          }
         } else if (data.type === 'error') {
           assistantMessage.isStreaming = false
           assistantMessage.content = '执行失败: ' + (data.message || '未知错误')

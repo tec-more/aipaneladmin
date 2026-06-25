@@ -328,8 +328,13 @@ class DialogFlowService:
                 return {output_var: "模型未启用"}
 
             api_key_obj = await LLMApiKey.filter(
-                model_id=model.model_id
+                model_id=model.id
             ).first()
+            if not api_key_obj:
+                api_key_obj = await LLMApiKey.filter(
+                    provider_id=model.provider_id,
+                    model_id__isnull=True
+                ).first()
             if not api_key_obj:
                 return {output_var: "没有可用的API密钥"}
 
