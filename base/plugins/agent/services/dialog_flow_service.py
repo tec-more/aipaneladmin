@@ -549,6 +549,74 @@ class DialogFlowService:
         return unique_urls
 
     @staticmethod
+    async def _save_dialog_memory(
+        agent_id: int,
+        user_id: int,
+        input_data: Dict[str, Any],
+        variables: Dict[str, Any]
+    ):
+        """保存对话流执行结果到记忆"""
+        try:
+            from base.plugins.agent.services.memory_service import MemoryService
+            from base.plugins.agent.schemas.memory import MemoryCreate
+
+            memory_mode = "private"
+            user_id_val = user_id
+
+            input_text = input_data.get("text", "")
+            if input_text:
+                input_memory_data = MemoryCreate(
+                    agent_id=agent_id,
+                    content=f"用户输入: {input_text}",
+                    type="short_term",
+                    importance=0.8,
+                    memory_mode=memory_mode,
+                    user_id=user_id_val
+                )
+                await MemoryService.create_memory(input_memory_data)
+                logger.info("对话流记忆保存: 输入内容已保存")
+
+            key_variables = [
+                "response", "output", "result", "text",
+                "summary", "answer", "reply", "content",
+                "knowledge_result", "api_result",
+                "final_output", "output_data"
+            ]
+
+            saved_vars = set()
+            for var_name in key_variables:
+                if var_name in variables and var_name not in saved_vars:
+                    value = variables[var_name]
+
+                    content_str = ""
+                    if isinstance(value, dict):
+                        content_str = json.dumps(value, ensure_ascii=False)
+                    elif isinstance(value, list):
+                        content_str = json.dumps(value, ensure_ascii=False)
+                    else:
+                        content_str = str(value)
+
+                    if content_str and len(content_str.strip()) > 0 and len(content_str) < 5000:
+                        try:
+                            importance = 0.9 if var_name in ["final_output", "response", "answer"] else 0.7
+                            memory_data = MemoryCreate(
+                                agent_id=agent_id,
+                                content=f"{var_name}: {content_str}",
+                                type="long_term",
+                                importance=importance,
+                                memory_mode=memory_mode,
+                                user_id=user_id_val
+                            )
+                            await MemoryService.create_memory(memory_data)
+                            saved_vars.add(var_name)
+                            logger.info(f"对话流记忆保存: {var_name} 已保存")
+                        except Exception as e:
+                            logger.warning(f"保存记忆失败 {var_name}: {e}")
+
+        except Exception as e:
+            logger.warning(f"保存对话流记忆时出错: {e}")
+
+    @staticmethod
     def _evaluate_condition(edge: Dict, variables: Dict[str, Any]) -> bool:
         """评估边的条件"""
         condition = edge.get("condition", "")
@@ -678,6 +746,14 @@ class DialogFlowService:
             execution.completed_at = datetime.utcnow()
             await execution.save()
             
+            if agent_id and user_id:
+                await DialogFlowService._save_dialog_memory(
+                    agent_id=agent_id,
+                    user_id=user_id,
+                    input_data=input_data or {},
+                    variables=variables
+                )
+            
         except Exception as e:
             execution.status = "failed"
             execution.error_message = str(e)
@@ -775,6 +851,16 @@ class DialogFlowService:
                         if DialogFlowService._evaluate_condition(edge, variables):
                             current_node_id = edge.get("target")
                             break
+                
+                agent_id = input_data.get('agent_id') if input_data else None
+                user_id = input_data.get('user_id') if input_data else None
+                if agent_id and user_id:
+                    await DialogFlowService._save_dialog_memory(
+                        agent_id=agent_id,
+                        user_id=user_id,
+                        input_data=input_data or {},
+                        variables=variables
+                    )
                 
                 await push_event({
                     'type': 'complete',
