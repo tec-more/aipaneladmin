@@ -98,6 +98,37 @@ class WorkflowService:
         return True
 
     @staticmethod
+    async def import_workflow(import_data: dict) -> Workflow:
+        """
+        导入工作流完整配置
+        支持的格式：
+        {
+          "workflow": { ... },
+          "nodes": [...],
+          "edges": [...]
+        }
+        或直接传入 workflow 配置
+        """
+        workflow_data = import_data.get('workflow') or import_data
+
+        definition = workflow_data.get('definition', {'nodes': [], 'edges': []})
+        
+        if not definition or 'nodes' not in definition:
+            definition = {
+                'nodes': workflow_data.get('nodes', []),
+                'edges': workflow_data.get('edges', [])
+            }
+
+        workflow = await Workflow.create(
+            name=workflow_data.get('name', '导入的工作流'),
+            description=workflow_data.get('description', ''),
+            status=workflow_data.get('status', 'draft'),
+            definition=definition
+        )
+
+        return workflow
+
+    @staticmethod
     async def create_workflow_node(workflow_id: int, node_data: Dict[str, Any]) -> WorkflowNode:
         """Create workflow node"""
         workflow = await WorkflowService.get_workflow_by_id(workflow_id)

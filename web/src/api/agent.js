@@ -290,6 +290,10 @@ export function createWorkflow(data) {
   return request.post('/v1/agent/workflows/', data)
 }
 
+export function importWorkflow(data) {
+  return request.post('/v1/agent/workflows/import', data)
+}
+
 export function updateWorkflow(id, data) {
   return request.put(`/v1/agent/workflows/${id}`, data)
 }

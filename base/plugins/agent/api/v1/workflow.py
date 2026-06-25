@@ -51,6 +51,34 @@ async def create_workflow(workflow: WorkflowCreate):
         return fail_response(msg=str(e))
 
 
+@workflow_router.post("/import")
+async def import_workflow(import_data: dict):
+    """Import workflow from template"""
+    try:
+        imported_workflow = await WorkflowService.import_workflow(import_data)
+        
+        definition = imported_workflow.definition or {}
+        node_count = len(definition.get('nodes', []))
+        edge_count = len(definition.get('edges', []))
+        
+        data = {
+            "id": imported_workflow.id,
+            "name": imported_workflow.name,
+            "description": imported_workflow.description,
+            "status": imported_workflow.status,
+            "definition": imported_workflow.definition,
+            "created_at": imported_workflow.created_at.isoformat() if imported_workflow.created_at else None,
+            "updated_at": imported_workflow.updated_at.isoformat() if imported_workflow.updated_at else None,
+            "node_count": node_count,
+            "edge_count": edge_count
+        }
+        
+        return success_response(data=data, msg="工作流导入成功")
+    except Exception as e:
+        import traceback
+        return fail_response(msg=f"导入失败: {str(e)}", data={"traceback": traceback.format_exc()})
+
+
 @workflow_router.get("/")
 async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status: str = ""):
     """Get all workflows"""
