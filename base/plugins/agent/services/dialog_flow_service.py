@@ -625,6 +625,21 @@ class DialogFlowService:
             
             variables = {}
             variables.update(input_data or {})
+            
+            if agent_id and user_id:
+                try:
+                    from base.plugins.agent.services.memory_service import MemoryService
+                    user_memories = await MemoryService.get_memories_by_agent(
+                        agent_id=agent_id,
+                        user_id=user_id
+                    )
+                    if user_memories:
+                        memory_text = "\n".join([f"- {m.content}" for m in user_memories])
+                        variables["memory"] = memory_text
+                        variables["user_id"] = user_id
+                except Exception as e:
+                    logger.warning(f"检索用户记忆失败: {e}")
+            
             execution_path = []
             
             current_node_id = start_node.get("id")
@@ -706,6 +721,24 @@ class DialogFlowService:
                 
                 variables = {}
                 variables.update(input_data or {})
+                
+                agent_id = input_data.get('agent_id') if input_data else None
+                user_id = input_data.get('user_id') if input_data else None
+                
+                if agent_id and user_id:
+                    try:
+                        from base.plugins.agent.services.memory_service import MemoryService
+                        user_memories = await MemoryService.get_memories_by_agent(
+                            agent_id=agent_id,
+                            user_id=user_id
+                        )
+                        if user_memories:
+                            memory_text = "\n".join([f"- {m.content}" for m in user_memories])
+                            variables["memory"] = memory_text
+                            variables["user_id"] = user_id
+                    except Exception as e:
+                        logger.warning(f"检索用户记忆失败: {e}")
+                
                 execution_path = []
                 
                 current_node_id = start_node.get("id")
