@@ -1,10 +1,5 @@
 <template>
   <div class="langgraph-edit-page">
-    <div class="page-header">
-      <el-button @click="goBack" :icon="ArrowLeft">返回</el-button>
-      <h2>{{ workflowName || 'LangGraph 工作流编辑' }}</h2>
-    </div>
-
     <LangGraphEditor
       v-if="workflowId"
       :workflow-id="workflowId"
