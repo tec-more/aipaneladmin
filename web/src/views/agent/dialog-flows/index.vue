@@ -50,12 +50,30 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="230" fixed="right">
+        <el-table-column label="操作" width="330" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button type="primary" size="small" @click="handleEdit(row)">
                 <el-icon><Edit /></el-icon>
                 编辑
+              </el-button>
+              <el-button 
+                v-if="row.status === 'active'" 
+                type="warning" 
+                size="small" 
+                @click="handleToggleStatus(row)"
+              >
+                <el-icon><SwitchButton /></el-icon>
+                禁用
+              </el-button>
+              <el-button 
+                v-if="row.status === 'inactive'" 
+                type="success" 
+                size="small" 
+                @click="handleToggleStatus(row)"
+              >
+                <el-icon><SwitchButton /></el-icon>
+                启用
               </el-button>
               <el-button type="danger" size="small" @click="handleDelete(row.id)">
                 <el-icon><Delete /></el-icon>
@@ -117,9 +135,9 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, VideoPlay, Upload, Download } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, VideoPlay, Upload, Download, SwitchButton } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getDialogFlows, createDialogFlow, deleteDialogFlow, executeDialogFlow } from '@/api/agent'
+import { getDialogFlows, createDialogFlow, deleteDialogFlow, executeDialogFlow, updateDialogFlow } from '@/api/agent'
 
 const router = useRouter()
 const loading = ref(false)
@@ -241,6 +259,22 @@ const submitCreate = async () => {
 
 const handleEdit = (row) => {
   router.push(`/panel/agent/dialog-flows/edit/${row.id}`)
+}
+
+const handleToggleStatus = async (row) => {
+  const newStatus = row.status === 'active' ? 'inactive' : 'active'
+  const action = newStatus === 'active' ? '启用' : '禁用'
+  try {
+    await ElMessageBox.confirm(`确定要${action}该对话流吗？`, '提示', { type: 'warning' })
+    await updateDialogFlow(row.id, { status: newStatus })
+    ElMessage.success(`${action}成功`)
+    fetchDialogFlows()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(`${action}失败`)
+      console.error(error)
+    }
+  }
 }
 
 const handleExecute = (row) => {

@@ -477,6 +477,113 @@ export function executeDialogFlow(id, params) {
   return longRequest.post(`/v1/agent/dialog-flows/${id}/execute`, params)
 }
 
+export function executeDialogFlowAuto(id, params, callbacks = {}) {
+  const { onStart, onData, onComplete, onError } = callbacks
+  
+  const safeOnStart = typeof onStart === 'function' ? onStart : () => {}
+  const safeOnData = typeof onData === 'function' ? onData : () => {}
+  const safeOnComplete = typeof onComplete === 'function' ? onComplete : () => {}
+  const safeOnError = typeof onError === 'function' ? onError : () => {}
+  
+  const abortController = new AbortController()
+  let executionId = null
+  let isAborted = false
+
+  const controller = {
+    abort: () => {
+      isAborted = true
+      abortController.abort()
+    }
+  }
+
+  queueMicrotask(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/v1/agent/dialog-flows/${id}/execute`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify(params),
+        signal: abortController.signal,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
+      }
+
+      const contentType = response.headers.get('Content-Type')
+      
+      if (contentType && contentType.includes('text/event-stream')) {
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        
+        safeOnStart()
+        
+        let buffer = ''
+        
+        while (true) {
+          if (isAborted || abortController.signal.aborted) {
+            break
+          }
+          
+          const { done, value } = await reader.read()
+          if (done) {
+            break
+          }
+          
+          buffer += decoder.decode(value, { stream: true })
+          
+          const lines = buffer.split('\n')
+          buffer = lines.pop()
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6).trim()
+              if (dataStr) {
+                try {
+                  const data = JSON.parse(dataStr)
+                  if (data.type === 'start' && data.execution_id) {
+                    executionId = data.execution_id
+                  }
+                  console.log('[DialogFlow SSE Stream] Received data:', data)
+                  safeOnData(data)
+                } catch (e) {
+                }
+              }
+            }
+          }
+        }
+        
+        if (!isAborted && !abortController.signal.aborted) {
+          safeOnComplete()
+        }
+      } else {
+        safeOnStart()
+        
+        const result = await response.json()
+        
+        if (!isAborted) {
+          if (result.success) {
+            safeOnData({ type: 'complete', result: result.data })
+            safeOnComplete(result)
+          } else {
+            safeOnError(new Error(result.message || '执行失败'))
+          }
+        }
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        safeOnError(error)
+      }
+    }
+  })
+
+  return controller
+}
+
 export function getDialogFlowExecutions(params) {
   return request.get('/v1/agent/dialog-flows/executions', { params })
 }

@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from base.plugins.agent.schemas.dialog_flow import (
     DialogFlowCreate, DialogFlowUpdate, DialogFlowResponse,
     DialogFlowNodeCreate, DialogFlowNodeUpdate, DialogFlowNodeResponse,
@@ -8,6 +9,7 @@ from base.plugins.agent.schemas.dialog_flow import (
 )
 from base.plugins.agent.services.dialog_flow_service import DialogFlowService
 from base.common.response import success_response, fail_response
+import uuid
 
 dialog_flow_router = APIRouter(prefix="/dialog-flows", tags=["dialog-flows"])
 
@@ -22,7 +24,6 @@ async def list_dialog_flows(
     """列出对话流，可按名称或状态过滤"""
     from base.plugins.agent.models.dialog_flow import DialogFlow
     
-    # 构建查询条件
     query = DialogFlow.all()
     
     if name:
@@ -31,10 +32,8 @@ async def list_dialog_flows(
     if status:
         query = query.filter(status=status)
     
-    # 获取总数
     total = await query.count()
     
-    # 获取分页数据
     dialog_flows = await DialogFlowService.list_dialog_flows(None, skip, limit, name, status)
     
     return success_response(data={"items": dialog_flows, "total": total})
@@ -104,14 +103,55 @@ async def delete_edge(edge_id: int):
     return success_response(msg="边删除成功")
 
 
-@dialog_flow_router.post("/execute")
-async def execute_dialog_flow(data: DialogFlowExecutionCreate):
-    """执行对话流"""
+@dialog_flow_router.post("/{dialog_flow_id}/execute")
+async def execute_dialog_flow(
+    dialog_flow_id: int,
+    input_data: dict,
+    stream: Optional[bool] = Query(None, description="是否强制使用流式返回")
+):
+    """
+    执行对话流
+    根据对话流结构自动判断使用普通模式还是SSE模式
+    """
     try:
-        execution = await DialogFlowService.execute_dialog_flow(data)
-        return success_response(data=execution, msg="对话流执行成功")
+        dialog_flow = await DialogFlowService.get_dialog_flow(dialog_flow_id)
+        if not dialog_flow:
+            return fail_response(msg="对话流不存在", code=404)
+        
+        if dialog_flow.status != "active":
+            return fail_response(msg="对话流未激活", code=400)
+        
+        use_sse = stream if stream is not None else DialogFlowService.should_use_sse(dialog_flow)
+        
+        if use_sse:
+            execution_id = str(uuid.uuid4())
+            
+            async def sse_generator():
+                async for data in DialogFlowService.sse_execution_generator(
+                    dialog_flow, input_data, execution_id
+                ):
+                    yield data
+            
+            return StreamingResponse(
+                sse_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "X-Accel-Buffering": "no"
+                }
+            )
+        else:
+            execution = await DialogFlowService.execute_dialog_flow(
+                dialog_flow_id=dialog_flow_id,
+                input_data=input_data
+            )
+            return success_response(data=execution, msg="对话流执行成功")
+    
     except Exception as e:
-        return fail_response(msg=str(e))
+        import traceback
+        return fail_response(msg=str(e), data={"traceback": traceback.format_exc()}, code=500)
 
 
 @dialog_flow_router.get("/executions")
@@ -123,17 +163,14 @@ async def list_dialog_flow_executions(
     """列出对话流执行记录，可按对话流ID过滤"""
     from base.plugins.agent.models.dialog_flow import DialogFlowExecution
     
-    # 处理空值情况
     if dialog_flow_id is not None and not isinstance(dialog_flow_id, int):
         dialog_flow_id = None
     
-    # 先获取总数
     query = DialogFlowExecution.all()
     if dialog_flow_id:
         query = query.filter(dialog_flow_id=dialog_flow_id)
     total = await query.count()
     
-    # 获取分页数据
     executions = await DialogFlowService.list_executions(dialog_flow_id, None, skip, limit)
     return success_response(data={"items": executions, "total": total})
 

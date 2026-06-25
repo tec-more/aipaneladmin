@@ -424,7 +424,7 @@ import {
   Document, Mic, Upload, Download, Picture, Cpu
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getDialogFlow, updateDialogFlow, executeDialogFlow } from '@/api/agent'
+import { getDialogFlow, updateDialogFlow, executeDialogFlow, executeDialogFlowAuto } from '@/api/agent'
 import { getAgents } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer'
@@ -978,7 +978,6 @@ const doExecute = async () => {
   
   executing.value = true
   try {
-    // 添加用户输入到历史
     const userMessage = {
       role: 'user',
       content: currentInput.value,
@@ -986,48 +985,89 @@ const doExecute = async () => {
     }
     dialogHistory.value.push(userMessage)
     
-    // 准备输入数据 - 包含对话历史
     const input = {
       text: currentInput.value,
       history: [...dialogHistory.value]
     }
     
-    const res = await executeDialogFlow(flowId, input)
-    
-    // 解析执行结果
-    let assistantResponse = ''
-    if (typeof res.data === 'string') {
-      assistantResponse = res.data
-    } else if (res.data.output || res.data.result || res.data.text || res.data.response) {
-      assistantResponse = res.data.output || res.data.result || res.data.text || res.data.response
-    } else if (res.data.variables) {
-      // 尝试从变量中获取结果
-      const vars = res.data.variables
-      assistantResponse = vars.final_report || vars.response || vars.text || vars.output || JSON.stringify(vars, null, 2)
-    } else {
-      assistantResponse = JSON.stringify(res.data, null, 2)
-    }
-    
-    // 添加助手回复到历史
     const assistantMessage = {
       role: 'assistant',
-      content: assistantResponse,
-      time: new Date().toLocaleTimeString('zh-CN')
+      content: '',
+      time: new Date().toLocaleTimeString('zh-CN'),
+      isStreaming: true
     }
     dialogHistory.value.push(assistantMessage)
     
-    // 更新最新回复
-    latestResponse.value = assistantResponse
+    const executionResults = []
     
-    // 清空输入框
-    currentInput.value = ''
-    
-    // 保存原始执行结果
-    executeResult.value = JSON.stringify(res.data, null, 2)
-    
-    ElMessage.success('发送成功')
+    executeDialogFlowAuto(flowId, input, {
+      onStart: () => {
+        console.log('对话流执行开始')
+      },
+      onData: (data) => {
+        executionResults.push(data)
+        
+        if (data.type === 'stream') {
+          if (data.full_content) {
+            assistantMessage.content = data.full_content
+            latestResponse.value = data.full_content
+          }
+        } else if (data.type === 'message') {
+          if (data.content) {
+            assistantMessage.content += data.content + '\n'
+            latestResponse.value = assistantMessage.content
+          }
+        } else if (data.type === 'llm_complete') {
+          if (data.content) {
+            assistantMessage.content += data.content + '\n'
+            latestResponse.value = assistantMessage.content
+          }
+        } else if (data.type === 'knowledge_result') {
+          if (data.results) {
+            const contexts = data.results.map(r => r.content).join('\n')
+            assistantMessage.content += `[知识检索结果]\n${contexts}\n`
+            latestResponse.value = assistantMessage.content
+          }
+        } else if (data.type === 'api_result') {
+          if (data.result) {
+            assistantMessage.content += `[API响应]\n${JSON.stringify(data.result, null, 2)}\n`
+            latestResponse.value = assistantMessage.content
+          }
+        } else if (data.type === 'complete') {
+          assistantMessage.isStreaming = false
+          if (data.variables) {
+            const outputVars = Object.keys(data.variables).filter(k => 
+              k !== 'text' && k !== 'history' && k !== 'agent_id' && k !== 'agent_name'
+            )
+            if (outputVars.length > 0) {
+              const outputStr = outputVars.map(k => `${k}: ${data.variables[k]}`).join('\n')
+              assistantMessage.content += `\n[输出变量]\n${outputStr}`
+              latestResponse.value = assistantMessage.content
+            }
+          }
+        } else if (data.type === 'error') {
+          assistantMessage.isStreaming = false
+          assistantMessage.content = '执行失败: ' + (data.message || '未知错误')
+          latestResponse.value = assistantMessage.content
+        }
+      },
+      onComplete: () => {
+        assistantMessage.isStreaming = false
+        currentInput.value = ''
+        executeResult.value = JSON.stringify(executionResults, null, 2)
+        ElMessage.success('执行完成')
+        executing.value = false
+      },
+      onError: (error) => {
+        assistantMessage.isStreaming = false
+        assistantMessage.content = '执行失败: ' + (error.message || '未知错误')
+        latestResponse.value = assistantMessage.content
+        executeResult.value = error.message || '执行失败'
+        ElMessage.error('执行失败')
+        executing.value = false
+      }
+    })
   } catch (error) {
-    // 即使出错也要显示错误
     const errorMessage = {
       role: 'assistant',
       content: '执行失败: ' + (error.message || '未知错误'),
@@ -1037,7 +1077,6 @@ const doExecute = async () => {
     latestResponse.value = errorMessage.content
     executeResult.value = error.message || '执行失败'
     ElMessage.error('执行失败')
-  } finally {
     executing.value = false
   }
 }
