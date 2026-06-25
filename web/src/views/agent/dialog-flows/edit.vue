@@ -33,9 +33,9 @@
     
     <div class="editor-container">
       <div class="node-panel">
-        <div class="panel-title">流程控制</div>
+        <div class="panel-title">基础节点</div>
         <div 
-          v-for="nodeType in nodeCategories.flowControl" 
+          v-for="nodeType in nodeCategories.basic" 
           :key="nodeType.type"
           class="node-item"
           draggable="true"
@@ -45,33 +45,21 @@
           <span>{{ nodeType.label }}</span>
         </div>
         
-        <div class="panel-title" style="margin-top: 20px">输入输出</div>
-        <div 
-          v-for="nodeType in nodeCategories.inputOutput" 
-          :key="nodeType.type"
-          class="node-item"
-          draggable="true"
-          @dragstart="onDragStart($event, nodeType.type)"
-        >
-          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
-          <span>{{ nodeType.label }}</span>
-        </div>
-        
-        <div class="panel-title" style="margin-top: 20px">内容展示</div>
-        <div 
-          v-for="nodeType in nodeCategories.content" 
-          :key="nodeType.type"
-          class="node-item"
-          draggable="true"
-          @dragstart="onDragStart($event, nodeType.type)"
-        >
-          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
-          <span>{{ nodeType.label }}</span>
-        </div>
-        
-        <div class="panel-title" style="margin-top: 20px">功能调用</div>
+        <div class="panel-title" style="margin-top: 20px">功能节点</div>
         <div 
           v-for="nodeType in nodeCategories.functions" 
+          :key="nodeType.type"
+          class="node-item"
+          draggable="true"
+          @dragstart="onDragStart($event, nodeType.type)"
+        >
+          <el-icon :size="20"><component :is="nodeType.icon" /></el-icon>
+          <span>{{ nodeType.label }}</span>
+        </div>
+        
+        <div class="panel-title" style="margin-top: 20px">内容节点</div>
+        <div 
+          v-for="nodeType in nodeCategories.content" 
           :key="nodeType.type"
           class="node-item"
           draggable="true"
@@ -177,27 +165,6 @@
               <el-input v-model="nodeConfig.label" @change="updateNodeLabel" />
             </el-form-item>
             
-            <!-- 下一步节点配置 -->
-            <el-divider content-position="left">下一步节点配置</el-divider>
-            <el-form-item label="目标节点">
-              <div class="target-nodes-container" style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; border: 1px solid #e0e0e0;">
-                <div v-if="targetNodes.length === 0" style="text-align: center; color: #909399; padding: 20px;">
-                  无目标节点
-                </div>
-                <div v-else class="target-nodes-list">
-                  <div v-for="(node, index) in targetNodes" :key="node.id" class="target-node-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #fff; border-radius: 4px; border: 1px solid #e0e0e0;">
-                    <el-icon :size="16" style="color: #409eff; margin-right: 8px;">
-                      <component :is="allNodeTypes.find(n => n.type === node.type)?.icon || Document" />
-                    </el-icon>
-                    <span style="flex: 1; color: #303133;">{{ node.data.label }}</span>
-                    <el-tag size="small" type="info" style="margin-left: 10px;">
-                      {{ node.type }}
-                    </el-tag>
-                  </div>
-                </div>
-              </div>
-            </el-form-item>
-            
             <template v-if="selectedNode.type === 'message'">
               <el-form-item label="消息内容">
                 <el-input v-model="nodeConfig.content" type="textarea" :rows="4" @change="updateNodeData" placeholder="输入消息内容，支持变量 {{变量名}}" />
@@ -222,14 +189,26 @@
               </el-form-item>
             </template>
             
-            <template v-if="selectedNode.type === 'agent'">
-              <el-form-item label="选择智能体">
-                <el-select v-model="nodeConfig.agent_id" placeholder="请选择" @change="updateNodeData" style="width: 100%">
-                  <el-option v-for="agent in agents" :key="agent.id" :label="agent.name" :value="agent.id" />
+            <template v-if="selectedNode.type === 'llm'">
+              <el-form-item label="选择模型">
+                <el-select v-model="nodeConfig.llm_model_id" placeholder="请选择" @change="updateNodeData" style="width: 100%">
+                  <el-option v-for="model in models" :key="model.id" :label="`${model.provider_name} - ${model.model_name}`" :value="model.id" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="输入变量">
-                <el-input v-model="nodeConfig.input_variable" @change="updateNodeData" placeholder="输入变量名" />
+              <el-form-item label="提示词">
+                <el-input v-model="nodeConfig.llm_prompt" type="textarea" :rows="4" @change="updateNodeData" placeholder="输入提示词，支持变量 {{变量名}}" />
+              </el-form-item>
+              <el-form-item label="温度">
+                <el-slider v-model="nodeConfig.llm_temperature" :min="0" :max="2" :step="0.1" @change="updateNodeData" />
+              </el-form-item>
+              <el-form-item label="最大Token">
+                <el-input-number v-model="nodeConfig.llm_max_tokens" :min="1" :max="4096" @change="updateNodeData" />
+              </el-form-item>
+              <el-form-item label="流式输出">
+                <el-switch v-model="nodeConfig.llm_stream" @change="updateNodeData" active-text="开" inactive-text="关" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" @change="updateNodeData" placeholder="存储输出结果的变量名" />
               </el-form-item>
             </template>
             
@@ -274,6 +253,24 @@
                   <el-option label="中文" value="zh-CN" />
                   <el-option label="英文" value="en-US" />
                 </el-select>
+              </el-form-item>
+            </template>
+            
+            <template v-if="selectedNode.type === 'image'">
+              <el-form-item label="图片URL">
+                <el-input v-model="nodeConfig.image_url" @change="updateNodeData" placeholder="输入图片地址" />
+              </el-form-item>
+              <el-form-item label="图片描述">
+                <el-input v-model="nodeConfig.image_alt" @change="updateNodeData" placeholder="图片描述（可选）" />
+              </el-form-item>
+              <el-form-item label="图片预览">
+                <div v-if="nodeConfig.image_url" class="image-preview">
+                  <img :src="nodeConfig.image_url" :alt="nodeConfig.image_alt || '图片预览'" />
+                </div>
+                <div v-else class="image-placeholder">
+                  <el-icon :size="48" color="#ccc"><Picture /></el-icon>
+                  <span>请输入图片URL预览</span>
+                </div>
               </el-form-item>
             </template>
             
@@ -424,11 +421,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { 
   ArrowLeft, Check, VideoPlay, ChatDotRound, QuestionFilled, 
   Share, User, Connection, VideoPlay as Play, CircleCheck, 
-  Document, Mic, Upload, Download
+  Document, Mic, Upload, Download, Picture, Cpu
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getDialogFlow, updateDialogFlow, executeDialogFlow } from '@/api/agent'
 import { getAgents } from '@/api/agent'
+import { getModelList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer'
 import { ZoomIn, ZoomOut, Refresh } from '@element-plus/icons-vue'
 
@@ -439,28 +437,19 @@ const flowId = route.params.id
 const dialogFlow = ref(null)
 const saving = ref(false)
 const agents = ref([])
+const models = ref([])
 
 const nodes = ref([])
 const edges = ref([])
 const selectedNode = ref(null)
 const selectedEdge = ref(null)
 
-// 计算当前节点的实际目标节点列表
-const targetNodes = computed(() => {
-  if (!selectedNode.value) return []
-  // 找到所有以当前节点为源节点的边
-  const nodeEdges = edges.value.filter(edge => edge.source === selectedNode.value.id)
-  // 对于每条边，找到对应的目标节点
-  return nodeEdges.map(edge => {
-    const targetNode = getNodeById(edge.target)
-    return targetNode || { id: edge.target, data: { label: '未知节点' } }
-  })
-})
-
 const nodeConfig = reactive({
   label: '',
   content: '',
   text: '',
+  image_url: '',
+  image_alt: '',
   voice_type: 'tts',
   language: 'zh-CN',
   question: '',
@@ -484,37 +473,39 @@ const nodeConfig = reactive({
   // 输出节点配置
   output_type: 'text',
   output_content: '',
-  output_var: ''
+  output_var: '',
+  // 大模型节点配置
+  llm_model_id: null,
+  llm_prompt: '',
+  llm_temperature: 0.7,
+  llm_max_tokens: 1024,
+  llm_stream: false
 })
 
 const nodeCategories = {
-  flowControl: [
-    { type: 'start', label: '开始', icon: Play, next: ['input', 'message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
+  basic: [
+    { type: 'start', label: '开始', icon: Play, next: ['input', 'message', 'text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval'] },
     { type: 'end', label: '结束', icon: CircleCheck, next: [] },
-    { type: 'condition', label: '条件判断', icon: Share, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] }
-  ],
-  inputOutput: [
-    { type: 'input', label: '输入', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval'] },
-    { type: 'output', label: '输出', icon: CircleCheck, next: ['end'] }
-  ],
-  content: [
-    { type: 'message', label: '消息', icon: ChatDotRound, next: ['text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-    { type: 'text', label: '文本', icon: Document, next: ['message', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-    { type: 'voice', label: '语音', icon: Mic, next: ['message', 'text', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-    { type: 'question', label: '问题', icon: QuestionFilled, next: ['message', 'text', 'voice', 'agent', 'api', 'knowledge_retrieval', 'output'] }
+    { type: 'input', label: '输入', icon: Document, next: ['message', 'text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval'] },
+    { type: 'output', label: '输出', icon: Share, next: ['end'] }
   ],
   functions: [
-    { type: 'agent', label: '智能体', icon: User, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'knowledge_retrieval', 'output'] },
-    { type: 'api', label: 'API调用', icon: Connection, next: ['message', 'text', 'voice', 'question', 'agent', 'knowledge_retrieval', 'output'] },
-    { type: 'knowledge_retrieval', label: '知识检索', icon: Document, next: ['message', 'text', 'voice', 'question', 'agent', 'api', 'output'] }
+    { type: 'llm', label: '大模型', icon: Cpu, next: ['message', 'text', 'image', 'voice', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'knowledge_retrieval', label: '知识检索', icon: Document, next: ['message', 'text', 'image', 'voice', 'llm', 'api', 'output'] },
+    { type: 'api', label: 'API调用', icon: Connection, next: ['message', 'text', 'image', 'voice', 'llm', 'knowledge_retrieval', 'output'] }
+  ],
+  content: [
+    { type: 'message', label: '消息', icon: ChatDotRound, next: ['text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'text', label: '文本', icon: Document, next: ['message', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'image', label: '图片', icon: Picture, next: ['message', 'text', 'voice', 'llm', 'api', 'knowledge_retrieval', 'output'] },
+    { type: 'voice', label: '语音', icon: Mic, next: ['message', 'text', 'image', 'llm', 'api', 'knowledge_retrieval', 'output'] }
   ]
 }
 
 const allNodeTypes = [
-  ...nodeCategories.flowControl,
-  ...nodeCategories.inputOutput,
-  ...nodeCategories.content,
-  ...nodeCategories.functions
+  ...nodeCategories.basic,
+  ...nodeCategories.functions,
+  ...nodeCategories.content
 ]
 
 const executeDialogVisible = ref(false)
@@ -590,15 +581,18 @@ const getNodeIcon = (type) => {
   const icons = {
     start: '▶️',
     end: '⏹️',
+    input: '📥',
+    output: '📤',
     message: '💬',
     text: '📝',
+    image: '🖼️',
     voice: '🎤',
     question: '❓',
     condition: '🔀',
     agent: '🤖',
+    llm: '🧠',
     api: '🔗',
-    knowledge_retrieval: '📚',
-    output: '📤'
+    knowledge_retrieval: '📚'
   }
   return icons[type] || '📦'
 }
@@ -693,6 +687,15 @@ const fetchAgents = async () => {
   }
 }
 
+const fetchModels = async () => {
+  try {
+    const res = await getModelList({ limit: 1000 })
+    models.value = res.data?.items || res.data || []
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const saveDialogFlow = async () => {
   saving.value = true
   try {
@@ -761,6 +764,8 @@ const onNodeClick = (node) => {
   nodeConfig.label = node.data.label || ''
   nodeConfig.content = node.data.content || ''
   nodeConfig.text = node.data.text || ''
+  nodeConfig.image_url = node.data.image_url || ''
+  nodeConfig.image_alt = node.data.image_alt || ''
   nodeConfig.voice_type = node.data.voice_type || 'tts'
   nodeConfig.language = node.data.language || 'zh-CN'
   nodeConfig.question = node.data.question || ''
@@ -773,18 +778,20 @@ const onNodeClick = (node) => {
   nodeConfig.method = node.data.method || 'GET'
   nodeConfig.headers = node.data.headers || '{}'
   nodeConfig.body = node.data.body || '{}'
-  // 输入节点配置
   nodeConfig.input_type = node.data.input_type || 'text'
   nodeConfig.input_placeholder = node.data.input_placeholder || ''
-  // 知识检索节点配置
   nodeConfig.knowledge_base = node.data.knowledge_base || 'default'
   nodeConfig.query = node.data.query || ''
   nodeConfig.top_k = node.data.top_k || 5
   nodeConfig.similarity_threshold = node.data.similarity_threshold || 0.7
-  // 输出节点配置
   nodeConfig.output_var = node.data.output_var || ''
   nodeConfig.output_type = node.data.output_type || 'text'
   nodeConfig.output_content = node.data.output_content || ''
+  nodeConfig.llm_model_id = node.data.llm_model_id || null
+  nodeConfig.llm_prompt = node.data.llm_prompt || ''
+  nodeConfig.llm_temperature = node.data.llm_temperature || 0.7
+  nodeConfig.llm_max_tokens = node.data.llm_max_tokens || 1024
+  nodeConfig.llm_stream = node.data.llm_stream || false
 }
 
 const onNodeMouseDown = (event, node) => {
@@ -881,6 +888,8 @@ const updateNodeData = () => {
       label: nodeConfig.label,
       content: nodeConfig.content,
       text: nodeConfig.text,
+      image_url: nodeConfig.image_url,
+      image_alt: nodeConfig.image_alt,
       voice_type: nodeConfig.voice_type,
       language: nodeConfig.language,
       question: nodeConfig.question,
@@ -893,18 +902,20 @@ const updateNodeData = () => {
       method: nodeConfig.method,
       headers: nodeConfig.headers,
       body: nodeConfig.body,
-      // 输入节点配置
       input_type: nodeConfig.input_type,
       input_placeholder: nodeConfig.input_placeholder,
-      // 知识检索节点配置
       knowledge_base: nodeConfig.knowledge_base,
       query: nodeConfig.query,
       top_k: nodeConfig.top_k,
       similarity_threshold: nodeConfig.similarity_threshold,
-      // 输出节点配置
       output_var: nodeConfig.output_var,
       output_type: nodeConfig.output_type,
-      output_content: nodeConfig.output_content
+      output_content: nodeConfig.output_content,
+      llm_model_id: nodeConfig.llm_model_id,
+      llm_prompt: nodeConfig.llm_prompt,
+      llm_temperature: nodeConfig.llm_temperature,
+      llm_max_tokens: nodeConfig.llm_max_tokens,
+      llm_stream: nodeConfig.llm_stream
     }
   }
 }
@@ -1080,6 +1091,7 @@ const handleImportGraph = () => {
 onMounted(() => {
   fetchDialogFlow()
   fetchAgents()
+  fetchModels()
 })
 </script>
 
@@ -1347,48 +1359,6 @@ onMounted(() => {
   border-color: #fa709a;
 }
 
-.message-node {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
-  border-color: #667eea;
-}
-
-.text-node {
-  background: linear-gradient(135deg, #a8caba 0%, #5d4e75 100%);
-  color: #fff;
-  border-color: #a8caba;
-}
-
-.voice-node {
-  background: linear-gradient(135deg, #fccb90 0%, #d57eeb 100%);
-  color: #333;
-  border-color: #fccb90;
-}
-
-.question-node {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: #fff;
-  border-color: #f093fb;
-}
-
-.condition-node {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  color: #fff;
-  border-color: #4facfe;
-}
-
-.agent-node {
-  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-  color: #333;
-  border-color: #a8edea;
-}
-
-.api-node {
-  background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
-  color: #333;
-  border-color: #d299c2;
-}
-
 .input-node {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
@@ -1401,10 +1371,64 @@ onMounted(() => {
   border-color: #f093fb;
 }
 
+.llm-node {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+  color: #333;
+  border-color: #fa709a;
+}
+
 .knowledge_retrieval-node {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: #fff;
+  border-color: #4facfe;
+}
+
+.api-node {
+  background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
+  color: #333;
+  border-color: #d299c2;
+}
+
+.message-node {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
   border-color: #667eea;
+}
+
+.text-node {
+  background: linear-gradient(135deg, #a8caba 0%, #5d4e75 100%);
+  color: #fff;
+  border-color: #a8caba;
+}
+
+.image-node {
+  background: linear-gradient(135deg, #fccb90 0%, #d57eeb 100%);
+  color: #333;
+  border-color: #fccb90;
+}
+
+.voice-node {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: #fff;
+  border-color: #f093fb;
+}
+
+.question-node {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: #fff;
+  border-color: #4facfe;
+}
+
+.condition-node {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: #fff;
+  border-color: #43e97b;
+}
+
+.agent-node {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: #333;
+  border-color: #a8edea;
 }
 
 .node-header {
@@ -1685,6 +1709,34 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.image-preview {
+  max-width: 200px;
+  max-height: 150px;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 100px;
+  background: #f5f7fa;
+  border: 1px dashed #d9d9d9;
+  border-radius: 4px;
+  color: #909399;
+  font-size: 12px;
 }
 
 /* 动画 */

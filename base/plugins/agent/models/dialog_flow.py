@@ -27,7 +27,7 @@ class DialogFlowNode(Model):
     """对话流节点模型"""
     id = fields.IntField(pk=True, description="节点ID")
     dialog_flow_id = fields.IntField(description="所属对话流ID")
-    node_type = fields.CharField(max_length=50, description="节点类型: start, question, condition, action, end")
+    node_type = fields.CharField(max_length=50, description="节点类型: start, end, input, output, llm, knowledge_retrieval, api, message, text, image, voice, question, condition")
     name = fields.CharField(max_length=100, description="节点名称")
     content = fields.JSONField(default=dict, description="节点内容")
     
