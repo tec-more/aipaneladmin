@@ -1,8 +1,9 @@
 """
 Workflow API routes
 """
-from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Dict, Any, Optional, AsyncGenerator
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from base.plugins.agent.schemas.workflow import (
     WorkflowCreate, WorkflowUpdate, WorkflowResponse,
     WorkflowNodeCreate, WorkflowNodeUpdate, WorkflowNodeResponse,
@@ -11,7 +12,17 @@ from base.plugins.agent.schemas.workflow import (
 )
 from base.plugins.agent.services.workflow_service import WorkflowService
 from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
+from base.plugins.agent.services.checkpoint_service import CheckpointService
+from base.common.security import get_current_actor
 from base.common.response import success_response, fail_response
+import uuid
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+
+workflow_execution_manager = {
+}
 
 workflow_router = APIRouter(prefix="/workflows", tags=["workflows"])
 workflow_execution_router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
@@ -178,41 +189,194 @@ async def create_workflow_edge(workflow_id: int, edge: WorkflowEdgeCreate):
         return fail_response(msg=str(e))
 
 
+@workflow_router.get("/{workflow_id}/graph")
+async def get_workflow_graph(workflow_id: int):
+    """Get workflow graph definition"""
+    try:
+        logger.info(f"=== 获取工作流结构图: workflow_id={workflow_id} ===")
+        
+        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
+        if not workflow:
+            logger.error(f"工作流不存在: workflow_id={workflow_id}")
+            return fail_response(msg="工作流不存在", code=404)
+        
+        logger.info(f"workflow.definition: {workflow.definition}")
+        
+        return success_response(data={"graph_definition": workflow.definition})
+    except Exception as e:
+        logger.exception(f"获取工作流结构图失败: {e}")
+        return fail_response(msg=str(e))
+
+
+@workflow_router.put("/{workflow_id}/graph")
+async def update_workflow_graph(workflow_id: int, graph_data: dict):
+    """Update workflow graph definition"""
+    try:
+        logger.info(f"=== 保存工作流结构图: workflow_id={workflow_id} ===")
+        logger.info(f"接收到的 graph_data: {graph_data}")
+        
+        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
+        if not workflow:
+            logger.error(f"工作流不存在: workflow_id={workflow_id}")
+            return fail_response(msg="工作流不存在", code=404)
+        
+        logger.info(f"保存前 workflow.definition: {workflow.definition}")
+        
+        workflow.definition = graph_data
+        await workflow.save()
+        
+        logger.info(f"保存后 workflow.definition: {workflow.definition}")
+        
+        return success_response(data={"graph_definition": workflow.definition}, msg="工作流结构图保存成功")
+    except Exception as e:
+        logger.exception(f"保存工作流结构图失败: {e}")
+        return fail_response(msg=str(e))
+
+
 @workflow_router.post("/{workflow_id}/execute")
-async def execute_workflow(workflow_id: int, input_data: Dict[str, Any]):
-    """Execute workflow using LangGraph"""
+async def execute_workflow_unified(
+    workflow_id: int,
+    input_data: dict,
+    stream: Optional[bool] = Query(None, description="是否强制使用流式返回"),
+    actor: dict = Depends(get_current_actor)
+):
+    """
+    统一工作流执行接口
+    根据工作流图结构自动判断使用普通模式还是SSE模式
+    
+    Args:
+        workflow_id: 工作流ID
+        input_data: 输入数据
+        stream: 是否强制使用流式返回（可选）
+        actor: 当前用户（从依赖注入获取）
+    
+    Returns:
+        普通响应或SSE流式响应
+    """
     try:
         workflow = await WorkflowService.get_workflow_by_id(workflow_id)
         if not workflow:
             return fail_response(msg="工作流不存在", code=404)
         
-        flow_data = workflow.definition or {}
+        if workflow.status != "active":
+            return fail_response(msg="工作流未激活", code=400)
         
-        # 使用 LangGraph 执行工作流
-        # 创建一个临时的 agent 对象（或者扩展 LangGraphExecutor 支持 workflow）
-        # 这里我们直接调用 LangGraphExecutor 的核心逻辑
-        # 或者创建一个通用的执行函数
+        checkpoint_service = CheckpointService.get_instance()
+        use_sse = stream if stream is not None else WorkflowService.should_use_sse(workflow)
         
-        # 临时方案：直接使用 LangGraphExecutor 的内部方法
-        from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
-        
-        # 创建一个 mock agent
-        class MockAgent:
-            def __init__(self, definition):
-                self.graph_definition = definition
-                self.id = workflow_id
-                self.name = workflow.name
-        
-        mock_agent = MockAgent(flow_data)
-        
-        # 执行
-        result = await LangGraphExecutor.execute_agent(mock_agent, input_data)
-        
-        return success_response(data=result, msg="工作流执行成功")
-    except ValueError as e:
-        return fail_response(msg=str(e), code=404)
+        if use_sse:
+            for exec_id, info in workflow_execution_manager.items():
+                if info.get('workflow_id') == workflow_id:
+                    return fail_response(msg="工作流正在执行中，请稍后再试", code=409)
+            
+            flow_data = workflow.definition or {}
+            nodes = flow_data.get("nodes", [])
+            
+            print(f"[Workflow API] 开始预加载资源...")
+            try:
+                llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
+                skill_resources = await LangGraphExecutor._preload_skill_resources(nodes)
+                print(f"[Workflow API] 预加载成功，LLM资源: {len(llm_resources)}, 技能资源: {len(skill_resources)}")
+            except ValueError as e:
+                print(f"[Workflow API] 预加载失败: {e}")
+                return fail_response(msg=str(e), code=400)
+            except Exception as e:
+                print(f"[Workflow API] 预加载异常: {e}")
+                import traceback
+                traceback.print_exc()
+                return fail_response(msg=f"资源预加载失败: {str(e)}", code=500)
+            
+            logger.info(f"[Workflow API] input_data: {input_data.get('text', '')}")
+            execution_id = input_data.get('execution_id', '')
+            execution_id = execution_id or checkpoint_service.create_thread_id(actor, execution_id)
+            
+            workflow_execution_manager[execution_id] = {
+                'workflow_id': workflow_id,
+                'is_cancelled': False,
+                '_llm_resources': llm_resources,
+                '_skill_resources': skill_resources
+            }
+            
+            class MockAgent:
+                def __init__(self, definition, wid, wname):
+                    self.graph_definition = definition
+                    self.id = wid
+                    self.name = wname
+            
+            mock_agent = MockAgent(flow_data, workflow_id, workflow.name)
+            
+            async def sse_generator():
+                try:
+                    async for data in WorkflowService.sse_execution_generator(
+                        mock_agent, input_data, execution_id, workflow_execution_manager, actor
+                    ):
+                        yield data
+                finally:
+                    if execution_id in workflow_execution_manager:
+                        del workflow_execution_manager[execution_id]
+            
+            return StreamingResponse(
+                sse_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "X-Accel-Buffering": "no"
+                }
+            )
+        else:
+            execution_id = input_data.get('execution_id', '') or checkpoint_service.create_thread_id(actor, '')
+            result = await WorkflowService.execute_workflow_direct(workflow_id, input_data, actor, execution_id)
+            if result.get("success"):
+                return success_response(data=result, msg="工作流执行成功")
+            else:
+                return fail_response(msg=result.get("message", "执行失败"))
+    
     except Exception as e:
-        return fail_response(msg=str(e))
+        import traceback
+        return fail_response(msg=str(e), data={"traceback": traceback.format_exc()}, code=500)
+
+
+@workflow_execution_router.post("/{execution_id}/cancel")
+async def cancel_workflow_execution(execution_id: str):
+    """取消执行中的工作流任务"""
+    try:
+        print(f"[Workflow API] 收到取消请求，execution_id: {execution_id}")
+        
+        exec_info = workflow_execution_manager.get(execution_id)
+        if not exec_info:
+            return fail_response(msg="执行任务不存在或已结束", code=404)
+        
+        exec_info['is_cancelled'] = True
+        print(f"[Workflow API] 已标记任务为取消状态，execution_id: {execution_id}")
+        
+        return success_response(msg="取消请求已发送，执行将在安全点停止")
+    except Exception as e:
+        import traceback
+        print(f"[Workflow API] 取消执行错误: {e}")
+        print(traceback.format_exc())
+        return fail_response(msg=str(e), code=500)
+
+
+@workflow_execution_router.get("/running")
+async def list_running_workflow_executions():
+    """列出所有正在执行的工作流任务"""
+    try:
+        executions_list = []
+        for exec_id, exec_info in workflow_execution_manager.items():
+            executions_list.append({
+                'execution_id': exec_id,
+                'workflow_id': exec_info.get('workflow_id'),
+                'is_cancelled': exec_info.get('is_cancelled', False)
+            })
+        
+        return success_response(data={"executions": executions_list, "count": len(executions_list)})
+    except Exception as e:
+        import traceback
+        print(f"[Workflow API] 列执行错误: {e}")
+        print(traceback.format_exc())
+        return fail_response(msg=str(e), code=500)
 
 
 @workflow_execution_router.get("/")

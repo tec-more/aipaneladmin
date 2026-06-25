@@ -429,7 +429,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { Check, VideoPlay, Download, Upload, User, Tools, Document, Link, Cpu, Filter, CircleCheck, VideoPlay as Play, Refresh, List, Collection, Edit, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraphAuto } from '@/api/agent'
+import { getAgents, getSkills, updateWorkflow, executeWorkflow as apiExecuteWorkflow, executeAgentGraphAuto, executeWorkflowGraphAuto } from '@/api/agent'
 import { getModelList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer';
 
@@ -1129,13 +1129,40 @@ const doExecute = async () => {
         }
       });
       currentAbortController.value = controller;
-    } else {
-      const result = await apiExecuteWorkflow(props.workflowId, input);
-      
-      handleNonSSEData(result);
-      stopTypingAnimation();
-      executing.value = false;
-      currentAbortController.value = null;
+    } else if (props.workflowId) {
+      console.log('执行工作流:', props.workflowId);
+      console.log('执行输入:', input);
+      const controller = executeWorkflowGraphAuto(props.workflowId, input, {
+        onStart: () => {
+          addRealtimeStep('info', '准备执行', '正在建立SSE连接...');
+          markLastStepCompleted();
+        },
+        onData: (data) => {
+          handleSSEData(data);
+        },
+        onComplete: (result) => {
+          addRealtimeStep('info', '执行完成', '工作流执行完成');
+          markLastStepCompleted();
+          ElMessage.success('执行完成');
+          
+          if (result) {
+            handleNonSSEData(result);
+          }
+          
+          stopTypingAnimation();
+          executing.value = false;
+          currentAbortController.value = null;
+        },
+        onError: (error) => {
+          addRealtimeStep('error', '执行失败', error.message || '未知错误');
+          markLastStepCompleted();
+          ElMessage.error('执行失败: ' + (error.message || '未知错误'));
+          stopTypingAnimation();
+          executing.value = false;
+          currentAbortController.value = null;
+        }
+      });
+      currentAbortController.value = controller;
     }
     
     emit('execute', executeResult.value);

@@ -167,6 +167,7 @@ const routes = [
       { path: 'agent/tool-tags', name: 'ToolTags', component: () => import('@/views/agent/tool_tags/index.vue'), meta: { title: '工具标签' } },
       { path: 'agent/workflows', name: 'AgentWorkflows', component: () => import('@/views/agent/workflows/index.vue'), meta: { title: '工作流' } },
       { path: 'agent/workflows/edit/:id', name: 'WorkflowEdit', component: () => import('@/views/agent/workflows/edit.vue'), meta: { title: '编辑工作流' } },
+      { path: 'agent/workflows/graph/:id', name: 'WorkflowGraph', component: () => import('@/views/agent/workflows/LangGraphEdit.vue'), meta: { title: '工作流结构图' } },
       { path: 'agent/executions', name: 'Executions', component: () => import('@/views/agent/executions.vue'), meta: { title: '执行记录' } },
       { path: 'agent/memory', name: 'AgentMemory', component: () => import('@/views/agent/memory/index.vue'), meta: { title: '记忆管理' } },
       { path: 'agent/dialog-flows', name: 'DialogFlows', component: () => import('@/views/agent/dialog-flows/index.vue'), meta: { title: '对话流' } },
