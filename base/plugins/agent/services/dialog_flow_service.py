@@ -316,20 +316,32 @@ class DialogFlowService:
             return {output_var: "请先配置大模型"}
 
         try:
-            from base.plugins.llm.models.llm import LLMModel
-            from base.plugins.llm.models.api_key import APIKey
+            from base.plugins.llm.models.model import LLMModel
+            from base.plugins.llm.models.api_key import LLMApiKey
             from base.plugins.llm.services.chat_service import ChatService
 
-            model = await LLMModel.get_or_none(id=model_id)
+            model = await LLMModel.get_or_none(id=model_id).prefetch_related('provider')
             if not model:
                 return {output_var: "模型不存在"}
 
-            api_key_obj = await APIKey.get_or_none(id=model.api_key_id)
+            if model.status != "active":
+                return {output_var: "模型未启用"}
+
+            api_key_obj = await LLMApiKey.filter(
+                model_id=model.model_id
+            ).first()
             if not api_key_obj:
-                return {output_var: "API密钥不存在"}
+                return {output_var: "没有可用的API密钥"}
+
+            endpoint_url = model.endpoint_url or api_key_obj.endpoint_url or model.provider.official_url
+            if endpoint_url:
+                endpoint_url = endpoint_url.rstrip('/')
+                if endpoint_url.endswith('/chat/completions'):
+                    endpoint_url = endpoint_url[:-len('/chat/completions')]
+                if '/responses' in endpoint_url:
+                    endpoint_url = endpoint_url.split('/responses')[0]
 
             credentials = api_key_obj.get_credentials()
-            endpoint_url = api_key_obj.get_endpoint_url()
 
             service = await ChatService.get_provider_service(
                 provider_name_en=model.provider.name_en,
