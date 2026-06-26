@@ -416,6 +416,7 @@
             :rows="3"
             placeholder="请输入你要说的话..."
             @keyup.enter.ctrl="doExecute"
+            @paste="handlePaste"
             class="input-textarea"
           />
           <div class="input-actions">
@@ -1015,27 +1016,50 @@ const beforeImageUpload = async (file) => {
     formData.append('file', file)
     
     const token = localStorage.getItem('token')
+    const headers = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
     const response = await fetch('/api/v1/upload/image', {
       method: 'POST',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      headers: headers,
       body: formData
     })
     
+    if (!response.ok) {
+      const errorText = await response.text()
+      ElMessage.error(`上传失败: ${response.status} ${errorText}`)
+      return false
+    }
+    
     const result = await response.json()
-    if (result.success && result.data) {
-      const baseUrl = window.location.origin
-      const imageUrl = result.data.url.startsWith('http') 
-        ? result.data.url 
-        : baseUrl + result.data.url
+    if (result.success && result.data && result.data.url) {
+      const rawUrl = result.data.url
+      let imageUrl = ''
+      if (rawUrl.startsWith('http')) {
+        imageUrl = rawUrl
+      } else if (rawUrl.startsWith('/uploads/images/')) {
+        const parts = rawUrl.replace('/uploads/images/', '').split('/')
+        if (parts.length >= 4) {
+          imageUrl = `/api/v1/upload/images/${parts[0]}/${parts[1]}/${parts[2]}/${parts.slice(3).join('/')}`
+        } else {
+          imageUrl = window.location.origin + rawUrl
+        }
+      } else {
+        imageUrl = window.location.origin + rawUrl
+      }
       uploadedImages.value.push({
         url: imageUrl,
         name: file.name
       })
+      ElMessage.success('图片上传成功')
     } else {
       ElMessage.error(result.message || '上传失败')
     }
   } catch (error) {
     ElMessage.error('上传失败: ' + error.message)
+    console.error('图片上传错误:', error)
   }
   
   return false
@@ -1043,6 +1067,38 @@ const beforeImageUpload = async (file) => {
 
 const removeImage = (index) => {
   uploadedImages.value.splice(index, 1)
+}
+
+const handlePaste = async (event) => {
+  const items = event.clipboardData?.items
+  if (!items) {
+    ElMessage.warning('浏览器不支持剪贴板操作')
+    return
+  }
+  
+  let hasImage = false
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.type.startsWith('image/')) {
+      hasImage = true
+      event.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        if (!file.name || file.name === 'blob') {
+          const ext = item.type.split('/')[1] || 'png'
+          file.name = `clipboard-image-${Date.now()}.${ext}`
+        }
+        await beforeImageUpload(file)
+      } else {
+        ElMessage.error('无法从剪贴板获取图片')
+      }
+      break
+    }
+  }
+  
+  if (!hasImage) {
+    return
+  }
 }
 
 const doExecute = async () => {
