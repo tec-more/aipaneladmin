@@ -1171,3 +1171,138 @@ class DialogFlowService:
         
         executions = await query.order_by("-started_at").offset(skip).limit(limit).all()
         return [DialogFlowExecutionResponse.from_orm(execution) for execution in executions]
+
+    @staticmethod
+    async def execute_dialog_flow_with_langgraph(
+        dialog_flow_id: int,
+        input_data: Dict[str, Any],
+        session_id: str = None,
+        user_id: int = None,
+        checkpoint_id: str = None,
+        sse_yield_func=None
+    ) -> Dict[str, Any]:
+        """
+        使用LangGraph执行对话流，支持多轮对话和Checkpoint
+        
+        Args:
+            dialog_flow_id: 对话流ID
+            input_data: 输入数据
+            session_id: 会话ID（用于多轮对话）
+            user_id: 用户ID（用于记忆管理）
+            checkpoint_id: 检查点ID（用于恢复指定检查点）
+            sse_yield_func: SSE推送回调函数
+            
+        Returns:
+            执行结果
+        """
+        from base.plugins.agent.services.dialog_flow_langgraph import DialogFlowLangGraphExecutor
+        import uuid
+        
+        dialog_flow = await DialogFlow.get_or_none(id=dialog_flow_id)
+        if not dialog_flow:
+            return {"success": False, "message": "对话流不存在"}
+        
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        
+        actor = {"id": user_id or "anonymous", "type": "user"}
+        
+        result = await DialogFlowLangGraphExecutor.execute_dialog_flow(
+            dialog_flow=dialog_flow,
+            input_data=input_data,
+            actor=actor,
+            sse_yield_func=sse_yield_func,
+            session_id=session_id,
+            user_id=user_id,
+            checkpoint_id=checkpoint_id
+        )
+        
+        # 保存执行记录
+        try:
+            execution_data = {
+                "dialog_flow_id": dialog_flow_id,
+                "user_id": user_id,
+                "input_data": input_data,
+                "output_data": result.get("output", {}),
+                "status": "completed" if result.get("success") else "failed",
+                "execution_path": result.get("execution_trace", [])
+            }
+            if not result.get("success"):
+                execution_data["error_message"] = result.get("message", "")
+            
+            await DialogFlowExecution.create(**execution_data)
+        except Exception as e:
+            logger.warning(f"保存执行记录失败: {e}")
+        
+        result["session_id"] = session_id
+        return result
+
+    @staticmethod
+    async def get_user_checkpoints(
+        dialog_flow_id: int,
+        user_id: int
+    ) -> List[Dict[str, Any]]:
+        """
+        获取用户的所有检查点
+        
+        Args:
+            dialog_flow_id: 对话流ID
+            user_id: 用户ID
+            
+        Returns:
+            检查点列表
+        """
+        from base.plugins.agent.services.checkpoint_service import CheckpointService
+        
+        checkpoint_service = CheckpointService.get_instance()
+        actor = {"id": user_id, "type": "user"}
+        all_checkpoints = checkpoint_service.get_user_checkpoints(actor)
+        
+        dialog_flow_checkpoints = [
+            cp for cp in all_checkpoints
+            if cp.get("metadata", {}).get("dialog_flow_id") == dialog_flow_id
+        ]
+        
+        return dialog_flow_checkpoints
+
+    @staticmethod
+    async def get_session_checkpoints(
+        session_id: str,
+        user_id: int
+    ) -> List[Dict[str, Any]]:
+        """
+        获取会话的所有检查点
+        
+        Args:
+            session_id: 会话ID
+            user_id: 用户ID
+            
+        Returns:
+            检查点列表
+        """
+        from base.plugins.agent.services.checkpoint_service import CheckpointService
+        
+        checkpoint_service = CheckpointService.get_instance()
+        actor = {"id": user_id, "type": "user"}
+        return checkpoint_service.get_session_checkpoints(actor, session_id)
+
+    @staticmethod
+    async def get_checkpoint_detail(
+        checkpoint_id: str,
+        user_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        获取检查点详情
+        
+        Args:
+            checkpoint_id: 检查点ID
+            user_id: 用户ID
+            
+        Returns:
+            检查点详情
+        """
+        from base.plugins.agent.services.checkpoint_service import CheckpointService
+        
+        checkpoint_service = CheckpointService.get_instance()
+        actor = {"id": user_id, "type": "user"}
+        return checkpoint_service.get_checkpoint(actor, checkpoint_id)

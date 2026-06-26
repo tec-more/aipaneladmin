@@ -245,3 +245,151 @@ async def list_edges(dialog_flow_id: int):
     """列出指定对话流的所有边"""
     edges = await DialogFlowService.list_edges(dialog_flow_id)
     return success_response(data=edges)
+
+
+@dialog_flow_router.post("/{dialog_flow_id}/langgraph-execute")
+async def execute_dialog_flow_langgraph(
+    dialog_flow_id: int,
+    request_data: dict,
+    session_id: Optional[str] = Query(None, description="会话ID，用于多轮对话"),
+    user_id: Optional[int] = Query(None, description="用户ID，用于记忆管理"),
+    checkpoint_id: Optional[str] = Query(None, description="检查点ID，用于恢复"),
+    stream: Optional[bool] = Query(True, description="是否使用流式返回")
+):
+    """
+    使用LangGraph执行对话流，支持多轮对话、记忆管理和Checkpoint
+    """
+    try:
+        dialog_flow = await DialogFlowService.get_dialog_flow(dialog_flow_id)
+        if not dialog_flow:
+            return fail_response(msg="对话流不存在", code=404)
+        
+        if dialog_flow.status != "active":
+            return fail_response(msg="对话流未激活", code=400)
+        
+        input_data = request_data.get("input_data", request_data)
+        
+        if stream:
+            import json
+            import asyncio
+            from datetime import datetime
+            
+            async def sse_generator():
+                event_queue = asyncio.Queue()
+                
+                async def push_event(event_data):
+                    await event_queue.put(
+                        f"data: {json.dumps({**event_data, 'timestamp': datetime.now().isoformat()}, ensure_ascii=False)}\n\n"
+                    )
+                
+                async def execute_flow():
+                    try:
+                        result = await DialogFlowService.execute_dialog_flow_with_langgraph(
+                            dialog_flow_id=dialog_flow_id,
+                            input_data=input_data,
+                            session_id=session_id,
+                            user_id=user_id,
+                            checkpoint_id=checkpoint_id,
+                            sse_yield_func=push_event
+                        )
+                        await push_event({
+                            "type": "complete",
+                            "data": result
+                        })
+                    except Exception as e:
+                        import traceback
+                        await push_event({
+                            "type": "error",
+                            "message": str(e),
+                            "traceback": traceback.format_exc()
+                        })
+                
+                task = asyncio.create_task(execute_flow())
+                
+                while True:
+                    try:
+                        event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
+                        yield event
+                    except asyncio.TimeoutError:
+                        if task.done():
+                            break
+                        continue
+                    except Exception:
+                        break
+                
+                if not task.done():
+                    await task
+            
+            return StreamingResponse(
+                sse_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "X-Accel-Buffering": "no"
+                }
+            )
+        else:
+            result = await DialogFlowService.execute_dialog_flow_with_langgraph(
+                dialog_flow_id=dialog_flow_id,
+                input_data=input_data,
+                session_id=session_id,
+                user_id=user_id,
+                checkpoint_id=checkpoint_id
+            )
+            return success_response(data=result, msg="对话流执行成功")
+    
+    except Exception as e:
+        import traceback
+        return fail_response(msg=str(e), data={"traceback": traceback.format_exc()}, code=500)
+
+
+@dialog_flow_router.get("/{dialog_flow_id}/checkpoints")
+async def list_user_checkpoints(
+    dialog_flow_id: int,
+    user_id: int = Query(..., description="用户ID")
+):
+    """获取用户在指定对话流中的所有检查点"""
+    try:
+        checkpoints = await DialogFlowService.get_user_checkpoints(
+            dialog_flow_id=dialog_flow_id,
+            user_id=user_id
+        )
+        return success_response(data={"items": checkpoints, "total": len(checkpoints)})
+    except Exception as e:
+        return fail_response(msg=str(e), code=500)
+
+
+@dialog_flow_router.get("/checkpoints/session/{session_id}")
+async def list_session_checkpoints(
+    session_id: str,
+    user_id: int = Query(..., description="用户ID")
+):
+    """获取指定会话的所有检查点"""
+    try:
+        checkpoints = await DialogFlowService.get_session_checkpoints(
+            session_id=session_id,
+            user_id=user_id
+        )
+        return success_response(data={"items": checkpoints, "total": len(checkpoints)})
+    except Exception as e:
+        return fail_response(msg=str(e), code=500)
+
+
+@dialog_flow_router.get("/checkpoints/{checkpoint_id}")
+async def get_checkpoint_detail(
+    checkpoint_id: str,
+    user_id: int = Query(..., description="用户ID")
+):
+    """获取检查点详情"""
+    try:
+        checkpoint = await DialogFlowService.get_checkpoint_detail(
+            checkpoint_id=checkpoint_id,
+            user_id=user_id
+        )
+        if not checkpoint:
+            return fail_response(msg="检查点不存在", code=404)
+        return success_response(data=checkpoint)
+    except Exception as e:
+        return fail_response(msg=str(e), code=500)
