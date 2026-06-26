@@ -1,12 +1,11 @@
 """
-对话流 LangGraph 执行器 - 使用 LangGraph 执行对话流结构图
-支持多轮对话、记忆管理、Checkpoint 检查点
+对话流 LangGraph 执行器 - 复用智能体的LangGraph执行器
+支持智能体的所有高级节点类型，实现能力对齐
 """
 import asyncio
 import json
 import logging
 from datetime import datetime
-from operator import add
 from typing import Dict, Any, List, Optional, Annotated, TypedDict
 
 # LangGraph 和 LangChain 相关导入
@@ -20,84 +19,30 @@ from langgraph.errors import GraphInterrupt
 
 # 本地导入
 from base.plugins.agent.models.dialog_flow import DialogFlow
+from base.plugins.agent.models.agent import Agent
 from base.plugins.agent.utils.safe_eval import safe_eval
 from base.plugins.agent.services.memory_service import MemoryService
 from base.plugins.agent.services.checkpoint_service import CheckpointService
+from base.plugins.agent.services.langgraph_executor import LangGraphExecutor, AgentState
 
 logger = logging.getLogger(__name__)
 
 
-def dict_merge_reducer(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
-    """字典合并reducer，支持并发更新"""
-    result = left.copy()
-    result.update(right)
-    return result
-
-
-def last_value_reducer(left, right):
-    """最后值reducer，保留最后一个值"""
-    return right if right is not None else left
-
-
-class DialogFlowState(TypedDict):
-    """对话流执行状态，支持并发更新"""
-    input: Annotated[Dict[str, Any], dict_merge_reducer]
-    output: Annotated[Dict[str, Any], dict_merge_reducer]
-    messages: Annotated[List[Dict[str, Any]], add]
-    variables: Annotated[Dict[str, Any], dict_merge_reducer]
-    node_results: Annotated[Dict[str, Any], dict_merge_reducer]
-    execution_trace: Annotated[List[Dict[str, Any]], add]
-    current_node: Annotated[Optional[str], last_value_reducer]
-    error: Annotated[Optional[str], last_value_reducer]
-    flow_data: Annotated[Dict[str, Any], dict_merge_reducer]
-    dialog_flow_id: Annotated[Optional[int], last_value_reducer]
-    user_id: Annotated[Optional[int], last_value_reducer]
-    session_id: Annotated[Optional[str], last_value_reducer]
-
-
-def create_initial_state(input_data: Dict[str, Any], dialog_flow: DialogFlow = None, 
-                         session_id: str = None, user_id: int = None) -> Dict[str, Any]:
-    """创建初始状态"""
-    variables = {
-        "recent_memories": [],
-        "important_memories": []
-    }
-    
-    if dialog_flow:
-        variables["dialog_flow_id"] = dialog_flow.id
-        variables["dialog_flow_name"] = dialog_flow.name
-    
-    if user_id:
-        variables["user_id"] = user_id
-    
-    if session_id:
-        variables["session_id"] = session_id
-    
-    return {
-        "input": input_data,
-        "output": {},
-        "messages": [],
-        "variables": variables,
-        "node_results": {},
-        "execution_trace": [],
-        "current_node": None,
-        "error": None,
-        "flow_data": {},
-        "dialog_flow_id": dialog_flow.id if dialog_flow else None,
-        "user_id": user_id,
-        "session_id": session_id
-    }
+class DialogFlowState(AgentState):
+    """对话流执行状态，继承智能体状态"""
+    dialog_flow_id: Annotated[Optional[int], LangGraphExecutor._last_value_reducer]
+    user_id: Annotated[Optional[int], LangGraphExecutor._last_value_reducer]
+    session_id: Annotated[Optional[str], LangGraphExecutor._last_value_reducer]
 
 
 class DialogFlowLangGraphExecutor:
-    """对话流 LangGraph 执行器 - 使用 LangGraph 执行对话流结构图"""
+    """对话流 LangGraph 执行器 - 复用智能体执行器，支持所有高级节点类型"""
 
-    _graph_cache = {}  # 缓存已编译的图: dialog_flow_id -> graph
-    _preloaded_llm_resources = {}  # 缓存预加载的LLM资源
+    _graph_cache = {}
+    _preloaded_llm_resources = {}
 
     @staticmethod
     def _get_cache_key(dialog_flow_id: int) -> str:
-        """获取缓存键"""
         return f"dialog_flow_{dialog_flow_id}"
 
     @staticmethod
@@ -111,7 +56,7 @@ class DialogFlowLangGraphExecutor:
         checkpoint_id: str = None
     ) -> Dict[str, Any]:
         """
-        执行对话流
+        执行对话流 - 使用智能体的LangGraph执行器
         
         Args:
             dialog_flow: 对话流对象
@@ -152,9 +97,6 @@ class DialogFlowLangGraphExecutor:
                     user_id=user_id,
                     checkpoint_id=checkpoint_id
                 )
-                logger.info("=" * 50)
-                logger.info("[DialogFlow LangGraph] ===== RETURNING =====")
-                logger.info("=" * 50)
                 return result
             else:
                 logger.warning("对话流没有配置节点，使用简化执行方式")
@@ -162,192 +104,11 @@ class DialogFlowLangGraphExecutor:
         except Exception as e:
             logger.exception(f"执行对话流失败: {str(e)}")
             import traceback
-            error_result = {
+            return {
                 "success": False,
                 "message": str(e),
                 "traceback": traceback.format_exc()
             }
-            return error_result
-
-    @staticmethod
-    async def _preload_llm_resources(nodes: List[Dict]) -> Dict[str, Any]:
-        """
-        预加载所有LLM节点所需的资源（模型信息、API密钥等）
-        
-        Args:
-            nodes: 节点列表
-            
-        Returns:
-            预加载的资源字典，key为节点ID
-        """
-        from base.plugins.llm.models.model import LLMModel
-        from base.plugins.llm.models.provider import LLMProvider
-        from base.plugins.llm.models.api_key import LLMApiKey
-        
-        llm_resources = {}
-        errors = []
-        
-        for node in nodes:
-            if node.get("type") != "llm":
-                continue
-                
-            node_id = node.get("id", "")
-            node_label = node.get("data", {}).get("label", node_id)
-            node_data = node.get("data", {})
-            model_id = node_data.get("llm_model_id") or node_data.get("model_id")
-            
-            if not model_id:
-                errors.append(f"节点 [{node_label}] 未配置模型ID")
-                continue
-            
-            logger.info(f"[预加载] 节点 [{node_label}] 的模型资源, model_id={model_id}")
-            
-            try:
-                model = await LLMModel.get_or_none(id=model_id, status="active")
-                if not model:
-                    errors.append(f"节点 [{node_label}] 模型不存在或未激活: model_id={model_id}")
-                    continue
-                
-                provider = await LLMProvider.get_or_none(id=model.provider_id)
-                if not provider:
-                    errors.append(f"节点 [{node_label}] 提供者不存在: provider_id={model.provider_id}")
-                    continue
-                
-                api_key = await LLMApiKey.filter(model_id=model.id).first()
-                if not api_key:
-                    api_key = await LLMApiKey.filter(provider_id=model.provider_id, model_id__isnull=True).first()
-                
-                llm_resources[node_id] = {
-                    "model": model,
-                    "provider": provider,
-                    "api_key": api_key,
-                    "model_id": model.id,
-                    "model_name": model.model_name,
-                    "provider_name": provider.name,
-                    "supports_vision": model.supports_vision,
-                    "supports_stream": True
-                }
-                logger.info(f"[预加载] 模型加载成功: {provider.name} - {model.model_name}")
-            except Exception as e:
-                logger.exception(f"[预加载] 模型加载失败: node_id={node_id}, error={e}")
-                errors.append(f"节点 [{node_label}] 模型加载失败: {str(e)}")
-        
-        if errors:
-            logger.warning(f"[预加载] 部分模型加载失败: {errors}")
-        
-        return llm_resources
-
-    @staticmethod
-    async def _load_memory_for_user(
-        dialog_flow_id: int,
-        user_id: int
-    ) -> List[Dict[str, Any]]:
-        """
-        加载用户的记忆
-        
-        Args:
-            dialog_flow_id: 对话流ID
-            user_id: 用户ID
-            
-        Returns:
-            记忆列表
-        """
-        try:
-            memories = await MemoryService.get_memories_by_agent(
-                agent_id=dialog_flow_id,
-                memory_mode="private",
-                user_id=user_id
-            )
-            
-            memory_list = []
-            for m in memories:
-                memory_list.append({
-                    "id": m.id,
-                    "content": m.content,
-                    "type": m.type,
-                    "importance": m.importance,
-                    "created_at": m.created_at.isoformat() if m.created_at else None
-                })
-            
-            return memory_list
-        except Exception as e:
-            logger.warning(f"加载用户记忆失败: {e}")
-            return []
-
-    @staticmethod
-    async def _save_dialog_memory(
-        dialog_flow_id: int,
-        user_id: int,
-        input_data: Dict[str, Any],
-        variables: Dict[str, Any]
-    ):
-        """
-        保存对话流执行结果到记忆
-        
-        Args:
-            dialog_flow_id: 对话流ID
-            user_id: 用户ID
-            input_data: 输入数据
-            variables: 变量
-        """
-        try:
-            from base.plugins.agent.schemas.memory import MemoryCreate
-
-            memory_mode = "private"
-            user_id_val = user_id
-
-            input_text = input_data.get("text", "")
-            if input_text and user_id_val:
-                input_memory_data = MemoryCreate(
-                    agent_id=dialog_flow_id,
-                    content=f"用户输入: {input_text}",
-                    type="short_term",
-                    importance=0.8,
-                    memory_mode=memory_mode,
-                    user_id=user_id_val
-                )
-                await MemoryService.create_memory(input_memory_data)
-                logger.info("对话流记忆保存: 输入内容已保存")
-
-            key_variables = [
-                "response", "output", "result", "text",
-                "summary", "answer", "reply", "content",
-                "knowledge_result", "api_result",
-                "final_output", "output_data"
-            ]
-
-            saved_vars = set()
-            for var_name in key_variables:
-                if var_name in variables and var_name not in saved_vars:
-                    value = variables[var_name]
-
-                    content_str = ""
-                    if isinstance(value, dict):
-                        content_str = json.dumps(value, ensure_ascii=False)
-                    elif isinstance(value, list):
-                        content_str = json.dumps(value, ensure_ascii=False)
-                    else:
-                        content_str = str(value)
-
-                    if content_str and len(content_str.strip()) > 0 and len(content_str) < 5000 and user_id_val:
-                        try:
-                            importance = 0.9 if var_name in ["final_output", "response", "answer"] else 0.7
-                            memory_data = MemoryCreate(
-                                agent_id=dialog_flow_id,
-                                content=f"{var_name}: {content_str}",
-                                type="long_term",
-                                importance=importance,
-                                memory_mode=memory_mode,
-                                user_id=user_id_val
-                            )
-                            await MemoryService.create_memory(memory_data)
-                            saved_vars.add(var_name)
-                            logger.info(f"对话流记忆保存: {var_name} 已保存")
-                        except Exception as e:
-                            logger.warning(f"保存记忆失败 {var_name}: {e}")
-
-        except Exception as e:
-            logger.warning(f"保存对话流记忆时出错: {e}")
 
     @staticmethod
     async def _execute_with_langgraph(
@@ -361,7 +122,7 @@ class DialogFlowLangGraphExecutor:
         checkpoint_id: str = None
     ) -> Dict[str, Any]:
         """
-        使用 LangGraph 执行对话流结构图
+        使用智能体的LangGraph执行器执行对话流
         
         Args:
             dialog_flow: 对话流对象
@@ -384,18 +145,19 @@ class DialogFlowLangGraphExecutor:
                 logger.warning("对话流没有节点，回退到简单执行")
                 return await DialogFlowLangGraphExecutor._execute_simple(dialog_flow, input_data)
 
-            # 预加载LLM资源
             cache_key = DialogFlowLangGraphExecutor._get_cache_key(dialog_flow.id)
             if cache_key not in DialogFlowLangGraphExecutor._preloaded_llm_resources:
                 logger.info("[预加载] 开始预加载LLM节点资源...")
-                llm_resources = await DialogFlowLangGraphExecutor._preload_llm_resources(nodes)
+                llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
                 DialogFlowLangGraphExecutor._preloaded_llm_resources[cache_key] = llm_resources
                 logger.info(f"[预加载] LLM资源预加载完成，资源数: {len(llm_resources)}")
             else:
                 llm_resources = DialogFlowLangGraphExecutor._preloaded_llm_resources[cache_key]
                 logger.info(f"[预加载] 使用缓存的LLM资源，资源数: {len(llm_resources)}")
 
-            # 加载用户记忆
+            skill_resources = await LangGraphExecutor._preload_skill_resources(nodes)
+            logger.info(f"[预加载] 技能资源预加载完成，资源数: {len(skill_resources)}")
+
             memory_list = []
             if user_id:
                 logger.info(f"[记忆] 加载用户记忆: user_id={user_id}")
@@ -404,10 +166,9 @@ class DialogFlowLangGraphExecutor:
                 )
                 logger.info(f"[记忆] 加载完成，共 {len(memory_list)} 条记忆")
 
-            # 构建图
             workflow = StateGraph(DialogFlowState)
             node_map = {node.get("id"): node for node in nodes}
-            start_node = DialogFlowLangGraphExecutor._find_start_node(nodes)
+            start_node = LangGraphExecutor._find_start_node(nodes)
             start_node_id = start_node.get("id", "start") if start_node else "start"
 
             logger.info(f"开始构建 LangGraph，节点数: {len(nodes)}, 边数: {len(edges)}")
@@ -418,10 +179,19 @@ class DialogFlowLangGraphExecutor:
                 node_type = node.get("type", "")
                 async def node_executor(state: Dict[str, Any]):
                     logger.info(f"节点执行器被调用: {node_id} ({node_type})")
+                    
+                    original_flow_data = state.get("flow_data")
+                    
                     result = await DialogFlowLangGraphExecutor._execute_node_with_logging(
-                        node, state, llm_resources=llm_resources, sse_yield_func=sse_yield_func
+                        node, state, 
+                        llm_resources=llm_resources, 
+                        skill_resources=skill_resources,
+                        sse_yield_func=sse_yield_func
                     )
-                    logger.debug(f"节点执行器返回状态: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+                    
+                    if original_flow_data is not None and "flow_data" not in result:
+                        result["flow_data"] = original_flow_data
+                    
                     return result
                 return node_executor
 
@@ -430,8 +200,6 @@ class DialogFlowLangGraphExecutor:
                 node_type = node.get("type", "")
                 if not node_id:
                     continue
-
-                logger.debug(f"创建节点: {node_id} (类型: {node_type})")
                 workflow.add_node(node_id, create_node_executor(node))
 
             edge_map = {}
@@ -442,13 +210,9 @@ class DialogFlowLangGraphExecutor:
                     edge_map[source] = target
 
             if start_node_id in node_map:
-                logger.info(f"添加起始边: START -> {start_node_id}")
                 workflow.add_edge(START, start_node_id)
-            else:
-                logger.error(f"开始节点 {start_node_id} 不在节点映射中")
 
             condition_edges = {}
-            logger.info(f"边列表: {edges}")
             for edge in edges:
                 source = edge.get("source", "")
                 target = edge.get("target", "")
@@ -458,9 +222,7 @@ class DialogFlowLangGraphExecutor:
                         if source not in condition_edges:
                             condition_edges[source] = []
                         condition_edges[source].append(edge)
-                        logger.info(f"条件边: {source} -> {target}, 条件: {edge.get('condition', '')}, 优先级: {edge.get('priority', 0)}")
                     else:
-                        logger.info(f"添加边: {source} -> {target}")
                         workflow.add_edge(source, target)
 
             import re
@@ -482,11 +244,8 @@ class DialogFlowLangGraphExecutor:
                         
                         conditional_edges.sort(key=lambda x: x.get("priority", 0))
                         
-                        logger.info(f"条件节点 {node_id}: {len(conditional_edges)} 条条件边, {len(default_edges)} 条默认边")
-                        
                         for edge in conditional_edges:
                             if not edge.get("enabled", True):
-                                logger.info(f"边 {edge.get('id')} 已禁用，跳过")
                                 continue
                                 
                             condition = edge.get("condition", "")
@@ -513,31 +272,22 @@ class DialogFlowLangGraphExecutor:
                                 result = safe_eval(expr, {"variables": variables, "get_var": get_var})
                                 
                                 if result:
-                                    logger.info(f"条件边匹配成功: {edge.get('id')} -> {edge_target}, 条件: {condition}")
                                     return edge_target
                             except Exception as e:
-                                logger.warning(f"条件表达式执行失败 [{edge.get('id')}]: {e}, 条件: {condition}")
+                                logger.warning(f"条件表达式执行失败 [{edge.get('id')}]: {e}")
                         
                         if default_edges:
-                            if len(default_edges) > 1:
-                                logger.warning(f"条件节点 {node_id} 有 {len(default_edges)} 条默认边")
-                            
                             default_edges.sort(key=lambda x: x.get("priority", 0))
-                            default_edge = default_edges[0]
-                            default_target = default_edge.get("target")
-                            logger.info(f"使用默认路由: {default_edge.get('id')} -> {default_target}")
-                            return default_target
+                            return default_edges[0].get("target")
                         
-                        logger.warning(f"条件节点 {node_id} 没有找到匹配的边，返回 END")
                         return END
                     return condition_router
 
-                if len(edge_list) > 0:
-                    workflow.add_conditional_edges(
-                        condition_node_id,
-                        create_condition_router(condition_node_id, edge_list),
-                        [e.get("target") for e in edge_list]
-                    )
+                workflow.add_conditional_edges(
+                    condition_node_id,
+                    create_condition_router(condition_node_id, edge_list),
+                    [e.get("target") for e in edge_list]
+                )
 
             for node in nodes:
                 if node.get("type") == "end":
@@ -548,9 +298,6 @@ class DialogFlowLangGraphExecutor:
             if start_node_id not in node_map:
                 raise ValueError(f"开始节点 {start_node_id} 不在节点映射中")
 
-            logger.info("LangGraph 编译完成")
-
-            # 构建初始状态
             initial_state: Dict[str, Any] = {
                 "input": input_data,
                 "output": {},
@@ -561,7 +308,8 @@ class DialogFlowLangGraphExecutor:
                     "session_id": session_id,
                     "user_id": user_id,
                     "recent_memories": memory_list,
-                    "_llm_resources": llm_resources
+                    "_llm_resources": llm_resources,
+                    "_skill_resources": skill_resources
                 },
                 "node_results": {},
                 "execution_trace": [],
@@ -573,13 +321,9 @@ class DialogFlowLangGraphExecutor:
                 "session_id": session_id
             }
 
-            logger.info("使用 LangGraph 执行")
-            
-            # 获取 Checkpointer 和配置
             checkpoint_service = CheckpointService.get_instance()
             checkpointer = checkpoint_service.get_checkpointer()
             
-            # 如果没有提供 actor，构造一个
             if not actor:
                 actor = {"id": user_id or "anonymous", "type": "user"}
             
@@ -590,19 +334,10 @@ class DialogFlowLangGraphExecutor:
                 dialog_flow_id=dialog_flow.id,
                 dialog_flow_name=dialog_flow.name
             )
-            
-            logger.info(f"[编译图] 配置: {json.dumps(config, ensure_ascii=False)}")
 
             graph_with_memory = workflow.compile(checkpointer=checkpointer)
-
-            logger.info("调用 graph.ainvoke...")
-            
             final_state = await graph_with_memory.ainvoke(initial_state, config=config)
-            
-            logger.info("LangGraph 执行完成")
-            logger.debug(f"最终状态变量: {json.dumps(final_state.get('variables', {}), ensure_ascii=False, default=str)[:500]}...")
 
-            # 保存记忆
             if user_id:
                 await DialogFlowLangGraphExecutor._save_dialog_memory(
                     dialog_flow_id=dialog_flow.id,
@@ -636,8 +371,8 @@ class DialogFlowLangGraphExecutor:
             }
 
     @staticmethod
-    async def _execute_node_with_logging(current_node, state, llm_resources=None, sse_yield_func=None):
-        """执行节点，带日志记录和 SSE 推送"""
+    async def _execute_node_with_logging(current_node, state, llm_resources=None, skill_resources=None, sse_yield_func=None):
+        """执行节点，支持智能体的所有节点类型"""
         node_id = current_node.get("id", "")
         node_type = current_node.get("type")
         node_data = current_node.get("data", {})
@@ -668,11 +403,11 @@ class DialogFlowLangGraphExecutor:
             if node_type == "start":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'info', 'label': '开始节点', 'message': '开始执行...'})
-                state = await DialogFlowLangGraphExecutor._execute_start_node(node_data, state)
+                state = await LangGraphExecutor._execute_start_node(node_data, state)
             elif node_type == "end":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'info', 'label': '结束节点', 'message': '执行结束'})
-                state = await DialogFlowLangGraphExecutor._execute_end_node(node_data, state)
+                state = await LangGraphExecutor._execute_end_node(node_data, state)
             elif node_type == "input":
                 state = await DialogFlowLangGraphExecutor._execute_input_node(node_data, state)
             elif node_type == "output":
@@ -715,11 +450,47 @@ class DialogFlowLangGraphExecutor:
             elif node_type == "condition":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'thinking', 'label': node_label, 'message': '条件判断中...'})
-                state = await DialogFlowLangGraphExecutor._execute_condition_node(node_data, state)
+                state = await LangGraphExecutor._execute_condition_node(node_data, state)
             elif node_type == "question":
                 state = await DialogFlowLangGraphExecutor._execute_question_node(node_data, state)
+            elif node_type == "skill":
+                if sse_yield_func:
+                    await sse_yield_func({'type': 'action', 'label': node_label, 'message': f'执行技能: {node_data.get("skill_id", "unknown")}'})
+                state = await LangGraphExecutor._execute_skill_node(node_data, state)
+            elif node_type == "tool":
+                if sse_yield_func:
+                    await sse_yield_func({'type': 'action', 'label': node_label, 'message': f'执行工具: {node_data.get("tool_name", "unknown")}'})
+                state = await LangGraphExecutor._execute_tool_node(node_data, state)
+            elif node_type == "http":
+                if sse_yield_func:
+                    await sse_yield_func({'type': 'action', 'label': node_label, 'message': '发送HTTP请求'})
+                state = await LangGraphExecutor._execute_http_node(node_data, state)
+            elif node_type == "code":
+                state = await LangGraphExecutor._execute_code_node(node_data, state)
+            elif node_type == "template":
+                state = await LangGraphExecutor._execute_template_node(node_data, state)
+            elif node_type == "loop":
+                state = await LangGraphExecutor._execute_loop_node(node_data, state)
+            elif node_type == "iteration":
+                state = await LangGraphExecutor._execute_iteration_node(node_data, state)
+            elif node_type == "parallel":
+                if sse_yield_func:
+                    await sse_yield_func({'type': 'action', 'label': node_label, 'message': '并行执行分支任务...'})
+                state = await LangGraphExecutor._execute_parallel_node(current_node, state)
+            elif node_type == "variable_aggregator":
+                state = await LangGraphExecutor._execute_variable_aggregator_node(node_data, state)
+            elif node_type == "variable_assigner":
+                state = await LangGraphExecutor._execute_variable_assigner_node(node_data, state)
+            elif node_type == "parameter_extractor":
+                state = await LangGraphExecutor._execute_parameter_extractor_node(node_data, state)
+            elif node_type == "json_extractor":
+                state = await LangGraphExecutor._execute_json_extractor_node(node_data, state)
+            elif node_type == "document_extractor":
+                state = await LangGraphExecutor._execute_document_extractor_node(node_data, state)
+            elif node_type == "agent":
+                state = await LangGraphExecutor._execute_agent_node(node_data, state)
             else:
-                state = await DialogFlowLangGraphExecutor._execute_default_node(node_data, state)
+                state = await LangGraphExecutor._execute_default_node(node_data, state)
 
             state["execution_trace"].append({
                 "node_id": node_id,
@@ -753,61 +524,101 @@ class DialogFlowLangGraphExecutor:
         return state
 
     @staticmethod
-    def _find_start_node(nodes: List[Dict]) -> Optional[Dict]:
-        """找到开始节点"""
-        for node in nodes:
-            if node.get("type") == "start":
-                return node
-        if nodes:
-            return nodes[0]
-        return None
+    async def _load_memory_for_user(dialog_flow_id: int, user_id: int) -> List[Dict[str, Any]]:
+        """加载用户记忆"""
+        try:
+            memories = await MemoryService.get_memories_by_agent(
+                agent_id=dialog_flow_id,
+                memory_mode="private",
+                user_id=user_id
+            )
+            memory_list = []
+            for m in memories:
+                memory_list.append({
+                    "id": m.id,
+                    "content": m.content,
+                    "type": m.type,
+                    "importance": m.importance,
+                    "created_at": m.created_at.isoformat() if m.created_at else None
+                })
+            return memory_list
+        except Exception as e:
+            logger.warning(f"加载用户记忆失败: {e}")
+            return []
 
     @staticmethod
-    def _replace_variables(text: str, variables: Dict[str, Any]) -> str:
-        """替换文本中的变量"""
-        if not text:
-            return text
-        for key, value in variables.items():
-            placeholder = f"{{{{{key}}}}}"
-            text = text.replace(placeholder, str(value))
-        return text
+    async def _save_dialog_memory(dialog_flow_id: int, user_id: int, input_data: Dict[str, Any], variables: Dict[str, Any]):
+        """保存对话记忆"""
+        try:
+            from base.plugins.agent.schemas.memory import MemoryCreate
+
+            memory_mode = "private"
+            user_id_val = user_id
+
+            input_text = input_data.get("text", "")
+            if input_text and user_id_val:
+                input_memory_data = MemoryCreate(
+                    agent_id=dialog_flow_id,
+                    content=f"用户输入: {input_text}",
+                    type="short_term",
+                    importance=0.8,
+                    memory_mode=memory_mode,
+                    user_id=user_id_val
+                )
+                await MemoryService.create_memory(input_memory_data)
+
+            key_variables = [
+                "response", "output", "result", "text",
+                "summary", "answer", "reply", "content",
+                "knowledge_result", "api_result",
+                "final_output", "output_data"
+            ]
+
+            saved_vars = set()
+            for var_name in key_variables:
+                if var_name in variables and var_name not in saved_vars:
+                    value = variables[var_name]
+                    content_str = ""
+                    if isinstance(value, dict):
+                        content_str = json.dumps(value, ensure_ascii=False)
+                    elif isinstance(value, list):
+                        content_str = json.dumps(value, ensure_ascii=False)
+                    else:
+                        content_str = str(value)
+
+                    if content_str and len(content_str.strip()) > 0 and len(content_str) < 5000 and user_id_val:
+                        try:
+                            importance = 0.9 if var_name in ["final_output", "response", "answer"] else 0.7
+                            memory_data = MemoryCreate(
+                                agent_id=dialog_flow_id,
+                                content=f"{var_name}: {content_str}",
+                                type="long_term",
+                                importance=importance,
+                                memory_mode=memory_mode,
+                                user_id=user_id_val
+                            )
+                            await MemoryService.create_memory(memory_data)
+                            saved_vars.add(var_name)
+                        except Exception as e:
+                            logger.warning(f"保存记忆失败 {var_name}: {e}")
+
+        except Exception as e:
+            logger.warning(f"保存对话流记忆时出错: {e}")
 
     @staticmethod
     async def _execute_simple(dialog_flow: DialogFlow, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """简化的执行方式"""
-        logger.info("使用简化执行方式")
-        try:
-            input_text = input_data.get("text", "")
-            return {
-                "success": True,
-                "message": "执行成功",
-                "input": input_data,
-                "output": {
-                    "text": f"已处理: {input_text}"
-                }
-            }
-        except Exception as e:
-            logger.exception(f"简化执行失败: {e}")
-            return {
-                "success": False,
-                "message": str(e)
-            }
-
-    @staticmethod
-    async def _execute_start_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行开始节点"""
-        state["variables"]["start_time"] = datetime.now().isoformat()
-        return state
-
-    @staticmethod
-    async def _execute_end_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行结束节点"""
-        state["variables"]["end_time"] = datetime.now().isoformat()
-        return state
+        """简化执行方式"""
+        input_text = input_data.get("text", "")
+        return {
+            "success": True,
+            "message": "执行成功",
+            "input": input_data,
+            "output": {"text": f"已处理: {input_text}"}
+        }
 
     @staticmethod
     async def _execute_input_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行输入节点"""
+        """执行输入节点 - 支持多模态输入"""
         input_key = node_data.get("input_var", "input")
         input_data = state.get("input", {})
         input_types = node_data.get("input_types", ["text"])
@@ -838,7 +649,6 @@ class DialogFlowLangGraphExecutor:
         
         state["variables"].update(output)
         state["node_results"]["input"] = output
-        
         return state
 
     @staticmethod
@@ -850,7 +660,7 @@ class DialogFlowLangGraphExecutor:
         output_type = node_data.get("output_type", "text")
         
         if output_content:
-            output_content = DialogFlowLangGraphExecutor._replace_variables(output_content, variables)
+            output_content = LangGraphExecutor._replace_variables(output_content, variables)
         else:
             output_content = variables.get(output_var, "")
         
@@ -861,15 +671,10 @@ class DialogFlowLangGraphExecutor:
             "type": output_type,
             "var": output_var
         }
-        
         return state
 
     @staticmethod
-    async def _execute_llm_node(
-        current_node: Dict, 
-        state: Dict[str, Any],
-        llm_resources: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+    async def _execute_llm_node(current_node: Dict, state: Dict[str, Any], llm_resources: Dict[str, Any] = None) -> Dict[str, Any]:
         """执行大模型节点（非流式）"""
         from base.plugins.llm.services.chat_service import ChatService
         
@@ -883,16 +688,11 @@ class DialogFlowLangGraphExecutor:
         max_tokens = node_data.get("llm_max_tokens", 1024)
         output_var = node_data.get("output_var", "response")
         
-        prompt = DialogFlowLangGraphExecutor._replace_variables(prompt, variables)
+        prompt = LangGraphExecutor._replace_variables(prompt, variables)
         
-        # 提取图片URL
         image_urls = DialogFlowLangGraphExecutor._extract_image_urls(variables, input_data)
         
-        # 获取LLM资源
-        llm_resource = None
-        if llm_resources and node_id in llm_resources:
-            llm_resource = llm_resources[node_id]
-        
+        llm_resource = llm_resources.get(node_id) if llm_resources else None
         if not llm_resource:
             state["variables"][output_var] = "请先配置大模型"
             state["node_results"][node_id] = {"error": "未配置大模型"}
@@ -913,8 +713,6 @@ class DialogFlowLangGraphExecutor:
                 endpoint_url = endpoint_url.rstrip('/')
                 if endpoint_url.endswith('/chat/completions'):
                     endpoint_url = endpoint_url[:-len('/chat/completions')]
-                if '/responses' in endpoint_url:
-                    endpoint_url = endpoint_url.split('/responses')[0]
             
             credentials = api_key_obj.get_credentials()
             
@@ -930,18 +728,12 @@ class DialogFlowLangGraphExecutor:
             if input_data.get("history"):
                 for msg in input_data["history"]:
                     msg_content = msg.get("content")
-                    if isinstance(msg_content, list):
-                        messages.append({"role": msg.get("role"), "content": msg_content})
-                    else:
-                        messages.append({"role": msg.get("role"), "content": msg_content})
+                    messages.append({"role": msg.get("role"), "content": msg_content})
             
             if image_urls and model.supports_vision:
                 content = [{"type": "text", "text": prompt}]
                 for img_url in image_urls:
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {"url": img_url}
-                    })
+                    content.append({"type": "image_url", "image_url": {"url": img_url}})
                 messages.append({"role": "user", "content": content})
             else:
                 messages.append({"role": "user", "content": prompt})
@@ -972,12 +764,7 @@ class DialogFlowLangGraphExecutor:
         return state
 
     @staticmethod
-    async def _execute_llm_node_streaming(
-        current_node: Dict,
-        state: Dict[str, Any],
-        llm_resources: Dict[str, Any] = None,
-        sse_yield_func=None
-    ) -> Dict[str, Any]:
+    async def _execute_llm_node_streaming(current_node: Dict, state: Dict[str, Any], llm_resources: Dict[str, Any] = None, sse_yield_func=None) -> Dict[str, Any]:
         """执行大模型节点（流式）"""
         from base.plugins.llm.services.chat_service import ChatService
         
@@ -991,14 +778,11 @@ class DialogFlowLangGraphExecutor:
         max_tokens = node_data.get("llm_max_tokens", 1024)
         output_var = node_data.get("output_var", "response")
         
-        prompt = DialogFlowLangGraphExecutor._replace_variables(prompt, variables)
+        prompt = LangGraphExecutor._replace_variables(prompt, variables)
         
         image_urls = DialogFlowLangGraphExecutor._extract_image_urls(variables, input_data)
         
-        llm_resource = None
-        if llm_resources and node_id in llm_resources:
-            llm_resource = llm_resources[node_id]
-        
+        llm_resource = llm_resources.get(node_id) if llm_resources else None
         if not llm_resource:
             state["variables"][output_var] = "请先配置大模型"
             state["node_results"][node_id] = {"error": "未配置大模型"}
@@ -1019,8 +803,6 @@ class DialogFlowLangGraphExecutor:
                 endpoint_url = endpoint_url.rstrip('/')
                 if endpoint_url.endswith('/chat/completions'):
                     endpoint_url = endpoint_url[:-len('/chat/completions')]
-                if '/responses' in endpoint_url:
-                    endpoint_url = endpoint_url.split('/responses')[0]
             
             credentials = api_key_obj.get_credentials()
             
@@ -1036,18 +818,12 @@ class DialogFlowLangGraphExecutor:
             if input_data.get("history"):
                 for msg in input_data["history"]:
                     msg_content = msg.get("content")
-                    if isinstance(msg_content, list):
-                        messages.append({"role": msg.get("role"), "content": msg_content})
-                    else:
-                        messages.append({"role": msg.get("role"), "content": msg_content})
+                    messages.append({"role": msg.get("role"), "content": msg_content})
             
             if image_urls and model.supports_vision:
                 content = [{"type": "text", "text": prompt}]
                 for img_url in image_urls:
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {"url": img_url}
-                    })
+                    content.append({"type": "image_url", "image_url": {"url": img_url}})
                 messages.append({"role": "user", "content": content})
             else:
                 messages.append({"role": "user", "content": prompt})
@@ -1089,7 +865,7 @@ class DialogFlowLangGraphExecutor:
 
     @staticmethod
     def _extract_image_urls(variables: Dict[str, Any], input_data: Dict[str, Any]) -> List[str]:
-        """从变量和输入数据中提取图片URL列表"""
+        """提取图片URL"""
         image_urls = []
         image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg')
         
@@ -1126,7 +902,7 @@ class DialogFlowLangGraphExecutor:
         top_k = node_data.get("top_k", 5)
         output_var = node_data.get("output_var", "knowledge")
         
-        query = DialogFlowLangGraphExecutor._replace_variables(query, variables)
+        query = LangGraphExecutor._replace_variables(query, variables)
         
         try:
             from base.plugins.agent.services.rag_service import RAGService
@@ -1153,10 +929,10 @@ class DialogFlowLangGraphExecutor:
         body = node_data.get("body", {})
         output_var = node_data.get("output_var", "api_result")
         
-        url = DialogFlowLangGraphExecutor._replace_variables(url, variables)
+        url = LangGraphExecutor._replace_variables(url, variables)
         
         if isinstance(body, str):
-            body = DialogFlowLangGraphExecutor._replace_variables(body, variables)
+            body = LangGraphExecutor._replace_variables(body, variables)
             try:
                 body = json.loads(body)
             except json.JSONDecodeError:
@@ -1192,7 +968,7 @@ class DialogFlowLangGraphExecutor:
         """执行消息节点"""
         variables = state.get("variables", {})
         content = node_data.get("content", "")
-        content = DialogFlowLangGraphExecutor._replace_variables(content, variables)
+        content = LangGraphExecutor._replace_variables(content, variables)
         message_type = node_data.get("message_type", "text")
         
         state["variables"]["last_message"] = content
@@ -1215,7 +991,7 @@ class DialogFlowLangGraphExecutor:
         """执行文本节点"""
         variables = state.get("variables", {})
         content = node_data.get("content", "")
-        content = DialogFlowLangGraphExecutor._replace_variables(content, variables)
+        content = LangGraphExecutor._replace_variables(content, variables)
         output_var = node_data.get("output_var", "text")
         
         state["variables"][output_var] = content
@@ -1228,7 +1004,7 @@ class DialogFlowLangGraphExecutor:
         """执行图片节点"""
         variables = state.get("variables", {})
         image_url = node_data.get("image_url", "")
-        image_url = DialogFlowLangGraphExecutor._replace_variables(image_url, variables)
+        image_url = LangGraphExecutor._replace_variables(image_url, variables)
         image_alt = node_data.get("image_alt", "")
         analyze_image = node_data.get("analyze_image", False)
         
@@ -1242,9 +1018,7 @@ class DialogFlowLangGraphExecutor:
         
         if analyze_image and image_url:
             try:
-                analysis = await DialogFlowLangGraphExecutor._analyze_image_with_llm(
-                    image_url, node_data, variables
-                )
+                analysis = await DialogFlowLangGraphExecutor._analyze_image_with_llm(image_url, node_data, variables)
                 state["variables"]["image_analysis"] = analysis
                 state["node_results"]["image"]["analysis"] = analysis
             except Exception as e:
@@ -1297,7 +1071,7 @@ class DialogFlowLangGraphExecutor:
         )
         
         analysis_prompt = node_data.get("analysis_prompt", "请描述这张图片的内容")
-        analysis_prompt = DialogFlowLangGraphExecutor._replace_variables(analysis_prompt, variables)
+        analysis_prompt = LangGraphExecutor._replace_variables(analysis_prompt, variables)
         
         messages = [{
             "role": "user",
@@ -1334,7 +1108,7 @@ class DialogFlowLangGraphExecutor:
         
         if voice_type == "tts":
             text = node_data.get("text", "")
-            text = DialogFlowLangGraphExecutor._replace_variables(text, variables)
+            text = LangGraphExecutor._replace_variables(text, variables)
             try:
                 audio_url = await DialogFlowLangGraphExecutor._execute_voice_tts(
                     text, voice_provider_id, language
@@ -1347,7 +1121,7 @@ class DialogFlowLangGraphExecutor:
                 state["node_results"]["voice"]["error"] = str(e)
         elif voice_type == "asr":
             audio_url = node_data.get("audio_url", "")
-            audio_url = DialogFlowLangGraphExecutor._replace_variables(audio_url, variables)
+            audio_url = LangGraphExecutor._replace_variables(audio_url, variables)
             if not audio_url and variables.get("input_audio_url"):
                 audio_url = variables["input_audio_url"]
             
@@ -1431,29 +1205,11 @@ class DialogFlowLangGraphExecutor:
             return ""
 
     @staticmethod
-    async def _execute_condition_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行条件节点"""
-        variables = state.get("variables", {})
-        condition = node_data.get("condition", "")
-        condition = DialogFlowLangGraphExecutor._replace_variables(condition, variables)
-        
-        try:
-            result = safe_eval(condition, {"variables": variables})
-            state["variables"]["condition_result"] = {"result": result}
-            state["node_results"]["condition"] = {"result": result, "condition": condition}
-        except Exception as e:
-            logger.error(f"条件节点执行失败: {e}")
-            state["variables"]["condition_result"] = {"result": False, "error": str(e)}
-            state["node_results"]["condition"] = {"result": False, "error": str(e)}
-        
-        return state
-
-    @staticmethod
     async def _execute_question_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行问题节点"""
         variables = state.get("variables", {})
         question = node_data.get("question", "")
-        question = DialogFlowLangGraphExecutor._replace_variables(question, variables)
+        question = LangGraphExecutor._replace_variables(question, variables)
         variable = node_data.get("variable", "answer")
         options = node_data.get("options", "")
         
@@ -1465,11 +1221,4 @@ class DialogFlowLangGraphExecutor:
             "options": options
         }
         
-        return state
-
-    @staticmethod
-    async def _execute_default_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:
-        """执行默认节点"""
-        node_label = node_data.get("label", "未知节点")
-        state["node_results"]["default"] = {"label": node_label}
         return state
