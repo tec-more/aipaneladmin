@@ -131,7 +131,7 @@
                     发送 (Ctrl+Enter)
                   </el-button>
                   <el-button @click="handleClear">
-                    <el-icon><DeleteRefresh /></el-icon>
+                    <el-icon><Delete /></el-icon>
                     清空
                   </el-button>
                 </div>
@@ -194,7 +194,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Position, DeleteRefresh, Close } from '@element-plus/icons-vue'
+import { Refresh, Position, Delete, Close } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 const configForm = ref({
