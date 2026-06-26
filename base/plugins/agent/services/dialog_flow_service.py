@@ -214,7 +214,32 @@ class DialogFlowService:
         
         elif node_type == "input":
             input_key = node_data.get("input_var", "input")
-            result["output"] = {input_key: input_data.get("text", "")}
+            input_types = node_data.get("input_types", ["text"])
+            output = {input_key: input_data.get("text", "")}
+            
+            if isinstance(input_types, str):
+                input_types = [input_types]
+            
+            if "text" in input_types:
+                output["input_text"] = input_data.get("text", "")
+            
+            if "image" in input_types:
+                image_urls = input_data.get("image_urls", [])
+                if isinstance(image_urls, str):
+                    image_urls = [image_urls] if image_urls else []
+                output["input_image_urls"] = image_urls
+                if image_urls:
+                    output["input_image_url"] = image_urls[0]
+            
+            if "voice" in input_types:
+                audio_urls = input_data.get("audio_urls", [])
+                if isinstance(audio_urls, str):
+                    audio_urls = [audio_urls] if audio_urls else []
+                output["input_audio_urls"] = audio_urls
+                if audio_urls:
+                    output["input_audio_url"] = audio_urls[0]
+            
+            result["output"] = output
         
         elif node_type == "output":
             output_var = node_data.get("output_var", "output")

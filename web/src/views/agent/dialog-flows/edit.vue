@@ -351,11 +351,11 @@
             <!-- 输入节点配置 -->
             <template v-if="selectedNode.type === 'input'">
               <el-form-item label="输入类型">
-                <el-select v-model="nodeConfig.input_type" @change="updateNodeData" style="width: 100%">
-                  <el-option label="文本" value="text" />
-                  <el-option label="文件" value="file" />
-                  <el-option label="表单" value="form" />
-                </el-select>
+                <el-checkbox-group v-model="nodeConfig.input_types" @change="updateNodeData">
+                  <el-checkbox label="text">文本</el-checkbox>
+                  <el-checkbox label="image">图片</el-checkbox>
+                  <el-checkbox label="voice">语音</el-checkbox>
+                </el-checkbox-group>
               </el-form-item>
               <el-form-item label="输入提示">
                 <el-input v-model="nodeConfig.input_placeholder" @change="updateNodeData" placeholder="用户输入提示" />
@@ -467,17 +467,25 @@
               <el-icon class="remove-image" @click="removeImage(idx)"><Close /></el-icon>
             </div>
           </div>
+          <div v-if="uploadedAudio.length > 0" class="audio-preview-list">
+            <div v-for="(audio, idx) in uploadedAudio" :key="idx" class="audio-preview-item">
+              <audio :src="audio.url" controls class="audio-preview-player" />
+              <el-icon class="remove-audio" @click="removeAudio(idx)"><Close /></el-icon>
+            </div>
+          </div>
           <el-input
+            v-if="inputTypes.includes('text')"
             v-model="currentInput"
             type="textarea"
             :rows="3"
-            placeholder="请输入你要说的话..."
+            :placeholder="inputPlaceholder || '请输入你要说的话...'"
             @keyup.enter.ctrl="doExecute"
             @paste="handlePaste"
             class="input-textarea"
           />
           <div class="input-actions">
             <el-upload
+              v-if="inputTypes.includes('image')"
               :show-file-list="false"
               :before-upload="beforeImageUpload"
               accept="image/*"
@@ -489,6 +497,10 @@
                 图片
               </el-button>
             </el-upload>
+            <el-button v-if="inputTypes.includes('voice')" @click="toggleVoiceRecording">
+              <el-icon><Mic /></el-icon>
+              {{ recording ? '停止录音' : '语音' }}
+            </el-button>
             <el-button @click="clearDialogHistory" :disabled="dialogHistory.length === 0">清空历史</el-button>
             <el-button @click="executeDialogVisible = false">关闭</el-button>
             <el-button type="primary" @click="doExecute" :loading="executing">发送</el-button>
@@ -555,7 +567,7 @@ const nodeConfig = reactive({
   headers: '{}',
   body: '{}',
   // 输入节点配置
-  input_type: 'text',
+  input_types: ['text'],
   input_placeholder: '',
   // 知识检索节点配置
   knowledge_base: 'default',
@@ -608,6 +620,12 @@ const dialogHistory = ref([])
 const currentInput = ref('')
 const latestResponse = ref('')
 const uploadedImages = ref([])
+const uploadedAudio = ref([])
+const inputTypes = ref(['text'])
+const inputPlaceholder = ref('')
+const recording = ref(false)
+let mediaRecorder = null
+let audioChunks = []
 
 const drawingEdge = ref(false)
 const edgeStartNode = ref(null)
@@ -936,7 +954,7 @@ const onNodeClick = (node) => {
   nodeConfig.method = node.data.method || 'GET'
   nodeConfig.headers = node.data.headers || '{}'
   nodeConfig.body = node.data.body || '{}'
-  nodeConfig.input_type = node.data.input_type || 'text'
+  nodeConfig.input_types = node.data.input_types || ['text']
   nodeConfig.input_placeholder = node.data.input_placeholder || ''
   nodeConfig.knowledge_base = node.data.knowledge_base || 'default'
   nodeConfig.query = node.data.query || ''
@@ -1060,7 +1078,7 @@ const updateNodeData = () => {
       method: nodeConfig.method,
       headers: nodeConfig.headers,
       body: nodeConfig.body,
-      input_type: nodeConfig.input_type,
+      input_types: nodeConfig.input_types,
       input_placeholder: nodeConfig.input_placeholder,
       knowledge_base: nodeConfig.knowledge_base,
       query: nodeConfig.query,
@@ -1118,6 +1136,18 @@ const executeDialog = () => {
   // 清空之前的输入和回复，但保留对话历史
   currentInput.value = ''
   latestResponse.value = ''
+  uploadedImages.value = []
+  
+  // 从输入节点读取配置
+  const inputNode = nodes.value.find(n => n.type === 'input')
+  if (inputNode && inputNode.data) {
+    inputTypes.value = inputNode.data.input_types || ['text']
+    inputPlaceholder.value = inputNode.data.input_placeholder || ''
+  } else {
+    inputTypes.value = ['text']
+    inputPlaceholder.value = ''
+  }
+  
   executeDialogVisible.value = true
 }
 
@@ -1199,6 +1229,88 @@ const removeImage = (index) => {
   uploadedImages.value.splice(index, 1)
 }
 
+const removeAudio = (index) => {
+  uploadedAudio.value.splice(index, 1)
+}
+
+const toggleVoiceRecording = async () => {
+  if (recording.value) {
+    stopRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaRecorder = new MediaRecorder(stream)
+    audioChunks = []
+    
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data)
+    }
+    
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+      const audioFile = new File([audioBlob], `recording-${Date.now()}.webm`, { type: 'audio/webm' })
+      
+      try {
+        const formData = new FormData()
+        formData.append('file', audioFile)
+        
+        const token = localStorage.getItem('token')
+        const headers = {}
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+        
+        const response = await fetch('/api/v1/upload/audio', {
+          method: 'POST',
+          headers: headers,
+          body: formData
+        })
+        
+        if (!response.ok) {
+          throw new Error(`上传失败: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        if (result.success && result.data && result.data.url) {
+          if (!uploadedAudio.value) {
+            uploadedAudio.value = []
+          }
+          uploadedAudio.value.push({
+            url: result.data.url,
+            name: audioFile.name
+          })
+          ElMessage.success('音频上传成功')
+        }
+      } catch (error) {
+        ElMessage.error('音频上传失败: ' + error.message)
+        console.error('音频上传错误:', error)
+      }
+      
+      stream.getTracks().forEach(track => track.stop())
+    }
+    
+    mediaRecorder.start()
+    recording.value = true
+    ElMessage.info('开始录音...')
+  } catch (error) {
+    ElMessage.error('无法访问麦克风: ' + error.message)
+    console.error('录音错误:', error)
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder && recording.value) {
+    mediaRecorder.stop()
+    recording.value = false
+    ElMessage.success('录音结束')
+  }
+}
+
 const handlePaste = async (event) => {
   const items = event.clipboardData?.items
   if (!items) {
@@ -1232,8 +1344,8 @@ const handlePaste = async (event) => {
 }
 
 const doExecute = async () => {
-  if (!currentInput.value.trim() && uploadedImages.value.length === 0) {
-    ElMessage.warning('请输入内容或上传图片')
+  if (!currentInput.value.trim() && uploadedImages.value.length === 0 && uploadedAudio.value.length === 0) {
+    ElMessage.warning('请输入内容或上传图片/语音')
     return
   }
   
@@ -1244,6 +1356,7 @@ const doExecute = async () => {
       role: 'user',
       content: userContent,
       images: uploadedImages.value.map(img => img.url),
+      audio: uploadedAudio.value.map(a => a.url),
       time: new Date().toLocaleTimeString('zh-CN')
     }
     dialogHistory.value.push(userMessage)
@@ -1251,10 +1364,12 @@ const doExecute = async () => {
     const input = {
       text: userContent,
       image_urls: uploadedImages.value.map(img => img.url),
+      audio_urls: uploadedAudio.value.map(a => a.url),
       history: [...dialogHistory.value]
     }
     
     uploadedImages.value = []
+    uploadedAudio.value = []
     
     const msgIndex = dialogHistory.value.length
     dialogHistory.value.push({
