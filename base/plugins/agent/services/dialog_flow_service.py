@@ -223,12 +223,16 @@ class DialogFlowService:
         elif node_type == "message":
             content = node_data.get("content", "")
             content = DialogFlowService._replace_variables(content, variables)
-            result["output"] = {"message": content}
+            message_type = node_data.get("message_type", "text")
+            buttons = node_data.get("buttons", [])
+            result["output"] = {"message": content, "message_type": message_type, "buttons": buttons}
             if sse_yield_func:
                 await sse_yield_func({
                     "type": "message",
                     "node_id": node.get("id"),
-                    "content": content
+                    "content": content,
+                    "message_type": message_type,
+                    "buttons": buttons
                 })
         
         elif node_type == "text":
@@ -240,12 +244,58 @@ class DialogFlowService:
         elif node_type == "image":
             image_url = node_data.get("image_url", "")
             image_url = DialogFlowService._replace_variables(image_url, variables)
-            result["output"] = {"image_url": image_url, "image_alt": node_data.get("image_alt", "")}
+            image_alt = node_data.get("image_alt", "")
+            image_alt = DialogFlowService._replace_variables(image_alt, variables)
+            analyze_image = node_data.get("analyze_image", False)
+            
+            result["output"] = {"image_url": image_url, "image_alt": image_alt, "analyze_image": analyze_image}
+            
+            if sse_yield_func:
+                await sse_yield_func({
+                    "type": "image",
+                    "node_id": node.get("id"),
+                    "image_url": image_url,
+                    "image_alt": image_alt
+                })
+            
+            if analyze_image and image_url:
+                result["output"]["image_analysis"] = await DialogFlowService._analyze_image_with_llm(
+                    image_url, node, variables, input_data, sse_yield_func
+                )
         
         elif node_type == "voice":
             text = node_data.get("text", "")
             text = DialogFlowService._replace_variables(text, variables)
-            result["output"] = {"text": text, "voice_type": node_data.get("voice_type", "tts")}
+            voice_type = node_data.get("voice_type", "tts")
+            voice_provider_id = node_data.get("voice_provider_id")
+            language = node_data.get("language", "zh")
+            
+            result["output"] = {"text": text, "voice_type": voice_type, "language": language}
+            
+            if voice_type == "tts":
+                audio_url = await DialogFlowService._execute_voice_tts(
+                    text, voice_provider_id, language, sse_yield_func
+                )
+                result["output"]["audio_url"] = audio_url
+            elif voice_type == "asr":
+                audio_url = node_data.get("audio_url", "")
+                if audio_url:
+                    audio_url = DialogFlowService._replace_variables(audio_url, variables)
+                    recognized_text = await DialogFlowService._execute_voice_asr(
+                        audio_url, voice_provider_id, language, sse_yield_func
+                    )
+                    result["output"]["recognized_text"] = recognized_text
+                    result["output"]["audio_url"] = audio_url
+            
+            if sse_yield_func:
+                await sse_yield_func({
+                    "type": "voice",
+                    "node_id": node.get("id"),
+                    "text": text,
+                    "voice_type": voice_type,
+                    "audio_url": result["output"].get("audio_url"),
+                    "recognized_text": result["output"].get("recognized_text")
+                })
         
         elif node_type == "llm":
             llm_result = await DialogFlowService._execute_llm_node(
@@ -615,6 +665,194 @@ class DialogFlowService:
 
         except Exception as e:
             logger.warning(f"保存对话流记忆时出错: {e}")
+
+    @staticmethod
+    async def _analyze_image_with_llm(
+        image_url: str,
+        node: Dict[str, Any],
+        variables: Dict[str, Any],
+        input_data: Dict[str, Any],
+        sse_yield_func=None
+    ) -> Dict[str, Any]:
+        """使用大模型分析图片"""
+        try:
+            from base.plugins.llm.models.model import LLMModel
+            from base.plugins.llm.models.api_key import LLMApiKey
+            from base.plugins.llm.services.chat_service import ChatService
+            
+            node_data = node.get("data", {})
+            llm_model_id = node_data.get("llm_model_id")
+            if not llm_model_id:
+                return {"error": "未配置分析图片的大模型"}
+            
+            model = await LLMModel.get_or_none(id=llm_model_id).prefetch_related('provider')
+            if not model or model.status != "active":
+                return {"error": "模型不存在或未启用"}
+            
+            if not model.supports_vision:
+                return {"error": "模型不支持视觉"}
+            
+            api_key_obj = await LLMApiKey.filter(model_id=model.id).first()
+            if not api_key_obj:
+                api_key_obj = await LLMApiKey.filter(
+                    provider_id=model.provider_id,
+                    model_id__isnull=True
+                ).first()
+            if not api_key_obj:
+                return {"error": "没有可用的API密钥"}
+            
+            endpoint_url = model.endpoint_url or api_key_obj.endpoint_url or model.provider.official_url
+            if endpoint_url:
+                endpoint_url = endpoint_url.rstrip('/')
+                if endpoint_url.endswith('/chat/completions'):
+                    endpoint_url = endpoint_url[:-len('/chat/completions')]
+            
+            credentials = api_key_obj.get_credentials()
+            
+            service = await ChatService.get_provider_service(
+                provider_name_en=model.provider.name_en,
+                api_key=credentials.get("api_key", ""),
+                endpoint_url=endpoint_url,
+                api_secret=credentials.get("api_secret", ""),
+                call_mode=credentials.get("call_mode", "vendor_sdk"),
+            )
+            
+            analysis_prompt = node_data.get("analysis_prompt", "请描述这张图片的内容")
+            analysis_prompt = DialogFlowService._replace_variables(analysis_prompt, variables)
+            
+            messages = [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": analysis_prompt},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]
+            }]
+            
+            result = await service.chat(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2048,
+                stream=False
+            )
+            
+            response_text = result["choices"][0]["message"]["content"]
+            
+            if sse_yield_func:
+                await sse_yield_func({
+                    "type": "image_analysis",
+                    "node_id": node.get("id"),
+                    "image_url": image_url,
+                    "analysis": response_text
+                })
+            
+            return {"analysis": response_text}
+            
+        except Exception as e:
+            logger.error(f"图片分析失败: {e}")
+            return {"error": str(e)}
+
+    @staticmethod
+    async def _execute_voice_tts(
+        text: str,
+        voice_provider_id: int = None,
+        language: str = "zh",
+        sse_yield_func=None
+    ) -> str:
+        """执行TTS语音合成"""
+        try:
+            from base.plugins.llm.services.voice_helper import VoiceServiceHelper
+            
+            if not text:
+                return ""
+            
+            if not voice_provider_id:
+                return ""
+            
+            service = await VoiceServiceHelper.get_voice_service(voice_provider_id)
+            
+            audio_bytes = await service.text_to_speech(
+                text=text,
+                voice="zhichu",
+                language=language,
+                format="mp3"
+            )
+            
+            import os
+            import uuid
+            from datetime import datetime
+            
+            audio_dir = os.path.join(os.path.dirname(__file__), "../../../", "uploads", "audio")
+            os.makedirs(audio_dir, exist_ok=True)
+            
+            date_dir = datetime.now().strftime("%Y/%m/%d")
+            save_dir = os.path.join(audio_dir, date_dir)
+            os.makedirs(save_dir, exist_ok=True)
+            
+            file_name = f"{uuid.uuid4()}.mp3"
+            file_path = os.path.join(save_dir, file_name)
+            
+            with open(file_path, "wb") as f:
+                f.write(audio_bytes)
+            
+            audio_url = f"/api/v1/upload/audio/{date_dir}/{file_name}"
+            
+            if sse_yield_func:
+                await sse_yield_func({
+                    "type": "voice_tts",
+                    "text": text,
+                    "audio_url": audio_url
+                })
+            
+            return audio_url
+            
+        except Exception as e:
+            logger.error(f"TTS失败: {e}")
+            return ""
+
+    @staticmethod
+    async def _execute_voice_asr(
+        audio_url: str,
+        voice_provider_id: int = None,
+        language: str = "zh",
+        sse_yield_func=None
+    ) -> str:
+        """执行ASR语音识别"""
+        try:
+            from base.plugins.llm.services.voice_helper import VoiceServiceHelper
+            
+            if not audio_url:
+                return ""
+            
+            if not voice_provider_id:
+                return ""
+            
+            service = await VoiceServiceHelper.get_voice_service(voice_provider_id)
+            
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(audio_url)
+                audio_data = response.content
+            
+            result = await service.file_asr(
+                audio_file=audio_url,
+                format="mp3",
+                language=language
+            )
+            
+            recognized_text = result.get("text", "")
+            
+            if sse_yield_func:
+                await sse_yield_func({
+                    "type": "voice_asr",
+                    "audio_url": audio_url,
+                    "recognized_text": recognized_text
+                })
+            
+            return recognized_text
+            
+        except Exception as e:
+            logger.error(f"ASR失败: {e}")
+            return ""
 
     @staticmethod
     def _evaluate_condition(edge: Dict, variables: Dict[str, Any]) -> bool:

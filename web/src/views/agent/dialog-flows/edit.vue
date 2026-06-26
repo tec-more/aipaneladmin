@@ -169,6 +169,16 @@
               <el-form-item label="消息内容">
                 <el-input v-model="nodeConfig.content" type="textarea" :rows="4" @change="updateNodeData" placeholder="输入消息内容，支持变量 {{变量名}}" />
               </el-form-item>
+              <el-form-item label="消息类型">
+                <el-select v-model="nodeConfig.message_type" @change="updateNodeData" style="width: 100%">
+                  <el-option label="普通文本" value="text" />
+                  <el-option label="富文本" value="rich_text" />
+                  <el-option label="卡片消息" value="card" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="按钮配置">
+                <el-input v-model="nodeConfig.buttons" type="textarea" :rows="2" @change="updateNodeData" placeholder="按钮配置，JSON格式：[{label:按钮1,value:action1}]" />
+              </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'question'">
@@ -239,37 +249,79 @@
             </template>
             
             <template v-if="selectedNode.type === 'voice'">
-              <el-form-item label="语音文本">
-                <el-input v-model="nodeConfig.text" type="textarea" :rows="3" @change="updateNodeData" placeholder="输入要转换的文本内容" />
-              </el-form-item>
               <el-form-item label="语音类型">
                 <el-select v-model="nodeConfig.voice_type" @change="updateNodeData" style="width: 100%">
-                  <el-option label="文本转语音" value="tts" />
-                  <el-option label="语音识别" value="asr" />
+                  <el-option label="文本转语音(TTS)" value="tts" />
+                  <el-option label="语音识别(ASR)" value="asr" />
                 </el-select>
               </el-form-item>
               <el-form-item label="语言">
                 <el-select v-model="nodeConfig.language" @change="updateNodeData" style="width: 100%">
-                  <el-option label="中文" value="zh-CN" />
-                  <el-option label="英文" value="en-US" />
+                  <el-option label="中文" value="zh" />
+                  <el-option label="英文" value="en" />
+                  <el-option label="日文" value="ja" />
+                  <el-option label="韩文" value="ko" />
                 </el-select>
+              </el-form-item>
+              <el-form-item label="语音服务商">
+                <el-select v-model="nodeConfig.voice_provider_id" @change="updateNodeData" style="width: 100%">
+                  <el-option label="请选择" :value="null" />
+                  <el-option v-for="provider in voiceProviders" :key="provider.id" :label="provider.name" :value="provider.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="语音文本" v-if="nodeConfig.voice_type === 'tts'">
+                <el-input v-model="nodeConfig.text" type="textarea" :rows="3" @change="updateNodeData" placeholder="输入要转换的文本内容，支持变量 {{变量名}}" />
+              </el-form-item>
+              <el-form-item label="音频URL" v-if="nodeConfig.voice_type === 'asr'">
+                <el-input v-model="nodeConfig.audio_url" @change="updateNodeData" placeholder="输入音频文件地址" />
+              </el-form-item>
+              <el-form-item label="上传音频文件" v-if="nodeConfig.voice_type === 'asr'">
+                <el-upload
+                  :show-file-list="false"
+                  :before-upload="handleAudioUpload"
+                  accept="audio/*"
+                  class="upload-btn"
+                >
+                  <el-button type="primary">上传音频</el-button>
+                </el-upload>
               </el-form-item>
             </template>
             
             <template v-if="selectedNode.type === 'image'">
               <el-form-item label="图片URL">
-                <el-input v-model="nodeConfig.image_url" @change="updateNodeData" placeholder="输入图片地址" />
+                <el-input v-model="nodeConfig.image_url" @change="updateNodeData" placeholder="输入图片地址或点击下方按钮上传" />
+              </el-form-item>
+              <el-form-item label="上传图片">
+                <el-upload
+                  :show-file-list="false"
+                  :before-upload="handleImageNodeUpload"
+                  accept="image/*"
+                  class="upload-btn"
+                >
+                  <el-button type="primary">上传图片</el-button>
+                </el-upload>
               </el-form-item>
               <el-form-item label="图片描述">
-                <el-input v-model="nodeConfig.image_alt" @change="updateNodeData" placeholder="图片描述（可选）" />
+                <el-input v-model="nodeConfig.image_alt" @change="updateNodeData" placeholder="图片描述（可选），支持变量 {{变量名}}" />
+              </el-form-item>
+              <el-form-item label="使用大模型分析图片">
+                <el-switch v-model="nodeConfig.analyze_image" @change="updateNodeData" active-text="开" inactive-text="关" />
+              </el-form-item>
+              <el-form-item label="分析提示词" v-if="nodeConfig.analyze_image">
+                <el-input v-model="nodeConfig.analysis_prompt" type="textarea" :rows="2" @change="updateNodeData" placeholder="请描述这张图片的内容" />
+              </el-form-item>
+              <el-form-item label="分析模型" v-if="nodeConfig.analyze_image">
+                <el-select v-model="nodeConfig.llm_model_id" placeholder="请选择视觉模型" @change="updateNodeData" style="width: 100%">
+                  <el-option v-for="model in models.filter(m => m.supports_vision)" :key="model.id" :label="`${model.provider_name} - ${model.model_name}`" :value="model.id" />
+                </el-select>
               </el-form-item>
               <el-form-item label="图片预览">
                 <div v-if="nodeConfig.image_url" class="image-preview">
                   <img :src="nodeConfig.image_url" :alt="nodeConfig.image_alt || '图片预览'" />
                 </div>
                 <div v-else class="image-placeholder">
-                  <el-icon :size="48" color="#ccc"><Picture /></el-icon>
-                  <span>请输入图片URL预览</span>
+                  <el-icon class="placeholder-icon"><Picture /></el-icon>
+                  <span>暂无图片</span>
                 </div>
               </el-form-item>
             </template>
@@ -380,6 +432,11 @@
                   class="msg-image"
                 />
               </div>
+              <div v-if="msg.audioUrl" class="message-audio">
+                <audio :src="msg.audioUrl" controls class="audio-player">
+                  您的浏览器不支持音频播放
+                </audio>
+              </div>
               <div class="message-content">{{ msg.content }}</div>
               <div class="message-time">{{ msg.time }}</div>
               
@@ -453,7 +510,7 @@ import {
 import { ElMessage } from 'element-plus'
 import { getDialogFlow, updateDialogFlow, executeDialogFlow, executeDialogFlowAuto } from '@/api/agent'
 import { getAgents } from '@/api/agent'
-import { getModelList } from '@/api/llm'
+import { getModelList, getProviderList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer'
 import { ZoomIn, ZoomOut, Refresh } from '@element-plus/icons-vue'
 
@@ -465,6 +522,7 @@ const dialogFlow = ref(null)
 const saving = ref(false)
 const agents = ref([])
 const models = ref([])
+const voiceProviders = ref([])
 
 const nodes = ref([])
 const edges = ref([])
@@ -477,8 +535,15 @@ const nodeConfig = reactive({
   text: '',
   image_url: '',
   image_alt: '',
+  image_analysis: '',
+  analyze_image: false,
+  analysis_prompt: '',
   voice_type: 'tts',
-  language: 'zh-CN',
+  voice_provider_id: null,
+  language: 'zh',
+  audio_url: '',
+  message_type: 'text',
+  buttons: '',
   question: '',
   variable: '',
   options: '',
@@ -722,6 +787,71 @@ const fetchModels = async () => {
   } catch (error) {
     console.error(error)
   }
+}
+
+const fetchVoiceProviders = async () => {
+  try {
+    const res = await getProviderList({ limit: 100 })
+    voiceProviders.value = res.data?.items || res.data || []
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const handleImageNodeUpload = async (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    const response = await fetch('/api/v1/upload/image', {
+      method: 'POST',
+      body: formData
+    })
+    const result = await response.json()
+    if (result.success && result.data && result.data.url) {
+      const rawUrl = result.data.url
+      let imageUrl = ''
+      if (rawUrl.startsWith('http')) {
+        imageUrl = rawUrl
+      } else if (rawUrl.startsWith('/uploads/images/')) {
+        const parts = rawUrl.replace('/uploads/images/', '').split('/')
+        if (parts.length >= 4) {
+          imageUrl = `/api/v1/upload/images/${parts[0]}/${parts[1]}/${parts[2]}/${parts.slice(3).join('/')}`
+        } else {
+          imageUrl = window.location.origin + rawUrl
+        }
+      } else {
+        imageUrl = window.location.origin + rawUrl
+      }
+      nodeConfig.image_url = imageUrl
+      updateNodeData()
+      ElMessage.success('图片上传成功')
+    }
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('图片上传失败')
+  }
+  return false
+}
+
+const handleAudioUpload = async (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    const response = await fetch('/api/v1/upload/audio', {
+      method: 'POST',
+      body: formData
+    })
+    const result = await response.json()
+    if (result.success && result.data && result.data.url) {
+      nodeConfig.audio_url = result.data.url
+      updateNodeData()
+      ElMessage.success('音频上传成功')
+    }
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('音频上传失败')
+  }
+  return false
 }
 
 const saveDialogFlow = async () => {
@@ -1177,6 +1307,43 @@ const doExecute = async () => {
           if (data.result) {
             appendAssistantContent(`[API响应]\n${JSON.stringify(data.result, null, 2)}\n`)
           }
+        } else if (data.type === 'image') {
+          if (data.image_url) {
+            appendAssistantContent(`[图片]\n${data.image_url}\n`)
+            const msgIndex = dialogHistory.value.length - 1
+            if (msgIndex >= 0 && dialogHistory.value[msgIndex].role === 'assistant') {
+              if (!dialogHistory.value[msgIndex].images) {
+                dialogHistory.value[msgIndex].images = []
+              }
+              dialogHistory.value[msgIndex].images.push(data.image_url)
+            }
+          }
+        } else if (data.type === 'image_analysis') {
+          if (data.analysis) {
+            appendAssistantContent(`[图片分析]\n${data.analysis}\n`)
+          }
+        } else if (data.type === 'voice') {
+          if (data.audio_url) {
+            appendAssistantContent(`[语音消息]\n${data.audio_url}\n`)
+            const msgIndex = dialogHistory.value.length - 1
+            if (msgIndex >= 0 && dialogHistory.value[msgIndex].role === 'assistant') {
+              dialogHistory.value[msgIndex].audioUrl = data.audio_url
+            }
+          } else if (data.recognized_text) {
+            appendAssistantContent(`[语音识别]\n${data.recognized_text}\n`)
+          }
+        } else if (data.type === 'voice_tts') {
+          if (data.audio_url) {
+            appendAssistantContent(`[TTS语音]\n${data.audio_url}\n`)
+            const msgIndex = dialogHistory.value.length - 1
+            if (msgIndex >= 0 && dialogHistory.value[msgIndex].role === 'assistant') {
+              dialogHistory.value[msgIndex].audioUrl = data.audio_url
+            }
+          }
+        } else if (data.type === 'voice_asr') {
+          if (data.recognized_text) {
+            appendAssistantContent(`[ASR识别]\n${data.recognized_text}\n`)
+          }
         } else if (data.type === 'complete') {
           setAssistantStreaming(false)
         } else if (data.type === 'error') {
@@ -1263,6 +1430,7 @@ onMounted(() => {
   fetchDialogFlow()
   fetchAgents()
   fetchModels()
+  fetchVoiceProviders()
 })
 </script>
 

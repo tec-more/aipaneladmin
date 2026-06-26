@@ -125,3 +125,30 @@ async def get_uploaded_image(year: str, month: str, day: str, filename: str):
     content_type = content_type_map.get(ext, "image/jpeg")
     
     return FileResponse(file_path, media_type=content_type)
+
+
+AUDIO_UPLOAD_DIR = Path(settings.base_path) / "uploads" / "audio"
+AUDIO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.get("/audio/{year}/{month}/{day}/{filename}", summary="访问上传的音频")
+async def get_uploaded_audio(year: str, month: str, day: str, filename: str):
+    """
+    访问上传的音频文件
+    """
+    file_path = AUDIO_UPLOAD_DIR / year / month / day / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="音频文件不存在")
+    
+    ext = file_path.suffix.lower()
+    content_type_map = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".flac": "audio/flac",
+        ".aac": "audio/aac"
+    }
+    content_type = content_type_map.get(ext, "audio/mpeg")
+    
+    return FileResponse(file_path, media_type=content_type)
