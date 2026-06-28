@@ -460,7 +460,8 @@ class DialogFlowLangGraphExecutor:
             elif node_type == "tool":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'action', 'label': node_label, 'message': f'执行工具: {node_data.get("tool_name", "unknown")}'})
-                state = await LangGraphExecutor._execute_tool_node(node_data, state)
+                processed_node_data = DialogFlowLangGraphExecutor._process_tool_node_data(node_data)
+                state = await LangGraphExecutor._execute_tool_node(processed_node_data, state)
             elif node_type == "http":
                 if sse_yield_func:
                     await sse_yield_func({'type': 'action', 'label': node_label, 'message': '发送HTTP请求'})
@@ -1203,6 +1204,21 @@ class DialogFlowLangGraphExecutor:
         except Exception as e:
             logger.error(f"ASR失败: {e}")
             return ""
+
+    @staticmethod
+    def _process_tool_node_data(node_data: Dict) -> Dict:
+        """处理工具节点数据，确保tool_params是字典格式"""
+        processed = node_data.copy()
+        
+        tool_params = processed.get("tool_params", {})
+        if isinstance(tool_params, str):
+            try:
+                processed["tool_params"] = json.loads(tool_params)
+            except json.JSONDecodeError:
+                logger.warning(f"工具参数解析失败，使用空字典: {tool_params}")
+                processed["tool_params"] = {}
+        
+        return processed
 
     @staticmethod
     async def _execute_question_node(node_data: Dict, state: Dict[str, Any]) -> Dict[str, Any]:

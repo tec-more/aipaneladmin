@@ -242,6 +242,28 @@
               </el-form-item>
             </template>
             
+            <template v-if="selectedNode.type === 'tool'">
+              <el-form-item label="选择工具">
+                <el-select v-model="nodeConfig.tool_name" placeholder="请选择工具" @change="updateNodeData" style="width: 100%">
+                  <el-option v-for="tool in tools" :key="tool.name" :label="tool.display_name || tool.name" :value="tool.name">
+                    <span style="float: left">{{ tool.display_name || tool.name }}</span>
+                    <span style="float: right; color: #8492a6; font-size: 12px">{{ tool.name }}</span>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+              <el-form-item label="工具描述" v-if="selectedTool">
+                <div style="font-size: 13px; color: #606266; background: #f5f7fa; padding: 8px; border-radius: 4px;">
+                  {{ selectedTool.description || '暂无描述' }}
+                </div>
+              </el-form-item>
+              <el-form-item label="工具参数">
+                <el-input v-model="nodeConfig.tool_params" type="textarea" :rows="5" @change="updateNodeData" placeholder="JSON格式，支持变量 {{变量名}}" />
+              </el-form-item>
+              <el-form-item label="输出变量">
+                <el-input v-model="nodeConfig.output_var" @change="updateNodeData" placeholder="存储输出结果的变量名，默认 tool_result" />
+              </el-form-item>
+            </template>
+            
             <template v-if="selectedNode.type === 'text'">
               <el-form-item label="文本内容">
                 <el-input v-model="nodeConfig.content" type="textarea" :rows="4" @change="updateNodeData" placeholder="输入文本内容，支持变量 {{变量名}}" />
@@ -520,7 +542,7 @@ import {
   Document, Mic, Upload, Download, Picture, Cpu, Close
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getDialogFlow, updateDialogFlow, executeDialogFlow, executeDialogFlowAuto } from '@/api/agent'
+import { getDialogFlow, updateDialogFlow, executeDialogFlow, executeDialogFlowAuto, getActiveTools } from '@/api/agent'
 import { getAgents } from '@/api/agent'
 import { getModelList, getProviderList } from '@/api/llm'
 import { getEdgePathByType, getDefaultEdgeType } from '@/utils/edge-renderer'
@@ -535,6 +557,7 @@ const saving = ref(false)
 const agents = ref([])
 const models = ref([])
 const voiceProviders = ref([])
+const tools = ref([])
 
 const nodes = ref([])
 const edges = ref([])
@@ -583,20 +606,24 @@ const nodeConfig = reactive({
   llm_prompt: '',
   llm_temperature: 0.7,
   llm_max_tokens: 1024,
-  llm_stream: false
+  llm_stream: false,
+  // 工具节点配置
+  tool_name: '',
+  tool_params: '{}'
 })
 
 const nodeCategories = {
   basic: [
-    { type: 'start', label: '开始', icon: Play, next: ['input', 'message', 'text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval'] },
+    { type: 'start', label: '开始', icon: Play, next: ['input', 'message', 'text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval', 'tool'] },
     { type: 'end', label: '结束', icon: CircleCheck, next: [] },
-    { type: 'input', label: '输入', icon: Document, next: ['message', 'text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval'] },
+    { type: 'input', label: '输入', icon: Document, next: ['message', 'text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval', 'tool'] },
     { type: 'output', label: '输出', icon: Share, next: ['end'] }
   ],
   functions: [
-    { type: 'llm', label: '大模型', icon: Cpu, next: ['message', 'text', 'image', 'voice', 'api', 'knowledge_retrieval', 'output'] },
-    { type: 'knowledge_retrieval', label: '知识检索', icon: Document, next: ['message', 'text', 'image', 'voice', 'llm', 'api', 'output'] },
-    { type: 'api', label: 'API调用', icon: Connection, next: ['message', 'text', 'image', 'voice', 'llm', 'knowledge_retrieval', 'output'] }
+    { type: 'llm', label: '大模型', icon: Cpu, next: ['message', 'text', 'image', 'voice', 'api', 'knowledge_retrieval', 'tool', 'output'] },
+    { type: 'knowledge_retrieval', label: '知识检索', icon: Document, next: ['message', 'text', 'image', 'voice', 'llm', 'api', 'tool', 'output'] },
+    { type: 'api', label: 'API调用', icon: Connection, next: ['message', 'text', 'image', 'voice', 'llm', 'knowledge_retrieval', 'tool', 'output'] },
+    { type: 'tool', label: '工具', icon: User, next: ['message', 'text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval', 'output'] }
   ],
   content: [
     { type: 'message', label: '消息', icon: ChatDotRound, next: ['text', 'image', 'voice', 'llm', 'api', 'knowledge_retrieval', 'output'] },
@@ -816,6 +843,19 @@ const fetchVoiceProviders = async () => {
   }
 }
 
+const fetchTools = async () => {
+  try {
+    const res = await getActiveTools()
+    tools.value = res.data || []
+  } catch (error) {
+    console.error('获取工具列表失败:', error)
+  }
+}
+
+const selectedTool = computed(() => {
+  return tools.value.find(t => t.name === nodeConfig.tool_name) || null
+})
+
 const handleImageNodeUpload = async (file) => {
   const formData = new FormData()
   formData.append('file', file)
@@ -968,6 +1008,8 @@ const onNodeClick = (node) => {
   nodeConfig.llm_temperature = node.data.llm_temperature || 0.7
   nodeConfig.llm_max_tokens = node.data.llm_max_tokens || 1024
   nodeConfig.llm_stream = node.data.llm_stream || false
+  nodeConfig.tool_name = node.data.tool_name || ''
+  nodeConfig.tool_params = node.data.tool_params || '{}'
 }
 
 const onNodeMouseDown = (event, node) => {
@@ -1091,7 +1133,9 @@ const updateNodeData = () => {
       llm_prompt: nodeConfig.llm_prompt,
       llm_temperature: nodeConfig.llm_temperature,
       llm_max_tokens: nodeConfig.llm_max_tokens,
-      llm_stream: nodeConfig.llm_stream
+      llm_stream: nodeConfig.llm_stream,
+      tool_name: nodeConfig.tool_name,
+      tool_params: nodeConfig.tool_params
     }
   }
 }
@@ -1546,6 +1590,7 @@ onMounted(() => {
   fetchAgents()
   fetchModels()
   fetchVoiceProviders()
+  fetchTools()
 })
 </script>
 
