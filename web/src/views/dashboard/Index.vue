@@ -114,19 +114,19 @@
             <el-divider />
             <h4>快速入口</h4>
             <div class="quick-links">
-              <el-button type="primary" @click="$router.push('/users')">
+              <el-button type="primary" @click="$router.push('/panel/users')">
                 <el-icon><User /></el-icon>
                 用户管理
               </el-button>
-              <el-button type="success" @click="$router.push('/departments')">
+              <el-button type="success" @click="$router.push('/panel/departments')">
                 <el-icon><OfficeBuilding /></el-icon>
                 部门管理
               </el-button>
-              <el-button type="warning" @click="$router.push('/roles')">
+              <el-button type="warning" @click="$router.push('/panel/roles')">
                 <el-icon><UserFilled /></el-icon>
                 角色管理
               </el-button>
-              <el-button type="info" @click="$router.push('/menus')">
+              <el-button type="info" @click="$router.push('/panel/menus')">
                 <el-icon><Menu /></el-icon>
                 菜单管理
               </el-button>
@@ -190,7 +190,7 @@
           <template #header>
             <div class="card-header">
               <span>最近注册用户</span>
-              <el-button type="primary" link @click="$router.push('/users')">
+              <el-button type="primary" link @click="$router.push('/panel/users')">
                 查看全部
               </el-button>
             </div>
