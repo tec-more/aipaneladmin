@@ -331,7 +331,11 @@ class PluginManager:
                     module_path = f"base.plugins.{name}.{relative_path.as_posix().replace('/', '.')[:-3]}"  # 去掉.py
 
                     # 根据 {文件名}_router 的规则构建路由属性名
-                    router_attr = f"{route_file.stem}_router"
+                    # 如果文件名已以 _router 结尾，则直接使用文件名作为属性名
+                    if route_file.stem.endswith("_router"):
+                        router_attr = route_file.stem
+                    else:
+                        router_attr = f"{route_file.stem}_router"
 
                     # 动态加载模块
                     spec = importlib.util.spec_from_file_location(module_path, route_file)
