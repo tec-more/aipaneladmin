@@ -3,6 +3,7 @@
 """
 from fastapi import APIRouter, Depends, status, Query
 from typing import Optional
+from decimal import Decimal
 
 # 导入响应类
 try:
@@ -503,6 +504,335 @@ async def get_product_categories():
     try:
         categories = await ProductService.get_product_categories()
         return SuccessResponse(data={"categories": categories}, msg="获取分类成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+# ==================== 库存关联接口 ====================
+
+try:
+    from base.plugins.inventory.services.inventory_service import QuantService
+    INVENTORY_AVAILABLE = True
+except ImportError:
+    QuantService = None
+    INVENTORY_AVAILABLE = False
+
+
+@product_router.get("/{product_id}/inventory", summary="获取产品库存详情")
+async def get_product_inventory(
+        product_id: int
+):
+    """
+    获取产品的库存详情
+
+    Args:
+        product_id: 产品ID
+
+    Returns:
+        产品库存信息（按库位分组）
+    """
+    try:
+        if not INVENTORY_AVAILABLE or QuantService is None:
+            return ErrorResponse(msg="库存模块未启用", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        product = await ProductService.get_by_id(product_id)
+        if not product:
+            return ErrorResponse(msg="产品不存在", status_code=status.HTTP_404_NOT_FOUND)
+
+        quants = await QuantService.get_by_product(product.name)
+        
+        inventory_data = {
+            "product_id": product.id,
+            "product_name": product.name,
+            "total_quantity": 0,
+            "total_reserved": 0,
+            "total_available": 0,
+            "locations": []
+        }
+
+        location_map = {}
+        for quant in quants:
+            loc_key = quant.location_id
+            if loc_key not in location_map:
+                location_map[loc_key] = {
+                    "location_id": quant.location_id,
+                    "location_code": quant.location_code,
+                    "location_name": quant.location_name,
+                    "quantity": 0,
+                    "reserved_quantity": 0,
+                    "available_quantity": 0,
+                    "lots": []
+                }
+            
+            location_map[loc_key]["quantity"] += float(quant.quantity) if quant.quantity else 0
+            location_map[loc_key]["reserved_quantity"] += float(quant.reserved_quantity) if quant.reserved_quantity else 0
+            location_map[loc_key]["available_quantity"] += float(quant.available_quantity) if quant.available_quantity else 0
+            
+            if quant.lot_name:
+                location_map[loc_key]["lots"].append({
+                    "lot_id": quant.lot_id,
+                    "lot_name": quant.lot_name,
+                    "quantity": float(quant.quantity) if quant.quantity else 0,
+                    "expiry_date": quant.expiry_date.strftime("%Y-%m-%d") if quant.expiry_date else None
+                })
+
+        inventory_data["locations"] = list(location_map.values())
+        inventory_data["total_quantity"] = sum(loc["quantity"] for loc in inventory_data["locations"])
+        inventory_data["total_reserved"] = sum(loc["reserved_quantity"] for loc in inventory_data["locations"])
+        inventory_data["total_available"] = sum(loc["available_quantity"] for loc in inventory_data["locations"])
+
+        return SuccessResponse(data=inventory_data, msg="获取库存成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/inventory/list", summary="批量获取产品库存")
+async def get_product_inventory_list(
+        page: int = Query(1, ge=1, description="页码"),
+        page_size: int = Query(10, ge=1, le=100, description="每页数量")
+):
+    """
+    批量获取产品库存信息
+
+    Args:
+        page: 页码
+        page_size: 每页数量
+
+    Returns:
+        产品库存列表
+    """
+    try:
+        if not INVENTORY_AVAILABLE or QuantService is None:
+            return ErrorResponse(msg="库存模块未启用", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        quants, total = await QuantService.get_list(page=page, page_size=page_size)
+        
+        product_map = {}
+        for quant in quants:
+            prod_key = quant.product_code
+            if prod_key not in product_map:
+                product_map[prod_key] = {
+                    "product_code": quant.product_code,
+                    "product_name": quant.product_name,
+                    "total_quantity": 0,
+                    "total_reserved": 0,
+                    "total_available": 0
+                }
+            
+            product_map[prod_key]["total_quantity"] += float(quant.quantity) if quant.quantity else 0
+            product_map[prod_key]["total_reserved"] += float(quant.reserved_quantity) if quant.reserved_quantity else 0
+            product_map[prod_key]["total_available"] += float(quant.available_quantity) if quant.available_quantity else 0
+
+        inventory_list = list(product_map.values())
+
+        response_data = {
+            "total": len(inventory_list),
+            "page": page,
+            "page_size": page_size,
+            "items": inventory_list
+        }
+
+        return SuccessResponse(data=response_data, msg="获取库存列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+# ==================== BOM关联接口 ====================
+
+try:
+    from base.plugins.mes.services.base_data_service import BomService
+    MES_AVAILABLE = True
+except ImportError:
+    BomService = None
+    MES_AVAILABLE = False
+
+
+@product_router.get("/{product_id}/bom", summary="获取产品BOM结构")
+async def get_product_bom(
+        product_id: int,
+        version: Optional[str] = Query(None, description="BOM版本号"),
+        expand_level: int = Query(1, ge=1, le=10, description="展开层级")
+):
+    """
+    获取产品的BOM结构（物料清单）
+
+    Args:
+        product_id: 产品ID
+        version: BOM版本号（可选）
+        expand_level: 展开层级（1=单层，>1=多级展开）
+
+    Returns:
+        产品BOM结构（支持多级展开）
+    """
+    try:
+        if not MES_AVAILABLE or BomService is None:
+            return ErrorResponse(msg="MES模块未启用", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        product = await ProductService.get_by_id(product_id)
+        if not product:
+            return ErrorResponse(msg="产品不存在", status_code=status.HTTP_404_NOT_FOUND)
+
+        # 根据展开层级选择查询方式
+        if expand_level == 1:
+            boms = await BomService.get_bom_by_product(product.name, version)
+            bom_data = {
+                "product_id": product.id,
+                "product_name": product.name,
+                "version": version or "latest",
+                "expand_level": 1,
+                "total_items": len(boms),
+                "items": []
+            }
+
+            for bom in boms:
+                item_info = {
+                    "id": bom.id,
+                    "product_code": bom.product_code,
+                    "product_name": bom.product_name,
+                    "version": bom.version,
+                    "level": bom.level,
+                    "parent_item_code": bom.parent_item_code,
+                    "item_id": bom.item_id,
+                    "item_code": bom.item_code,
+                    "item_name": bom.item_name,
+                    "quantity": float(bom.quantity) if bom.quantity and hasattr(bom.quantity, "__float__") else bom.quantity,
+                    "unit": bom.unit,
+                    "scrap_rate": float(bom.scrap_rate) if bom.scrap_rate and hasattr(bom.scrap_rate, "__float__") else bom.scrap_rate,
+                    "remark": bom.remark,
+                    "is_active": bom.is_active,
+                }
+                
+                if bom.item_id:
+                    item_product = await ProductService.get_by_id(bom.item_id)
+                    if item_product:
+                        item_info["item_product_info"] = {
+                            "id": item_product.id,
+                            "name": item_product.name,
+                            "description": item_product.description,
+                            "price": float(item_product.price) if item_product.price and hasattr(item_product.price, "__float__") else item_product.price,
+                            "category": item_product.category,
+                        }
+                
+                bom_data["items"].append(item_info)
+
+        else:
+            # 多级展开
+            multi_level_bom = await BomService.get_multi_level_bom(
+                product_code=product.name,
+                version=version,
+                max_level=expand_level
+            )
+            
+            bom_data = {
+                "product_id": product.id,
+                "product_name": product.name,
+                "version": version or "latest",
+                "expand_level": expand_level,
+                "total_items": len(multi_level_bom),
+                "items": multi_level_bom
+            }
+
+        return SuccessResponse(data=bom_data, msg="获取BOM成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/bom/list", summary="获取所有BOM列表")
+async def get_product_bom_list(
+        page: int = Query(1, ge=1, description="页码"),
+        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        product_code: Optional[str] = Query(None, description="成品编码")
+):
+    """
+    获取所有BOM列表
+
+    Args:
+        page: 页码
+        page_size: 每页数量
+        product_code: 成品编码（可选）
+
+    Returns:
+        BOM列表
+    """
+    try:
+        if not MES_AVAILABLE or BomService is None:
+            return ErrorResponse(msg="MES模块未启用", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        boms, total = await BomService.get_list(page=page, page_size=page_size, product_code=product_code)
+        
+        bom_list = []
+        for bom in boms:
+            item_info = {
+                "id": bom.id,
+                "product_id": bom.product_id,
+                "product_code": bom.product_code,
+                "product_name": bom.product_name,
+                "version": bom.version,
+                "level": bom.level,
+                "parent_item_code": bom.parent_item_code,
+                "item_id": bom.item_id,
+                "item_code": bom.item_code,
+                "item_name": bom.item_name,
+                "quantity": float(bom.quantity) if bom.quantity and hasattr(bom.quantity, "__float__") else bom.quantity,
+                "unit": bom.unit,
+                "scrap_rate": float(bom.scrap_rate) if bom.scrap_rate and hasattr(bom.scrap_rate, "__float__") else bom.scrap_rate,
+                "remark": bom.remark,
+                "is_active": bom.is_active,
+            }
+            bom_list.append(item_info)
+
+        response_data = {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "items": bom_list
+        }
+
+        return SuccessResponse(data=response_data, msg="获取BOM列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/{product_id}/mrp", summary="计算物料需求计划(MRP)")
+async def calculate_mrp(
+        product_id: int,
+        quantity: Decimal = Query(..., ge=Decimal("0.000001"), description="需求数量"),
+        version: Optional[str] = Query(None, description="BOM版本号"),
+        max_level: int = Query(5, ge=1, le=10, description="最大展开层级")
+):
+    """
+    计算产品的物料需求计划(MRP)
+    
+    根据需求数量，递归计算所需的所有物料及其数量（考虑损耗率）
+
+    Args:
+        product_id: 产品ID
+        quantity: 需求数量
+        version: BOM版本号（可选）
+        max_level: 最大展开层级
+
+    Returns:
+        MRP计算结果，包含详细BOM和物料汇总
+    """
+    try:
+        if not MES_AVAILABLE or BomService is None:
+            return ErrorResponse(msg="MES模块未启用", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        product = await ProductService.get_by_id(product_id)
+        if not product:
+            return ErrorResponse(msg="产品不存在", status_code=status.HTTP_404_NOT_FOUND)
+
+        mrp_result = await BomService.calculate_mrp(
+            product_code=product.name,
+            demand_quantity=quantity,
+            version=version,
+            max_level=max_level
+        )
+
+        mrp_result["product_id"] = product.id
+        mrp_result["product_name"] = product.name
+
+        return SuccessResponse(data=mrp_result, msg="MRP计算成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 

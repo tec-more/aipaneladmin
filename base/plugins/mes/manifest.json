@@ -1,0 +1,91 @@
+{
+    "name": "mes",
+    "display_name": "MES制造执行系统",
+    "version": "1.0.0",
+    "description": "MES制造执行系统模块，包含生产计划、执行管理、质量管理、设备管理和基础数据管理",
+    "author": "hepan",
+    "is_installed": true,
+    "is_enabled": true,
+    "route_prefix": "/v1/mes",
+    "routes": [
+        "api/v1"
+    ],
+    "models": [
+        "material",
+        "bom",
+        "work_center",
+        "process",
+        "route",
+        "manufacturing_order",
+        "work_order",
+        "quality_inspection",
+        "equipment"
+    ],
+    "schemas": [
+        "mes_schema"
+    ],
+    "menus": [
+        {
+            "name": "MES制造执行系统",
+            "path": "/mes",
+            "icon": "Factory",
+            "component": "mes/Index",
+            "sort": 8,
+            "is_hidden": false,
+            "menu_type": "menu",
+            "permission_code": "mes:list",
+            "children": [
+                {
+                    "name": "基础数据",
+                    "path": "/mes/base",
+                    "icon": "Database",
+                    "component": "mes/base/Index",
+                    "sort": 1,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "mes:base:list"
+                },
+                {
+                    "name": "生产计划",
+                    "path": "/mes/plan",
+                    "icon": "Calendar",
+                    "component": "mes/plan/Index",
+                    "sort": 2,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "mes:plan:list"
+                },
+                {
+                    "name": "生产执行",
+                    "path": "/mes/exec",
+                    "icon": "ListChecks",
+                    "component": "mes/exec/Index",
+                    "sort": 3,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "mes:exec:list"
+                },
+                {
+                    "name": "质量管理",
+                    "path": "/mes/quality",
+                    "icon": "ShieldCheck",
+                    "component": "mes/quality/Index",
+                    "sort": 4,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "mes:quality:list"
+                },
+                {
+                    "name": "设备管理",
+                    "path": "/mes/equipment",
+                    "icon": "Settings",
+                    "component": "mes/equipment/Index",
+                    "sort": 5,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "mes:equipment:list"
+                }
+            ]
+        }
+    ]
+}
