@@ -1840,21 +1840,38 @@ class QuantService:
         if product_code:
             query = query.filter(product_code=product_code)
 
-        # 计算汇总数据
         quants = await query
+        
         total_quantity = sum(q.quantity for q in quants)
         total_reserved = sum(q.reserved_quantity for q in quants)
         total_available = sum(q.available_quantity for q in quants)
         total_value = sum(q.inventory_value for q in quants)
+        total_sku = len(set(q.product_code for q in quants))
+
+        location_dict = {}
+        for q in quants:
+            loc_key = q.location_id or q.location_code or 'unknown'
+            if loc_key not in location_dict:
+                location_dict[loc_key] = {
+                    'location_name': q.location_name or '未知',
+                    'sku_count': 0,
+                    'total_quantity': 0,
+                    'total_reserved': 0
+                }
+            location_dict[loc_key]['sku_count'] += 1
+            location_dict[loc_key]['total_quantity'] += q.quantity
+            location_dict[loc_key]['total_reserved'] += q.reserved_quantity
 
         return {
             'product_code': product_code,
+            'total_sku': total_sku,
             'total_quantity': total_quantity,
             'total_reserved': total_reserved,
             'total_available': total_available,
             'total_value': total_value,
-            'location_count': len(set(q.location_id for q in quants)),
+            'location_count': len(location_dict),
             'lot_count': len(set(q.lot_id for q in quants if q.lot_id)),
+            'by_location': list(location_dict.values())
         }
 
     @staticmethod
