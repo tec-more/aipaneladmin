@@ -187,6 +187,24 @@ async def list_mos(
     )
     return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
 
+
+@production_router.get("/plans", summary="获取生产计划列表（制造单别名）")
+async def list_plans(
+    page: int = 1,
+    page_size: int = 10,
+    plan_code: Optional[str] = None,
+    product_name: Optional[str] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None
+):
+    items, total = await ManufacturingOrderService.get_list(
+        page=page, page_size=page_size,
+        mo_code=plan_code,
+        status=status,
+        priority=priority
+    )
+    return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
+
 @production_router.get("/work-orders/{wo_id}", summary="获取工单详情")
 async def get_wo(wo_id: int):
     wo = await WorkOrderService.get_by_id(wo_id)
@@ -274,6 +292,24 @@ async def list_wos(
         wo_code=wo_code,
         mo_code=mo_code,
         product_code=product_code,
+        status=status,
+        work_center_code=work_center_code
+    )
+    return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
+
+
+@production_router.get("/orders", summary="获取生产订单列表（工单别名）")
+async def list_orders(
+    page: int = 1,
+    page_size: int = 10,
+    order_code: Optional[str] = None,
+    product_name: Optional[str] = None,
+    status: Optional[str] = None,
+    work_center_code: Optional[str] = None
+):
+    items, total = await WorkOrderService.get_list(
+        page=page, page_size=page_size,
+        wo_code=order_code,
         status=status,
         work_center_code=work_center_code
     )
