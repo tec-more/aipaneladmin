@@ -137,6 +137,11 @@ async def get_product_by_code(product_code: str) -> Optional[dict]:
                 'name': product.name,
                 'description': product.description,
                 'price': float(product.price) if hasattr(product.price, '__float__') else product.price,
+                'uom_code': getattr(product, 'uom_code', 'unit'),
+                'uom_name': getattr(product, 'uom_name', '件'),
+                'secondary_uom_code': getattr(product, 'secondary_uom_code', None),
+                'secondary_uom_name': getattr(product, 'secondary_uom_name', None),
+                'conversion_factor': float(getattr(product, 'conversion_factor', 1)) if hasattr(getattr(product, 'conversion_factor', 1), '__float__') else 1,
             }
     except Exception:
         pass
@@ -157,11 +162,74 @@ async def get_product_by_name(product_name: str) -> Optional[dict]:
                 'name': product.name,
                 'description': product.description,
                 'price': float(product.price) if hasattr(product.price, '__float__') else product.price,
+                'uom_code': getattr(product, 'uom_code', 'unit'),
+                'uom_name': getattr(product, 'uom_name', '件'),
+                'secondary_uom_code': getattr(product, 'secondary_uom_code', None),
+                'secondary_uom_name': getattr(product, 'secondary_uom_name', None),
+                'conversion_factor': float(getattr(product, 'conversion_factor', 1)) if hasattr(getattr(product, 'conversion_factor', 1), '__float__') else 1,
             }
     except Exception:
         pass
     
     return None
+
+
+# ==================== 单位转换工具 ====================
+
+class UomConverter:
+    """单位转换工具类"""
+    
+    @staticmethod
+    def to_secondary(uom_qty: Decimal, conversion_factor: Decimal) -> Decimal:
+        """主单位转辅助单位
+        
+        Args:
+            uom_qty: 主单位数量
+            conversion_factor: 换算比例（主单位 = 辅助单位 × 换算比例）
+        
+        Returns:
+            辅助单位数量
+        """
+        if conversion_factor == 0:
+            return Decimal("0")
+        return uom_qty / conversion_factor
+    
+    @staticmethod
+    def to_uom(secondary_qty: Decimal, conversion_factor: Decimal) -> Decimal:
+        """辅助单位转主单位
+        
+        Args:
+            secondary_qty: 辅助单位数量
+            conversion_factor: 换算比例（主单位 = 辅助单位 × 换算比例）
+        
+        Returns:
+            主单位数量
+        """
+        return secondary_qty * conversion_factor
+    
+    @staticmethod
+    async def get_product_uom_info(product_code: str) -> Optional[dict]:
+        """获取产品的单位信息"""
+        if not PRODUCT_AVAILABLE or Product is None:
+            return None
+        
+        try:
+            product = await Product.filter(name=product_code).first()
+            if product:
+                return {
+                    'uom_id': getattr(product, 'uom_id', None),
+                    'uom_code': getattr(product, 'uom_code', 'unit'),
+                    'uom_name': getattr(product, 'uom_name', '件'),
+                    'uom_category': getattr(product, 'uom_category', 'unit'),
+                    'secondary_uom_id': getattr(product, 'secondary_uom_id', None),
+                    'secondary_uom_code': getattr(product, 'secondary_uom_code', None),
+                    'secondary_uom_name': getattr(product, 'secondary_uom_name', None),
+                    'conversion_factor': float(getattr(product, 'conversion_factor', 1)) if hasattr(getattr(product, 'conversion_factor', 1), '__float__') else 1,
+                }
+        except Exception:
+            pass
+        
+        return None
 
 
 # ==================== 序列码生成工具 ====================
@@ -1619,6 +1687,15 @@ class QuantService:
                 quant_data['product_id'] = product.id
                 if not quant_data.get('product_name'):
                     quant_data['product_name'] = product.name
+                # 填充单位信息
+                if not quant_data.get('uom_code'):
+                    quant_data['uom_code'] = getattr(product, 'uom_code', 'unit')
+                if not quant_data.get('uom_name'):
+                    quant_data['uom_name'] = getattr(product, 'uom_name', '件')
+                if not quant_data.get('secondary_uom_name'):
+                    quant_data['secondary_uom_name'] = getattr(product, 'secondary_uom_name', None)
+                if not quant_data.get('conversion_factor'):
+                    quant_data['conversion_factor'] = getattr(product, 'conversion_factor', 1)
         
         if data.lot_id:
             lot = await LotService.get_by_id(data.lot_id)

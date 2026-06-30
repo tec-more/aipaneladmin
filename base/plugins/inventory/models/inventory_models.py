@@ -312,6 +312,9 @@ class StockMove(BaseModel, TimestampMixin):
     product_name = fields.CharField(max_length=255, description="产品名称")
     product_uom = fields.CharField(max_length=20, description="计量单位")
     product_uom_qty = fields.DecimalField(max_digits=12, decimal_places=2, description="需求数量")
+    secondary_uom = fields.CharField(max_length=20, null=True, description="辅助单位")
+    secondary_uom_qty = fields.DecimalField(max_digits=12, decimal_places=2, null=True, description="辅助单位数量")
+    conversion_factor = fields.DecimalField(max_digits=12, decimal_places=4, default=1, description="换算比例")
     location_id = fields.IntField(description="源库位ID", index=True)
     location_code = fields.CharField(max_length=100, description="源库位编码")
     location_name = fields.CharField(max_length=255, description="源库位名称")
@@ -486,6 +489,12 @@ class StockQuant(BaseModel, TimestampMixin):
     quantity = fields.DecimalField(max_digits=12, decimal_places=2, default=0, description="库存数量")
     reserved_quantity = fields.DecimalField(max_digits=12, decimal_places=2, default=0, description="预留数量")
     available_quantity = fields.DecimalField(max_digits=12, decimal_places=2, default=0, description="可用数量")
+    uom_id = fields.IntField(null=True, description="单位ID")
+    uom_code = fields.CharField(max_length=20, default="unit", description="单位编码")
+    uom_name = fields.CharField(max_length=50, default="件", description="单位名称")
+    secondary_uom_id = fields.IntField(null=True, description="辅助单位ID")
+    secondary_uom_name = fields.CharField(max_length=50, null=True, description="辅助单位名称")
+    conversion_factor = fields.DecimalField(max_digits=12, decimal_places=4, default=1, description="换算比例")
     inventory_value = fields.DecimalField(max_digits=15, decimal_places=2, default=0, description="库存价值")
     cost = fields.DecimalField(max_digits=12, decimal_places=2, null=True, description="成本单价")
     company_code = fields.CharField(max_length=100, null=True, description="公司编码")
@@ -517,6 +526,12 @@ class StockQuant(BaseModel, TimestampMixin):
             "quantity": float(self.quantity) if self.quantity and hasattr(self.quantity, "__float__") else self.quantity,
             "reserved_quantity": float(self.reserved_quantity) if self.reserved_quantity and hasattr(self.reserved_quantity, "__float__") else self.reserved_quantity,
             "available_quantity": float(self.available_quantity) if self.available_quantity and hasattr(self.available_quantity, "__float__") else self.available_quantity,
+            "uom_id": self.uom_id,
+            "uom_code": self.uom_code,
+            "uom_name": self.uom_name,
+            "secondary_uom_id": self.secondary_uom_id,
+            "secondary_uom_name": self.secondary_uom_name,
+            "conversion_factor": float(self.conversion_factor) if self.conversion_factor and hasattr(self.conversion_factor, "__float__") else self.conversion_factor,
             "inventory_value": float(self.inventory_value) if self.inventory_value and hasattr(self.inventory_value, "__float__") else self.inventory_value,
             "cost": float(self.cost) if self.cost and hasattr(self.cost, "__float__") else self.cost,
             "company_code": self.company_code,

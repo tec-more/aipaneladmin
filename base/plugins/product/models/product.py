@@ -68,6 +68,18 @@ class Product(BaseModel, TimestampMixin):
     is_new = fields.BooleanField(default=False, description="是否新品", index=True)
     view_count = fields.IntField(default=0, description="浏览次数", index=True)
     sales_count = fields.IntField(default=0, description="销售数量", index=True)
+    
+    # 多单位支持字段
+    uom_id = fields.IntField(null=True, description="主单位ID")
+    uom_code = fields.CharField(max_length=20, default="unit", description="主单位编码")
+    uom_name = fields.CharField(max_length=50, default="件", description="主单位名称")
+    uom_category = fields.CharField(max_length=50, default="unit", description="单位类别：unit/weight/length/volume/time")
+    
+    secondary_uom_id = fields.IntField(null=True, description="辅助单位ID")
+    secondary_uom_code = fields.CharField(max_length=20, null=True, description="辅助单位编码")
+    secondary_uom_name = fields.CharField(max_length=50, null=True, description="辅助单位名称")
+    conversion_factor = fields.DecimalField(max_digits=12, decimal_places=4, default=1, description="换算比例（主单位 = 辅助单位 × 换算比例）")
+    
     # 充值相关字段
     recharge_hours = fields.IntField(null=True, description="充值时长（小时）")
     bonus_hours = fields.IntField(default=0, description="赠送时长（小时）")
@@ -175,6 +187,16 @@ class Product(BaseModel, TimestampMixin):
             "is_new": self.is_new,
             "view_count": self.view_count,
             "sales_count": self.sales_count,
+            # 多单位支持
+            "uom_id": self.uom_id,
+            "uom_code": self.uom_code,
+            "uom_name": self.uom_name,
+            "uom_category": self.uom_category,
+            "secondary_uom_id": self.secondary_uom_id,
+            "secondary_uom_code": self.secondary_uom_code,
+            "secondary_uom_name": self.secondary_uom_name,
+            "conversion_factor": float(self.conversion_factor) if self.conversion_factor and hasattr(self.conversion_factor, "__float__") else self.conversion_factor,
+            # 充值相关字段
             "recharge_hours": self.recharge_hours,
             "bonus_hours": self.bonus_hours,
             "total_hours": self.total_hours,
