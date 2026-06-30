@@ -100,8 +100,8 @@ const fetchData = async () => {
       page_size: pagination.pageSize,
       ...searchForm
     })
-    tableData.value = res.data?.items || []
-    pagination.total = res.data?.total || 0
+    tableData.value = res.items || []
+    pagination.total = res.total || 0
   } catch (e) { console.error('获取设备列表失败:', e) }
   finally { loading.value = false }
 }

@@ -139,8 +139,8 @@ const fetchData = async () => {
       ...searchForm,
       picking_type: pickingType.value
     })
-    tableData.value = res.data?.items || []
-    pagination.total = res.data?.total || 0
+    tableData.value = res.items || []
+    pagination.total = res.total || 0
   } catch (e) {
     console.error('获取调拨单列表失败:', e)
   } finally {

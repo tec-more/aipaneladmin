@@ -88,7 +88,8 @@ request.interceptors.response.use(
     }
     const res = response.data
     // 后端成功响应码为 0 或 success 为 true
-    if (res.code === 0 || res.code === 200 || res.success === true) {
+    // 兼容直接返回数据的格式（如分页响应 {items, total}）
+    if (res.code === 0 || res.code === 200 || res.success === true || (res.items !== undefined)) {
       return res
     } else {
       ElMessage.error(res.msg || res.message || '请求失败')

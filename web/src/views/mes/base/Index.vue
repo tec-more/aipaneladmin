@@ -135,8 +135,8 @@ const fetchMaterialList = async () => {
       page_size: materialPagination.pageSize,
       ...materialSearch
     })
-    materialList.value = res.data?.items || []
-    materialPagination.total = res.data?.total || 0
+    materialList.value = res.items || []
+    materialPagination.total = res.total || 0
   } catch (e) { console.error('获取物料列表失败:', e) }
   finally { materialLoading.value = false }
 }
@@ -156,8 +156,8 @@ const fetchBomList = async () => {
       page_size: bomPagination.pageSize,
       ...bomSearch
     })
-    bomList.value = res.data?.items || []
-    bomPagination.total = res.data?.total || 0
+    bomList.value = res.items || []
+    bomPagination.total = res.total || 0
   } catch (e) { console.error('获取BOM列表失败:', e) }
   finally { bomLoading.value = false }
 }
