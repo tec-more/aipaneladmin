@@ -1,5 +1,25 @@
-from .inventory_models import Warehouse, WarehouseLocation, Package, Inventory, InventoryTransaction, Transfer
+from .inventory_models import (
+    StockLocation,
+    StockWarehouse,
+    StockPickingType,
+    StockPicking,
+    StockMove,
+    StockMoveLine,
+    StockQuant,
+    StockQuantReservation,
+    StockLot,
+    StockPackage
+)
 
 __all__ = [
-    "Warehouse", "WarehouseLocation", "Package", "Inventory", "InventoryTransaction", "Transfer"
+    "StockLocation",
+    "StockWarehouse",
+    "StockPickingType",
+    "StockPicking",
+    "StockMove",
+    "StockMoveLine",
+    "StockQuant",
+    "StockQuantReservation",
+    "StockLot",
+    "StockPackage"
 ]

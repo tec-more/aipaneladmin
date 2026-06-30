@@ -11,14 +11,9 @@
         "api/v1"
     ],
     "models": [
-        "material",
-        "bom",
-        "work_center",
-        "process",
-        "route",
-        "manufacturing_order",
-        "work_order",
-        "quality_inspection",
+        "base_data",
+        "production",
+        "quality",
         "equipment"
     ],
     "schemas": [

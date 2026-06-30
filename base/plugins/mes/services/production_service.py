@@ -1,4 +1,5 @@
 from typing import Optional, List, Tuple, Dict, Any
+from decimal import Decimal
 from tortoise.expressions import Q
 
 try:

@@ -1,4 +1,5 @@
 from typing import Optional
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -71,16 +72,16 @@ except ImportError:
     class EquipmentListQuery(BaseModel): pass
     class ListResponse(BaseModel): pass
 
-router = APIRouter(prefix="/equipment", tags=["设备管理"])
+equipment_router_router = APIRouter(prefix="/equipment", tags=["设备管理"])
 
-@router.get("/{equipment_id}", response_model=EquipmentResponse)
+@equipment_router_router.get("/{equipment_id}", response_model=EquipmentResponse)
 async def get_equipment(equipment_id: int):
     equipment = await EquipmentService.get_by_id(equipment_id)
     if not equipment:
         raise HTTPException(status_code=404, detail="设备不存在")
     return equipment
 
-@router.post("", response_model=EquipmentResponse)
+@equipment_router_router.post("", response_model=EquipmentResponse)
 async def create_equipment(data: EquipmentCreate):
     try:
         equipment = await EquipmentService.create_equipment(data)
@@ -88,7 +89,7 @@ async def create_equipment(data: EquipmentCreate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.put("/{equipment_id}", response_model=EquipmentResponse)
+@equipment_router_router.put("/{equipment_id}", response_model=EquipmentResponse)
 async def update_equipment(equipment_id: int, data: EquipmentUpdate):
     try:
         equipment = await EquipmentService.update_equipment(equipment_id, data)
@@ -98,21 +99,21 @@ async def update_equipment(equipment_id: int, data: EquipmentUpdate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.delete("/{equipment_id}")
+@equipment_router_router.delete("/{equipment_id}")
 async def delete_equipment(equipment_id: int):
     success = await EquipmentService.delete_equipment(equipment_id)
     if not success:
         raise HTTPException(status_code=404, detail="设备不存在")
     return {"message": "删除成功"}
 
-@router.post("/{equipment_id}/status")
+@equipment_router_router.post("/{equipment_id}/status")
 async def change_equipment_status(equipment_id: int, status: str):
     equipment = await EquipmentService.change_status(equipment_id, status)
     if not equipment:
         raise HTTPException(status_code=404, detail="设备不存在")
     return equipment
 
-@router.get("", response_model=ListResponse[EquipmentResponse])
+@equipment_router_router.get("", response_model=ListResponse[EquipmentResponse])
 async def list_equipment(
     page: int = 1,
     page_size: int = 10,

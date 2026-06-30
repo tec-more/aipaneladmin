@@ -61,10 +61,10 @@ except ImportError:
     class MessageResponse: pass
 
 
-router = APIRouter(prefix="/picking-types", tags=["调拨类型管理"])
+picking_type_router_router = APIRouter(prefix="/picking-types", tags=["调拨类型管理"])
 
 
-@router.get("/{picking_type_id}", response_model=StockPickingTypeResponse, summary="获取调拨类型详情")
+@picking_type_router_router.get("/{picking_type_id}", response_model=StockPickingTypeResponse, summary="获取调拨类型详情")
 async def get_picking_type(picking_type_id: int):
     """根据ID获取调拨类型详情"""
     picking_type = await PickingTypeService.get_by_id(picking_type_id)
@@ -73,7 +73,7 @@ async def get_picking_type(picking_type_id: int):
     return await picking_type.to_dict()
 
 
-@router.post("", response_model=StockPickingTypeResponse, summary="创建调拨类型")
+@picking_type_router_router.post("", response_model=StockPickingTypeResponse, summary="创建调拨类型")
 async def create_picking_type(data: StockPickingTypeCreate):
     """创建新调拨类型，定义序列码模板"""
     try:
@@ -83,7 +83,7 @@ async def create_picking_type(data: StockPickingTypeCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.put("/{picking_type_id}", response_model=StockPickingTypeResponse, summary="更新调拨类型")
+@picking_type_router_router.put("/{picking_type_id}", response_model=StockPickingTypeResponse, summary="更新调拨类型")
 async def update_picking_type(picking_type_id: int, data: StockPickingTypeUpdate):
     """更新调拨类型信息"""
     try:
@@ -95,7 +95,7 @@ async def update_picking_type(picking_type_id: int, data: StockPickingTypeUpdate
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{picking_type_id}", response_model=MessageResponse, summary="删除调拨类型")
+@picking_type_router_router.delete("/{picking_type_id}", response_model=MessageResponse, summary="删除调拨类型")
 async def delete_picking_type(picking_type_id: int):
     """删除调拨类型（需无调拨单）"""
     try:
@@ -107,7 +107,7 @@ async def delete_picking_type(picking_type_id: int):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("", response_model=ListResponse, summary="获取调拨类型列表")
+@picking_type_router_router.get("", response_model=ListResponse, summary="获取调拨类型列表")
 async def list_picking_types(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),

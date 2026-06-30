@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Any
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -71,16 +72,16 @@ except ImportError:
     class QualityInspectionListQuery(BaseModel): pass
     class ListResponse(BaseModel): pass
 
-router = APIRouter(prefix="/quality", tags=["质量管理"])
+quality_router_router = APIRouter(prefix="/quality", tags=["质量管理"])
 
-@router.get("/inspections/{inspection_id}", response_model=QualityInspectionResponse)
+@quality_router_router.get("/inspections/{inspection_id}", response_model=QualityInspectionResponse)
 async def get_inspection(inspection_id: int):
     inspection = await QualityInspectionService.get_by_id(inspection_id)
     if not inspection:
         raise HTTPException(status_code=404, detail="检验单不存在")
     return inspection
 
-@router.post("/inspections", response_model=QualityInspectionResponse)
+@quality_router_router.post("/inspections", response_model=QualityInspectionResponse)
 async def create_inspection(data: QualityInspectionCreate):
     try:
         inspection = await QualityInspectionService.create_inspection(data)
@@ -88,21 +89,21 @@ async def create_inspection(data: QualityInspectionCreate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.put("/inspections/{inspection_id}", response_model=QualityInspectionResponse)
+@quality_router_router.put("/inspections/{inspection_id}", response_model=QualityInspectionResponse)
 async def update_inspection(inspection_id: int, data: QualityInspectionUpdate):
     inspection = await QualityInspectionService.update_inspection(inspection_id, data)
     if not inspection:
         raise HTTPException(status_code=404, detail="检验单不存在")
     return inspection
 
-@router.delete("/inspections/{inspection_id}")
+@quality_router_router.delete("/inspections/{inspection_id}")
 async def delete_inspection(inspection_id: int):
     success = await QualityInspectionService.delete_inspection(inspection_id)
     if not success:
         raise HTTPException(status_code=404, detail="检验单不存在")
     return {"message": "删除成功"}
 
-@router.post("/inspections/{inspection_id}/submit")
+@quality_router_router.post("/inspections/{inspection_id}/submit")
 async def submit_inspection(
     inspection_id: int,
     qualified_quantity: int,
@@ -120,7 +121,7 @@ async def submit_inspection(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/inspections", response_model=ListResponse[QualityInspectionResponse])
+@quality_router_router.get("/inspections", response_model=ListResponse[QualityInspectionResponse])
 async def list_inspections(
     page: int = 1,
     page_size: int = 10,

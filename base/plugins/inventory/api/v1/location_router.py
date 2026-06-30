@@ -65,10 +65,10 @@ except ImportError:
     class MessageResponse: pass
 
 
-router = APIRouter(prefix="/locations", tags=["库位管理"])
+location_router_router = APIRouter(prefix="/locations", tags=["库位管理"])
 
 
-@router.get("/{location_id}", response_model=StockLocationResponse, summary="获取库位详情")
+@location_router_router.get("/{location_id}", response_model=StockLocationResponse, summary="获取库位详情")
 async def get_location(location_id: int):
     """根据ID获取库位详情"""
     location = await LocationService.get_by_id(location_id)
@@ -77,7 +77,7 @@ async def get_location(location_id: int):
     return await location.to_dict()
 
 
-@router.post("", response_model=StockLocationResponse, summary="创建库位")
+@location_router_router.post("", response_model=StockLocationResponse, summary="创建库位")
 async def create_location(data: StockLocationCreate):
     """创建新库位，支持层级结构，自动生成完整名称和路径"""
     try:
@@ -87,7 +87,7 @@ async def create_location(data: StockLocationCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.put("/{location_id}", response_model=StockLocationResponse, summary="更新库位")
+@location_router_router.put("/{location_id}", response_model=StockLocationResponse, summary="更新库位")
 async def update_location(location_id: int, data: StockLocationUpdate):
     """更新库位信息"""
     try:
@@ -99,7 +99,7 @@ async def update_location(location_id: int, data: StockLocationUpdate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{location_id}", response_model=MessageResponse, summary="删除库位")
+@location_router_router.delete("/{location_id}", response_model=MessageResponse, summary="删除库位")
 async def delete_location(location_id: int):
     """删除库位（需无子库位和库存）"""
     try:
@@ -111,7 +111,7 @@ async def delete_location(location_id: int):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("", response_model=ListResponse, summary="获取库位列表")
+@location_router_router.get("", response_model=ListResponse, summary="获取库位列表")
 async def list_locations(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -135,14 +135,14 @@ async def list_locations(
     return {"items": items_dict, "total": total, "page": page, "page_size": page_size}
 
 
-@router.get("/tree", summary="获取库位树形结构")
+@location_router_router.get("/tree", summary="获取库位树形结构")
 async def get_location_tree(location_id: Optional[int] = Query(None, description="根库位ID（可选）")):
     """获取库位树形结构，用于层级展示"""
     tree = await LocationService.get_tree(location_id)
     return tree
 
 
-@router.get("/{location_id}/children", summary="获取子库位列表")
+@location_router_router.get("/{location_id}/children", summary="获取子库位列表")
 async def get_location_children(location_id: int):
     """获取指定库位的所有子库位"""
     children = await LocationService.get_children(location_id)

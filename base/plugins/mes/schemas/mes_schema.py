@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Generic, TypeVar
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, computed_field
 from decimal import Decimal
@@ -437,8 +437,10 @@ class EquipmentListQuery(BaseModel):
     status: Optional[str] = Field(None, description="状态")
 
 
-class ListResponse(BaseModel):
+T = TypeVar("T")
+
+class ListResponse(BaseModel, Generic[T]):
     total: int = Field(..., description="总数")
     page: int = Field(..., description="当前页")
     page_size: int = Field(..., description="每页数量")
-    items: List[Any] = Field(..., description="数据列表")
+    items: List[T] = Field(..., description="数据列表")

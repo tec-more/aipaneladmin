@@ -3,6 +3,7 @@
 """
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime
+from decimal import Decimal
 from tortoise.expressions import Q
 from tortoise.queryset import QuerySet
 

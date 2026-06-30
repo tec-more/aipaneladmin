@@ -11,16 +11,7 @@
         "api/v1"
     ],
     "models": [
-        "stock_location",
-        "stock_warehouse",
-        "stock_picking_type",
-        "stock_picking",
-        "stock_move",
-        "stock_move_line",
-        "stock_quant",
-        "stock_quant_reservation",
-        "stock_lot",
-        "stock_package"
+        "inventory_models"
     ],
     "schemas": [
         "inventory_schema"
