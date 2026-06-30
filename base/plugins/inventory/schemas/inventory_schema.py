@@ -824,8 +824,8 @@ class StockPackageQuery(BaseModel):
 
 class StockQuantSummary(BaseModel):
     """库存汇总统计"""
-    product_code: str = Field(..., description="产品编码")
-    product_name: str = Field(..., description="产品名称")
+    product_code: Optional[str] = Field(None, description="产品编码")
+    product_name: Optional[str] = Field(None, description="产品名称")
     total_quantity: Decimal = Field(..., description="总数量")
     total_reserved: Decimal = Field(..., description="总预留数量")
     total_available: Decimal = Field(..., description="总可用数量")
