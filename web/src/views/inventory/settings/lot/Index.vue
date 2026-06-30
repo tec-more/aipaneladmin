@@ -96,8 +96,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const res = await getLotList({ page: pagination.page, page_size: pagination.pageSize, ...searchForm })
-    tableData.value = res.items || []
-    pagination.total = res.total || 0
+    tableData.value = res.data.items || []
+    pagination.total = res.data.total || 0
   } catch (e) { console.error('获取批次列表失败:', e) }
   finally { loading.value = false }
 }

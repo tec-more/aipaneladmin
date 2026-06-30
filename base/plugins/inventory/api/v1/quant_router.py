@@ -6,6 +6,7 @@ try:
     from base.plugins.inventory.schemas.inventory_schema import (
         StockQuantResponse, ListResponse, StockQuantSummary
     )
+    from base.common.response import success_response
 except ImportError:
     class APIRouter:
         def __init__(self, prefix="", tags=None):
@@ -68,14 +69,14 @@ async def list_quants(
         owner_id=owner_id
     )
     items_dict = [await item.to_dict() for item in items]
-    return {"items": items_dict, "total": total, "page": page, "page_size": page_size}
+    return success_response(data={"items": items_dict, "total": total, "page": page, "page_size": page_size})
 
 
-@quant_router.get("/summary", response_model=StockQuantSummary, summary="库存汇总统计")
+@quant_router.get("/summary", summary="库存汇总统计")
 async def get_quant_summary(product_code: Optional[str] = Query(None, description="产品编码（可选）")):
     """获取库存汇总统计"""
     summary = await QuantService.get_summary(product_code)
-    return summary
+    return success_response(data=summary)
 
 
 @quant_router.get("/by-product/{product_code}", summary="按产品查询库存")
@@ -83,7 +84,7 @@ async def get_quants_by_product(product_code: str):
     """按产品编码查询所有库存"""
     quants = await QuantService.get_by_product(product_code)
     quants_dict = [await quant.to_dict() for quant in quants]
-    return quants_dict
+    return success_response(data=quants_dict)
 
 
 @quant_router.get("/by-location/{location_id}", summary="按库位查询库存")
@@ -91,10 +92,10 @@ async def get_quants_by_location(location_id: int):
     """按库位ID查询所有库存"""
     quants = await QuantService.get_by_location(location_id)
     quants_dict = [await quant.to_dict() for quant in quants]
-    return quants_dict
+    return success_response(data=quants_dict)
 
 
-@quant_router.get("/reservations", response_model=ListResponse, summary="获取库存预留列表")
+@quant_router.get("/reservations", summary="获取库存预留列表")
 async def list_reservations(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -107,13 +108,13 @@ async def list_reservations(
         product_code=product_code, location_name=location_name
     )
     items_dict = [await item.to_dict() for item in items]
-    return {"items": items_dict, "total": total, "page": page, "page_size": page_size}
+    return success_response(data={"items": items_dict, "total": total, "page": page, "page_size": page_size})
 
 
-@quant_router.get("/{quant_id}", response_model=StockQuantResponse, summary="获取库存详情")
+@quant_router.get("/{quant_id}", summary="获取库存详情")
 async def get_quant(quant_id: int):
     """根据ID获取库存详情"""
     quant = await QuantService.get_by_id(quant_id)
     if not quant:
         raise HTTPException(status_code=404, detail="库存不存在")
-    return await quant.to_dict()
+    return success_response(data=await quant.to_dict())

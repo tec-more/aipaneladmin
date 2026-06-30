@@ -9,6 +9,7 @@ try:
         QualityInspectionCreate, QualityInspectionUpdate, QualityInspectionResponse, QualityInspectionListQuery,
         ListResponse
     )
+    from base.common.response import success_response
 except ImportError:
     class BaseModel:
         pass
@@ -74,36 +75,36 @@ except ImportError:
 
 quality_router = APIRouter(prefix="/quality", tags=["质量管理"])
 
-@quality_router.get("/inspections/{inspection_id}", response_model=QualityInspectionResponse)
+@quality_router.get("/inspections/{inspection_id}", summary="获取检验单详情")
 async def get_inspection(inspection_id: int):
     inspection = await QualityInspectionService.get_by_id(inspection_id)
     if not inspection:
         raise HTTPException(status_code=404, detail="检验单不存在")
-    return inspection
+    return success_response(data=inspection)
 
-@quality_router.post("/inspections", response_model=QualityInspectionResponse)
+@quality_router.post("/inspections", summary="创建检验单")
 async def create_inspection(data: QualityInspectionCreate):
     try:
         inspection = await QualityInspectionService.create_inspection(data)
-        return inspection
+        return success_response(data=inspection)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@quality_router.put("/inspections/{inspection_id}", response_model=QualityInspectionResponse)
+@quality_router.put("/inspections/{inspection_id}", summary="更新检验单")
 async def update_inspection(inspection_id: int, data: QualityInspectionUpdate):
     inspection = await QualityInspectionService.update_inspection(inspection_id, data)
     if not inspection:
         raise HTTPException(status_code=404, detail="检验单不存在")
-    return inspection
+    return success_response(data=inspection)
 
-@quality_router.delete("/inspections/{inspection_id}")
+@quality_router.delete("/inspections/{inspection_id}", summary="删除检验单")
 async def delete_inspection(inspection_id: int):
     success = await QualityInspectionService.delete_inspection(inspection_id)
     if not success:
         raise HTTPException(status_code=404, detail="检验单不存在")
-    return {"message": "删除成功"}
+    return success_response(data={"message": "检验单删除成功"}, msg="检验单删除成功")
 
-@quality_router.post("/inspections/{inspection_id}/submit")
+@quality_router.post("/inspections/{inspection_id}/submit", summary="提交检验结果")
 async def submit_inspection(
     inspection_id: int,
     qualified_quantity: int,
@@ -117,11 +118,11 @@ async def submit_inspection(
         )
         if not inspection:
             raise HTTPException(status_code=404, detail="检验单不存在")
-        return inspection
+        return success_response(data=inspection)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@quality_router.get("/inspections", response_model=ListResponse[QualityInspectionResponse])
+@quality_router.get("/inspections", summary="获取检验单列表")
 async def list_inspections(
     page: int = 1,
     page_size: int = 10,
@@ -137,4 +138,4 @@ async def list_inspections(
         material_code=material_code,
         inspection_result=inspection_result
     )
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
+    return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})

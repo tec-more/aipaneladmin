@@ -9,6 +9,7 @@ try:
         EquipmentCreate, EquipmentUpdate, EquipmentResponse, EquipmentListQuery,
         ListResponse
     )
+    from base.common.response import success_response
 except ImportError:
     class BaseModel:
         pass
@@ -74,46 +75,46 @@ except ImportError:
 
 equipment_router = APIRouter(prefix="/equipment", tags=["设备管理"])
 
-@equipment_router.get("/{equipment_id}", response_model=EquipmentResponse)
+@equipment_router.get("/{equipment_id}", summary="获取设备详情")
 async def get_equipment(equipment_id: int):
     equipment = await EquipmentService.get_by_id(equipment_id)
     if not equipment:
         raise HTTPException(status_code=404, detail="设备不存在")
-    return equipment
+    return success_response(data=equipment)
 
-@equipment_router.post("", response_model=EquipmentResponse)
+@equipment_router.post("", summary="创建设备")
 async def create_equipment(data: EquipmentCreate):
     try:
         equipment = await EquipmentService.create_equipment(data)
-        return equipment
+        return success_response(data=equipment)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@equipment_router.put("/{equipment_id}", response_model=EquipmentResponse)
+@equipment_router.put("/{equipment_id}", summary="更新设备")
 async def update_equipment(equipment_id: int, data: EquipmentUpdate):
     try:
         equipment = await EquipmentService.update_equipment(equipment_id, data)
         if not equipment:
             raise HTTPException(status_code=404, detail="设备不存在")
-        return equipment
+        return success_response(data=equipment)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@equipment_router.delete("/{equipment_id}")
+@equipment_router.delete("/{equipment_id}", summary="删除设备")
 async def delete_equipment(equipment_id: int):
     success = await EquipmentService.delete_equipment(equipment_id)
     if not success:
         raise HTTPException(status_code=404, detail="设备不存在")
-    return {"message": "删除成功"}
+    return success_response(data={"message": "设备删除成功"}, msg="设备删除成功")
 
-@equipment_router.post("/{equipment_id}/status")
+@equipment_router.post("/{equipment_id}/status", summary="变更设备状态")
 async def change_equipment_status(equipment_id: int, status: str):
     equipment = await EquipmentService.change_status(equipment_id, status)
     if not equipment:
         raise HTTPException(status_code=404, detail="设备不存在")
-    return equipment
+    return success_response(data=equipment)
 
-@equipment_router.get("", response_model=ListResponse[EquipmentResponse])
+@equipment_router.get("", summary="获取设备列表")
 async def list_equipment(
     page: int = 1,
     page_size: int = 10,
@@ -129,4 +130,4 @@ async def list_equipment(
         equipment_type=equipment_type,
         status=status
     )
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
+    return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})

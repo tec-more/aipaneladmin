@@ -75,8 +75,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const res = await getQuantSummary()
-    Object.assign(summary, res)
-    locationSummary.value = res.by_location || []
+    Object.assign(summary, res.data)
+    locationSummary.value = res.data.by_location || []
   } catch (e) {
     console.error('获取库存汇总失败:', e)
   } finally {

@@ -7,6 +7,7 @@ try:
         StockLotCreate, StockLotUpdate, StockLotResponse,
         ListResponse, MessageResponse
     )
+    from base.common.response import success_response
 except ImportError:
     class APIRouter:
         def __init__(self, prefix="", tags=None):
@@ -64,50 +65,50 @@ except ImportError:
 lot_router = APIRouter(prefix="/lots", tags=["批次管理"])
 
 
-@lot_router.get("/{lot_id}", response_model=StockLotResponse, summary="获取批次详情")
+@lot_router.get("/{lot_id}", summary="获取批次详情")
 async def get_lot(lot_id: int):
     """根据ID获取批次详情"""
     lot = await LotService.get_by_id(lot_id)
     if not lot:
         raise HTTPException(status_code=404, detail="批次不存在")
-    return await lot.to_dict()
+    return success_response(data=await lot.to_dict())
 
 
-@lot_router.post("", response_model=StockLotResponse, summary="创建批次")
+@lot_router.post("", summary="创建批次")
 async def create_lot(data: StockLotCreate):
     """创建新批次"""
     try:
         lot = await LotService.create_lot(data)
-        return await lot.to_dict()
+        return success_response(data=await lot.to_dict())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@lot_router.put("/{lot_id}", response_model=StockLotResponse, summary="更新批次")
+@lot_router.put("/{lot_id}", summary="更新批次")
 async def update_lot(lot_id: int, data: StockLotUpdate):
     """更新批次信息"""
     try:
         lot = await LotService.update_lot(lot_id, data)
         if not lot:
             raise HTTPException(status_code=404, detail="批次不存在")
-        return await lot.to_dict()
+        return success_response(data=await lot.to_dict())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@lot_router.delete("/{lot_id}", response_model=MessageResponse, summary="删除批次")
+@lot_router.delete("/{lot_id}", summary="删除批次")
 async def delete_lot(lot_id: int):
     """删除批次（需无库存）"""
     try:
         success = await LotService.delete_lot(lot_id)
         if not success:
             raise HTTPException(status_code=404, detail="批次不存在")
-        return {"message": "批次删除成功", "success": True}
+        return success_response(data={"message": "批次删除成功"}, msg="批次删除成功")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@lot_router.get("", response_model=ListResponse, summary="获取批次列表")
+@lot_router.get("", summary="获取批次列表")
 async def list_lots(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -123,4 +124,4 @@ async def list_lots(
         product_code=product_code, is_active=is_active
     )
     items_dict = [await item.to_dict() for item in items]
-    return {"items": items_dict, "total": total, "page": page, "page_size": page_size}
+    return success_response(data={"items": items_dict, "total": total, "page": page, "page_size": page_size})

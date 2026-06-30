@@ -9,6 +9,7 @@ try:
         StockPickingCreate, StockPickingUpdate, StockPickingResponse,
         ListResponse, MessageResponse
     )
+    from base.common.response import success_response
 except ImportError:
     class APIRouter:
         def __init__(self, prefix="", tags=None):
@@ -80,7 +81,7 @@ except ImportError:
 picking_router = APIRouter(prefix="/pickings", tags=["调拨单管理"])
 
 
-@picking_router.get("/{picking_id}", response_model=StockPickingResponse, summary="获取调拨单详情")
+@picking_router.get("/{picking_id}", summary="获取调拨单详情")
 async def get_picking(picking_id: int):
     """根据ID获取调拨单详情，包含移动明细列表和move_lines"""
     picking = await PickingService.get_by_id(picking_id)
@@ -97,10 +98,10 @@ async def get_picking(picking_id: int):
 
     picking_dict = await picking.to_dict()
     picking_dict['moves'] = moves_dict
-    return picking_dict
+    return success_response(data=picking_dict)
 
 
-@picking_router.post("", response_model=StockPickingResponse, summary="创建调拨单")
+@picking_router.post("", summary="创建调拨单")
 async def create_picking(data: StockPickingCreate):
     """创建新调拨单，自动生成编码，可包含移动明细"""
     try:
@@ -116,12 +117,12 @@ async def create_picking(data: StockPickingCreate):
 
         picking_dict = await picking.to_dict()
         picking_dict['moves'] = moves_dict
-        return picking_dict
+        return success_response(data=picking_dict)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@picking_router.put("/{picking_id}", response_model=StockPickingResponse, summary="更新调拨单")
+@picking_router.put("/{picking_id}", summary="更新调拨单")
 async def update_picking(picking_id: int, data: StockPickingUpdate):
     """更新调拨单信息（仅draft状态）"""
     try:
@@ -134,24 +135,24 @@ async def update_picking(picking_id: int, data: StockPickingUpdate):
 
         picking_dict = await picking.to_dict()
         picking_dict['moves'] = moves_dict
-        return picking_dict
+        return success_response(data=picking_dict)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@picking_router.delete("/{picking_id}", response_model=MessageResponse, summary="删除调拨单")
+@picking_router.delete("/{picking_id}", summary="删除调拨单")
 async def delete_picking(picking_id: int):
     """删除调拨单（仅draft/cancel状态）"""
     try:
         success = await PickingService.delete_picking(picking_id)
         if not success:
             raise HTTPException(status_code=404, detail="调拨单不存在")
-        return {"message": "调拨单删除成功", "success": True}
+        return success_response(data={"message": "调拨单删除成功"}, msg="调拨单删除成功")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@picking_router.post("/{picking_id}/confirm", response_model=StockPickingResponse, summary="确认调拨单")
+@picking_router.post("/{picking_id}/confirm", summary="确认调拨单")
 async def confirm_picking(picking_id: int):
     """确认调拨单，检查库存可用性并创建预留"""
     try:
@@ -162,12 +163,12 @@ async def confirm_picking(picking_id: int):
 
         picking_dict = await picking.to_dict()
         picking_dict['moves'] = moves_dict
-        return picking_dict
+        return success_response(data=picking_dict)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@picking_router.post("/{picking_id}/assign", response_model=StockPickingResponse, summary="分配库存")
+@picking_router.post("/{picking_id}/assign", summary="分配库存")
 async def assign_picking(picking_id: int):
     """分配库存，更新预留状态"""
     try:
@@ -178,12 +179,12 @@ async def assign_picking(picking_id: int):
 
         picking_dict = await picking.to_dict()
         picking_dict['moves'] = moves_dict
-        return picking_dict
+        return success_response(data=picking_dict)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@picking_router.post("/{picking_id}/do", response_model=StockPickingResponse, summary="完成调拨单")
+@picking_router.post("/{picking_id}/do", summary="完成调拨单")
 async def do_picking(picking_id: int):
     """完成调拨单，更新库存数量并生成交易记录"""
     try:
@@ -194,12 +195,12 @@ async def do_picking(picking_id: int):
 
         picking_dict = await picking.to_dict()
         picking_dict['moves'] = moves_dict
-        return picking_dict
+        return success_response(data=picking_dict)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@picking_router.post("/{picking_id}/cancel", response_model=StockPickingResponse, summary="取消调拨单")
+@picking_router.post("/{picking_id}/cancel", summary="取消调拨单")
 async def cancel_picking(picking_id: int):
     """取消调拨单，释放预留"""
     try:
@@ -210,12 +211,12 @@ async def cancel_picking(picking_id: int):
 
         picking_dict = await picking.to_dict()
         picking_dict['moves'] = moves_dict
-        return picking_dict
+        return success_response(data=picking_dict)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@picking_router.post("/{picking_id}/print", response_model=MessageResponse, summary="打印调拨单")
+@picking_router.post("/{picking_id}/print", summary="打印调拨单")
 async def print_picking(picking_id: int):
     """标记调拨单为已打印"""
     picking = await PickingService.get_by_id(picking_id)
@@ -225,10 +226,10 @@ async def print_picking(picking_id: int):
     picking.printed = True
     await picking.save()
 
-    return {"message": "调拨单已标记为已打印", "success": True}
+    return success_response(data={"message": "调拨单已标记为已打印"}, msg="调拨单已标记为已打印")
 
 
-@picking_router.get("", response_model=ListResponse, summary="获取调拨单列表")
+@picking_router.get("", summary="获取调拨单列表")
 async def list_pickings(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -258,4 +259,4 @@ async def list_pickings(
         item_dict['moves'] = [await move.to_dict() for move in moves]
         items_dict.append(item_dict)
 
-    return {"items": items_dict, "total": total, "page": page, "page_size": page_size}
+    return success_response(data={"items": items_dict, "total": total, "page": page, "page_size": page_size})

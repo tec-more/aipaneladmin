@@ -156,8 +156,8 @@ const fetchBomList = async () => {
       page_size: bomPagination.pageSize,
       ...bomSearch
     })
-    bomList.value = res.items || []
-    bomPagination.total = res.total || 0
+    bomList.value = res.data.items || []
+    bomPagination.total = res.data.total || 0
   } catch (e) { console.error('获取BOM列表失败:', e) }
   finally { bomLoading.value = false }
 }
