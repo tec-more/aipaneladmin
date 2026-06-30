@@ -43,10 +43,10 @@ except ImportError:
     class StockQuantSummary: pass
 
 
-quant_router_router = APIRouter(prefix="/quants", tags=["库存查询"])
+quant_router = APIRouter(prefix="/quants", tags=["库存查询"])
 
 
-@quant_router_router.get("/{quant_id}", response_model=StockQuantResponse, summary="获取库存详情")
+@quant_router.get("/{quant_id}", response_model=StockQuantResponse, summary="获取库存详情")
 async def get_quant(quant_id: int):
     """根据ID获取库存详情"""
     quant = await QuantService.get_by_id(quant_id)
@@ -55,7 +55,7 @@ async def get_quant(quant_id: int):
     return await quant.to_dict()
 
 
-@quant_router_router.get("", response_model=ListResponse, summary="获取库存列表")
+@quant_router.get("", response_model=ListResponse, summary="获取库存列表")
 async def list_quants(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -80,14 +80,14 @@ async def list_quants(
     return {"items": items_dict, "total": total, "page": page, "page_size": page_size}
 
 
-@quant_router_router.get("/summary", response_model=StockQuantSummary, summary="库存汇总统计")
+@quant_router.get("/summary", response_model=StockQuantSummary, summary="库存汇总统计")
 async def get_quant_summary(product_code: Optional[str] = Query(None, description="产品编码（可选）")):
     """获取库存汇总统计"""
     summary = await QuantService.get_summary(product_code)
     return summary
 
 
-@quant_router_router.get("/by-product/{product_code}", summary="按产品查询库存")
+@quant_router.get("/by-product/{product_code}", summary="按产品查询库存")
 async def get_quants_by_product(product_code: str):
     """按产品编码查询所有库存"""
     quants = await QuantService.get_by_product(product_code)
@@ -95,7 +95,7 @@ async def get_quants_by_product(product_code: str):
     return quants_dict
 
 
-@quant_router_router.get("/by-location/{location_id}", summary="按库位查询库存")
+@quant_router.get("/by-location/{location_id}", summary="按库位查询库存")
 async def get_quants_by_location(location_id: int):
     """按库位ID查询所有库存"""
     quants = await QuantService.get_by_location(location_id)

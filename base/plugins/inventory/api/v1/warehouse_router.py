@@ -61,10 +61,10 @@ except ImportError:
     class MessageResponse: pass
 
 
-warehouse_router_router = APIRouter(prefix="/warehouses", tags=["仓库管理"])
+warehouse_router = APIRouter(prefix="/warehouses", tags=["仓库管理"])
 
 
-@warehouse_router_router.get("/{warehouse_id}", response_model=StockWarehouseResponse, summary="获取仓库详情")
+@warehouse_router.get("/{warehouse_id}", response_model=StockWarehouseResponse, summary="获取仓库详情")
 async def get_warehouse(warehouse_id: int):
     """根据ID获取仓库详情"""
     warehouse = await WarehouseService.get_by_id(warehouse_id)
@@ -73,7 +73,7 @@ async def get_warehouse(warehouse_id: int):
     return await warehouse.to_dict()
 
 
-@warehouse_router_router.post("", response_model=StockWarehouseResponse, summary="创建仓库")
+@warehouse_router.post("", response_model=StockWarehouseResponse, summary="创建仓库")
 async def create_warehouse(data: StockWarehouseCreate):
     """创建新仓库，可关联关键库位，验证关联库位有效性"""
     try:
@@ -83,7 +83,7 @@ async def create_warehouse(data: StockWarehouseCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@warehouse_router_router.put("/{warehouse_id}", response_model=StockWarehouseResponse, summary="更新仓库")
+@warehouse_router.put("/{warehouse_id}", response_model=StockWarehouseResponse, summary="更新仓库")
 async def update_warehouse(warehouse_id: int, data: StockWarehouseUpdate):
     """更新仓库信息"""
     try:
@@ -95,7 +95,7 @@ async def update_warehouse(warehouse_id: int, data: StockWarehouseUpdate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@warehouse_router_router.delete("/{warehouse_id}", response_model=MessageResponse, summary="删除仓库")
+@warehouse_router.delete("/{warehouse_id}", response_model=MessageResponse, summary="删除仓库")
 async def delete_warehouse(warehouse_id: int):
     """删除仓库（需无关联库位）"""
     try:
@@ -107,7 +107,7 @@ async def delete_warehouse(warehouse_id: int):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@warehouse_router_router.get("", response_model=ListResponse, summary="获取仓库列表")
+@warehouse_router.get("", response_model=ListResponse, summary="获取仓库列表")
 async def list_warehouses(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),

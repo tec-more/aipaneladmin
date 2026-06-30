@@ -61,10 +61,10 @@ except ImportError:
     class MessageResponse: pass
 
 
-package_router_router = APIRouter(prefix="/packages", tags=["包裹管理"])
+package_router = APIRouter(prefix="/packages", tags=["包裹管理"])
 
 
-@package_router_router.get("/{package_id}", response_model=StockPackageResponse, summary="获取包裹详情")
+@package_router.get("/{package_id}", response_model=StockPackageResponse, summary="获取包裹详情")
 async def get_package(package_id: int):
     """根据ID获取包裹详情"""
     package = await PackageService.get_by_id(package_id)
@@ -73,7 +73,7 @@ async def get_package(package_id: int):
     return await package.to_dict()
 
 
-@package_router_router.post("", response_model=StockPackageResponse, summary="创建包裹")
+@package_router.post("", response_model=StockPackageResponse, summary="创建包裹")
 async def create_package(data: StockPackageCreate):
     """创建新包裹"""
     try:
@@ -83,7 +83,7 @@ async def create_package(data: StockPackageCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@package_router_router.put("/{package_id}", response_model=StockPackageResponse, summary="更新包裹")
+@package_router.put("/{package_id}", response_model=StockPackageResponse, summary="更新包裹")
 async def update_package(package_id: int, data: StockPackageUpdate):
     """更新包裹信息"""
     try:
@@ -95,7 +95,7 @@ async def update_package(package_id: int, data: StockPackageUpdate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@package_router_router.delete("/{package_id}", response_model=MessageResponse, summary="删除包裹")
+@package_router.delete("/{package_id}", response_model=MessageResponse, summary="删除包裹")
 async def delete_package(package_id: int):
     """删除包裹（需无子包裹和库存）"""
     try:
@@ -107,7 +107,7 @@ async def delete_package(package_id: int):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@package_router_router.get("", response_model=ListResponse, summary="获取包裹列表")
+@package_router.get("", response_model=ListResponse, summary="获取包裹列表")
 async def list_packages(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),

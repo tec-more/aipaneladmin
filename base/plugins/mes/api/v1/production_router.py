@@ -104,16 +104,16 @@ except ImportError:
     class WorkOrderListQuery(BaseModel): pass
     class ListResponse(BaseModel): pass
 
-production_router_router = APIRouter(prefix="/production", tags=["生产计划管理"])
+production_router = APIRouter(prefix="/production", tags=["生产计划管理"])
 
-@production_router_router.get("/manufacturing-orders/{mo_id}", response_model=ManufacturingOrderResponse)
+@production_router.get("/manufacturing-orders/{mo_id}", response_model=ManufacturingOrderResponse)
 async def get_mo(mo_id: int):
     mo = await ManufacturingOrderService.get_by_id(mo_id)
     if not mo:
         raise HTTPException(status_code=404, detail="制造单不存在")
     return mo
 
-@production_router_router.post("/manufacturing-orders", response_model=ManufacturingOrderResponse)
+@production_router.post("/manufacturing-orders", response_model=ManufacturingOrderResponse)
 async def create_mo(data: ManufacturingOrderCreate):
     try:
         mo = await ManufacturingOrderService.create_mo(data)
@@ -121,7 +121,7 @@ async def create_mo(data: ManufacturingOrderCreate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.put("/manufacturing-orders/{mo_id}", response_model=ManufacturingOrderResponse)
+@production_router.put("/manufacturing-orders/{mo_id}", response_model=ManufacturingOrderResponse)
 async def update_mo(mo_id: int, data: ManufacturingOrderUpdate):
     try:
         mo = await ManufacturingOrderService.update_mo(mo_id, data)
@@ -131,14 +131,14 @@ async def update_mo(mo_id: int, data: ManufacturingOrderUpdate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.delete("/manufacturing-orders/{mo_id}")
+@production_router.delete("/manufacturing-orders/{mo_id}")
 async def delete_mo(mo_id: int):
     success = await ManufacturingOrderService.delete_mo(mo_id)
     if not success:
         raise HTTPException(status_code=404, detail="制造单不存在")
     return {"message": "删除成功"}
 
-@production_router_router.post("/manufacturing-orders/{mo_id}/release")
+@production_router.post("/manufacturing-orders/{mo_id}/release")
 async def release_mo(mo_id: int):
     try:
         mo = await ManufacturingOrderService.release_mo(mo_id)
@@ -148,7 +148,7 @@ async def release_mo(mo_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.post("/manufacturing-orders/{mo_id}/complete")
+@production_router.post("/manufacturing-orders/{mo_id}/complete")
 async def complete_mo(mo_id: int):
     try:
         mo = await ManufacturingOrderService.complete_mo(mo_id)
@@ -158,7 +158,7 @@ async def complete_mo(mo_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.post("/manufacturing-orders/{mo_id}/cancel")
+@production_router.post("/manufacturing-orders/{mo_id}/cancel")
 async def cancel_mo(mo_id: int):
     try:
         mo = await ManufacturingOrderService.cancel_mo(mo_id)
@@ -168,7 +168,7 @@ async def cancel_mo(mo_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.get("/manufacturing-orders", response_model=ListResponse[ManufacturingOrderResponse])
+@production_router.get("/manufacturing-orders", response_model=ListResponse[ManufacturingOrderResponse])
 async def list_mos(
     page: int = 1,
     page_size: int = 10,
@@ -186,14 +186,14 @@ async def list_mos(
     )
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-@production_router_router.get("/work-orders/{wo_id}", response_model=WorkOrderResponse)
+@production_router.get("/work-orders/{wo_id}", response_model=WorkOrderResponse)
 async def get_wo(wo_id: int):
     wo = await WorkOrderService.get_by_id(wo_id)
     if not wo:
         raise HTTPException(status_code=404, detail="工单不存在")
     return wo
 
-@production_router_router.post("/work-orders", response_model=WorkOrderResponse)
+@production_router.post("/work-orders", response_model=WorkOrderResponse)
 async def create_wo(data: WorkOrderCreate):
     try:
         wo = await WorkOrderService.create_wo(data)
@@ -201,7 +201,7 @@ async def create_wo(data: WorkOrderCreate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.put("/work-orders/{wo_id}", response_model=WorkOrderResponse)
+@production_router.put("/work-orders/{wo_id}", response_model=WorkOrderResponse)
 async def update_wo(wo_id: int, data: WorkOrderUpdate):
     try:
         wo = await WorkOrderService.update_wo(wo_id, data)
@@ -211,14 +211,14 @@ async def update_wo(wo_id: int, data: WorkOrderUpdate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.delete("/work-orders/{wo_id}")
+@production_router.delete("/work-orders/{wo_id}")
 async def delete_wo(wo_id: int):
     success = await WorkOrderService.delete_wo(wo_id)
     if not success:
         raise HTTPException(status_code=404, detail="工单不存在")
     return {"message": "删除成功"}
 
-@production_router_router.post("/work-orders/{wo_id}/release")
+@production_router.post("/work-orders/{wo_id}/release")
 async def release_wo(wo_id: int):
     try:
         wo = await WorkOrderService.release_wo(wo_id)
@@ -228,7 +228,7 @@ async def release_wo(wo_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.post("/work-orders/{wo_id}/start")
+@production_router.post("/work-orders/{wo_id}/start")
 async def start_wo(wo_id: int, operator: Optional[str] = None):
     try:
         wo = await WorkOrderService.start_wo(wo_id, operator)
@@ -238,7 +238,7 @@ async def start_wo(wo_id: int, operator: Optional[str] = None):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.post("/work-orders/{wo_id}/complete")
+@production_router.post("/work-orders/{wo_id}/complete")
 async def complete_wo(wo_id: int, actual_quantity: int, scrap_quantity: int = 0):
     try:
         wo = await WorkOrderService.complete_wo(wo_id, actual_quantity, scrap_quantity)
@@ -248,7 +248,7 @@ async def complete_wo(wo_id: int, actual_quantity: int, scrap_quantity: int = 0)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.post("/work-orders/{wo_id}/close")
+@production_router.post("/work-orders/{wo_id}/close")
 async def close_wo(wo_id: int):
     try:
         wo = await WorkOrderService.close_wo(wo_id)
@@ -258,7 +258,7 @@ async def close_wo(wo_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@production_router_router.get("/work-orders", response_model=ListResponse[WorkOrderResponse])
+@production_router.get("/work-orders", response_model=ListResponse[WorkOrderResponse])
 async def list_wos(
     page: int = 1,
     page_size: int = 10,

@@ -21,7 +21,7 @@
     ],
     "menus": [
         {
-            "name": "MES制造执行系统",
+            "name": "制造管理",
             "path": "/mes",
             "icon": "Factory",
             "component": "mes/Index",

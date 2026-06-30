@@ -61,10 +61,10 @@ except ImportError:
     class MessageResponse: pass
 
 
-lot_router_router = APIRouter(prefix="/lots", tags=["批次管理"])
+lot_router = APIRouter(prefix="/lots", tags=["批次管理"])
 
 
-@lot_router_router.get("/{lot_id}", response_model=StockLotResponse, summary="获取批次详情")
+@lot_router.get("/{lot_id}", response_model=StockLotResponse, summary="获取批次详情")
 async def get_lot(lot_id: int):
     """根据ID获取批次详情"""
     lot = await LotService.get_by_id(lot_id)
@@ -73,7 +73,7 @@ async def get_lot(lot_id: int):
     return await lot.to_dict()
 
 
-@lot_router_router.post("", response_model=StockLotResponse, summary="创建批次")
+@lot_router.post("", response_model=StockLotResponse, summary="创建批次")
 async def create_lot(data: StockLotCreate):
     """创建新批次"""
     try:
@@ -83,7 +83,7 @@ async def create_lot(data: StockLotCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@lot_router_router.put("/{lot_id}", response_model=StockLotResponse, summary="更新批次")
+@lot_router.put("/{lot_id}", response_model=StockLotResponse, summary="更新批次")
 async def update_lot(lot_id: int, data: StockLotUpdate):
     """更新批次信息"""
     try:
@@ -95,7 +95,7 @@ async def update_lot(lot_id: int, data: StockLotUpdate):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@lot_router_router.delete("/{lot_id}", response_model=MessageResponse, summary="删除批次")
+@lot_router.delete("/{lot_id}", response_model=MessageResponse, summary="删除批次")
 async def delete_lot(lot_id: int):
     """删除批次（需无库存）"""
     try:
@@ -107,7 +107,7 @@ async def delete_lot(lot_id: int):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@lot_router_router.get("", response_model=ListResponse, summary="获取批次列表")
+@lot_router.get("", response_model=ListResponse, summary="获取批次列表")
 async def list_lots(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),

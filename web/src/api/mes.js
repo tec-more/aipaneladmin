@@ -153,7 +153,7 @@ export const deleteQualityInspection = (id) => {
 }
 
 export const getEquipmentList = (params) => {
-  return request.get(`${BASE}/equipment/list`, { params })
+  return request.get(`${BASE}/equipment`, { params })
 }
 
 export const getEquipmentDetail = (id) => {
