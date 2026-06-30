@@ -1,6 +1,6 @@
 {
     "name": "mes",
-    "display_name": "MES制造执行系统",
+    "display_name": "制造管理",
     "version": "1.0.0",
     "description": "MES制造执行系统模块，包含生产计划、执行管理、质量管理、设备管理和基础数据管理",
     "author": "hepan",
