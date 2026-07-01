@@ -1,5 +1,5 @@
 <template>
-  <div class="mes-quality">
+  <div class="quality-inspection">
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="检验单号">
@@ -64,7 +64,6 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑检验单对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
@@ -118,7 +117,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import { getQualityInspectionList, createQualityInspection } from '@/api/mes'
+import { getInspectionList, createInspection } from '@/api/quality'
 import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
@@ -132,13 +131,11 @@ const searchForm = reactive({
 
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 
-// 对话框相关
 const dialogVisible = ref(false)
 const dialogTitle = ref('新建检验单')
 const submitLoading = ref(false)
 const formRef = ref(null)
 
-// 表单数据
 const formData = reactive({
   inspection_code: '',
   inspection_type: null,
@@ -149,7 +146,6 @@ const formData = reactive({
   remarks: ''
 })
 
-// 表单验证规则
 const formRules = {
   inspection_code: [{ required: true, message: '请输入检验单号', trigger: 'blur' }],
   inspection_type: [{ required: true, message: '请选择检验类型', trigger: 'change' }],
@@ -158,26 +154,13 @@ const formRules = {
   result: [{ required: true, message: '请选择检验结果', trigger: 'change' }]
 }
 
-const resultMap = {
-  pending: '待检',
-  passed: '合格',
-  failed: '不合格'
-}
-
-const resultTypeMap = {
-  pending: 'warning',
-  passed: 'success',
-  failed: 'danger'
-}
+const resultMap = { pending: '待检', passed: '合格', failed: '不合格' }
+const resultTypeMap = { pending: 'warning', passed: 'success', failed: 'danger' }
 
 const fetchData = async () => {
   loading.value = true
   try {
-    const res = await getQualityInspectionList({
-      page: pagination.page,
-      page_size: pagination.pageSize,
-      ...searchForm
-    })
+    const res = await getInspectionList({ page: pagination.page, page_size: pagination.pageSize, ...searchForm })
     tableData.value = res.data.items || []
     pagination.total = res.data.total || 0
   } catch (e) { console.error('获取检验列表失败:', e) }
@@ -187,60 +170,40 @@ const fetchData = async () => {
 const handleSearch = () => { pagination.page = 1; fetchData() }
 const handleReset = () => { searchForm.inspection_code = ''; searchForm.inspection_type = null; searchForm.result = null; handleSearch() }
 
-// 打开新增对话框
-const openAddDialog = () => {
-  dialogTitle.value = '新建检验单'
-  dialogVisible.value = true
-}
+const openAddDialog = () => { dialogTitle.value = '新建检验单'; dialogVisible.value = true }
 
-// 保存检验单
 const handleSave = async () => {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
     if (valid) {
       submitLoading.value = true
       try {
-        await createQualityInspection(formData)
+        await createInspection(formData)
         ElMessage.success('创建检验单成功')
         dialogVisible.value = false
         fetchData()
-      } catch (e) {
-        console.error('创建检验单失败:', e)
-        ElMessage.error('创建检验单失败')
-      } finally {
-        submitLoading.value = false
-      }
+      } catch (e) { console.error('创建检验单失败:', e); ElMessage.error('创建检验单失败') }
+      finally { submitLoading.value = false }
     }
   })
 }
 
-// 对话框关闭重置表单
 const handleDialogClose = () => {
-  if (formRef.value) {
-    formRef.value.resetFields()
-  }
-  formData.inspection_code = ''
-  formData.inspection_type = null
-  formData.product_name = ''
-  formData.quantity = null
-  formData.passed_quantity = null
-  formData.result = null
-  formData.remarks = ''
+  formRef.value?.resetFields()
+  Object.keys(formData).forEach(k => { formData[k] = k === 'passed_quantity' ? null : (k === 'status' ? 'pending' : '') })
 }
 
 onMounted(() => { fetchData() })
 </script>
 
 <style lang="scss" scoped>
-.mes-quality {
+.quality-inspection {
   .search-card { margin-bottom: 16px;
     .search-form { display: flex; flex-wrap: wrap;
       .el-form-item { margin-bottom: 0; margin-right: 16px; }
     }
   }
-  .table-card {
-    .card-header { display: flex; justify-content: space-between; align-items: center; }
-  }
+  .table-card { .card-header { display: flex; justify-content: space-between; align-items: center; } }
   .pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 }
 </style>

@@ -49,7 +49,13 @@ const iconMap = {
   'Histogram': 'Histogram',
   'ShoppingCart': 'ShoppingCart',
   'Money': 'Money',
-  'Box': 'Box'
+  'Box': 'Box',
+  'ShieldCheck': 'ShieldCheck',
+  'FileCheck': 'FileCheck',
+  'BookOpen': 'BookOpen',
+  'Settings': 'Settings',
+  'Wrench': 'Wrench',
+  'AlertTriangle': 'AlertTriangle'
 }
 
 // 视图组件映射 - 根据后端返回的 component 路径映射到实际组件

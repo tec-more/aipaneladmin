@@ -2,7 +2,7 @@
     "name": "mes",
     "display_name": "制造管理",
     "version": "1.0.0",
-    "description": "MES制造执行系统模块，包含生产计划、执行管理、质量管理、设备管理和基础数据管理",
+    "description": "MES制造执行系统模块，包含生产计划、执行管理和基础数据管理",
     "author": "hepan",
     "is_installed": true,
     "is_enabled": true,
@@ -12,9 +12,7 @@
     ],
     "models": [
         "base_data",
-        "production",
-        "quality",
-        "equipment"
+        "production"
     ],
     "schemas": [
         "mes_schema"
@@ -59,26 +57,6 @@
                     "is_hidden": false,
                     "menu_type": "menu",
                     "permission_code": "mes:exec:list"
-                },
-                {
-                    "name": "质量管理",
-                    "path": "/mes/quality",
-                    "icon": "ShieldCheck",
-                    "component": "mes/quality/Index",
-                    "sort": 4,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "mes:quality:list"
-                },
-                {
-                    "name": "设备管理",
-                    "path": "/mes/equipment",
-                    "icon": "Settings",
-                    "component": "mes/equipment/Index",
-                    "sort": 5,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "mes:equipment:list"
                 }
             ]
         }

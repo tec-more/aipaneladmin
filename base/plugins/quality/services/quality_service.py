@@ -3,9 +3,10 @@ from decimal import Decimal
 from tortoise.expressions import Q
 
 try:
-    from base.plugins.mes.models.quality import QualityInspection
-    from base.plugins.mes.schemas.mes_schema import (
+    from base.plugins.quality.models.quality import QualityInspection, InspectionStandard
+    from base.plugins.quality.schemas.quality_schema import (
         QualityInspectionCreate, QualityInspectionUpdate,
+        InspectionStandardCreate, InspectionStandardUpdate,
     )
 except ImportError:
     from typing import Any
@@ -53,6 +54,9 @@ except ImportError:
         async def to_dict(self):
             return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
 
+    class InspectionStandard(QualityInspection):
+        pass
+
     class QualityInspectionCreate:
         def __init__(self, **kwargs):
             for key, value in kwargs.items():
@@ -61,6 +65,12 @@ except ImportError:
     class QualityInspectionUpdate(QualityInspectionCreate):
         def model_dump(self, exclude_none=False):
             return {k: v for k, v in self.__dict__.items() if v is not None}
+
+    class InspectionStandardCreate(QualityInspectionCreate):
+        pass
+
+    class InspectionStandardUpdate(QualityInspectionUpdate):
+        pass
 
 
 class QualityInspectionService:
@@ -144,6 +154,65 @@ class QualityInspectionService:
     @staticmethod
     async def check_code_exists(code: str, exclude_id: Optional[int] = None) -> bool:
         query = QualityInspection.filter(inspection_code=code)
+        if exclude_id:
+            query = query.exclude(id=exclude_id)
+        return await query.exists()
+
+
+class InspectionStandardService:
+    @staticmethod
+    async def get_by_id(standard_id: int) -> Optional[InspectionStandard]:
+        return await InspectionStandard.filter(id=standard_id).first()
+
+    @staticmethod
+    async def get_by_code(standard_code: str) -> Optional[InspectionStandard]:
+        return await InspectionStandard.filter(standard_code=standard_code).first()
+
+    @staticmethod
+    async def create_standard(data: InspectionStandardCreate) -> InspectionStandard:
+        if await InspectionStandardService.check_code_exists(data.standard_code):
+            raise ValueError("标准编码已存在")
+        return await InspectionStandard.create(**data.__dict__)
+
+    @staticmethod
+    async def update_standard(standard_id: int, data: InspectionStandardUpdate) -> Optional[InspectionStandard]:
+        standard = await InspectionStandard.filter(id=standard_id).first()
+        if not standard:
+            return None
+        update_data = data.model_dump(exclude_none=True)
+        await standard.update_from_dict(update_data).save()
+        return standard
+
+    @staticmethod
+    async def delete_standard(standard_id: int) -> bool:
+        deleted_count = await InspectionStandard.filter(id=standard_id).delete()
+        return deleted_count > 0
+
+    @staticmethod
+    async def get_list(
+        page: int = 1, page_size: int = 10,
+        standard_code: Optional[str] = None,
+        standard_name: Optional[str] = None,
+        inspection_type: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> Tuple[List[InspectionStandard], int]:
+        query = InspectionStandard.all()
+        if standard_code:
+            query = query.filter(standard_code__icontains=standard_code)
+        if standard_name:
+            query = query.filter(standard_name__icontains=standard_name)
+        if inspection_type:
+            query = query.filter(inspection_type=inspection_type)
+        if is_active is not None:
+            query = query.filter(is_active=is_active)
+        total = await query.count()
+        offset = (page - 1) * page_size
+        items = await query.offset(offset).limit(page_size).order_by('-created_at')
+        return items, total
+
+    @staticmethod
+    async def check_code_exists(code: str, exclude_id: Optional[int] = None) -> bool:
+        query = InspectionStandard.filter(standard_code=code)
         if exclude_id:
             query = query.exclude(id=exclude_id)
         return await query.exists()

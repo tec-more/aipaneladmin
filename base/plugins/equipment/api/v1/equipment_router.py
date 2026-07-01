@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 try:
-    from base.plugins.mes.services.equipment_service import EquipmentService
-    from base.plugins.mes.schemas.mes_schema import (
-        EquipmentCreate, EquipmentUpdate, EquipmentResponse, EquipmentListQuery,
+    from base.plugins.equipment.services.equipment_service import EquipmentService
+    from base.plugins.equipment.schemas.equipment_schema import (
+        EquipmentCreate, EquipmentUpdate, EquipmentResponse,
         ListResponse
     )
     from base.common.response import success_response
@@ -70,10 +70,9 @@ except ImportError:
     class EquipmentCreate(BaseModel): pass
     class EquipmentUpdate(BaseModel): pass
     class EquipmentResponse(BaseModel): pass
-    class EquipmentListQuery(BaseModel): pass
     class ListResponse(BaseModel): pass
 
-equipment_router = APIRouter(prefix="/equipment", tags=["设备管理"])
+equipment_router = APIRouter(prefix="", tags=["设备台账"])
 
 @equipment_router.get("/{equipment_id}", summary="获取设备详情")
 async def get_equipment(equipment_id: int):
