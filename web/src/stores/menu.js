@@ -55,7 +55,18 @@ const iconMap = {
   'BookOpen': 'BookOpen',
   'Settings': 'Settings',
   'Wrench': 'Wrench',
-  'AlertTriangle': 'AlertTriangle'
+  'AlertTriangle': 'AlertTriangle',
+  'Wallet': 'Wallet',
+  'FileText': 'FileText',
+  'Columns': 'Columns',
+  'TrendingUp': 'TrendingUp',
+  'BarChart3': 'BarChart3',
+  'Activity': 'Activity',
+  'CloudServer': 'CloudServer',
+  'Bot': 'Bot',
+  'Management': 'Management',
+  'DataAnalysis': 'DataAnalysis',
+  'UserFilled': 'UserFilled'
 }
 
 // 视图组件映射 - 根据后端返回的 component 路径映射到实际组件

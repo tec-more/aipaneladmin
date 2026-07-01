@@ -1,25 +1,33 @@
 <template>
   <div class="account-index">
-    <div class="page-header">
-      <h2>会计科目</h2>
-      <div class="header-actions">
-        <button @click="loadAccountTypes" class="btn btn-outline">科目类型</button>
-        <button @click="handleAdd" class="btn btn-primary">新增科目</button>
-      </div>
-    </div>
+    <el-card shadow="never" class="search-card">
+      <template #header>
+        <div class="card-header">
+          <span>会计科目</span>
+          <div class="header-actions">
+            <el-button @click="handleAdd" type="primary">新增科目</el-button>
+          </div>
+        </div>
+      </template>
+      
+      <el-form :inline="true" :model="searchForm" class="search-form">
+        <el-form-item label="搜索">
+          <el-input v-model="searchForm.keyword" placeholder="搜索科目名称或编码" clearable />
+        </el-form-item>
+        <el-form-item label="科目类型">
+          <el-select v-model="searchForm.account_type" placeholder="全部类型" clearable style="width: 140px">
+            <el-option v-for="type in accountTypes" :key="type.value" :label="type.label" :value="type.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <el-button @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
     
-    <div class="search-bar">
-      <input v-model="searchForm.keyword" placeholder="搜索科目名称或编码" @keyup.enter="handleSearch" />
-      <select v-model="searchForm.account_type">
-        <option value="">全部类型</option>
-        <option v-for="type in accountTypes" :key="type.value" :value="type.value">{{ type.label }}</option>
-      </select>
-      <button @click="handleSearch" class="btn btn-primary">搜索</button>
-      <button @click="handleReset" class="btn btn-outline">重置</button>
-    </div>
-    
-    <div class="table-container">
-      <el-table :data="tableData" border>
+    <el-card shadow="never" class="table-card">
+      <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="code" label="科目编码" />
         <el-table-column prop="name" label="科目名称" />
         <el-table-column prop="account_type" label="科目类型">
@@ -29,56 +37,61 @@
         </el-table-column>
         <el-table-column prop="parent_name" label="上级科目" />
         <el-table-column prop="balance" label="余额" />
-        <el-table-column prop="is_active" label="状态">
+        <el-table-column prop="is_active" label="状态" width="100" align="center">
           <template #default="{ row }">
-            <span :class="row.is_active ? 'status-active' : 'status-inactive'">
+            <el-tag :type="row.is_active ? 'success' : 'info'">
               {{ row.is_active ? '启用' : '禁用' }}
-            </span>
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <button @click="handleEdit(row)" class="btn btn-sm btn-outline">编辑</button>
-            <button @click="handleDelete(row)" class="btn btn-sm btn-danger">删除</button>
+            <div class="action-buttons">
+              <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+              <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
       
-      <el-pagination
-        :current-page="pagination.page"
-        :page-size="pagination.page_size"
-        :total="pagination.total"
-        @current-change="handlePageChange"
-        layout="total, prev, pager, next"
-      />
-    </div>
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.page_size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="fetchData"
+          @current-change="fetchData"
+        />
+      </div>
+    </el-card>
     
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
-      <el-form :model="formData" label-width="100px">
-        <el-form-item label="科目编码">
-          <el-input v-model="formData.code" />
+      <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
+        <el-form-item label="科目编码" prop="code">
+          <el-input v-model="formData.code" placeholder="请输入科目编码" />
         </el-form-item>
-        <el-form-item label="科目名称">
-          <el-input v-model="formData.name" />
+        <el-form-item label="科目名称" prop="name">
+          <el-input v-model="formData.name" placeholder="请输入科目名称" />
         </el-form-item>
-        <el-form-item label="科目类型">
-          <el-select v-model="formData.account_type">
+        <el-form-item label="科目类型" prop="account_type">
+          <el-select v-model="formData.account_type" placeholder="请选择科目类型">
             <el-option v-for="type in accountTypes" :key="type.value" :label="type.label" :value="type.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="上级科目">
-          <el-select v-model="formData.parent_id">
-            <el-option :label="''" :value="null" />
+          <el-select v-model="formData.parent_id" placeholder="请选择上级科目" clearable>
             <el-option v-for="acc in accountList" :key="acc.id" :label="acc.code + ' ' + acc.name" :value="acc.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="formData.description" type="textarea" />
+          <el-input v-model="formData.description" type="textarea" placeholder="请输入备注" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <button @click="dialogVisible = false" class="btn btn-outline">取消</button>
-        <button @click="handleSave" class="btn btn-primary">保存</button>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSave">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -86,9 +99,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 
-const router = useRouter()
 const tableData = ref([])
 const accountTypes = ref([])
 const accountList = ref([])
@@ -96,6 +107,7 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('新增科目')
 const isEdit = ref(false)
 const currentId = ref(null)
+const loading = ref(false)
 
 const searchForm = reactive({
   keyword: '',
@@ -116,6 +128,12 @@ const formData = reactive({
   description: ''
 })
 
+const rules = {
+  code: [{ required: true, message: '请输入科目编码', trigger: 'blur' }],
+  name: [{ required: true, message: '请输入科目名称', trigger: 'blur' }],
+  account_type: [{ required: true, message: '请选择科目类型', trigger: 'change' }]
+}
+
 const getAccountTypeName = (type) => {
   const found = accountTypes.value.find(t => t.value === type)
   return found ? found.label : type
@@ -130,11 +148,6 @@ const handleReset = () => {
   searchForm.keyword = ''
   searchForm.account_type = ''
   handleSearch()
-}
-
-const handlePageChange = (page) => {
-  pagination.page = page
-  fetchData()
 }
 
 const handleAdd = () => {
@@ -166,23 +179,30 @@ const handleEdit = (row) => {
 }
 
 const handleDelete = async (row) => {
-  if (confirm(`确定删除科目 ${row.name} 吗？`)) {
-    const response = await fetch(`/api/finance/accounts/${row.id}`, {
-      method: 'DELETE'
-    })
-    const data = await response.json()
-    if (data.code === 0) {
-      alert(data.msg)
-      fetchData()
-    } else {
-      alert(data.msg || '删除失败')
+  await ElMessageBox.confirm(
+    `确定删除科目 ${row.name} 吗？`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
     }
+  )
+  const response = await fetch(`/api/finance/accounts/${row.id}`, {
+    method: 'DELETE'
+  })
+  const data = await response.json()
+  if (data.code === 0) {
+    ElMessage.success(data.msg)
+    fetchData()
+  } else {
+    ElMessage.error(data.msg || '删除失败')
   }
 }
 
 const handleSave = async () => {
   if (!formData.code || !formData.name || !formData.account_type) {
-    alert('请填写必填项')
+    ElMessage.warning('请填写必填项')
     return
   }
   
@@ -197,11 +217,11 @@ const handleSave = async () => {
   
   const data = await response.json()
   if (data.code === 0 || response.ok) {
-    alert('保存成功')
+    ElMessage.success('保存成功')
     dialogVisible.value = false
     fetchData()
   } else {
-    alert(data.msg || '保存失败')
+    ElMessage.error(data.msg || '保存失败')
   }
 }
 
@@ -214,6 +234,7 @@ const loadAccountTypes = async () => {
 }
 
 const fetchData = async () => {
+  loading.value = true
   const params = new URLSearchParams({
     page: pagination.page,
     page_size: pagination.page_size,
@@ -233,6 +254,7 @@ const fetchData = async () => {
     tableData.value = data.data || []
     pagination.total = data.total || 0
   }
+  loading.value = false
 }
 
 const fetchAccountList = async () => {
@@ -255,53 +277,5 @@ onMounted(() => {
 <style lang="scss" scoped>
 .account-index {
   padding: 20px;
-  
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    
-    h2 {
-      margin: 0;
-    }
-  }
-  
-  .header-actions {
-    display: flex;
-    gap: 10px;
-  }
-  
-  .search-bar {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    
-    input, select {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-  }
-  
-  .table-container {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    
-    .el-pagination {
-      margin-top: 20px;
-      text-align: right;
-    }
-  }
-  
-  .status-active {
-    color: #67c23a;
-    font-weight: bold;
-  }
-  
-  .status-inactive {
-    color: #909399;
-  }
 }
 </style>

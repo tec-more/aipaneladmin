@@ -1,29 +1,44 @@
 <template>
   <div class="report-index">
-    <div class="page-header">
-      <h2>财务报表</h2>
-    </div>
+    <el-card shadow="never" class="search-card">
+      <div class="card-header">
+        <span>财务报表</span>
+      </div>
+      
+      <div class="report-tabs">
+        <el-button 
+          v-for="tab in tabs" 
+          :key="tab.key"
+          :type="activeTab === tab.key ? 'primary' : 'default'"
+          @click="activeTab = tab.key"
+        >{{ tab.label }}</el-button>
+      </div>
+      
+      <div class="report-filters">
+        <el-form :inline="true" :model="filterForm" class="filter-form">
+          <el-form-item label="年份">
+            <el-select v-model="filterForm.year" style="width: 100px">
+              <el-option v-for="year in years" :key="year" :value="year">{{ year }}年</el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="月份">
+            <el-select v-model="filterForm.month" style="width: 100px">
+              <el-option v-for="month in months" :key="month" :value="month">{{ month }}月</el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="generateReport">生成报表</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+    </el-card>
     
-    <div class="report-tabs">
-      <button @click="activeTab = 'trial_balance'" :class="['tab-btn', { active: activeTab === 'trial_balance' }]">科目余额表</button>
-      <button @click="activeTab = 'profit_loss'" :class="['tab-btn', { active: activeTab === 'profit_loss' }]">利润表</button>
-      <button @click="activeTab = 'balance_sheet'" :class="['tab-btn', { active: activeTab === 'balance_sheet' }]">资产负债表</button>
-      <button @click="activeTab = 'cash_flow'" :class="['tab-btn', { active: activeTab === 'cash_flow' }]">现金流量表</button>
-    </div>
-    
-    <div class="report-filters">
-      <select v-model="filterYear">
-        <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
-      </select>
-      <select v-model="filterMonth">
-        <option v-for="month in months" :key="month" :value="month">{{ month }}月</option>
-      </select>
-      <button @click="generateReport" class="btn btn-primary">生成报表</button>
-    </div>
-    
-    <div v-if="activeTab === 'trial_balance'" class="report-content">
-      <h3>科目余额表</h3>
-      <el-table :data="trialBalanceData" border>
+    <el-card shadow="never" class="table-card">
+      <template #header>
+        <span>{{ currentTabLabel }}</span>
+      </template>
+      
+      <el-table v-if="activeTab === 'trial_balance'" :data="trialBalanceData" border stripe>
         <el-table-column prop="account_code" label="科目编码" />
         <el-table-column prop="account_name" label="科目名称" />
         <el-table-column prop="account_type" label="科目类型" />
@@ -34,11 +49,8 @@
         <el-table-column prop="ending_debit" label="期末借方" />
         <el-table-column prop="ending_credit" label="期末贷方" />
       </el-table>
-    </div>
-    
-    <div v-if="activeTab === 'profit_loss'" class="report-content">
-      <h3>利润表</h3>
-      <div class="profit-loss-container">
+      
+      <div v-if="activeTab === 'profit_loss'" class="profit-loss-container">
         <div class="section">
           <h4>一、营业收入</h4>
           <div v-for="item in profitLossData.revenue_items" :key="item.name" class="item-row">
@@ -87,11 +99,8 @@
           </div>
         </div>
       </div>
-    </div>
-    
-    <div v-if="activeTab === 'balance_sheet'" class="report-content">
-      <h3>资产负债表</h3>
-      <div class="balance-sheet-container">
+      
+      <div v-if="activeTab === 'balance_sheet'" class="balance-sheet-container">
         <div class="left-section">
           <h4>资产</h4>
           <div class="section">
@@ -163,11 +172,8 @@
           </div>
         </div>
       </div>
-    </div>
-    
-    <div v-if="activeTab === 'cash_flow'" class="report-content">
-      <h3>现金流量表</h3>
-      <div class="cash-flow-container">
+      
+      <div v-if="activeTab === 'cash_flow'" class="cash-flow-container">
         <div class="summary-row">
           <span>期初现金余额</span>
           <span>{{ cashFlowData.cash_beginning_balance }}</span>
@@ -237,16 +243,30 @@
           </div>
         </div>
       </div>
-    </div>
+    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+
+const tabs = [
+  { key: 'trial_balance', label: '科目余额表' },
+  { key: 'profit_loss', label: '利润表' },
+  { key: 'balance_sheet', label: '资产负债表' },
+  { key: 'cash_flow', label: '现金流量表' }
+]
 
 const activeTab = ref('trial_balance')
-const filterYear = ref(new Date().getFullYear())
-const filterMonth = ref(new Date().getMonth() + 1)
+const currentTabLabel = computed(() => {
+  const tab = tabs.find(t => t.key === activeTab.value)
+  return tab ? tab.label : ''
+})
+
+const filterForm = reactive({
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1
+})
 
 const years = []
 const months = []
@@ -308,7 +328,7 @@ const cashFlowData = ref({
 
 const generateReport = async () => {
   const response = await fetch(
-    `/api/finance/reports/${activeTab.value}?year=${filterYear.value}&month=${filterMonth.value}`
+    `/api/finance/reports/${activeTab.value}?year=${filterForm.year}&month=${filterForm.month}`
   )
   const data = await response.json()
   
@@ -327,12 +347,8 @@ const generateReport = async () => {
   }
 }
 
-const loadDefaultReport = () => {
-  generateReport()
-}
-
 onMounted(() => {
-  loadDefaultReport()
+  generateReport()
 })
 </script>
 
@@ -340,57 +356,17 @@ onMounted(() => {
 .report-index {
   padding: 20px;
   
-  .page-header {
-    margin-bottom: 20px;
-    
-    h2 {
-      margin: 0;
-    }
-  }
-  
   .report-tabs {
     display: flex;
     gap: 10px;
     margin-bottom: 20px;
-    
-    .tab-btn {
-      padding: 10px 20px;
-      border: 1px solid #ddd;
-      background: white;
-      border-radius: 4px;
-      cursor: pointer;
-      
-      &.active {
-        background: #409eff;
-        color: white;
-        border-color: #409eff;
-      }
-    }
   }
   
   .report-filters {
-    display: flex;
-    gap: 10px;
     margin-bottom: 20px;
-    
-    select {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
   }
   
-  .report-content {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    
-    h3 {
-      margin: 0 0 20px 0;
-    }
-  }
-  
-  .profit-loss-container, .balance-sheet-container {
+  .profit-loss-container, .balance-sheet-container, .cash-flow-container {
     .section {
       margin-bottom: 20px;
       
@@ -400,13 +376,13 @@ onMounted(() => {
         border-bottom: 1px solid #eee;
       }
       
-      .item-row {
+      .item-row, .section-row {
         display: flex;
         justify-content: space-between;
         padding: 5px 0;
       }
       
-      .total-row {
+      .total-row, .net-row {
         display: flex;
         justify-content: space-between;
         padding: 10px 0;
@@ -445,41 +421,6 @@ onMounted(() => {
       font-size: 1.1em;
       border-bottom: 2px solid #333;
       margin-bottom: 20px;
-    }
-    
-    .section {
-      margin-bottom: 20px;
-      
-      h4 {
-        margin: 0 0 10px 0;
-        padding-bottom: 5px;
-        border-bottom: 1px solid #eee;
-      }
-      
-      .section-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 5px 0;
-      }
-      
-      .net-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 10px 0;
-        font-weight: bold;
-        border-top: 1px solid #eee;
-        margin-top: 5px;
-      }
-      
-      .grand-total {
-        display: flex;
-        justify-content: space-between;
-        padding: 15px 0;
-        font-weight: bold;
-        font-size: 1.2em;
-        border-top: 2px solid #333;
-        margin-top: 10px;
-      }
     }
   }
 }

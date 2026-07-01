@@ -56,54 +56,14 @@
                     "permission_code": "finance:journal:list"
                 },
                 {
-                    "name": "日记账",
-                    "path": "/finance/daily",
-                    "icon": "Calendar",
-                    "component": "finance/daily/Index",
+                    "name": "财务报表",
+                    "path": "/finance/report",
+                    "icon": "PieChart",
+                    "component": "finance/report/Index",
                     "sort": 3,
                     "is_hidden": false,
                     "menu_type": "menu",
-                    "permission_code": "finance:daily:list"
-                },
-                {
-                    "name": "总账",
-                    "path": "/finance/ledger",
-                    "icon": "Columns",
-                    "component": "finance/ledger/Index",
-                    "sort": 4,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "finance:ledger:list"
-                },
-                {
-                    "name": "科目余额表",
-                    "path": "/finance/trial_balance",
-                    "icon": "PieChart",
-                    "component": "finance/trial_balance/Index",
-                    "sort": 5,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "finance:trial_balance:list"
-                },
-                {
-                    "name": "利润表",
-                    "path": "/finance/profit",
-                    "icon": "TrendingUp",
-                    "component": "finance/profit/Index",
-                    "sort": 6,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "finance:profit:list"
-                },
-                {
-                    "name": "资产负债表",
-                    "path": "/finance/balance_sheet",
-                    "icon": "BarChart3",
-                    "component": "finance/balance_sheet/Index",
-                    "sort": 7,
-                    "is_hidden": false,
-                    "menu_type": "menu",
-                    "permission_code": "finance:balance_sheet:list"
+                    "permission_code": "finance:report:list"
                 }
             ]
         }
