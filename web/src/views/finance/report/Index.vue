@@ -1,0 +1,338 @@
+<template>
+  <div class="report-index">
+    <div class="page-header">
+      <h2>财务报表</h2>
+    </div>
+    
+    <div class="report-tabs">
+      <button @click="activeTab = 'trial_balance'" :class="['tab-btn', { active: activeTab === 'trial_balance' }]">科目余额表</button>
+      <button @click="activeTab = 'profit_loss'" :class="['tab-btn', { active: activeTab === 'profit_loss' }]">利润表</button>
+      <button @click="activeTab = 'balance_sheet'" :class="['tab-btn', { active: activeTab === 'balance_sheet' }]">资产负债表</button>
+    </div>
+    
+    <div class="report-filters">
+      <select v-model="filterYear">
+        <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
+      </select>
+      <select v-model="filterMonth">
+        <option v-for="month in months" :key="month" :value="month">{{ month }}月</option>
+      </select>
+      <button @click="generateReport" class="btn btn-primary">生成报表</button>
+    </div>
+    
+    <div v-if="activeTab === 'trial_balance'" class="report-content">
+      <h3>科目余额表</h3>
+      <el-table :data="trialBalanceData" border>
+        <el-table-column prop="account_code" label="科目编码" />
+        <el-table-column prop="account_name" label="科目名称" />
+        <el-table-column prop="account_type" label="科目类型" />
+        <el-table-column prop="opening_debit" label="期初借方" />
+        <el-table-column prop="opening_credit" label="期初贷方" />
+        <el-table-column prop="period_debit" label="本期借方" />
+        <el-table-column prop="period_credit" label="本期贷方" />
+        <el-table-column prop="ending_debit" label="期末借方" />
+        <el-table-column prop="ending_credit" label="期末贷方" />
+      </el-table>
+    </div>
+    
+    <div v-if="activeTab === 'profit_loss'" class="report-content">
+      <h3>利润表</h3>
+      <div class="profit-loss-container">
+        <div class="section">
+          <h4>一、营业收入</h4>
+          <div v-for="item in profitLossData.revenue_items" :key="item.name" class="item-row">
+            <span>{{ item.name }}</span>
+            <span>{{ item.amount }}</span>
+          </div>
+          <div class="total-row">
+            <span>营业收入合计</span>
+            <span>{{ profitLossData.total_revenue }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>二、营业成本</h4>
+          <div v-for="item in profitLossData.cost_items" :key="item.name" class="item-row">
+            <span>{{ item.name }}</span>
+            <span>{{ item.amount }}</span>
+          </div>
+          <div class="total-row">
+            <span>营业成本合计</span>
+            <span>{{ profitLossData.total_cost }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>三、营业利润</h4>
+          <div class="item-row">
+            <span>营业利润</span>
+            <span>{{ profitLossData.operating_profit }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>四、利润总额</h4>
+          <div class="item-row">
+            <span>利润总额</span>
+            <span>{{ profitLossData.total_profit }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>五、净利润</h4>
+          <div class="item-row">
+            <span>净利润</span>
+            <span>{{ profitLossData.net_profit }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div v-if="activeTab === 'balance_sheet'" class="report-content">
+      <h3>资产负债表</h3>
+      <div class="balance-sheet-container">
+        <div class="left-section">
+          <h4>资产</h4>
+          <div class="section">
+            <h5>流动资产</h5>
+            <div v-for="item in balanceSheetData.current_assets" :key="item.name" class="item-row">
+              <span>{{ item.name }}</span>
+              <span>{{ item.amount }}</span>
+            </div>
+            <div class="total-row">
+              <span>流动资产合计</span>
+              <span>{{ balanceSheetData.total_current_assets }}</span>
+            </div>
+          </div>
+          <div class="section">
+            <h5>非流动资产</h5>
+            <div v-for="item in balanceSheetData.non_current_assets" :key="item.name" class="item-row">
+              <span>{{ item.name }}</span>
+              <span>{{ item.amount }}</span>
+            </div>
+            <div class="total-row">
+              <span>非流动资产合计</span>
+              <span>{{ balanceSheetData.total_non_current_assets }}</span>
+            </div>
+          </div>
+          <div class="grand-total">
+            <span>资产总计</span>
+            <span>{{ balanceSheetData.total_assets }}</span>
+          </div>
+        </div>
+        
+        <div class="right-section">
+          <h4>负债和所有者权益</h4>
+          <div class="section">
+            <h5>流动负债</h5>
+            <div v-for="item in balanceSheetData.current_liabilities" :key="item.name" class="item-row">
+              <span>{{ item.name }}</span>
+              <span>{{ item.amount }}</span>
+            </div>
+            <div class="total-row">
+              <span>流动负债合计</span>
+              <span>{{ balanceSheetData.total_current_liabilities }}</span>
+            </div>
+          </div>
+          <div class="section">
+            <h5>非流动负债</h5>
+            <div v-for="item in balanceSheetData.non_current_liabilities" :key="item.name" class="item-row">
+              <span>{{ item.name }}</span>
+              <span>{{ item.amount }}</span>
+            </div>
+            <div class="total-row">
+              <span>非流动负债合计</span>
+              <span>{{ balanceSheetData.total_non_current_liabilities }}</span>
+            </div>
+          </div>
+          <div class="section">
+            <h5>所有者权益</h5>
+            <div v-for="item in balanceSheetData.equity" :key="item.name" class="item-row">
+              <span>{{ item.name }}</span>
+              <span>{{ item.amount }}</span>
+            </div>
+            <div class="total-row">
+              <span>所有者权益合计</span>
+              <span>{{ balanceSheetData.total_equity }}</span>
+            </div>
+          </div>
+          <div class="grand-total">
+            <span>负债和所有者权益总计</span>
+            <span>{{ balanceSheetData.total_liabilities_equity }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const activeTab = ref('trial_balance')
+const filterYear = ref(new Date().getFullYear())
+const filterMonth = ref(new Date().getMonth() + 1)
+
+const years = []
+const months = []
+for (let i = 2020; i <= new Date().getFullYear() + 1; i++) {
+  years.push(i)
+}
+for (let i = 1; i <= 12; i++) {
+  months.push(i)
+}
+
+const trialBalanceData = ref([])
+const profitLossData = ref({
+  revenue_items: [],
+  cost_items: [],
+  total_revenue: 0,
+  total_cost: 0,
+  operating_profit: 0,
+  total_profit: 0,
+  net_profit: 0
+})
+const balanceSheetData = ref({
+  current_assets: [],
+  non_current_assets: [],
+  total_current_assets: 0,
+  total_non_current_assets: 0,
+  total_assets: 0,
+  current_liabilities: [],
+  non_current_liabilities: [],
+  total_current_liabilities: 0,
+  total_non_current_liabilities: 0,
+  equity: [],
+  total_equity: 0,
+  total_liabilities_equity: 0
+})
+
+const generateReport = async () => {
+  const response = await fetch(
+    `/api/finance/reports/${activeTab.value}?year=${filterYear.value}&month=${filterMonth.value}`
+  )
+  const data = await response.json()
+  
+  if (data.code === 0 || response.ok) {
+    if (activeTab.value === 'trial_balance') {
+      trialBalanceData.value = data.data || []
+    } else if (activeTab.value === 'profit_loss') {
+      profitLossData.value = data.data || data
+    } else if (activeTab.value === 'balance_sheet') {
+      balanceSheetData.value = data.data || data
+    }
+  } else {
+    alert(data.msg || '生成报表失败')
+  }
+}
+
+const loadDefaultReport = () => {
+  generateReport()
+}
+
+onMounted(() => {
+  loadDefaultReport()
+})
+</script>
+
+<style lang="scss" scoped>
+.report-index {
+  padding: 20px;
+  
+  .page-header {
+    margin-bottom: 20px;
+    
+    h2 {
+      margin: 0;
+    }
+  }
+  
+  .report-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    
+    .tab-btn {
+      padding: 10px 20px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      
+      &.active {
+        background: #409eff;
+        color: white;
+        border-color: #409eff;
+      }
+    }
+  }
+  
+  .report-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    
+    select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  }
+  
+  .report-content {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    
+    h3 {
+      margin: 0 0 20px 0;
+    }
+  }
+  
+  .profit-loss-container, .balance-sheet-container {
+    .section {
+      margin-bottom: 20px;
+      
+      h4, h5 {
+        margin: 0 0 10px 0;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+      }
+      
+      .item-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+      }
+      
+      .total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        font-weight: bold;
+        border-top: 1px solid #eee;
+        margin-top: 5px;
+      }
+      
+      .grand-total {
+        display: flex;
+        justify-content: space-between;
+        padding: 15px 0;
+        font-weight: bold;
+        font-size: 1.2em;
+        border-top: 2px solid #333;
+        margin-top: 10px;
+      }
+    }
+  }
+  
+  .balance-sheet-container {
+    display: flex;
+    gap: 40px;
+    
+    .left-section, .right-section {
+      flex: 1;
+    }
+  }
+}
+</style>

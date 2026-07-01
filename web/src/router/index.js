@@ -174,6 +174,31 @@ const routes = [
       { path: 'agent/dialog-flows/edit/:id', name: 'DialogFlowEdit', component: () => import('@/views/agent/dialog-flows/edit.vue'), meta: { title: '编辑对话流' } },
       { path: 'agent/rag', name: 'RAG', component: () => import('@/views/agent/rag/index.vue'), meta: { title: 'RAG知识库' } },
       { path: 'joke/agent-debug', name: 'JokeAgentDebug', component: () => import('@/views/joke/agent-debug.vue'), meta: { title: '笑话智能体调试' } },
+      // 财务管理模块
+      {
+        path: 'finance',
+        name: 'Finance',
+        redirect: 'finance/account',
+        meta: { title: '财务管理', icon: 'Wallet' }
+      },
+      {
+        path: 'finance/account',
+        name: 'FinanceAccount',
+        component: () => import('@/views/finance/account/Index.vue'),
+        meta: { title: '会计科目' }
+      },
+      {
+        path: 'finance/journal',
+        name: 'FinanceJournal',
+        component: () => import('@/views/finance/journal/Index.vue'),
+        meta: { title: '凭证管理' }
+      },
+      {
+        path: 'finance/report',
+        name: 'FinanceReport',
+        component: () => import('@/views/finance/report/Index.vue'),
+        meta: { title: '财务报表' }
+      },
 
     ]
   },

@@ -1,0 +1,111 @@
+{
+    "name": "finance",
+    "display_name": "财务管理",
+    "version": "1.0.0",
+    "description": "财务管理模块，包含会计科目管理、凭证管理、日记账、总账、报表等功能",
+    "author": "hepan",
+    "route_prefix": "/v1/finance",
+    "routes": [
+        "api/v1"
+    ],
+    "models": [
+        "account",
+        "journal",
+        "general_ledger",
+        "trial_balance"
+    ],
+    "schemas": [
+        "finance_schema"
+    ],
+    "dependencies": [
+        "sales",
+        "purchase",
+        "inventory"
+    ],
+    "is_installed": true,
+    "is_enabled": true,
+    "menus": [
+        {
+            "name": "财务管理",
+            "path": "/finance",
+            "icon": "Wallet",
+            "component": "finance/Index",
+            "sort": 7,
+            "is_hidden": false,
+            "menu_type": "menu",
+            "permission_code": "finance:list",
+            "children": [
+                {
+                    "name": "会计科目",
+                    "path": "/finance/account",
+                    "icon": "BookOpen",
+                    "component": "finance/account/Index",
+                    "sort": 1,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:account:list"
+                },
+                {
+                    "name": "凭证管理",
+                    "path": "/finance/journal",
+                    "icon": "FileText",
+                    "component": "finance/journal/Index",
+                    "sort": 2,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:journal:list"
+                },
+                {
+                    "name": "日记账",
+                    "path": "/finance/daily",
+                    "icon": "Calendar",
+                    "component": "finance/daily/Index",
+                    "sort": 3,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:daily:list"
+                },
+                {
+                    "name": "总账",
+                    "path": "/finance/ledger",
+                    "icon": "Columns",
+                    "component": "finance/ledger/Index",
+                    "sort": 4,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:ledger:list"
+                },
+                {
+                    "name": "科目余额表",
+                    "path": "/finance/trial_balance",
+                    "icon": "PieChart",
+                    "component": "finance/trial_balance/Index",
+                    "sort": 5,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:trial_balance:list"
+                },
+                {
+                    "name": "利润表",
+                    "path": "/finance/profit",
+                    "icon": "TrendingUp",
+                    "component": "finance/profit/Index",
+                    "sort": 6,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:profit:list"
+                },
+                {
+                    "name": "资产负债表",
+                    "path": "/finance/balance_sheet",
+                    "icon": "BarChart3",
+                    "component": "finance/balance_sheet/Index",
+                    "sort": 7,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:balance_sheet:list"
+                }
+            ]
+        }
+    ]
+}
