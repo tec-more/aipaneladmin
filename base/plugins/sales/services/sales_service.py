@@ -175,7 +175,7 @@ class SalesService:
             end_of_day = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
             filters["order__created_at__lt"] = end_of_day.replace(tzinfo=timezone.utc)
 
-        from tortoise.expressions import Sum, Count
+        from tortoise.functions import Sum, Count
 
         product_stats = await OrderItem.filter(**filters).annotate(
             total_sales=Sum("total_price"),
@@ -208,7 +208,7 @@ class SalesService:
             end_of_day = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
             filters["created_at__lt"] = end_of_day.replace(tzinfo=timezone.utc)
 
-        from tortoise.expressions import Sum, Count
+        from tortoise.functions import Sum, Count
 
         customer_stats = await CustomerOrder.filter(**filters).annotate(
             total_spent=Sum("final_amount"),
@@ -242,7 +242,7 @@ class SalesService:
             end_of_day = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
             filters["created_at__lt"] = end_of_day.replace(tzinfo=timezone.utc)
 
-        from tortoise.expressions import Sum, Count
+        from tortoise.functions import Sum, Count
 
         payment_stats = await CustomerOrder.filter(**filters).annotate(
             total_amount=Sum("final_amount"),
