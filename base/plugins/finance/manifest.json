@@ -56,11 +56,21 @@
                     "permission_code": "finance:journal:list"
                 },
                 {
+                    "name": "日记账",
+                    "path": "/finance/daily",
+                    "icon": "Calendar",
+                    "component": "finance/daily/Index",
+                    "sort": 3,
+                    "is_hidden": false,
+                    "menu_type": "menu",
+                    "permission_code": "finance:daily:list"
+                },
+                {
                     "name": "财务报表",
                     "path": "/finance/report",
                     "icon": "PieChart",
                     "component": "finance/report/Index",
-                    "sort": 3,
+                    "sort": 4,
                     "is_hidden": false,
                     "menu_type": "menu",
                     "permission_code": "finance:report:list"

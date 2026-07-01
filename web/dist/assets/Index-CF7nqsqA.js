@@ -1,0 +1,1 @@
+import{_ as o,an as n,c as t,o as c,b as r}from"./index-DDuSrHZl.js";const s={},_={class:"inventory-index"};function a(d,i){const e=n("router-view");return c(),t("div",_,[r(e)])}const f=o(s,[["render",a],["__scopeId","data-v-4c0b2118"]]);export{f as default};

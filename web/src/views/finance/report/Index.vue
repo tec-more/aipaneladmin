@@ -10,7 +10,7 @@
           v-for="tab in tabs" 
           :key="tab.key"
           :type="activeTab === tab.key ? 'primary' : 'default'"
-          @click="activeTab = tab.key"
+          @click="switchTab(tab.key)"
         >{{ tab.label }}</el-button>
       </div>
       
@@ -27,7 +27,7 @@
             </el-select>
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="generateReport">生成报表</el-button>
+            <el-button type="primary" :loading="loading" @click="generateReport">生成报表</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -38,7 +38,14 @@
         <span>{{ currentTabLabel }}</span>
       </template>
       
-      <el-table v-if="activeTab === 'trial_balance'" :data="trialBalanceData" border stripe>
+      <el-table 
+        v-if="activeTab === 'trial_balance'" 
+        v-loading="loading" 
+        :data="trialBalanceData" 
+        border 
+        stripe
+        empty-text="暂无数据，请点击「生成报表」查询"
+      >
         <el-table-column prop="account_code" label="科目编码" />
         <el-table-column prop="account_name" label="科目名称" />
         <el-table-column prop="account_type" label="科目类型" />
@@ -50,205 +57,215 @@
         <el-table-column prop="ending_credit" label="期末贷方" />
       </el-table>
       
-      <div v-if="activeTab === 'profit_loss'" class="profit-loss-container">
-        <div class="section">
-          <h4>一、营业收入</h4>
-          <div v-for="item in profitLossData.revenue_items" :key="item.name" class="item-row">
-            <span>{{ item.name }}</span>
-            <span>{{ item.amount }}</span>
+      <div v-if="activeTab === 'profit_loss'" v-loading="loading" class="profit-loss-container">
+        <div v-if="hasProfitLossData">
+          <div class="section">
+            <h4>一、营业收入</h4>
+            <div v-for="item in profitLossData.revenue_items" :key="item.name" class="item-row">
+              <span>{{ item.name }}</span>
+              <span>{{ item.amount }}</span>
+            </div>
+            <div class="total-row">
+              <span>营业收入合计</span>
+              <span>{{ profitLossData.total_revenue }}</span>
+            </div>
           </div>
-          <div class="total-row">
-            <span>营业收入合计</span>
-            <span>{{ profitLossData.total_revenue }}</span>
+          
+          <div class="section">
+            <h4>二、营业成本</h4>
+            <div v-for="item in profitLossData.cost_items" :key="item.name" class="item-row">
+              <span>{{ item.name }}</span>
+              <span>{{ item.amount }}</span>
+            </div>
+            <div class="total-row">
+              <span>营业成本合计</span>
+              <span>{{ profitLossData.total_cost }}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h4>三、营业利润</h4>
+            <div class="item-row">
+              <span>营业利润</span>
+              <span>{{ profitLossData.operating_profit }}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h4>四、利润总额</h4>
+            <div class="item-row">
+              <span>利润总额</span>
+              <span>{{ profitLossData.total_profit }}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h4>五、净利润</h4>
+            <div class="item-row">
+              <span>净利润</span>
+              <span>{{ profitLossData.net_profit }}</span>
+            </div>
           </div>
         </div>
-        
-        <div class="section">
-          <h4>二、营业成本</h4>
-          <div v-for="item in profitLossData.cost_items" :key="item.name" class="item-row">
-            <span>{{ item.name }}</span>
-            <span>{{ item.amount }}</span>
-          </div>
-          <div class="total-row">
-            <span>营业成本合计</span>
-            <span>{{ profitLossData.total_cost }}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h4>三、营业利润</h4>
-          <div class="item-row">
-            <span>营业利润</span>
-            <span>{{ profitLossData.operating_profit }}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h4>四、利润总额</h4>
-          <div class="item-row">
-            <span>利润总额</span>
-            <span>{{ profitLossData.total_profit }}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h4>五、净利润</h4>
-          <div class="item-row">
-            <span>净利润</span>
-            <span>{{ profitLossData.net_profit }}</span>
-          </div>
-        </div>
+        <el-empty v-else description="暂无数据，请点击「生成报表」查询" />
       </div>
       
-      <div v-if="activeTab === 'balance_sheet'" class="balance-sheet-container">
-        <div class="left-section">
-          <h4>资产</h4>
-          <div class="section">
-            <h5>流动资产</h5>
-            <div v-for="item in balanceSheetData.current_assets" :key="item.name" class="item-row">
-              <span>{{ item.name }}</span>
-              <span>{{ item.amount }}</span>
+      <div v-if="activeTab === 'balance_sheet'" v-loading="loading" class="balance-sheet-container">
+        <div v-if="hasBalanceSheetData" style="display: flex; gap: 40px;">
+          <div class="left-section" style="flex: 1;">
+            <h4>资产</h4>
+            <div class="section">
+              <h5>流动资产</h5>
+              <div v-for="item in balanceSheetData.current_assets" :key="item.name" class="item-row">
+                <span>{{ item.name }}</span>
+                <span>{{ item.amount }}</span>
+              </div>
+              <div class="total-row">
+                <span>流动资产合计</span>
+                <span>{{ balanceSheetData.total_current_assets }}</span>
+              </div>
             </div>
-            <div class="total-row">
-              <span>流动资产合计</span>
-              <span>{{ balanceSheetData.total_current_assets }}</span>
+            <div class="section">
+              <h5>非流动资产</h5>
+              <div v-for="item in balanceSheetData.non_current_assets" :key="item.name" class="item-row">
+                <span>{{ item.name }}</span>
+                <span>{{ item.amount }}</span>
+              </div>
+              <div class="total-row">
+                <span>非流动资产合计</span>
+                <span>{{ balanceSheetData.total_non_current_assets }}</span>
+              </div>
+            </div>
+            <div class="grand-total">
+              <span>资产总计</span>
+              <span>{{ balanceSheetData.total_assets }}</span>
             </div>
           </div>
-          <div class="section">
-            <h5>非流动资产</h5>
-            <div v-for="item in balanceSheetData.non_current_assets" :key="item.name" class="item-row">
-              <span>{{ item.name }}</span>
-              <span>{{ item.amount }}</span>
+          
+          <div class="right-section" style="flex: 1;">
+            <h4>负债和所有者权益</h4>
+            <div class="section">
+              <h5>流动负债</h5>
+              <div v-for="item in balanceSheetData.current_liabilities" :key="item.name" class="item-row">
+                <span>{{ item.name }}</span>
+                <span>{{ item.amount }}</span>
+              </div>
+              <div class="total-row">
+                <span>流动负债合计</span>
+                <span>{{ balanceSheetData.total_current_liabilities }}</span>
+              </div>
             </div>
-            <div class="total-row">
-              <span>非流动资产合计</span>
-              <span>{{ balanceSheetData.total_non_current_assets }}</span>
+            <div class="section">
+              <h5>非流动负债</h5>
+              <div v-for="item in balanceSheetData.non_current_liabilities" :key="item.name" class="item-row">
+                <span>{{ item.name }}</span>
+                <span>{{ item.amount }}</span>
+              </div>
+              <div class="total-row">
+                <span>非流动负债合计</span>
+                <span>{{ balanceSheetData.total_non_current_liabilities }}</span>
+              </div>
             </div>
-          </div>
-          <div class="grand-total">
-            <span>资产总计</span>
-            <span>{{ balanceSheetData.total_assets }}</span>
+            <div class="section">
+              <h5>所有者权益</h5>
+              <div v-for="item in balanceSheetData.equity" :key="item.name" class="item-row">
+                <span>{{ item.name }}</span>
+                <span>{{ item.amount }}</span>
+              </div>
+              <div class="total-row">
+                <span>所有者权益合计</span>
+                <span>{{ balanceSheetData.total_equity }}</span>
+              </div>
+            </div>
+            <div class="grand-total">
+              <span>负债和所有者权益总计</span>
+              <span>{{ balanceSheetData.total_liabilities_equity }}</span>
+            </div>
           </div>
         </div>
-        
-        <div class="right-section">
-          <h4>负债和所有者权益</h4>
-          <div class="section">
-            <h5>流动负债</h5>
-            <div v-for="item in balanceSheetData.current_liabilities" :key="item.name" class="item-row">
-              <span>{{ item.name }}</span>
-              <span>{{ item.amount }}</span>
-            </div>
-            <div class="total-row">
-              <span>流动负债合计</span>
-              <span>{{ balanceSheetData.total_current_liabilities }}</span>
-            </div>
-          </div>
-          <div class="section">
-            <h5>非流动负债</h5>
-            <div v-for="item in balanceSheetData.non_current_liabilities" :key="item.name" class="item-row">
-              <span>{{ item.name }}</span>
-              <span>{{ item.amount }}</span>
-            </div>
-            <div class="total-row">
-              <span>非流动负债合计</span>
-              <span>{{ balanceSheetData.total_non_current_liabilities }}</span>
-            </div>
-          </div>
-          <div class="section">
-            <h5>所有者权益</h5>
-            <div v-for="item in balanceSheetData.equity" :key="item.name" class="item-row">
-              <span>{{ item.name }}</span>
-              <span>{{ item.amount }}</span>
-            </div>
-            <div class="total-row">
-              <span>所有者权益合计</span>
-              <span>{{ balanceSheetData.total_equity }}</span>
-            </div>
-          </div>
-          <div class="grand-total">
-            <span>负债和所有者权益总计</span>
-            <span>{{ balanceSheetData.total_liabilities_equity }}</span>
-          </div>
-        </div>
+        <el-empty v-else description="暂无数据，请点击「生成报表」查询" />
       </div>
       
-      <div v-if="activeTab === 'cash_flow'" class="cash-flow-container">
-        <div class="summary-row">
-          <span>期初现金余额</span>
-          <span>{{ cashFlowData.cash_beginning_balance }}</span>
+      <div v-if="activeTab === 'cash_flow'" v-loading="loading" class="cash-flow-container">
+        <div v-if="hasCashFlowData">
+          <div class="summary-row">
+            <span>期初现金余额</span>
+            <span>{{ cashFlowData.cash_beginning_balance }}</span>
+          </div>
+          
+          <div class="section">
+            <h4>一、经营活动产生的现金流量</h4>
+            <div class="section-row">
+              <span>现金流入</span>
+              <span>{{ cashFlowData.operating.cash_inflow }}</span>
+            </div>
+            <div class="section-row">
+              <span>现金流出</span>
+              <span>{{ cashFlowData.operating.cash_outflow }}</span>
+            </div>
+            <div class="net-row">
+              <span>经营活动净现金流</span>
+              <span>{{ cashFlowData.operating.net_cash_flow }}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h4>二、投资活动产生的现金流量</h4>
+            <div class="section-row">
+              <span>现金流入</span>
+              <span>{{ cashFlowData.investing.cash_inflow }}</span>
+            </div>
+            <div class="section-row">
+              <span>现金流出</span>
+              <span>{{ cashFlowData.investing.cash_outflow }}</span>
+            </div>
+            <div class="net-row">
+              <span>投资活动净现金流</span>
+              <span>{{ cashFlowData.investing.net_cash_flow }}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h4>三、筹资活动产生的现金流量</h4>
+            <div class="section-row">
+              <span>现金流入</span>
+              <span>{{ cashFlowData.financing.cash_inflow }}</span>
+            </div>
+            <div class="section-row">
+              <span>现金流出</span>
+              <span>{{ cashFlowData.financing.cash_outflow }}</span>
+            </div>
+            <div class="net-row">
+              <span>筹资活动净现金流</span>
+              <span>{{ cashFlowData.financing.net_cash_flow }}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h4>四、现金净增加额</h4>
+            <div class="grand-total">
+              <span>现金净增加额</span>
+              <span>{{ cashFlowData.net_cash_flow }}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h4>五、期末现金余额</h4>
+            <div class="grand-total">
+              <span>期末现金余额</span>
+              <span>{{ cashFlowData.cash_ending_balance }}</span>
+            </div>
+          </div>
         </div>
-        
-        <div class="section">
-          <h4>一、经营活动产生的现金流量</h4>
-          <div class="section-row">
-            <span>现金流入</span>
-            <span>{{ cashFlowData.operating.cash_inflow }}</span>
-          </div>
-          <div class="section-row">
-            <span>现金流出</span>
-            <span>{{ cashFlowData.operating.cash_outflow }}</span>
-          </div>
-          <div class="net-row">
-            <span>经营活动净现金流</span>
-            <span>{{ cashFlowData.operating.net_cash_flow }}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h4>二、投资活动产生的现金流量</h4>
-          <div class="section-row">
-            <span>现金流入</span>
-            <span>{{ cashFlowData.investing.cash_inflow }}</span>
-          </div>
-          <div class="section-row">
-            <span>现金流出</span>
-            <span>{{ cashFlowData.investing.cash_outflow }}</span>
-          </div>
-          <div class="net-row">
-            <span>投资活动净现金流</span>
-            <span>{{ cashFlowData.investing.net_cash_flow }}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h4>三、筹资活动产生的现金流量</h4>
-          <div class="section-row">
-            <span>现金流入</span>
-            <span>{{ cashFlowData.financing.cash_inflow }}</span>
-          </div>
-          <div class="section-row">
-            <span>现金流出</span>
-            <span>{{ cashFlowData.financing.cash_outflow }}</span>
-          </div>
-          <div class="net-row">
-            <span>筹资活动净现金流</span>
-            <span>{{ cashFlowData.financing.net_cash_flow }}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h4>四、现金净增加额</h4>
-          <div class="grand-total">
-            <span>现金净增加额</span>
-            <span>{{ cashFlowData.net_cash_flow }}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h4>五、期末现金余额</h4>
-          <div class="grand-total">
-            <span>期末现金余额</span>
-            <span>{{ cashFlowData.cash_ending_balance }}</span>
-          </div>
-        </div>
+        <el-empty v-else description="暂无数据，请点击「生成报表」查询" />
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 
 const tabs = [
   { key: 'trial_balance', label: '科目余额表' },
@@ -258,6 +275,8 @@ const tabs = [
 ]
 
 const activeTab = ref('trial_balance')
+const loading = ref(false)
+
 const currentTabLabel = computed(() => {
   const tab = tabs.find(t => t.key === activeTab.value)
   return tab ? tab.label : ''
@@ -326,30 +345,82 @@ const cashFlowData = ref({
   }
 })
 
-const generateReport = async () => {
-  const response = await fetch(
-    `/api/finance/reports/${activeTab.value}?year=${filterForm.year}&month=${filterForm.month}`
-  )
-  const data = await response.json()
-  
-  if (data.code === 0 || response.ok) {
-    if (activeTab.value === 'trial_balance') {
-      trialBalanceData.value = data.data || []
-    } else if (activeTab.value === 'profit_loss') {
-      profitLossData.value = data.data || data
-    } else if (activeTab.value === 'balance_sheet') {
-      balanceSheetData.value = data.data || data
-    } else if (activeTab.value === 'cash_flow') {
-      cashFlowData.value = data.data || data
-    }
-  } else {
-    alert(data.msg || '生成报表失败')
-  }
+const hasProfitLossData = computed(() => {
+  return (profitLossData.value.revenue_items && profitLossData.value.revenue_items.length > 0) ||
+         (profitLossData.value.cost_items && profitLossData.value.cost_items.length > 0) ||
+         Number(profitLossData.value.total_revenue) !== 0
+})
+
+const hasBalanceSheetData = computed(() => {
+  return (balanceSheetData.value.current_assets && balanceSheetData.value.current_assets.length > 0) ||
+         (balanceSheetData.value.equity && balanceSheetData.value.equity.length > 0) ||
+         Number(balanceSheetData.value.total_assets) !== 0
+})
+
+const hasCashFlowData = computed(() => {
+  return Number(cashFlowData.value.cash_beginning_balance) !== 0 ||
+         Number(cashFlowData.value.net_cash_flow) !== 0 ||
+         Number(cashFlowData.value.operating.net_cash_flow) !== 0
+})
+
+const switchTab = (key) => {
+  activeTab.value = key
 }
 
-onMounted(() => {
-  generateReport()
-})
+const generateReport = async () => {
+  loading.value = true
+  try {
+    let response, data
+    
+    response = await fetch(
+      `/api/finance/reports/${activeTab.value}?year=${filterForm.year}&month=${filterForm.month}`
+    )
+    data = await response.json()
+    
+    if (response.ok) {
+      if (activeTab.value === 'trial_balance') {
+        const records = data.data || []
+        if (records.length === 0) {
+          ElMessage.warning('报表生成失败：未查询到科目余额表数据')
+        } else {
+          ElMessage.success(`查询成功，共 ${records.length} 条记录`)
+        }
+        trialBalanceData.value = records
+      } else if (activeTab.value === 'profit_loss') {
+        const records = data.data || data
+        if (!records || (Array.isArray(records.revenue_items) && records.revenue_items.length === 0 && Number(records.total_revenue) === 0)) {
+          ElMessage.warning('报表生成失败：未查询到利润表数据')
+        } else {
+          ElMessage.success('利润表查询成功')
+        }
+        profitLossData.value = records
+      } else if (activeTab.value === 'balance_sheet') {
+        const records = data.data || data
+        if (!records || (Array.isArray(records.current_assets) && records.current_assets.length === 0 && Number(records.total_assets) === 0)) {
+          ElMessage.warning('报表生成失败：未查询到资产负债表数据')
+        } else {
+          ElMessage.success('资产负债表查询成功')
+        }
+        balanceSheetData.value = records
+      } else if (activeTab.value === 'cash_flow') {
+        const records = data.data || data
+        if (!records || (Number(records.cash_beginning_balance) === 0 && Number(records.net_cash_flow) === 0)) {
+          ElMessage.warning('报表生成失败：未查询到现金流量表数据')
+        } else {
+          ElMessage.success('现金流量表查询成功')
+        }
+        cashFlowData.value = records
+      }
+    } else {
+      ElMessage.error(data.msg || data.detail || '报表生成失败')
+    }
+  } catch (error) {
+    console.error('生成报表出错:', error)
+    ElMessage.error('报表生成失败：' + (error.message || '网络错误'))
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -404,11 +475,14 @@ onMounted(() => {
   }
   
   .balance-sheet-container {
-    display: flex;
-    gap: 40px;
-    
-    .left-section, .right-section {
-      flex: 1;
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      font-weight: bold;
+      font-size: 1.1em;
+      border-bottom: 2px solid #333;
+      margin-bottom: 20px;
     }
   }
   
