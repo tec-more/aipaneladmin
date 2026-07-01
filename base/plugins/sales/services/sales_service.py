@@ -175,25 +175,33 @@ class SalesService:
             end_of_day = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
             filters["order__created_at__lt"] = end_of_day.replace(tzinfo=timezone.utc)
 
-        from tortoise.functions import Sum, Count
+        items = await OrderItem.filter(**filters).prefetch_related("order")
 
-        product_stats = await OrderItem.filter(**filters).annotate(
-            total_sales=Sum("total_price"),
-            total_quantity=Sum("quantity"),
-            order_count=Count("order_id", distinct=True)
-        ).group_by("product_name", "product_type").order_by("-total_sales").limit(limit)
+        product_map = {}
+        for item in items:
+            key = (item.product_name or "未知", item.product_type or "未知")
+            if key not in product_map:
+                product_map[key] = {
+                    "total_sales": Decimal("0.00"),
+                    "total_quantity": 0,
+                    "order_ids": set()
+                }
+            product_map[key]["total_sales"] += item.total_price if item.total_price else Decimal("0.00")
+            product_map[key]["total_quantity"] += item.quantity or 0
+            product_map[key]["order_ids"].add(item.order_id)
 
         result = []
-        for stat in product_stats:
+        for (product_name, product_type), stats in product_map.items():
             result.append({
-                "product_name": stat.product_name,
-                "product_type": stat.product_type,
-                "total_sales": float(stat.total_sales) if stat.total_sales else 0.0,
-                "total_quantity": stat.total_quantity or 0,
-                "order_count": stat.order_count or 0
+                "product_name": product_name,
+                "product_type": product_type,
+                "total_sales": float(stats["total_sales"]),
+                "total_quantity": stats["total_quantity"],
+                "order_count": len(stats["order_ids"])
             })
 
-        return result
+        result.sort(key=lambda x: x["total_sales"], reverse=True)
+        return result[:limit]
 
     @staticmethod
     async def get_top_customers(limit: int = 10, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -208,26 +216,35 @@ class SalesService:
             end_of_day = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
             filters["created_at__lt"] = end_of_day.replace(tzinfo=timezone.utc)
 
-        from tortoise.functions import Sum, Count
+        orders = await CustomerOrder.filter(**filters).prefetch_related("customer")
 
-        customer_stats = await CustomerOrder.filter(**filters).annotate(
-            total_spent=Sum("final_amount"),
-            order_count=Count("id")
-        ).group_by("customer_id").order_by("-total_spent").limit(limit).prefetch_related("customer")
+        customer_map = {}
+        for order in orders:
+            customer_id = order.customer_id
+            if customer_id not in customer_map:
+                customer_map[customer_id] = {
+                    "total_spent": Decimal("0.00"),
+                    "order_count": 0,
+                    "customer": order.customer
+                }
+            customer_map[customer_id]["total_spent"] += order.final_amount if order.final_amount else Decimal("0.00")
+            customer_map[customer_id]["order_count"] += 1
 
         result = []
-        for stat in customer_stats:
-            customer_name = str(stat.customer) if stat.customer else "未知客户"
-            customer_phone = stat.customer.phone if stat.customer else None
+        for customer_id, stats in customer_map.items():
+            customer = stats["customer"]
+            customer_name = str(customer) if customer else "未知客户"
+            customer_phone = customer.phone if customer else None
             result.append({
-                "customer_id": stat.customer_id,
+                "customer_id": customer_id,
                 "customer_name": customer_name,
                 "customer_phone": customer_phone,
-                "total_spent": float(stat.total_spent) if stat.total_spent else 0.0,
-                "order_count": stat.order_count or 0
+                "total_spent": float(stats["total_spent"]),
+                "order_count": stats["order_count"]
             })
 
-        return result
+        result.sort(key=lambda x: x["total_spent"], reverse=True)
+        return result[:limit]
 
     @staticmethod
     async def get_payment_method_stats(start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
@@ -242,33 +259,28 @@ class SalesService:
             end_of_day = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
             filters["created_at__lt"] = end_of_day.replace(tzinfo=timezone.utc)
 
-        from tortoise.functions import Sum, Count
-
-        payment_stats = await CustomerOrder.filter(**filters).annotate(
-            total_amount=Sum("final_amount"),
-            order_count=Count("id")
-        ).group_by("payment_method")
+        orders = await CustomerOrder.filter(**filters)
 
         result = {}
         total_amount = Decimal("0.00")
         total_count = 0
 
-        for stat in payment_stats:
-            method = stat.payment_method.value if hasattr(stat.payment_method, 'value') else stat.payment_method
-            amount = float(stat.total_amount) if stat.total_amount else 0.0
-            count = stat.order_count or 0
-
-            result[method] = {
-                "amount": amount,
-                "count": count,
-                "percentage": 0.0
-            }
-            total_amount += stat.total_amount if stat.total_amount else Decimal("0.00")
-            total_count += count
+        for order in orders:
+            method = order.payment_method.value if hasattr(order.payment_method, 'value') else order.payment_method
+            if method not in result:
+                result[method] = {
+                    "amount": Decimal("0.00"),
+                    "count": 0
+                }
+            result[method]["amount"] += order.final_amount if order.final_amount else Decimal("0.00")
+            result[method]["count"] += 1
+            total_amount += order.final_amount if order.final_amount else Decimal("0.00")
+            total_count += 1
 
         for method in result:
             if total_amount > 0:
-                result[method]["percentage"] = round((result[method]["amount"] / float(total_amount)) * 100, 2)
+                result[method]["percentage"] = round((float(result[method]["amount"]) / float(total_amount)) * 100, 2)
+            result[method]["amount"] = float(result[method]["amount"])
 
         return {
             "total_amount": float(total_amount),
