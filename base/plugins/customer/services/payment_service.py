@@ -10,12 +10,10 @@ from decimal import Decimal
 
 from base.plugins.customer.models import (
     PaymentTransaction,
-    OrderStatus,
     TransactionStatus,
     PaymentMethod
 )
-# 使用新的订单模型
-from base.plugins.sales.models.order import CustomerOrder
+from base.plugins.sales.models.order import CustomerOrder, PaymentStatus, OrderStatus
 from base.plugins.customer.models.membership import MembershipLevel
 
 
@@ -61,21 +59,23 @@ class PaymentService:
     async def cancel_order(self, order_no: str) -> bool:
         """取消订单"""
         order = await self.get_order(order_no)
-        if not order or order.payment_status != OrderStatus.PENDING:
+        if not order or order.payment_status != PaymentStatus.PENDING:
             return False
 
-        order.payment_status = OrderStatus.CANCELLED
+        order.payment_status = PaymentStatus.EXPIRED
+        order.order_status = OrderStatus.CANCELLED
         await order.save()
         return True
 
     async def check_order_expired(self) -> None:
         """检查并更新过期订单（定时任务调用）"""
         expired_orders = await CustomerOrder.filter(
-            payment_status=OrderStatus.PENDING
+            payment_status=PaymentStatus.PENDING
         ).filter(expire_time__lt=datetime.now())
 
         for order in expired_orders:
-            order.payment_status = OrderStatus.EXPIRED
+            order.payment_status = PaymentStatus.EXPIRED
+            order.order_status = OrderStatus.CANCELLED
             await order.save()
 
     async def process_payment_callback(

@@ -5,7 +5,7 @@ from decimal import Decimal
 
 try:
     from base.plugins.sales.models.order import (
-        CustomerOrder, OrderItem, OrderStatus, PaymentMethod, generate_order_no
+        CustomerOrder, OrderItem, OrderStatus, PaymentStatus, PaymentMethod, generate_order_no
     )
     from base.plugins.customer.models.customer import Customer
     from base.plugins.customer.models.customer_membership import CustomerMembership
@@ -14,6 +14,7 @@ except ImportError:
     CustomerOrder = None
     OrderItem = None
     OrderStatus = None
+    PaymentStatus = None
     PaymentMethod = None
     Customer = None
     CustomerMembership = None
@@ -83,7 +84,8 @@ class OrderService:
             discount_amount=total_discount,
             final_amount=total_amount,
             payment_method=payment_method_enum,
-            payment_status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            order_status=OrderStatus.PENDING,
             expire_time=expire_time,
             client_ip=client_ip,
             device_info=device_info,
@@ -212,9 +214,16 @@ class OrderService:
         ).prefetch_related('items').order_by("-created_at").offset(offset).limit(page_size)
 
     @staticmethod
-    async def get_all_orders(page: int = 1, page_size: int = 20) -> List[CustomerOrder]:
+    async def get_all_orders(page: int = 1, page_size: int = 20, order_status: Optional[str] = None, payment_status: Optional[str] = None) -> List[CustomerOrder]:
         offset = (page - 1) * page_size
-        return await CustomerOrder.all().prefetch_related('customer', 'items').order_by("-created_at").offset(offset).limit(page_size)
+        query = CustomerOrder.all().prefetch_related('customer', 'items').order_by("-created_at")
+        
+        if order_status:
+            query = query.filter(order_status=order_status)
+        if payment_status:
+            query = query.filter(payment_status=payment_status)
+        
+        return await query.offset(offset).limit(page_size)
 
     @staticmethod
     async def update_order_status(order_id: int, status: str) -> bool:
@@ -232,13 +241,13 @@ class OrderService:
         transaction_id: Optional[str] = None
     ) -> bool:
         try:
-            order_status = OrderStatus(status)
+            payment_status_enum = PaymentStatus(status)
         except ValueError:
             raise ValueError(f"无效的支付状态: {status}")
 
-        update_data = {"payment_status": order_status}
+        update_data = {"payment_status": payment_status_enum}
 
-        if order_status == OrderStatus.PAID:
+        if payment_status_enum == PaymentStatus.PAID:
             update_data["pay_time"] = datetime.now(timezone.utc)
 
         if transaction_id:
@@ -248,15 +257,25 @@ class OrderService:
         return result > 0
 
     @staticmethod
+    async def update_order_status(order_id: int, status: str) -> bool:
+        try:
+            order_status_enum = OrderStatus(status)
+        except ValueError:
+            raise ValueError(f"无效的订单状态: {status}")
+
+        result = await CustomerOrder.filter(id=order_id).update(order_status=order_status_enum)
+        return result > 0
+
+    @staticmethod
     async def cancel_order(order_no: str) -> bool:
         order = await CustomerOrder.get_or_none(order_no=order_no)
         if not order:
             return False
 
-        if order.payment_status != OrderStatus.PENDING:
+        if order.payment_status != PaymentStatus.PENDING:
             return False
 
-        await CustomerOrder.filter(order_no=order_no).update(payment_status=OrderStatus.CANCELLED)
+        await CustomerOrder.filter(order_no=order_no).update(payment_status=PaymentStatus.EXPIRED, order_status=OrderStatus.CANCELLED)
         return True
 
     @staticmethod
@@ -275,13 +294,14 @@ class OrderService:
         if not order:
             return False
 
-        if order.payment_status == OrderStatus.PAID:
+        if order.payment_status == PaymentStatus.PAID:
             return True
 
         if float(order.final_amount) != amount:
             return False
 
-        order.payment_status = OrderStatus.PAID
+        order.payment_status = PaymentStatus.PAID
+        order.order_status = OrderStatus.PROCESSING
         order.trade_no = transaction_id
         order.pay_time = datetime.now(timezone.utc)
         await order.save()
@@ -305,14 +325,15 @@ class OrderService:
         now = datetime.now(timezone.utc)
 
         expired_orders = await CustomerOrder.filter(
-            payment_status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
             expire_time__lt=now
         )
 
         cancelled_count = 0
         for order in expired_orders:
             try:
-                order.payment_status = OrderStatus.CANCELLED
+                order.payment_status = PaymentStatus.EXPIRED
+                order.order_status = OrderStatus.CANCELLED
                 await order.save()
                 cancelled_count += 1
                 print(f"[OrderService] 订单 {order.order_no} 已过期，自动取消")
@@ -330,7 +351,7 @@ class OrderService:
         if not order:
             return False
 
-        if order.payment_status != OrderStatus.PENDING:
+        if order.payment_status != PaymentStatus.PENDING:
             return False
 
         now = datetime.now(timezone.utc)
@@ -342,7 +363,8 @@ class OrderService:
             expire_time_utc = expire_time.replace(tzinfo=timezone.utc)
 
         if now > expire_time_utc:
-            order.payment_status = OrderStatus.CANCELLED
+            order.payment_status = PaymentStatus.EXPIRED
+            order.order_status = OrderStatus.CANCELLED
             await order.save()
             print(f"[OrderService] 订单 {order.order_no} 已过期，自动取消")
             return True

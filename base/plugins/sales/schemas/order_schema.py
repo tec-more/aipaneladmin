@@ -187,7 +187,7 @@ class OrderCreateResponse(BaseModel):
 
 
 class OrderUpdateRequest(BaseModel):
-    payment_status: Optional[str] = Field(None, description="支付状态(pending/processing/paid/completed/cancelled/failed/refunded/expired)")
+    payment_status: Optional[str] = Field(None, description="支付状态(pending/paid/failed/refunded/expired)")
     remark: Optional[str] = Field(None, description="订单备注")
 
 

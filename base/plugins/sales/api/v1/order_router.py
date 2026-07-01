@@ -115,6 +115,7 @@ async def get_customer_orders(
             "final_amount": float(order.final_amount),
             "payment_method": order.payment_method.value if hasattr(order.payment_method, 'value') else order.payment_method,
             "payment_status": order.payment_status.value if hasattr(order.payment_status, 'value') else order.payment_status,
+            "order_status": order.order_status.value if hasattr(order.order_status, 'value') else order.order_status,
             "pay_time": order.pay_time.strftime("%Y-%m-%d %H:%M:%S") if order.pay_time else None,
             "expire_time": order.expire_time.strftime("%Y-%m-%d %H:%M:%S") if order.expire_time else None,
             "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else None,
@@ -134,12 +135,19 @@ async def get_all_orders(
     page_size: int = Query(20, ge=1, le=1000, description="每页数量"),
     order_no: Optional[str] = Query(None, description="订单号"),
     customer_name: Optional[str] = Query(None, description="客户名称"),
-    product_name: Optional[str] = Query(None, description="产品名称")
+    product_name: Optional[str] = Query(None, description="产品名称"),
+    order_status: Optional[str] = Query(None, description="订单状态"),
+    payment_status: Optional[str] = Query(None, description="支付状态")
 ):
-    orders = await OrderService.get_all_orders(page, page_size)
+    orders = await OrderService.get_all_orders(page, page_size, order_status=order_status, payment_status=payment_status)
 
     from base.plugins.sales.models.order import CustomerOrder, OrderItem
-    total = await CustomerOrder.all().count()
+    query = CustomerOrder.all()
+    if order_status:
+        query = query.filter(order_status=order_status)
+    if payment_status:
+        query = query.filter(payment_status=payment_status)
+    total = await query.count()
 
     order_list = []
     for order in orders:
@@ -158,6 +166,7 @@ async def get_all_orders(
             "final_amount": float(order.final_amount),
             "payment_method": order.payment_method.value if hasattr(order.payment_method, 'value') else order.payment_method,
             "payment_status": order.payment_status.value if hasattr(order.payment_status, 'value') else order.payment_status,
+            "order_status": order.order_status.value if hasattr(order.order_status, 'value') else order.order_status,
             "pay_time": order.pay_time.strftime("%Y-%m-%d %H:%M:%S") if order.pay_time else None,
             "expire_time": order.expire_time.strftime("%Y-%m-%d %H:%M:%S") if order.expire_time else None,
             "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else None,
@@ -177,9 +186,11 @@ async def get_all_orders_alias(
     page_size: int = Query(20, ge=1, le=1000, description="每页数量"),
     order_no: Optional[str] = Query(None, description="订单号"),
     customer_name: Optional[str] = Query(None, description="客户名称"),
-    product_name: Optional[str] = Query(None, description="产品名称")
+    product_name: Optional[str] = Query(None, description="产品名称"),
+    order_status: Optional[str] = Query(None, description="订单状态"),
+    payment_status: Optional[str] = Query(None, description="支付状态")
 ):
-    return await get_all_orders(page=page, page_size=page_size, order_no=order_no, customer_name=customer_name, product_name=product_name)
+    return await get_all_orders(page=page, page_size=page_size, order_no=order_no, customer_name=customer_name, product_name=product_name, order_status=order_status, payment_status=payment_status)
 
 
 @order_router.delete("/batch", summary="批量删除订单")

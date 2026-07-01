@@ -13,10 +13,22 @@
           <el-input v-model="searchForm.product_name" placeholder="请输入产品名称" clearable />
         </el-form-item>
         <el-form-item label="订单状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px">
-            <el-option label="待处理" :value="'pending'" />
+          <el-select v-model="searchForm.order_status" placeholder="请选择" clearable style="width: 120px">
+            <el-option label="草稿" :value="'draft'" />
+            <el-option label="待确认" :value="'pending'" />
+            <el-option label="处理中" :value="'processing'" />
+            <el-option label="已发货" :value="'shipped'" />
             <el-option label="已完成" :value="'completed'" />
             <el-option label="已取消" :value="'cancelled'" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="支付状态">
+          <el-select v-model="searchForm.payment_status" placeholder="请选择" clearable style="width: 120px">
+            <el-option label="待支付" :value="'pending'" />
+            <el-option label="已支付" :value="'paid'" />
+            <el-option label="支付失败" :value="'failed'" />
+            <el-option label="已退款" :value="'refunded'" />
+            <el-option label="已过期" :value="'expired'" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -43,7 +55,32 @@
             ¥{{ Number(row.final_amount || 0).toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column label="支付状态" width="120" align="center">
+        <el-table-column label="订单状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.order_status === 'draft'" type="info">
+              草稿
+            </el-tag>
+            <el-tag v-else-if="row.order_status === 'pending'" type="warning">
+              待确认
+            </el-tag>
+            <el-tag v-else-if="row.order_status === 'processing'" type="primary">
+              处理中
+            </el-tag>
+            <el-tag v-else-if="row.order_status === 'shipped'" type="primary">
+              已发货
+            </el-tag>
+            <el-tag v-else-if="row.order_status === 'completed'" type="success">
+              已完成
+            </el-tag>
+            <el-tag v-else-if="row.order_status === 'cancelled'" type="danger">
+              已取消
+            </el-tag>
+            <el-tag v-else type="info">
+              {{ row.order_status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="支付状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.payment_status === 'pending'" type="warning">
               待支付
@@ -51,11 +88,11 @@
             <el-tag v-else-if="row.payment_status === 'paid'" type="success">
               已支付
             </el-tag>
-            <el-tag v-else-if="row.payment_status === 'completed'" type="success">
-              已完成
+            <el-tag v-else-if="row.payment_status === 'failed'" type="danger">
+              支付失败
             </el-tag>
-            <el-tag v-else-if="row.payment_status === 'cancelled'" type="danger">
-              已取消
+            <el-tag v-else-if="row.payment_status === 'refunded'" type="info">
+              已退款
             </el-tag>
             <el-tag v-else-if="row.payment_status === 'expired'" type="info">
               已过期
@@ -120,7 +157,8 @@ const tableData = ref([])
 const searchForm = reactive({
   order_no: '',
   customer_name: '',
-  status: null
+  order_status: null,
+  payment_status: null
 })
 
 const pagination = reactive({
@@ -154,7 +192,8 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.order_no = ''
   searchForm.customer_name = ''
-  searchForm.status = null
+  searchForm.order_status = null
+  searchForm.payment_status = null
   handleSearch()
 }
 

@@ -29,13 +29,21 @@
           <el-descriptions-item label="实付金额">
             <span class="price-text final">¥{{ Number(orderInfo.final_amount || 0).toFixed(2) }}</span>
           </el-descriptions-item>
+          <el-descriptions-item label="订单状态">
+            <el-tag v-if="orderInfo.order_status === 'draft'" type="info">草稿</el-tag>
+            <el-tag v-else-if="orderInfo.order_status === 'pending'" type="warning">待确认</el-tag>
+            <el-tag v-else-if="orderInfo.order_status === 'processing'" type="primary">处理中</el-tag>
+            <el-tag v-else-if="orderInfo.order_status === 'shipped'" type="primary">已发货</el-tag>
+            <el-tag v-else-if="orderInfo.order_status === 'completed'" type="success">已完成</el-tag>
+            <el-tag v-else-if="orderInfo.order_status === 'cancelled'" type="danger">已取消</el-tag>
+            <el-tag v-else type="info">{{ orderInfo.order_status }}</el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="支付状态">
             <el-tag v-if="orderInfo.payment_status === 'pending'" type="warning">待支付</el-tag>
             <el-tag v-else-if="orderInfo.payment_status === 'paid'" type="success">已支付</el-tag>
-            <el-tag v-else-if="orderInfo.payment_status === 'completed'" type="success">已完成</el-tag>
-            <el-tag v-else-if="orderInfo.payment_status === 'cancelled'" type="danger">已取消</el-tag>
             <el-tag v-else-if="orderInfo.payment_status === 'expired'" type="info">已过期</el-tag>
             <el-tag v-else-if="orderInfo.payment_status === 'failed'" type="danger">支付失败</el-tag>
+            <el-tag v-else-if="orderInfo.payment_status === 'refunded'" type="info">已退款</el-tag>
             <el-tag v-else type="info">{{ orderInfo.payment_status }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="第三方交易号">{{ orderInfo.trade_no || '暂无' }}</el-descriptions-item>

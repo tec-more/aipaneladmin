@@ -3,19 +3,20 @@ from typing import Optional, List, Dict, Any
 from decimal import Decimal
 
 try:
-    from base.plugins.sales.models.order import CustomerOrder, OrderItem, OrderStatus
+    from base.plugins.sales.models.order import CustomerOrder, OrderItem, OrderStatus, PaymentStatus
     from base.plugins.customer.models.customer import Customer
 except ImportError:
     CustomerOrder = None
     OrderItem = None
     OrderStatus = None
+    PaymentStatus = None
     Customer = None
 
 
 class SalesService:
     @staticmethod
     async def get_sales_overview(start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
-        filters = {"payment_status": OrderStatus.PAID}
+        filters = {"payment_status": PaymentStatus.PAID}
 
         if start_date:
             filters["created_at__gte"] = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -41,20 +42,20 @@ class SalesService:
 
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         today_orders = await CustomerOrder.filter(
-            payment_status=OrderStatus.PAID,
+            payment_status=PaymentStatus.PAID,
             created_at__gte=today_start
         ).count()
 
         today_amount = Decimal("0.00")
         today_order_list = await CustomerOrder.filter(
-            payment_status=OrderStatus.PAID,
+            payment_status=PaymentStatus.PAID,
             created_at__gte=today_start
         )
         for order in today_order_list:
             today_amount += order.final_amount
 
-        pending_orders = await CustomerOrder.filter(payment_status=OrderStatus.PENDING).count()
-        cancelled_orders = await CustomerOrder.filter(payment_status=OrderStatus.CANCELLED).count()
+        pending_orders = await CustomerOrder.filter(payment_status=PaymentStatus.PENDING).count()
+        cancelled_orders = await CustomerOrder.filter(order_status=OrderStatus.CANCELLED).count()
 
         return {
             "total_orders": total_orders,

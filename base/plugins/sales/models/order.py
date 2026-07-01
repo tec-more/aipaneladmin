@@ -13,12 +13,9 @@ class PaymentMethod(str, Enum):
     BALANCE = "balance"
 
 
-class OrderStatus(str, Enum):
+class PaymentStatus(str, Enum):
     PENDING = "pending"
-    PROCESSING = "processing"
     PAID = "paid"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
     FAILED = "failed"
     REFUNDED = "refunded"
     EXPIRED = "expired"
@@ -27,10 +24,7 @@ class OrderStatus(str, Enum):
     def get_status_color(cls, status: str) -> str:
         colors = {
             cls.PENDING.value: "warning",
-            cls.PROCESSING.value: "info",
             cls.PAID.value: "success",
-            cls.COMPLETED.value: "success",
-            cls.CANCELLED.value: "default",
             cls.FAILED.value: "danger",
             cls.REFUNDED.value: "secondary",
             cls.EXPIRED.value: "default",
@@ -41,13 +35,43 @@ class OrderStatus(str, Enum):
     def get_status_label(cls, status: str) -> str:
         labels = {
             cls.PENDING.value: "待支付",
-            cls.PROCESSING.value: "处理中",
             cls.PAID.value: "已支付",
-            cls.COMPLETED.value: "已完成",
-            cls.CANCELLED.value: "已取消",
             cls.FAILED.value: "支付失败",
             cls.REFUNDED.value: "已退款",
             cls.EXPIRED.value: "已过期",
+        }
+        return labels.get(status, "未知")
+
+
+class OrderStatus(str, Enum):
+    DRAFT = "draft"
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SHIPPED = "shipped"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+    @classmethod
+    def get_status_color(cls, status: str) -> str:
+        colors = {
+            cls.DRAFT.value: "info",
+            cls.PENDING.value: "warning",
+            cls.PROCESSING.value: "primary",
+            cls.SHIPPED.value: "primary",
+            cls.COMPLETED.value: "success",
+            cls.CANCELLED.value: "danger",
+        }
+        return colors.get(status, "default")
+
+    @classmethod
+    def get_status_label(cls, status: str) -> str:
+        labels = {
+            cls.DRAFT.value: "草稿",
+            cls.PENDING.value: "待确认",
+            cls.PROCESSING.value: "处理中",
+            cls.SHIPPED.value: "已发货",
+            cls.COMPLETED.value: "已完成",
+            cls.CANCELLED.value: "已取消",
         }
         return labels.get(status, "未知")
 
@@ -77,10 +101,16 @@ class CustomerOrder(BaseModel, TimestampMixin):
         description="支付方式"
     )
     payment_status = fields.CharEnumField(
+        PaymentStatus,
+        max_length=20,
+        default=PaymentStatus.PENDING,
+        description="支付状态"
+    )
+    order_status = fields.CharEnumField(
         OrderStatus,
         max_length=20,
         default=OrderStatus.PENDING,
-        description="支付状态"
+        description="订单状态"
     )
     trade_no = fields.CharField(max_length=128, null=True, description="第三方交易号")
     pay_time = fields.DatetimeField(null=True, description="支付时间")
@@ -103,19 +133,27 @@ class CustomerOrder(BaseModel, TimestampMixin):
 
     @property
     def is_expired(self) -> bool:
-        return datetime.now() > self.expire_time and self.payment_status == OrderStatus.PENDING
+        return datetime.now() > self.expire_time and self.payment_status == PaymentStatus.PENDING
 
     @property
     def is_paid(self) -> bool:
-        return self.payment_status == OrderStatus.PAID
+        return self.payment_status == PaymentStatus.PAID
 
     @property
-    def status_color(self) -> str:
-        return OrderStatus.get_status_color(self.payment_status.value)
+    def payment_status_color(self) -> str:
+        return PaymentStatus.get_status_color(self.payment_status.value)
 
     @property
-    def status_label(self) -> str:
-        return OrderStatus.get_status_label(self.payment_status.value)
+    def payment_status_label(self) -> str:
+        return PaymentStatus.get_status_label(self.payment_status.value)
+
+    @property
+    def order_status_color(self) -> str:
+        return OrderStatus.get_status_color(self.order_status.value)
+
+    @property
+    def order_status_label(self) -> str:
+        return OrderStatus.get_status_label(self.order_status.value)
 
     async def to_dict(self) -> Dict[str, Any]:
         await self.fetch_related('customer')
@@ -159,7 +197,8 @@ class CustomerOrder(BaseModel, TimestampMixin):
             "final_amount": float(self.final_amount),
             "payment_method": self.payment_method.value if isinstance(self.payment_method, Enum) else self.payment_method,
             "payment_status": self.payment_status.value if isinstance(self.payment_status, Enum) else self.payment_status,
-            "status": self.payment_status.value if isinstance(self.payment_status, Enum) else self.payment_status,
+            "order_status": self.order_status.value if isinstance(self.order_status, Enum) else self.order_status,
+            "status": self.order_status.value if isinstance(self.order_status, Enum) else self.order_status,
             "trade_no": self.trade_no,
             "pay_time": self.pay_time.strftime("%Y-%m-%d %H:%M:%S") if self.pay_time else None,
             "expire_time": self.expire_time.strftime("%Y-%m-%d %H:%M:%S") if self.expire_time else None,
