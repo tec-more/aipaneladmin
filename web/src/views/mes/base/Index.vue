@@ -33,6 +33,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="specification" label="规格" min-width="150" />
+            <el-table-column prop="drawing_code" label="图纸编号" min-width="120" />
             <el-table-column prop="unit" label="单位" width="80" align="center" />
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
@@ -70,11 +71,48 @@
             <el-form-item label="物料编码">
               <el-input v-model="bomSearch.item_code" placeholder="请输入物料编码" clearable />
             </el-form-item>
+            <el-form-item label="版本">
+              <el-select v-model="bomSearch.version" placeholder="请选择版本" clearable>
+                <el-option v-for="v in bomVersionOptions" :key="v.version" :label="v.version" :value="v.version" />
+              </el-select>
+            </el-form-item>
             <el-form-item>
               <el-button type="primary" :icon="Search" @click="fetchBomList">搜索</el-button>
               <el-button :icon="Refresh" @click="resetBomSearch">重置</el-button>
             </el-form-item>
           </el-form>
+        </el-card>
+        <el-card shadow="never" class="table-card" style="margin-bottom: 16px;">
+          <template #header>
+            <div class="card-header">
+              <span>BOM版本管理</span>
+              <div>
+                <el-button type="primary" :icon="Plus" @click="handleAddVersion" style="margin-right: 8px;">创建版本</el-button>
+                <el-button :icon="CopyDocument" @click="handleCopyVersion">复制版本</el-button>
+              </div>
+            </div>
+          </template>
+          <el-table v-loading="bomVersionLoading" :data="bomVersionList" border stripe style="width: 100%;">
+            <el-table-column prop="product_code" label="产品编码" min-width="120" />
+            <el-table-column prop="product_name" label="产品名称" min-width="150" />
+            <el-table-column prop="version" label="版本号" width="100" align="center" />
+            <el-table-column prop="status" label="状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getStatusTagType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="ecn_code" label="ECN编号" min-width="120" />
+            <el-table-column prop="effective_date" label="生效日期" width="120" />
+            <el-table-column prop="description" label="描述" min-width="150" />
+            <el-table-column label="操作" width="250" align="center">
+              <template #default="{ row }">
+                <el-button v-if="row.status === 'draft'" type="primary" link @click="handleActivateVersion(row)">生效</el-button>
+                <el-button v-if="row.status === 'active'" type="warning" link @click="handleObsoleteVersion(row)">作废</el-button>
+                <el-button v-if="row.status !== 'obsolete'" type="primary" link @click="selectVersion(row)">查看BOM</el-button>
+                <el-button type="danger" link @click="handleDeleteVersion(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
         </el-card>
         <el-card shadow="never" class="table-card">
           <template #header>
@@ -94,6 +132,7 @@
             <el-table-column prop="quantity" label="用量" width="100" align="center" />
             <el-table-column prop="unit" label="单位" width="80" align="center" />
             <el-table-column prop="scrap_rate" label="损耗率" width="100" align="center" />
+            <el-table-column prop="drawing_code" label="装配图编号" min-width="120" />
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? '启用' : '停用' }}</el-tag>
@@ -206,6 +245,7 @@
             <el-table-column prop="sequence" label="顺序" width="80" align="center" />
             <el-table-column prop="work_center_code" label="工作中心" min-width="120" />
             <el-table-column prop="standard_time" label="标准工时(分钟)" width="140" align="center" />
+            <el-table-column prop="drawing_code" label="图纸编号" min-width="120" />
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? '启用' : '停用' }}</el-tag>
@@ -312,6 +352,12 @@
           <el-form-item label="规格型号">
             <el-input v-model="formData.specification" placeholder="请输入规格型号" />
           </el-form-item>
+          <el-form-item label="图纸编号">
+            <el-input v-model="formData.drawing_code" placeholder="请输入图纸编号" />
+          </el-form-item>
+          <el-form-item label="图纸文件">
+            <el-input v-model="formData.drawing_url" placeholder="请输入图纸文件地址" />
+          </el-form-item>
           <el-form-item label="计量单位" prop="unit">
             <el-input v-model="formData.unit" placeholder="请输入计量单位" />
           </el-form-item>
@@ -322,7 +368,6 @@
             <el-switch v-model="formData.is_active" />
           </el-form-item>
         </template>
-
         <template v-else-if="activeTab === 'bom'">
           <el-form-item label="成品编码" prop="product_code">
             <el-input v-model="formData.product_code" placeholder="请输入成品编码" />
@@ -348,6 +393,12 @@
           <el-form-item label="单位" prop="unit">
             <el-input v-model="formData.unit" placeholder="请输入单位" />
           </el-form-item>
+          <el-form-item label="装配图编号">
+            <el-input v-model="formData.drawing_code" placeholder="请输入装配图编号" />
+          </el-form-item>
+          <el-form-item label="装配图文件">
+            <el-input v-model="formData.drawing_url" placeholder="请输入装配图文件地址" />
+          </el-form-item>
           <el-form-item label="损耗率">
             <el-input-number v-model="formData.scrap_rate" :min="0" :max="1" :precision="4" />
           </el-form-item>
@@ -358,7 +409,6 @@
             <el-switch v-model="formData.is_active" />
           </el-form-item>
         </template>
-
         <template v-else-if="activeTab === 'workcenter'">
           <el-form-item label="工作中心编码" prop="work_center_code">
             <el-input v-model="formData.work_center_code" placeholder="请输入编码" />
@@ -407,6 +457,9 @@
           </el-form-item>
           <el-form-item label="标准工时(分钟)">
             <el-input-number v-model="formData.standard_time" :min="0" :precision="2" />
+          </el-form-item>
+          <el-form-item label="图纸编号">
+            <el-input v-model="formData.drawing_code" placeholder="请输入图纸编号" />
           </el-form-item>
           <el-form-item label="描述">
             <el-input type="textarea" v-model="formData.description" placeholder="请输入描述" />
@@ -492,10 +545,11 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Edit, Delete, CopyDocument } from '@element-plus/icons-vue'
 import {
   getMaterialList, createMaterial, updateMaterial, deleteMaterial,
   getBomList, createBom, updateBom, deleteBom, getBomOptions,
+  getBomVersionList, createBomVersion, copyBomVersion, activateBomVersion, obsoleteBomVersion,
   getWorkcenterList, createWorkcenter, updateWorkcenter, deleteWorkcenter,
   getProcessList, createProcess, updateProcess, deleteProcess,
   getRouteList, createRoute, updateRoute, deleteRoute, getRouteDetail
@@ -510,8 +564,12 @@ const materialPagination = reactive({ page: 1, pageSize: 10, total: 0 })
 
 const bomLoading = ref(false)
 const bomList = ref([])
-const bomSearch = reactive({ product_code: '', item_code: '' })
+const bomSearch = reactive({ product_code: '', item_code: '', version: '' })
 const bomPagination = reactive({ page: 1, pageSize: 10, total: 0 })
+
+const bomVersionLoading = ref(false)
+const bomVersionList = ref([])
+const bomVersionOptions = ref([])
 
 const wcLoading = ref(false)
 const wcList = ref([])
@@ -612,6 +670,129 @@ const resetWcSearch = () => {
   fetchWorkcenterList()
 }
 
+const fetchBomVersionList = async () => {
+  bomVersionLoading.value = true
+  try {
+    const res = await getBomVersionList({})
+    bomVersionList.value = res.data.items || res.data || []
+    bomVersionOptions.value = bomVersionList.value.map(v => ({
+      version: v.version,
+      label: `${v.product_code} - ${v.version}`
+    }))
+  } catch (e) { console.error('获取BOM版本列表失败:', e) }
+  finally { bomVersionLoading.value = false }
+}
+
+const getStatusLabel = (status) => {
+  const labels = { draft: '草稿', active: '生效', obsolete: '作废' }
+  return labels[status] || status
+}
+
+const getStatusTagType = (status) => {
+  const types = { draft: 'info', active: 'success', obsolete: 'warning' }
+  return types[status] || 'info'
+}
+
+const handleAddVersion = () => {
+  ElMessageBox.prompt('请输入版本号:', '创建版本', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPattern: /^V?\d+\.\d+$/,
+    inputErrorMessage: '版本号格式错误，如 V1.0 或 1.0'
+  }).then(async ({ value }) => {
+    const product_code = bomSearch.product_code || prompt('请输入产品编码:')
+    if (!product_code) return
+    
+    try {
+      await createBomVersion({
+        product_code,
+        version: value,
+        product_name: prompt('请输入产品名称:') || ''
+      })
+      ElMessage.success('版本创建成功')
+      fetchBomVersionList()
+    } catch (e) {
+      ElMessage.error(e.response?.data?.detail || '创建失败')
+    }
+  }).catch(() => {})
+}
+
+const handleCopyVersion = () => {
+  const rows = bomVersionList.value.filter(v => v.status !== 'obsolete')
+  if (rows.length === 0) {
+    ElMessage.warning('没有可复制的版本')
+    return
+  }
+  
+  const names = rows.map(v => `${v.product_code} - ${v.version}`).join('\n')
+  ElMessageBox.prompt(`请选择源版本:\n${names}\n\n输入源版本号:`, '复制版本', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消'
+  }).then(async ({ value }) => {
+    const source = rows.find(v => v.version === value)
+    if (!source) {
+      ElMessage.error('源版本不存在')
+      return
+    }
+    
+    ElMessageBox.prompt('请输入新版本号:', '复制版本', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /^V?\d+\.\d+$/,
+      inputErrorMessage: '版本号格式错误'
+    }).then(async ({ value: newVersion }) => {
+      try {
+        await copyBomVersion(source.id, { new_version: newVersion })
+        ElMessage.success('版本复制成功')
+        fetchBomVersionList()
+      } catch (e) {
+        ElMessage.error(e.response?.data?.detail || '复制失败')
+      }
+    }).catch(() => {})
+  }).catch(() => {})
+}
+
+const handleActivateVersion = async (row) => {
+  try {
+    await activateBomVersion(row.id)
+    ElMessage.success('版本已生效')
+    fetchBomVersionList()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '操作失败')
+  }
+}
+
+const handleObsoleteVersion = async (row) => {
+  try {
+    await obsoleteBomVersion(row.id)
+    ElMessage.success('版本已作废')
+    fetchBomVersionList()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '操作失败')
+  }
+}
+
+const handleDeleteVersion = async (row) => {
+  await ElMessageBox.confirm(`确定删除版本 ${row.version}?`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+  try {
+    await obsoleteBomVersion(row.id)
+    ElMessage.success('版本已删除')
+    fetchBomVersionList()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '删除失败')
+  }
+}
+
+const selectVersion = (row) => {
+  bomSearch.product_code = row.product_code
+  bomSearch.version = row.version
+  fetchBomList()
+}
+
 const fetchProcessList = async () => {
   processLoading.value = true
   try {
@@ -670,8 +851,11 @@ const resetRouteSearch = () => {
   fetchRouteList()
 }
 
-const handleTabChange = (tab) => {
+const handleTabChange = async (tab) => {
   activeTab.value = tab
+  if (tab === 'bom') {
+    await fetchBomVersionList()
+  }
 }
 
 const initForm = () => {
@@ -696,9 +880,9 @@ const resetMaterialForm = () => {
 
 const resetBomForm = () => {
   formData.id = null
-  formData.product_code = ''
+  formData.product_code = bomSearch.product_code || ''
   formData.product_name = ''
-  formData.version = 'V1.0'
+  formData.version = bomSearch.version || 'V1.0'
   formData.level = 1
   formData.item_code = ''
   formData.item_name = ''

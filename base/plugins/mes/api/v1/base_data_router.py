@@ -191,6 +191,77 @@ async def list_boms(
     )
     return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
 
+@base_data_router.get("/bom-versions", summary="获取BOM版本列表")
+async def list_bom_versions(
+    page: int = 1,
+    page_size: int = 10,
+    product_code: Optional[str] = None,
+    status: Optional[str] = None
+):
+    items, total = await BomVersionService.get_list(
+        page=page, page_size=page_size,
+        product_code=product_code,
+        status=status
+    )
+    return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
+
+@base_data_router.get("/bom-versions/{version_id}", summary="获取BOM版本详情")
+async def get_bom_version(version_id: int):
+    version = await BomVersionService.get_by_id(version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="BOM版本不存在")
+    return success_response(data=version)
+
+@base_data_router.get("/bom-versions/{product_code}/history", summary="获取产品BOM版本历史")
+async def get_bom_version_history(product_code: str):
+    versions = await BomVersionService.get_version_history(product_code)
+    return success_response(data=versions)
+
+@base_data_router.post("/bom-versions", summary="创建BOM版本")
+async def create_bom_version(data: dict):
+    try:
+        version = await BomVersionService.create_version(
+            product_code=data.get("product_code"),
+            version=data.get("version"),
+            product_name=data.get("product_name", ""),
+            description=data.get("description"),
+            ecn_code=data.get("ecn_code")
+        )
+        return success_response(data=version)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@base_data_router.post("/bom-versions/{version_id}/copy", summary="复制BOM版本")
+async def copy_bom_version(version_id: int, data: dict):
+    try:
+        new_version = await BomVersionService.copy_version(
+            source_version_id=version_id,
+            new_version=data.get("new_version")
+        )
+        return success_response(data=new_version)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@base_data_router.put("/bom-versions/{version_id}/activate", summary="生效BOM版本")
+async def activate_bom_version(version_id: int):
+    try:
+        version = await BomVersionService.activate_version(version_id)
+        if not version:
+            raise HTTPException(status_code=404, detail="BOM版本不存在")
+        return success_response(data=version)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@base_data_router.put("/bom-versions/{version_id}/obsolete", summary="作废BOM版本")
+async def obsolete_bom_version(version_id: int):
+    try:
+        version = await BomVersionService.obsolete_version(version_id)
+        if not version:
+            raise HTTPException(status_code=404, detail="BOM版本不存在")
+        return success_response(data=version)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @base_data_router.get("/work-centers/{wc_id}", summary="获取工作中心详情")
 async def get_work_center(wc_id: int):
     wc = await WorkCenterService.get_by_id(wc_id)

@@ -3,7 +3,7 @@ from decimal import Decimal
 from tortoise.expressions import Q
 
 try:
-    from base.plugins.mes.models.base_data import Material, Bom, WorkCenter, Process, Route, RouteProcess
+    from base.plugins.mes.models.base_data import Material, Bom, BomVersion, WorkCenter, Process, Route, RouteProcess
     from base.plugins.mes.schemas.mes_schema import (
         MaterialCreate, MaterialUpdate,
         BomCreate, BomUpdate,
@@ -401,6 +401,129 @@ class BomService:
             "detailed_bom": flattened_bom,
             "material_summary": list(material_summary.values())
         }
+
+
+class BomVersionService:
+    @staticmethod
+    async def get_by_id(version_id: int) -> Optional[BomVersion]:
+        return await BomVersion.filter(id=version_id).first()
+
+    @staticmethod
+    async def get_by_product_and_version(product_code: str, version: str) -> Optional[BomVersion]:
+        return await BomVersion.filter(product_code=product_code, version=version).first()
+
+    @staticmethod
+    async def get_active_version(product_code: str) -> Optional[BomVersion]:
+        return await BomVersion.filter(product_code=product_code, status="active").first()
+
+    @staticmethod
+    async def get_version_history(product_code: str) -> List[BomVersion]:
+        return await BomVersion.filter(product_code=product_code).order_by('-created_at')
+
+    @staticmethod
+    async def create_version(product_code: str, version: str, product_name: str = "", **kwargs) -> BomVersion:
+        if await BomVersionService.get_by_product_and_version(product_code, version):
+            raise ValueError(f"版本 {version} 已存在")
+        
+        return await BomVersion.create(
+            product_code=product_code,
+            version=version,
+            product_name=product_name,
+            status="draft",
+            **kwargs
+        )
+
+    @staticmethod
+    async def copy_version(source_version_id: int, new_version: str) -> BomVersion:
+        source_version = await BomVersionService.get_by_id(source_version_id)
+        if not source_version:
+            raise ValueError("源版本不存在")
+        
+        if await BomVersionService.get_by_product_and_version(source_version.product_code, new_version):
+            raise ValueError(f"版本 {new_version} 已存在")
+        
+        new_version_obj = await BomVersion.create(
+            product_code=source_version.product_code,
+            version=new_version,
+            product_name=source_version.product_name,
+            status="draft",
+            description=f"复制自版本 {source_version.version}",
+            ecn_code=source_version.ecn_code
+        )
+        
+        source_boms = await Bom.filter(product_code=source_version.product_code, version=source_version.version)
+        for bom in source_boms:
+            await Bom.create(
+                product_id=bom.product_id,
+                product_code=bom.product_code,
+                product_name=bom.product_name,
+                version=new_version,
+                level=bom.level,
+                parent_item_code=bom.parent_item_code,
+                item_id=bom.item_id,
+                item_code=bom.item_code,
+                item_name=bom.item_name,
+                quantity=bom.quantity,
+                unit=bom.unit,
+                scrap_rate=bom.scrap_rate,
+                drawing_code=bom.drawing_code,
+                drawing_url=bom.drawing_url,
+                remark=bom.remark,
+                is_active=bom.is_active
+            )
+        
+        return new_version_obj
+
+    @staticmethod
+    async def activate_version(version_id: int) -> Optional[BomVersion]:
+        version = await BomVersionService.get_by_id(version_id)
+        if not version:
+            return None
+        
+        if version.status == "active":
+            raise ValueError("版本已经是生效状态")
+        
+        active_version = await BomVersionService.get_active_version(version.product_code)
+        if active_version:
+            active_version.status = "obsolete"
+            await active_version.save()
+        
+        version.status = "active"
+        from datetime import date
+        version.effective_date = date.today()
+        await version.save()
+        
+        return version
+
+    @staticmethod
+    async def obsolete_version(version_id: int) -> Optional[BomVersion]:
+        version = await BomVersionService.get_by_id(version_id)
+        if not version:
+            return None
+        
+        if version.status == "obsolete":
+            raise ValueError("版本已经是作废状态")
+        
+        version.status = "obsolete"
+        await version.save()
+        
+        return version
+
+    @staticmethod
+    async def get_list(
+        page: int = 1, page_size: int = 10,
+        product_code: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> Tuple[List[BomVersion], int]:
+        query = BomVersion.all()
+        if product_code:
+            query = query.filter(product_code__icontains=product_code)
+        if status:
+            query = query.filter(status=status)
+        total = await query.count()
+        offset = (page - 1) * page_size
+        items = await query.offset(offset).limit(page_size).order_by('-created_at')
+        return items, total
 
 
 class WorkCenterService:

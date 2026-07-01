@@ -67,6 +67,8 @@ class Material(BaseModel, TimestampMixin):
     material_type = fields.CharField(max_length=50, description="物料类型：raw/finished/semi/fixture", index=True)
     unit = fields.CharField(max_length=20, description="计量单位")
     specification = fields.CharField(max_length=255, null=True, description="规格型号")
+    drawing_code = fields.CharField(max_length=100, null=True, description="图纸编号", index=True)
+    drawing_url = fields.CharField(max_length=500, null=True, description="图纸文件地址")
     description = fields.TextField(null=True, description="物料描述")
     is_active = fields.BooleanField(default=True, description="是否启用", index=True)
 
@@ -82,8 +84,43 @@ class Material(BaseModel, TimestampMixin):
             "material_type": self.material_type,
             "unit": self.unit,
             "specification": self.specification,
+            "drawing_code": self.drawing_code,
+            "drawing_url": self.drawing_url,
             "description": self.description,
             "is_active": self.is_active,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+
+
+class BomVersion(BaseModel, TimestampMixin):
+    """BOM版本管理模型"""
+    product_id = fields.IntField(null=True, description="成品产品ID", index=True)
+    product_code = fields.CharField(max_length=100, description="成品编码", index=True)
+    product_name = fields.CharField(max_length=255, description="成品名称")
+    version = fields.CharField(max_length=20, description="版本号")
+    status = fields.CharField(max_length=20, default="draft", description="版本状态：draft/active/obsolete", index=True)
+    description = fields.TextField(null=True, description="版本描述")
+    ecn_code = fields.CharField(max_length=100, null=True, description="工程变更通知编号")
+    effective_date = fields.DateField(null=True, description="生效日期")
+
+    class Meta:
+        table = "mes_bom_version"
+        indexes = [
+            fields.Index("product_code", "version", unique=True),
+        ]
+
+    async def to_dict(self):
+        return {
+            "id": self.id,
+            "product_id": self.product_id,
+            "product_code": self.product_code,
+            "product_name": self.product_name,
+            "version": self.version,
+            "status": self.status,
+            "description": self.description,
+            "ecn_code": self.ecn_code,
+            "effective_date": self.effective_date.strftime("%Y-%m-%d") if self.effective_date else None,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
         }
@@ -103,6 +140,8 @@ class Bom(BaseModel, TimestampMixin):
     quantity = fields.DecimalField(max_digits=15, decimal_places=6, description="用量")
     unit = fields.CharField(max_length=20, description="计量单位")
     scrap_rate = fields.DecimalField(max_digits=5, decimal_places=4, default=0, description="损耗率")
+    drawing_code = fields.CharField(max_length=100, null=True, description="装配图编号", index=True)
+    drawing_url = fields.CharField(max_length=500, null=True, description="装配图文件地址")
     remark = fields.TextField(null=True, description="备注")
     is_active = fields.BooleanField(default=True, description="是否启用", index=True)
 
@@ -124,6 +163,8 @@ class Bom(BaseModel, TimestampMixin):
             "quantity": float(self.quantity) if hasattr(self.quantity, "__float__") else self.quantity,
             "unit": self.unit,
             "scrap_rate": float(self.scrap_rate) if hasattr(self.scrap_rate, "__float__") else self.scrap_rate,
+            "drawing_code": self.drawing_code,
+            "drawing_url": self.drawing_url,
             "remark": self.remark,
             "is_active": self.is_active,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
@@ -168,6 +209,7 @@ class Process(BaseModel, TimestampMixin):
     work_center_code = fields.CharField(max_length=100, null=True, description="工作中心编码")
     work_center_name = fields.CharField(max_length=255, null=True, description="工作中心名称")
     standard_time = fields.DecimalField(max_digits=10, decimal_places=2, null=True, description="标准工时(分钟)")
+    drawing_code = fields.CharField(max_length=100, null=True, description="图纸编号", index=True)
     description = fields.TextField(null=True, description="描述")
     is_active = fields.BooleanField(default=True, description="是否启用", index=True)
 
@@ -184,6 +226,7 @@ class Process(BaseModel, TimestampMixin):
             "work_center_code": self.work_center_code,
             "work_center_name": self.work_center_name,
             "standard_time": float(self.standard_time) if self.standard_time and hasattr(self.standard_time, "__float__") else self.standard_time,
+            "drawing_code": self.drawing_code,
             "description": self.description,
             "is_active": self.is_active,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,

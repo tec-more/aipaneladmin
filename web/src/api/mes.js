@@ -52,6 +52,34 @@ export const deleteBom = (id) => {
   return request.delete(`${BASE}/base-data/boms/${id}`)
 }
 
+export const getBomVersionList = (params) => {
+  return request.get(`${BASE}/base-data/bom-versions`, { params })
+}
+
+export const getBomVersionDetail = (id) => {
+  return request.get(`${BASE}/base-data/bom-versions/${id}`)
+}
+
+export const getBomVersionHistory = (product_code) => {
+  return request.get(`${BASE}/base-data/bom-versions/${product_code}/history`)
+}
+
+export const createBomVersion = (data) => {
+  return request.post(`${BASE}/base-data/bom-versions`, data)
+}
+
+export const copyBomVersion = (id, data) => {
+  return request.post(`${BASE}/base-data/bom-versions/${id}/copy`, data)
+}
+
+export const activateBomVersion = (id) => {
+  return request.put(`${BASE}/base-data/bom-versions/${id}/activate`)
+}
+
+export const obsoleteBomVersion = (id) => {
+  return request.put(`${BASE}/base-data/bom-versions/${id}/obsolete`)
+}
+
 export const getBomOptions = () => {
   return request.get(`${BASE}/base-data/boms/options`)
 }
