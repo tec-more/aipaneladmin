@@ -1,18 +1,20 @@
 <template>
   <div class="report-index">
     <el-card shadow="never" class="search-card">
-      <div class="card-header">
-        <span>财务报表</span>
-      </div>
+      <template #header>
+        <div class="card-header">
+          <span>财务报表</span>
+        </div>
+      </template>
       
-      <div class="report-tabs">
-        <el-button 
+      <el-tabs v-model="activeTab" class="report-tabs">
+        <el-tab-pane 
           v-for="tab in tabs" 
-          :key="tab.key"
-          :type="activeTab === tab.key ? 'primary' : 'default'"
-          @click="switchTab(tab.key)"
-        >{{ tab.label }}</el-button>
-      </div>
+          :key="tab.key" 
+          :label="tab.label" 
+          :name="tab.key" 
+        />
+      </el-tabs>
       
       <div class="report-filters">
         <el-form :inline="true" :model="filterForm" class="filter-form">
@@ -428,9 +430,11 @@ const generateReport = async () => {
   padding: 20px;
   
   .report-tabs {
-    display: flex;
-    gap: 10px;
     margin-bottom: 20px;
+    
+    :deep(.el-tabs__header) {
+      margin-bottom: 0;
+    }
   }
   
   .report-filters {

@@ -4,26 +4,28 @@
       <template #header>
         <div class="card-header">
           <span>会计科目</span>
-          <div class="header-actions">
-            <el-button @click="handleAdd" type="primary">新增科目</el-button>
-          </div>
         </div>
       </template>
       
-      <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="搜索">
-          <el-input v-model="searchForm.keyword" placeholder="搜索科目名称或编码" clearable />
-        </el-form-item>
-        <el-form-item label="科目类型">
-          <el-select v-model="searchForm.account_type" placeholder="全部类型" clearable style="width: 140px">
-            <el-option v-for="type in accountTypes" :key="type.value" :label="type.label" :value="type.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
+      <div class="search-row">
+        <el-form :inline="true" :model="searchForm" class="search-form">
+          <el-form-item label="搜索">
+            <el-input v-model="searchForm.keyword" placeholder="搜索科目名称或编码" clearable />
+          </el-form-item>
+          <el-form-item label="科目类型">
+            <el-select v-model="searchForm.account_type" placeholder="全部类型" clearable style="width: 140px">
+              <el-option v-for="type in accountTypes" :key="type.value" :label="type.label" :value="type.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
+            <el-button @click="handleReset">重置</el-button>
+          </el-form-item>
+        </el-form>
+        <div class="search-actions">
+          <el-button @click="handleAdd" type="primary">新增科目</el-button>
+        </div>
+      </div>
     </el-card>
     
     <el-card shadow="never" class="table-card">
@@ -277,5 +279,22 @@ onMounted(() => {
 <style lang="scss" scoped>
 .account-index {
   padding: 20px;
+  
+  .search-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    
+    .search-form {
+      flex: 1;
+      margin: 0;
+    }
+    
+    .search-actions {
+      flex-shrink: 0;
+    }
+  }
 }
 </style>

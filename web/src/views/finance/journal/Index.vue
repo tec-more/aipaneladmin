@@ -4,31 +4,33 @@
       <template #header>
         <div class="card-header">
           <span>凭证管理</span>
-          <div class="header-actions">
-            <el-button @click="handleAdd" type="primary">新增凭证</el-button>
-          </div>
         </div>
       </template>
       
-      <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="凭证类型">
-          <el-select v-model="searchForm.journal_type" placeholder="全部类型" clearable style="width: 140px">
-            <el-option v-for="type in journalTypes" :key="type.value" :label="type.label" :value="type.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="全部状态" clearable style="width: 120px">
-            <el-option v-for="status in journalStatuses" :key="status.value" :label="status.label" :value="status.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="日期范围">
-          <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
+      <div class="search-row">
+        <el-form :inline="true" :model="searchForm" class="search-form">
+          <el-form-item label="凭证类型">
+            <el-select v-model="searchForm.journal_type" placeholder="全部类型" clearable style="width: 140px">
+              <el-option v-for="type in journalTypes" :key="type.value" :label="type.label" :value="type.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="searchForm.status" placeholder="全部状态" clearable style="width: 120px">
+              <el-option v-for="status in journalStatuses" :key="status.value" :label="status.label" :value="status.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="日期范围">
+            <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
+            <el-button @click="handleReset">重置</el-button>
+          </el-form-item>
+        </el-form>
+        <div class="search-actions">
+          <el-button @click="handleAdd" type="primary">新增凭证</el-button>
+        </div>
+      </div>
     </el-card>
     
     <el-card shadow="never" class="table-card">
@@ -360,6 +362,23 @@ onMounted(() => {
 <style lang="scss" scoped>
 .journal-index {
   padding: 20px;
+  
+  .search-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    
+    .search-form {
+      flex: 1;
+      margin: 0;
+    }
+    
+    .search-actions {
+      flex-shrink: 0;
+    }
+  }
   
   .journal-line {
     display: flex;
