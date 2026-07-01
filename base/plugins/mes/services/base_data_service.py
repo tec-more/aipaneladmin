@@ -3,7 +3,7 @@ from decimal import Decimal
 from tortoise.expressions import Q
 
 try:
-    from base.plugins.mes.models.base_data import Material, Bom, WorkCenter, Process, Route
+    from base.plugins.mes.models.base_data import Material, Bom, WorkCenter, Process, Route, RouteProcess
     from base.plugins.mes.schemas.mes_schema import (
         MaterialCreate, MaterialUpdate,
         BomCreate, BomUpdate,
@@ -531,27 +531,78 @@ class RouteService:
         return await Route.filter(route_code=route_code).first()
 
     @staticmethod
+    async def get_route_with_processes(route_id: int) -> Optional[dict]:
+        route = await Route.filter(id=route_id).first()
+        if not route:
+            return None
+        route_dict = await route.to_dict()
+        processes = await RouteProcess.filter(route_code=route.route_code).order_by('sequence')
+        route_dict['processes'] = [await p.to_dict() for p in processes]
+        return route_dict
+
+    @staticmethod
     async def create_route(data: RouteCreate) -> Route:
         if await RouteService.check_code_exists(data.route_code):
             raise ValueError("路线编码已存在")
-        return await Route.create(**data.__dict__)
+        
+        route_data = data.__dict__.copy()
+        processes_data = route_data.pop('processes', [])
+        
+        route = await Route.create(**route_data)
+        
+        for seq, process in enumerate(processes_data, 1):
+            await RouteProcess.create(
+                route_code=route.route_code,
+                process_code=process.get('process_code', ''),
+                process_name=process.get('process_name', ''),
+                sequence=process.get('sequence', seq),
+                work_center_code=process.get('work_center_code'),
+                work_center_name=process.get('work_center_name')
+            )
+        
+        return route
 
     @staticmethod
     async def update_route(route_id: int, data: RouteUpdate) -> Optional[Route]:
         route = await Route.filter(id=route_id).first()
         if not route:
             return None
-        if data.route_code and data.route_code != route.route_code:
+        
+        old_code = route.route_code
+        
+        if data.route_code and data.route_code != old_code:
             if await RouteService.check_code_exists(data.route_code, exclude_id=route_id):
                 raise ValueError("路线编码已被使用")
+        
         update_data = data.model_dump(exclude_none=True)
+        processes_data = update_data.pop('processes', None)
+        
         await route.update_from_dict(update_data).save()
+        
+        if processes_data is not None:
+            await RouteProcess.filter(route_code=old_code).delete()
+            new_code = update_data.get('route_code', old_code)
+            for seq, process in enumerate(processes_data, 1):
+                await RouteProcess.create(
+                    route_code=new_code,
+                    process_code=process.get('process_code', ''),
+                    process_name=process.get('process_name', ''),
+                    sequence=process.get('sequence', seq),
+                    work_center_code=process.get('work_center_code'),
+                    work_center_name=process.get('work_center_name')
+                )
+        
         return route
 
     @staticmethod
     async def delete_route(route_id: int) -> bool:
-        deleted_count = await Route.filter(id=route_id).delete()
-        return deleted_count > 0
+        route = await Route.filter(id=route_id).first()
+        if not route:
+            return False
+        
+        await RouteProcess.filter(route_code=route.route_code).delete()
+        await Route.filter(id=route_id).delete()
+        return True
 
     @staticmethod
     async def get_list(

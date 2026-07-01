@@ -53,23 +53,23 @@ export const deleteBom = (id) => {
 }
 
 export const getWorkcenterList = (params) => {
-  return request.get(`${BASE}/base-data/workcenters`, { params })
+  return request.get(`${BASE}/base-data/work-centers`, { params })
 }
 
 export const getWorkcenterDetail = (id) => {
-  return request.get(`${BASE}/base-data/workcenters/${id}`)
+  return request.get(`${BASE}/base-data/work-centers/${id}`)
 }
 
 export const createWorkcenter = (data) => {
-  return request.post(`${BASE}/base-data/workcenters`, data)
+  return request.post(`${BASE}/base-data/work-centers`, data)
 }
 
 export const updateWorkcenter = (id, data) => {
-  return request.put(`${BASE}/base-data/workcenters/${id}`, data)
+  return request.put(`${BASE}/base-data/work-centers/${id}`, data)
 }
 
 export const deleteWorkcenter = (id) => {
-  return request.delete(`${BASE}/base-data/workcenters/${id}`)
+  return request.delete(`${BASE}/base-data/work-centers/${id}`)
 }
 
 export const getProcessList = (params) => {

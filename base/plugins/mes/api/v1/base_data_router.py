@@ -289,7 +289,7 @@ async def list_processes(
 
 @base_data_router.get("/routes/{route_id}", summary="获取工艺路线详情")
 async def get_route(route_id: int):
-    route = await RouteService.get_by_id(route_id)
+    route = await RouteService.get_route_with_processes(route_id)
     if not route:
         raise HTTPException(status_code=404, detail="工艺路线不存在")
     return success_response(data=route)
@@ -298,7 +298,8 @@ async def get_route(route_id: int):
 async def create_route(data: RouteCreate):
     try:
         route = await RouteService.create_route(data)
-        return success_response(data=route)
+        route_with_processes = await RouteService.get_route_with_processes(route.id)
+        return success_response(data=route_with_processes)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -308,7 +309,8 @@ async def update_route(route_id: int, data: RouteUpdate):
         route = await RouteService.update_route(route_id, data)
         if not route:
             raise HTTPException(status_code=404, detail="工艺路线不存在")
-        return success_response(data=route)
+        route_with_processes = await RouteService.get_route_with_processes(route_id)
+        return success_response(data=route_with_processes)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -334,3 +336,10 @@ async def list_routes(
         product_code=product_code
     )
     return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
+
+@base_data_router.get("/routes/{route_id}/processes", summary="获取工艺路线的工序列表")
+async def get_route_processes(route_id: int):
+    route = await RouteService.get_by_id(route_id)
+    if not route:
+        raise HTTPException(status_code=404, detail="工艺路线不存在")
+    return success_response(data=await RouteService.get_route_with_processes(route_id))
