@@ -1,45 +1,45 @@
 import shutil
 import logging
-from aerich import Command
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.expressions import Q
 
-from base.common.setting import settings
+from base.common.setting import settings, TORTOISE_ORM
+
 
 async def init_db():
     print("开始初始化数据库...")
-    print(f"模型列表: {settings.TORTOISE_ORM['apps']['models']['models']}")
+    print(f"模型列表: {TORTOISE_ORM['apps']['models']['models']}")
     
-    command = Command(tortoise_config=settings.TORTOISE_ORM)
     try:
-        print("初始化数据库...")
-        await command.init_db(safe=True)
-        print("数据库初始化完成")
-    except FileExistsError:
-        print("数据库已存在，跳过初始化")
-    except Exception as e:
-        print(f"初始化数据库时出错: {e}")
-        import traceback
-        traceback.print_exc()
+        from aerich import Command
+        command = Command(tortoise_config=TORTOISE_ORM)
+        
+        try:
+            print("初始化aerich...")
+            await command.init()
+            print("aerich初始化完成")
+        except Exception as e:
+            print(f"初始化aerich时出错: {e}")
+            import traceback
+            traceback.print_exc()
 
-    try:
-        print("初始化aerich...")
-        await command.init()
-        print("aerich初始化完成")
+        try:
+            print("执行数据库迁移...")
+            await command.upgrade(run_in_transaction=True)
+            print("数据库迁移完成")
+        except Exception as e:
+            print(f"执行数据库迁移时出错: {e}")
+            print("继续执行，可能是因为迁移已应用...")
+            import traceback
+            traceback.print_exc()
+            
+    except ImportError:
+        print("aerich 未安装，跳过迁移")
     except Exception as e:
-        print(f"初始化aerich时出错: {e}")
-        import traceback
-        traceback.print_exc()
-
-    try:
-        print("执行数据库迁移...")
-        await command.upgrade(run_in_transaction=True)
-        print("数据库迁移完成")
-    except Exception as e:
-        print(f"执行数据库迁移时出错: {e}")
-        print("继续执行，可能是因为迁移已应用...")
+        print(f"数据库初始化流程出错: {e}")
         import traceback
         traceback.print_exc()
     
@@ -48,15 +48,12 @@ async def init_db():
 async def init_data():
     await init_db()
     
-    # 初始化 Tortoise ORM
     from tortoise import Tortoise
     print("初始化 Tortoise ORM...")
     try:
-        await Tortoise.init(config=settings.TORTOISE_ORM)
+        await Tortoise.init(config=TORTOISE_ORM)
         print("Tortoise ORM 初始化完成")
         
-        # 确保所有表都已创建（安全模式）
-        # 只在单进程或主进程模式下执行，避免多 worker 死锁
         import os
         is_main_worker = os.environ.get("UVICORN_WORKER_ID") is None
         if is_main_worker:

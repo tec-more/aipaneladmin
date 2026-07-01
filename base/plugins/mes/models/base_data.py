@@ -106,9 +106,7 @@ class BomVersion(BaseModel, TimestampMixin):
 
     class Meta:
         table = "mes_bom_version"
-        indexes = [
-            fields.Index("product_code", "version", unique=True),
-        ]
+        unique_together = ("product_code", "version")
 
     async def to_dict(self):
         return {
