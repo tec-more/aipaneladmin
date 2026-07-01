@@ -72,7 +72,7 @@ except ImportError:
     class EquipmentMaintenanceResponse(BaseModel): pass
     class ListResponse(BaseModel): pass
 
-maintenance_router = APIRouter(prefix="", tags=["设备保养"])
+maintenance_router = APIRouter(prefix="/maintenance", tags=["设备保养"])
 
 @maintenance_router.get("/{maintenance_id}", summary="获取保养单详情")
 async def get_maintenance(maintenance_id: int):
@@ -81,7 +81,7 @@ async def get_maintenance(maintenance_id: int):
         raise HTTPException(status_code=404, detail="保养单不存在")
     return success_response(data=maintenance)
 
-@maintenance_router.post("", summary="创建保养单")
+@maintenance_router.post("/", summary="创建保养单")
 async def create_maintenance(data: EquipmentMaintenanceCreate):
     try:
         maintenance = await EquipmentMaintenanceService.create_maintenance(data)
@@ -113,7 +113,7 @@ async def complete_maintenance(maintenance_id: int, operator: Optional[str] = No
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@maintenance_router.get("", summary="获取保养单列表")
+@maintenance_router.get("/", summary="获取保养单列表")
 async def list_maintenance(
     page: int = 1,
     page_size: int = 10,

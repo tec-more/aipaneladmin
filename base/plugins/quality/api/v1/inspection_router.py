@@ -81,7 +81,7 @@ async def get_inspection(inspection_id: int):
         raise HTTPException(status_code=404, detail="检验单不存在")
     return success_response(data=inspection)
 
-@inspection_router.post("", summary="创建检验单")
+@inspection_router.post("/", summary="创建检验单")
 async def create_inspection(data: QualityInspectionCreate):
     try:
         inspection = await QualityInspectionService.create_inspection(data)
@@ -121,7 +121,7 @@ async def submit_inspection(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@inspection_router.get("", summary="获取检验单列表")
+@inspection_router.get("/", summary="获取检验单列表")
 async def list_inspections(
     page: int = 1,
     page_size: int = 10,

@@ -78,7 +78,7 @@ except ImportError:
     class EquipmentFaultResponse(BaseModel): pass
     class ListResponse(BaseModel): pass
 
-fault_router = APIRouter(prefix="", tags=["设备故障"])
+fault_router = APIRouter(prefix="/fault", tags=["设备故障"])
 
 @fault_router.get("/{fault_id}", summary="获取故障单详情")
 async def get_fault(fault_id: int):
@@ -87,7 +87,7 @@ async def get_fault(fault_id: int):
         raise HTTPException(status_code=404, detail="故障单不存在")
     return success_response(data=fault)
 
-@fault_router.post("", summary="创建故障单")
+@fault_router.post("/", summary="创建故障单")
 async def create_fault(data: EquipmentFaultCreate):
     try:
         fault = await EquipmentFaultService.create_fault(data)
@@ -139,7 +139,7 @@ async def close_fault(fault_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@fault_router.get("", summary="获取故障单列表")
+@fault_router.get("/", summary="获取故障单列表")
 async def list_fault(
     page: int = 1,
     page_size: int = 10,

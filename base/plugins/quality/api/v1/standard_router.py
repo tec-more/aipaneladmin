@@ -78,7 +78,7 @@ async def get_standard(standard_id: int):
         raise HTTPException(status_code=404, detail="检验标准不存在")
     return success_response(data=standard)
 
-@standard_router.post("", summary="创建检验标准")
+@standard_router.post("/", summary="创建检验标准")
 async def create_standard(data: InspectionStandardCreate):
     try:
         standard = await InspectionStandardService.create_standard(data)
@@ -100,7 +100,7 @@ async def delete_standard(standard_id: int):
         raise HTTPException(status_code=404, detail="检验标准不存在")
     return success_response(data={"message": "检验标准删除成功"}, msg="检验标准删除成功")
 
-@standard_router.get("", summary="获取检验标准列表")
+@standard_router.get("/", summary="获取检验标准列表")
 async def list_standards(
     page: int = 1,
     page_size: int = 10,

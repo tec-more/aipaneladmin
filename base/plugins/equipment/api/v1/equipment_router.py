@@ -72,7 +72,7 @@ except ImportError:
     class EquipmentResponse(BaseModel): pass
     class ListResponse(BaseModel): pass
 
-equipment_router = APIRouter(prefix="", tags=["设备台账"])
+equipment_router = APIRouter(prefix="/equipment", tags=["设备台账"])
 
 @equipment_router.get("/{equipment_id}", summary="获取设备详情")
 async def get_equipment(equipment_id: int):
@@ -81,7 +81,7 @@ async def get_equipment(equipment_id: int):
         raise HTTPException(status_code=404, detail="设备不存在")
     return success_response(data=equipment)
 
-@equipment_router.post("", summary="创建设备")
+@equipment_router.post("/", summary="创建设备")
 async def create_equipment(data: EquipmentCreate):
     try:
         equipment = await EquipmentService.create_equipment(data)
@@ -113,7 +113,7 @@ async def change_equipment_status(equipment_id: int, status: str):
         raise HTTPException(status_code=404, detail="设备不存在")
     return success_response(data=equipment)
 
-@equipment_router.get("", summary="获取设备列表")
+@equipment_router.get("/", summary="获取设备列表")
 async def list_equipment(
     page: int = 1,
     page_size: int = 10,
