@@ -82,7 +82,7 @@ class SalesService:
             day_end = current + timedelta(days=1)
 
             orders = await CustomerOrder.filter(
-                payment_status=OrderStatus.PAID,
+                payment_status=PaymentStatus.PAID,
                 created_at__gte=day_start,
                 created_at__lt=day_end
             )
@@ -117,7 +117,7 @@ class SalesService:
             next_month_start = datetime(year, month + 1, 1).replace(tzinfo=timezone.utc)
 
         orders = await CustomerOrder.filter(
-            payment_status=OrderStatus.PAID,
+            payment_status=PaymentStatus.PAID,
             created_at__gte=month_start,
             created_at__lt=next_month_start
         )
@@ -132,7 +132,7 @@ class SalesService:
             day_end = current + timedelta(days=1)
 
             day_orders = await CustomerOrder.filter(
-                payment_status=OrderStatus.PAID,
+                payment_status=PaymentStatus.PAID,
                 created_at__gte=day_start,
                 created_at__lt=day_end
             )
@@ -165,7 +165,7 @@ class SalesService:
 
     @staticmethod
     async def get_top_products(limit: int = 10, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
-        filters = {"order__payment_status": OrderStatus.PAID}
+        filters = {"order__payment_status": PaymentStatus.PAID}
 
         if start_date:
             filters["order__created_at__gte"] = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -206,7 +206,7 @@ class SalesService:
 
     @staticmethod
     async def get_top_customers(limit: int = 10, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
-        filters = {"payment_status": OrderStatus.PAID}
+        filters = {"payment_status": PaymentStatus.PAID}
 
         if start_date:
             filters["created_at__gte"] = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -249,7 +249,7 @@ class SalesService:
 
     @staticmethod
     async def get_payment_method_stats(start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
-        filters = {"payment_status": OrderStatus.PAID}
+        filters = {"payment_status": PaymentStatus.PAID}
 
         if start_date:
             filters["created_at__gte"] = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)

@@ -94,7 +94,7 @@ class PaymentService:
             return False
 
         # 检查订单状态
-        if order.payment_status == OrderStatus.PAID:
+        if order.payment_status == PaymentStatus.PAID:
             print(f"[PaymentCallback] 订单已支付，跳过: {order_no}")
             return True  # 已处理，避免重复
 
@@ -115,7 +115,7 @@ class PaymentService:
         print(f"[PaymentCallback] 创建交易记录成功: {transaction.id}")
 
         # 更新订单状态
-        order.payment_status = OrderStatus.PAID
+        order.payment_status = PaymentStatus.PAID
         order.trade_no = transaction_id
         order.pay_time = datetime.now()
         await order.save()
