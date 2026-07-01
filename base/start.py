@@ -163,7 +163,7 @@ async def cancel_expired_orders_task():
             #     print(f"[定时任务] 数据库连接未初始化，跳过订单过期检查: {conn_error}")
             #     continue
 
-            from base.plugins.order.services.order_service import OrderService
+            from base.plugins.sales.services.order_service import OrderService
             cancelled_count = await OrderService.cancel_expired_orders()
 
             if cancelled_count > 0:

@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from decimal import Decimal
 
 try:
-    from base.plugins.order.models.order import CustomerOrder, OrderItem, OrderStatus
+    from base.plugins.sales.models.order import CustomerOrder, OrderItem, OrderStatus
     from base.plugins.customer.models.customer import Customer
 except ImportError:
     CustomerOrder = None

@@ -15,7 +15,7 @@ from base.plugins.customer.models import (
     PaymentMethod
 )
 # 使用新的订单模型
-from base.plugins.order.models.order import CustomerOrder
+from base.plugins.sales.models.order import CustomerOrder
 from base.plugins.customer.models.membership import MembershipLevel
 
 
@@ -40,7 +40,7 @@ class PaymentService:
             raise ValueError("会员等级不存在")
 
         # 使用新的 OrderService 创建订单
-        from base.plugins.order.services.order_service import OrderService
+        from base.plugins.sales.services.order_service import OrderService
 
         order = await OrderService.create_membership_order(
             customer_id=customer_id,
@@ -123,7 +123,7 @@ class PaymentService:
 
         # 处理订单完成后的业务逻辑
         try:
-            from base.plugins.order.models.order import OrderItem
+            from base.plugins.sales.models.order import OrderItem
 
             # 获取订单明细
             items = await OrderItem.filter(order_id=order.id)

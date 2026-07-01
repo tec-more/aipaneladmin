@@ -9,15 +9,16 @@
         "api/v1"
     ],
     "models": [
-        "sales"
+        "sales",
+        "order"
     ],
     "schemas": [
-        "sales_schema"
+        "sales_schema",
+        "order_schema"
     ],
     "dependencies": [
         "customer",
-        "product",
-        "order"
+        "product"
     ],
     "is_installed": true,
     "is_enabled": true,

@@ -549,7 +549,7 @@ async def get_payment_transactions_alias(
         print(f"[PaymentTransactions] payment_status={repr(payment_status)}")
 
         from base.plugins.customer.models.payment_transaction import PaymentTransaction
-        from base.plugins.order.models import CustomerOrder
+        from base.plugins.sales.models import CustomerOrder
 
         query = PaymentTransaction.all()
         print(f"[PaymentTransactions] 初始查询构建完成")

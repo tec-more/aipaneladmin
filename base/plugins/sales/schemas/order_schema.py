@@ -1,17 +1,10 @@
-"""
-订单相关 Schema - 订单主表 + 订单明细表设计
-"""
-
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from decimal import Decimal
 
 
-# ========== 订单明细相关 Schema ==========
-
 class OrderItemExtraInfo(BaseModel):
-    """订单明细扩展信息"""
     membership_level_id: Optional[int] = Field(None, description="会员等级ID")
     membership_level_name: Optional[str] = Field(None, description="会员等级名称")
     hours: Optional[int] = Field(None, description="购买小时数")
@@ -21,7 +14,6 @@ class OrderItemExtraInfo(BaseModel):
 
 
 class OrderItemCreate(BaseModel):
-    """创建订单明细项"""
     product_id: int = Field(..., description="产品ID")
     product_name: str = Field(..., description="产品名称")
     product_type: str = Field(..., description="产品类型：membership/points/item")
@@ -32,7 +24,6 @@ class OrderItemCreate(BaseModel):
 
 
 class OrderItemOut(BaseModel):
-    """订单明细输出"""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -49,10 +40,7 @@ class OrderItemOut(BaseModel):
     updated_at: datetime
 
 
-# ========== 订单创建相关 Schema ==========
-
 class CreateOrderIn(BaseModel):
-    """创建订单输入"""
     customer_id: int = Field(..., description="客户ID")
     items: List[OrderItemCreate] = Field(..., min_items=1, description="订单明细列表")
     payment_method: str = Field(..., description="支付方式(wechat/alipay/balance)")
@@ -61,10 +49,7 @@ class CreateOrderIn(BaseModel):
     remark: Optional[str] = Field(None, description="备注")
 
 
-# ========== 订单输出相关 Schema ==========
-
 class OrderOut(BaseModel):
-    """订单完整输出（包含明细）"""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -72,41 +57,33 @@ class OrderOut(BaseModel):
     customer_id: int
     customer_name: Optional[str] = None
 
-    # 金额信息
     total_amount: Decimal
     discount_amount: Decimal
     final_amount: Decimal
 
-    # 支付信息
     payment_method: str
     payment_status: str
     trade_no: Optional[str] = None
     pay_time: Optional[datetime] = None
     expire_time: datetime
 
-    # 其他信息
     client_ip: Optional[str] = None
     device_info: Optional[Dict[str, Any]] = None
     remark: Optional[str] = None
 
-    # 时间戳
     created_at: datetime
     updated_at: datetime
 
-    # 关联数据
     items: List[OrderItemOut] = []
 
-    # 计算字段
     @computed_field
     @property
     def is_paid(self) -> bool:
-        """是否已支付"""
         return self.payment_status == "paid"
 
     @computed_field
     @property
     def is_expired(self) -> bool:
-        """是否已过期"""
         if self.pay_time:
             return False
         return datetime.now() > self.expire_time if self.expire_time else False
@@ -114,7 +91,6 @@ class OrderOut(BaseModel):
     @computed_field
     @property
     def status_color(self) -> str:
-        """状态颜色"""
         colors = {
             "pending": "warning",
             "processing": "info",
@@ -130,7 +106,6 @@ class OrderOut(BaseModel):
     @computed_field
     @property
     def status_label(self) -> str:
-        """状态中文标签"""
         labels = {
             "pending": "待支付",
             "processing": "处理中",
@@ -146,12 +121,10 @@ class OrderOut(BaseModel):
     @computed_field
     @property
     def total_quantity(self) -> int:
-        """订单商品总数量"""
         return sum(item.quantity for item in self.items)
 
 
 class OrderListOut(BaseModel):
-    """订单列表输出（不包含明细详情）"""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -159,24 +132,19 @@ class OrderListOut(BaseModel):
     customer_id: int
     customer_name: Optional[str] = None
 
-    # 金额信息
     total_amount: Decimal
     final_amount: Decimal
 
-    # 支付信息
     payment_method: str
     payment_status: str
     pay_time: Optional[datetime] = None
     expire_time: datetime
 
-    # 时间戳
     created_at: datetime
 
-    # 计算字段
     @computed_field
     @property
     def status_color(self) -> str:
-        """状态颜色"""
         colors = {
             "pending": "warning",
             "processing": "info",
@@ -192,7 +160,6 @@ class OrderListOut(BaseModel):
     @computed_field
     @property
     def status_label(self) -> str:
-        """状态中文标签"""
         labels = {
             "pending": "待支付",
             "processing": "处理中",
@@ -207,13 +174,11 @@ class OrderListOut(BaseModel):
 
 
 class OrderListResponse(BaseModel):
-    """订单列表响应"""
     total: int
     items: List[OrderListOut]
 
 
 class OrderCreateResponse(BaseModel):
-    """创建订单响应"""
     order_id: int
     order_no: str
     total_amount: Decimal
@@ -221,43 +186,31 @@ class OrderCreateResponse(BaseModel):
     message: str = "订单创建成功"
 
 
-# ========== 订单更新相关 Schema ==========
-
 class OrderUpdateRequest(BaseModel):
-    """更新订单请求"""
     payment_status: Optional[str] = Field(None, description="支付状态(pending/processing/paid/completed/cancelled/failed/refunded/expired)")
     remark: Optional[str] = Field(None, description="订单备注")
 
 
 class PaymentUpdateRequest(BaseModel):
-    """更新支付状态请求"""
     order_id: int = Field(..., description="订单ID")
     payment_status: str = Field(..., description="支付状态: pending/paid/failed/refunded")
     payment_method: Optional[str] = Field(None, description="支付方式")
     transaction_id: Optional[str] = Field(None, description="支付平台交易ID")
 
 
-# ========== 支付回调相关 Schema ==========
-
 class PaymentWebhookIn(BaseModel):
-    """支付回调输入（基类）"""
     pass
 
 
 class WechatPayNotifyIn(BaseModel):
-    """微信支付回调"""
     pass
 
 
 class AlipayNotifyIn(BaseModel):
-    """支付宝回调"""
     pass
 
 
-# ========== 向后兼容的旧 Schema ==========
-
 class OrderBase(BaseModel):
-    """订单基础模型（保留以兼容旧代码）"""
     customer_id: int = Field(..., description="客户ID")
     product_id: int = Field(..., description="产品ID")
     quantity: int = Field(default=1, ge=1, description="购买数量")
@@ -265,12 +218,10 @@ class OrderBase(BaseModel):
 
 
 class OrderCreateRequest(OrderBase):
-    """创建订单请求模型（保留以兼容旧代码）"""
     pass
 
 
 class OrderItemResponse(BaseModel):
-    """订单项响应模型（保留以兼容旧代码）"""
     id: int
     order_no: str
     customer_id: int
@@ -291,7 +242,6 @@ class OrderItemResponse(BaseModel):
 
 
 class OrderDetailResponse(OrderItemResponse):
-    """订单详情响应模型（保留以兼容旧代码）"""
     payment_method: Optional[str] = None
     payment_time: Optional[datetime] = None
     transaction_id: Optional[str] = None

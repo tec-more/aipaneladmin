@@ -14,8 +14,8 @@ from .membership import (
     MembershipLevelOut,
     CustomerMembershipOut,
 )
-# 从 order 模块导入订单相关schemas
-from base.plugins.order.schemas import (
+# 从 sales 模块导入订单相关schemas
+from base.plugins.sales.schemas import (
     CreateOrderIn,
     OrderOut,
     PaymentWebhookIn,

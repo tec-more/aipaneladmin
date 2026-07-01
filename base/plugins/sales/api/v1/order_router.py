@@ -2,11 +2,11 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from base.common.response import SuccessResponse
-from base.plugins.order.schemas.order_schema import (
+from base.plugins.sales.schemas.order_schema import (
     CreateOrderIn, OrderOut, OrderListResponse, OrderUpdateRequest,
     OrderCreateResponse
 )
-from base.plugins.order.services.order_service import OrderService
+from base.plugins.sales.services.order_service import OrderService
 
 order_router = APIRouter(prefix="", tags=["订单管理"])
 
@@ -95,7 +95,7 @@ async def get_customer_orders(
 ):
     orders = await OrderService.get_orders_by_customer(customer_id, page, page_size)
 
-    from base.plugins.order.models.order import CustomerOrder, OrderItem
+    from base.plugins.sales.models.order import CustomerOrder, OrderItem
     total = await CustomerOrder.filter(customer_id=customer_id).count()
 
     order_list = []
@@ -138,7 +138,7 @@ async def get_all_orders(
 ):
     orders = await OrderService.get_all_orders(page, page_size)
 
-    from base.plugins.order.models.order import CustomerOrder, OrderItem
+    from base.plugins.sales.models.order import CustomerOrder, OrderItem
     total = await CustomerOrder.all().count()
 
     order_list = []
@@ -185,7 +185,7 @@ async def get_all_orders_alias(
 @order_router.delete("/batch", summary="批量删除订单")
 async def batch_delete_order(request_data: dict):
     try:
-        from base.plugins.order.models.order import CustomerOrder, OrderItem
+        from base.plugins.sales.models.order import CustomerOrder, OrderItem
 
         ids = request_data.get("ids", [])
         if not ids:
@@ -242,7 +242,7 @@ async def update_order(order_id: int, order_update: OrderUpdateRequest):
             raise HTTPException(status_code=500, detail="更新支付状态失败")
 
     if "remark" in update_data:
-        from base.plugins.order.models.order import CustomerOrder
+        from base.plugins.sales.models.order import CustomerOrder
         await CustomerOrder.filter(id=order_id).update(remark=update_data["remark"])
 
     updated_order = await OrderService.get_order_by_id(order_id)
@@ -260,7 +260,7 @@ async def update_order(order_id: int, order_update: OrderUpdateRequest):
 @order_router.delete("/{order_id}", summary="删除订单")
 async def delete_order(order_id: int):
     try:
-        from base.plugins.order.models.order import CustomerOrder, OrderItem
+        from base.plugins.sales.models.order import CustomerOrder, OrderItem
 
         order = await CustomerOrder.get_or_none(id=order_id)
         if not order:
