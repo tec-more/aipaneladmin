@@ -92,6 +92,26 @@ export const deleteProcess = (id) => {
   return request.delete(`${BASE}/base-data/processes/${id}`)
 }
 
+export const getRouteList = (params) => {
+  return request.get(`${BASE}/base-data/routes`, { params })
+}
+
+export const getRouteDetail = (id) => {
+  return request.get(`${BASE}/base-data/routes/${id}`)
+}
+
+export const createRoute = (data) => {
+  return request.post(`${BASE}/base-data/routes`, data)
+}
+
+export const updateRoute = (id, data) => {
+  return request.put(`${BASE}/base-data/routes/${id}`, data)
+}
+
+export const deleteRoute = (id) => {
+  return request.delete(`${BASE}/base-data/routes/${id}`)
+}
+
 export const getProductionPlanList = (params) => {
   return request.get(`${BASE}/production/plans`, { params })
 }

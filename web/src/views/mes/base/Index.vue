@@ -37,6 +37,11 @@
               </template>
             </el-table-column>
             <el-table-column prop="created_at" label="创建时间" width="180" />
+            <el-table-column label="操作" width="150" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-button type="primary" link :icon="Edit" @click="handleEditMaterial(row)">编辑</el-button>
+              </template>
+            </el-table-column>
           </el-table>
           <div class="pagination-wrapper">
             <el-pagination
@@ -107,13 +112,38 @@
         </el-card>
       </el-tab-pane>
     </el-tabs>
+
+    <el-dialog v-model="materialDialogVisible" :title="isEditMaterial ? '编辑物料' : '新增物料'" width="600px" @close="resetMaterialForm">
+      <el-form ref="materialFormRef" :model="materialForm" :rules="materialRules" label-width="100px">
+        <el-form-item label="物料编码" prop="material_code">
+          <el-input v-model="materialForm.material_code" placeholder="请输入物料编码" />
+        </el-form-item>
+        <el-form-item label="物料名称" prop="name">
+          <el-input v-model="materialForm.name" placeholder="请输入物料名称" />
+        </el-form-item>
+        <el-form-item label="规格" prop="specification">
+          <el-input v-model="materialForm.specification" placeholder="请输入规格" />
+        </el-form-item>
+        <el-form-item label="单位" prop="unit">
+          <el-input v-model="materialForm.unit" placeholder="请输入单位" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-switch v-model="materialForm.is_active" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="materialDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="materialSubmitLoading" @click="handleSaveMaterial">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import { getMaterialList, getBomList } from '@/api/mes'
+import { ElMessage } from 'element-plus'
+import { Search, Refresh, Plus, Edit } from '@element-plus/icons-vue'
+import { getMaterialList, getBomList, createMaterial, updateMaterial } from '@/api/mes'
 
 const activeTab = ref('material')
 
@@ -126,6 +156,28 @@ const bomLoading = ref(false)
 const bomList = ref([])
 const bomSearch = reactive({ bom_code: '', product_code: '' })
 const bomPagination = reactive({ page: 1, pageSize: 10, total: 0 })
+
+// 物料对话框相关
+const materialDialogVisible = ref(false)
+const isEditMaterial = ref(false)
+const materialSubmitLoading = ref(false)
+const materialFormRef = ref(null)
+const materialForm = reactive({
+  id: null,
+  material_code: '',
+  name: '',
+  specification: '',
+  unit: '',
+  is_active: true
+})
+const materialRules = {
+  material_code: [
+    { required: true, message: '请输入物料编码', trigger: 'blur' }
+  ],
+  name: [
+    { required: true, message: '请输入物料名称', trigger: 'blur' }
+  ]
+}
 
 const fetchMaterialList = async () => {
   materialLoading.value = true
@@ -169,7 +221,51 @@ const resetBomSearch = () => {
   fetchBomList()
 }
 
-const handleAddMaterial = () => {}
+const handleAddMaterial = () => {
+  isEditMaterial.value = false
+  materialForm.id = null
+  materialForm.material_code = ''
+  materialForm.name = ''
+  materialForm.specification = ''
+  materialForm.unit = ''
+  materialForm.is_active = true
+  materialDialogVisible.value = true
+}
+
+const handleEditMaterial = (row) => {
+  isEditMaterial.value = true
+  materialForm.id = row.id
+  materialForm.material_code = row.material_code
+  materialForm.name = row.name
+  materialForm.specification = row.specification || ''
+  materialForm.unit = row.unit || ''
+  materialForm.is_active = row.is_active
+  materialDialogVisible.value = true
+}
+
+const handleSaveMaterial = async () => {
+  await materialFormRef.value.validate()
+  materialSubmitLoading.value = true
+  try {
+    if (isEditMaterial.value) {
+      await updateMaterial(materialForm.id, materialForm)
+      ElMessage.success('更新成功')
+    } else {
+      await createMaterial(materialForm)
+      ElMessage.success('创建成功')
+    }
+    materialDialogVisible.value = false
+    fetchMaterialList()
+  } catch (e) {
+    console.error('提交失败:', e)
+  } finally {
+    materialSubmitLoading.value = false
+  }
+}
+
+const resetMaterialForm = () => {
+  materialFormRef.value?.resetFields()
+}
 
 onMounted(() => {
   fetchMaterialList()

@@ -30,7 +30,7 @@
       <template #header>
         <div class="card-header">
           <span>质量检验列表</span>
-          <el-button type="primary" :icon="Plus">新建检验单</el-button>
+          <el-button type="primary" :icon="Plus" @click="openAddDialog">新建检验单</el-button>
         </div>
       </template>
 
@@ -63,13 +63,63 @@
         />
       </div>
     </el-card>
+
+    <!-- 新增/编辑检验单对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      width="600px"
+      @close="handleDialogClose"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+      >
+        <el-form-item label="检验单号" prop="inspection_code">
+          <el-input v-model="formData.inspection_code" placeholder="请输入检验单号" />
+        </el-form-item>
+        <el-form-item label="检验类型" prop="inspection_type">
+          <el-select v-model="formData.inspection_type" placeholder="请选择检验类型" style="width: 100%">
+            <el-option label="来料检验" value="incoming" />
+            <el-option label="过程检验" value="process" />
+            <el-option label="成品检验" value="finished" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="产品名称" prop="product_name">
+          <el-input v-model="formData.product_name" placeholder="请输入产品名称" />
+        </el-form-item>
+        <el-form-item label="检验数量" prop="quantity">
+          <el-input-number v-model="formData.quantity" :min="1" placeholder="请输入检验数量" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="合格数量" prop="passed_quantity">
+          <el-input-number v-model="formData.passed_quantity" :min="0" placeholder="请输入合格数量" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="检验结果" prop="result">
+          <el-select v-model="formData.result" placeholder="请选择检验结果" style="width: 100%">
+            <el-option label="待检" value="pending" />
+            <el-option label="合格" value="passed" />
+            <el-option label="不合格" value="failed" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注" prop="remarks">
+          <el-input v-model="formData.remarks" type="textarea" :rows="3" placeholder="请输入备注" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="handleSave">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import { getQualityInspectionList } from '@/api/mes'
+import { getQualityInspectionList, createQualityInspection } from '@/api/mes'
+import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -81,6 +131,32 @@ const searchForm = reactive({
 })
 
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
+
+// 对话框相关
+const dialogVisible = ref(false)
+const dialogTitle = ref('新建检验单')
+const submitLoading = ref(false)
+const formRef = ref(null)
+
+// 表单数据
+const formData = reactive({
+  inspection_code: '',
+  inspection_type: null,
+  product_name: '',
+  quantity: null,
+  passed_quantity: null,
+  result: null,
+  remarks: ''
+})
+
+// 表单验证规则
+const formRules = {
+  inspection_code: [{ required: true, message: '请输入检验单号', trigger: 'blur' }],
+  inspection_type: [{ required: true, message: '请选择检验类型', trigger: 'change' }],
+  product_name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  quantity: [{ required: true, message: '请输入检验数量', trigger: 'blur' }],
+  result: [{ required: true, message: '请选择检验结果', trigger: 'change' }]
+}
 
 const resultMap = {
   pending: '待检',
@@ -110,6 +186,47 @@ const fetchData = async () => {
 
 const handleSearch = () => { pagination.page = 1; fetchData() }
 const handleReset = () => { searchForm.inspection_code = ''; searchForm.inspection_type = null; searchForm.result = null; handleSearch() }
+
+// 打开新增对话框
+const openAddDialog = () => {
+  dialogTitle.value = '新建检验单'
+  dialogVisible.value = true
+}
+
+// 保存检验单
+const handleSave = async () => {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      submitLoading.value = true
+      try {
+        await createQualityInspection(formData)
+        ElMessage.success('创建检验单成功')
+        dialogVisible.value = false
+        fetchData()
+      } catch (e) {
+        console.error('创建检验单失败:', e)
+        ElMessage.error('创建检验单失败')
+      } finally {
+        submitLoading.value = false
+      }
+    }
+  })
+}
+
+// 对话框关闭重置表单
+const handleDialogClose = () => {
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
+  formData.inspection_code = ''
+  formData.inspection_type = null
+  formData.product_name = ''
+  formData.quantity = null
+  formData.passed_quantity = null
+  formData.result = null
+  formData.remarks = ''
+}
 
 onMounted(() => { fetchData() })
 </script>

@@ -28,7 +28,7 @@
       <template #header>
         <div class="card-header">
           <span>生产计划列表</span>
-          <el-button type="primary" :icon="Plus">新建计划</el-button>
+          <el-button type="primary" :icon="Plus" @click="handleAdd">新建计划</el-button>
         </div>
       </template>
 
@@ -61,16 +61,105 @@
         />
       </div>
     </el-card>
+
+    <!-- 新增/编辑生产计划对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      width="600px"
+      @close="handleDialogClose"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+      >
+        <el-form-item label="计划编号" prop="plan_code">
+          <el-input v-model="formData.plan_code" placeholder="请输入计划编号" />
+        </el-form-item>
+        <el-form-item label="产品名称" prop="product_name">
+          <el-input v-model="formData.product_name" placeholder="请输入产品名称" />
+        </el-form-item>
+        <el-form-item label="计划数量" prop="planned_quantity">
+          <el-input-number v-model="formData.planned_quantity" :min="1" placeholder="请输入计划数量" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="开始日期" prop="start_date">
+          <el-date-picker
+            v-model="formData.start_date"
+            type="date"
+            placeholder="请选择开始日期"
+            style="width: 100%"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="结束日期" prop="end_date">
+          <el-date-picker
+            v-model="formData.end_date"
+            type="date"
+            placeholder="请选择结束日期"
+            style="width: 100%"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="formData.status" placeholder="请选择状态" style="width: 100%">
+            <el-option label="草稿" value="draft" />
+            <el-option label="已确认" value="confirmed" />
+            <el-option label="进行中" value="in_progress" />
+            <el-option label="已完成" value="completed" />
+            <el-option label="已取消" value="cancelled" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注" prop="remark">
+          <el-input v-model="formData.remark" type="textarea" :rows="3" placeholder="请输入备注" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saveLoading" @click="handleSave">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import { getProductionPlanList } from '@/api/mes'
+import { getProductionPlanList, createProductionPlan } from '@/api/mes'
+import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
 const tableData = ref([])
+
+// 对话框相关
+const dialogVisible = ref(false)
+const dialogTitle = ref('新建生产计划')
+const saveLoading = ref(false)
+const formRef = ref(null)
+
+// 表单数据
+const formData = reactive({
+  plan_code: '',
+  product_name: '',
+  planned_quantity: null,
+  start_date: '',
+  end_date: '',
+  status: 'draft',
+  remark: ''
+})
+
+// 表单验证规则
+const formRules = {
+  plan_code: [{ required: true, message: '请输入计划编号', trigger: 'blur' }],
+  product_name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  planned_quantity: [{ required: true, message: '请输入计划数量', trigger: 'blur' }],
+  start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
+  end_date: [{ required: true, message: '请选择结束日期', trigger: 'change' }],
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+}
 
 const searchForm = reactive({
   plan_code: '',
@@ -112,6 +201,50 @@ const fetchData = async () => {
 
 const handleSearch = () => { pagination.page = 1; fetchData() }
 const handleReset = () => { searchForm.plan_code = ''; searchForm.product_name = ''; searchForm.status = null; handleSearch() }
+
+// 打开新建对话框
+const handleAdd = () => {
+  dialogTitle.value = '新建生产计划'
+  dialogVisible.value = true
+}
+
+// 重置表单
+const resetForm = () => {
+  formData.plan_code = ''
+  formData.product_name = ''
+  formData.planned_quantity = null
+  formData.start_date = ''
+  formData.end_date = ''
+  formData.status = 'draft'
+  formData.remark = ''
+}
+
+// 对话框关闭回调
+const handleDialogClose = () => {
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
+  resetForm()
+}
+
+// 保存生产计划
+const handleSave = async () => {
+  if (!formRef.value) return
+  try {
+    const valid = await formRef.value.validate()
+    if (!valid) return
+    saveLoading.value = true
+    await createProductionPlan(formData)
+    ElMessage.success('创建成功')
+    dialogVisible.value = false
+    fetchData()
+  } catch (e) {
+    console.error('创建生产计划失败:', e)
+    ElMessage.error(e.message || '创建失败')
+  } finally {
+    saveLoading.value = false
+  }
+}
 
 onMounted(() => { fetchData() })
 </script>

@@ -27,7 +27,7 @@
       <template #header>
         <div class="card-header">
           <span>设备列表</span>
-          <el-button type="primary" :icon="Plus">新增设备</el-button>
+          <el-button type="primary" :icon="Plus" @click="handleAdd">新增设备</el-button>
         </div>
       </template>
 
@@ -59,13 +59,54 @@
         />
       </div>
     </el-card>
+
+    <!-- 新增/编辑设备对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      width="600px"
+      @close="handleDialogClose"
+    >
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="formRules"
+        label-width="100px"
+      >
+        <el-form-item label="设备编号" prop="equipment_code">
+          <el-input v-model="form.equipment_code" placeholder="请输入设备编号" />
+        </el-form-item>
+        <el-form-item label="设备名称" prop="name">
+          <el-input v-model="form.name" placeholder="请输入设备名称" />
+        </el-form-item>
+        <el-form-item label="规格型号" prop="specification">
+          <el-input v-model="form.specification" placeholder="请输入规格型号" />
+        </el-form-item>
+        <el-form-item label="所在位置" prop="location">
+          <el-input v-model="form.location" placeholder="请输入所在位置" />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="form.status" placeholder="请选择状态" style="width: 100%">
+            <el-option label="运行中" value="running" />
+            <el-option label="待机" value="idle" />
+            <el-option label="维修中" value="maintenance" />
+            <el-option label="停用" value="disabled" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saveLoading" @click="handleSave">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import { getEquipmentList } from '@/api/mes'
+import { ElMessage } from 'element-plus'
+import { getEquipmentList, createEquipment } from '@/api/mes'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -77,6 +118,26 @@ const searchForm = reactive({
 })
 
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
+
+// 对话框相关
+const dialogVisible = ref(false)
+const dialogTitle = ref('新增设备')
+const saveLoading = ref(false)
+const formRef = ref(null)
+
+const form = reactive({
+  equipment_code: '',
+  name: '',
+  specification: '',
+  location: '',
+  status: 'idle'
+})
+
+const formRules = {
+  equipment_code: [{ required: true, message: '请输入设备编号', trigger: 'blur' }],
+  name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }],
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+}
 
 const statusMap = {
   running: '运行中',
@@ -108,6 +169,40 @@ const fetchData = async () => {
 
 const handleSearch = () => { pagination.page = 1; fetchData() }
 const handleReset = () => { searchForm.equipment_code = ''; searchForm.name = ''; searchForm.status = null; handleSearch() }
+
+const handleAdd = () => {
+  dialogTitle.value = '新增设备'
+  dialogVisible.value = true
+}
+
+const handleSave = async () => {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      saveLoading.value = true
+      try {
+        await createEquipment(form)
+        ElMessage.success('添加成功')
+        dialogVisible.value = false
+        fetchData()
+      } catch (e) {
+        console.error('添加设备失败:', e)
+        ElMessage.error('添加失败')
+      } finally {
+        saveLoading.value = false
+      }
+    }
+  })
+}
+
+const handleDialogClose = () => {
+  formRef.value?.resetFields()
+  form.equipment_code = ''
+  form.name = ''
+  form.specification = ''
+  form.location = ''
+  form.status = 'idle'
+}
 
 onMounted(() => { fetchData() })
 </script>
