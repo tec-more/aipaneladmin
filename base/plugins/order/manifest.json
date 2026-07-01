@@ -2,7 +2,7 @@
     "name": "order",
     "display_name": "订单模块",
     "version": "1.0.0",
-    "description": "订单模块，用于记录虚拟产品的销售数据",
+    "description": "订单模块，用于记录虚拟产品的销售数据，集成在销售管理模块中",
     "author": "hepan",
     "route_prefix": "/v1/orders",
     "routes": [
@@ -20,16 +20,5 @@
     ],
     "is_installed": true,
     "is_enabled": true,
-    "menus": [
-        {
-            "name": "订单管理",
-            "path": "/order",
-            "icon": "ShoppingCart",
-            "component": "order/Index",
-            "sort": 4,
-            "is_hidden": false,
-            "menu_type": "menu",
-            "permission_code": "order:list"
-        }
-    ]
+    "menus": []
 }

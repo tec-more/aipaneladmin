@@ -110,7 +110,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, View, Delete } from '@element-plus/icons-vue'
-import { getOrderList, deleteOrder } from '@/api/order'
+import { getOrderList, deleteOrder } from '@/api/sales'
 
 const router = useRouter()
 const loading = ref(false)
