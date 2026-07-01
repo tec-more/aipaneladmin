@@ -144,44 +144,76 @@ export const deleteRoute = (id) => {
   return request.delete(`${BASE}/base-data/routes/${id}`)
 }
 
-export const getProductionPlanList = (params) => {
-  return request.get(`${BASE}/production/plans`, { params })
+export const getManufacturingOrderList = (params) => {
+  return request.get(`${BASE}/production/manufacturing-orders`, { params })
 }
 
-export const getProductionPlanDetail = (id) => {
-  return request.get(`${BASE}/production/plans/${id}`)
+export const getManufacturingOrderDetail = (id) => {
+  return request.get(`${BASE}/production/manufacturing-orders/${id}`)
 }
 
-export const createProductionPlan = (data) => {
-  return request.post(`${BASE}/production/plans`, data)
+export const createManufacturingOrder = (data) => {
+  return request.post(`${BASE}/production/manufacturing-orders`, data)
 }
 
-export const updateProductionPlan = (id, data) => {
-  return request.put(`${BASE}/production/plans/${id}`, data)
+export const updateManufacturingOrder = (id, data) => {
+  return request.put(`${BASE}/production/manufacturing-orders/${id}`, data)
 }
 
-export const deleteProductionPlan = (id) => {
-  return request.delete(`${BASE}/production/plans/${id}`)
+export const deleteManufacturingOrder = (id) => {
+  return request.delete(`${BASE}/production/manufacturing-orders/${id}`)
 }
 
-export const getProductionOrderList = (params) => {
-  return request.get(`${BASE}/production/orders`, { params })
+export const releaseManufacturingOrder = (id) => {
+  return request.put(`${BASE}/production/manufacturing-orders/${id}/release`)
 }
 
-export const getProductionOrderDetail = (id) => {
-  return request.get(`${BASE}/production/orders/${id}`)
+export const completeManufacturingOrder = (id) => {
+  return request.put(`${BASE}/production/manufacturing-orders/${id}/complete`)
 }
 
-export const createProductionOrder = (data) => {
-  return request.post(`${BASE}/production/orders`, data)
+export const generateWorkOrders = (id, data) => {
+  return request.post(`${BASE}/production/manufacturing-orders/${id}/generate-work-orders`, data)
 }
 
-export const updateProductionOrder = (id, data) => {
-  return request.put(`${BASE}/production/orders/${id}`, data)
+export const cancelManufacturingOrder = (id) => {
+  return request.put(`${BASE}/production/manufacturing-orders/${id}/cancel`)
 }
 
-export const deleteProductionOrder = (id) => {
-  return request.delete(`${BASE}/production/orders/${id}`)
+export const getWorkOrderList = (params) => {
+  return request.get(`${BASE}/production/work-orders`, { params })
+}
+
+export const getWorkOrderDetail = (id) => {
+  return request.get(`${BASE}/production/work-orders/${id}`)
+}
+
+export const createWorkOrder = (data) => {
+  return request.post(`${BASE}/production/work-orders`, data)
+}
+
+export const updateWorkOrder = (id, data) => {
+  return request.put(`${BASE}/production/work-orders/${id}`, data)
+}
+
+export const deleteWorkOrder = (id) => {
+  return request.delete(`${BASE}/production/work-orders/${id}`)
+}
+
+export const releaseWorkOrder = (id) => {
+  return request.put(`${BASE}/production/work-orders/${id}/release`)
+}
+
+export const startWorkOrder = (id, data) => {
+  return request.put(`${BASE}/production/work-orders/${id}/start`, data)
+}
+
+export const completeWorkOrder = (id, data) => {
+  return request.put(`${BASE}/production/work-orders/${id}/complete`, data)
+}
+
+export const closeWorkOrder = (id) => {
+  return request.put(`${BASE}/production/work-orders/${id}/close`)
 }
 
 export const getQualityInspectionList = (params) => {

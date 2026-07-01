@@ -163,6 +163,64 @@ class ManufacturingOrderService:
             query = query.exclude(id=exclude_id)
         return await query.exists()
 
+    @staticmethod
+    async def generate_work_orders(mo_id: int) -> List[WorkOrder]:
+        mo = await ManufacturingOrder.filter(id=mo_id).first()
+        if not mo:
+            raise ValueError("制造单不存在")
+        if mo.status not in ["released", "processing"]:
+            raise ValueError("只有已下发或生产中的制造单才能生成工单")
+
+        try:
+            from base.plugins.mes.models.base_data import Route
+            route = await Route.filter(product_code=mo.product_code).first()
+        except ImportError:
+            route = None
+
+        work_orders = []
+        if route and hasattr(route, 'route_details'):
+            details = await route.route_details.all()
+            for idx, detail in enumerate(details):
+                wo_code = f"WO-{mo.mo_code}-{idx + 1:03d}"
+                wo_data = WorkOrderCreate(
+                    wo_code=wo_code,
+                    mo_code=mo.mo_code,
+                    mo_name=mo.product_name,
+                    product_code=mo.product_code,
+                    product_name=mo.product_name,
+                    process_code=getattr(detail, 'process_code', f'PROC-{idx + 1}'),
+                    process_name=getattr(detail, 'process_name', f'工序{idx + 1}'),
+                    work_center_code=getattr(detail, 'work_center_code', ''),
+                    work_center_name=getattr(detail, 'work_center_name', ''),
+                    quantity=mo.quantity,
+                    planned_start_date=mo.planned_start_date,
+                    planned_end_date=mo.planned_end_date,
+                    remark=f"由制造单{mo.mo_code}自动生成"
+                )
+                wo = await WorkOrderService.create_wo(wo_data)
+                work_orders.append(wo)
+        else:
+            wo_code = f"WO-{mo.mo_code}-001"
+            wo_data = WorkOrderCreate(
+                wo_code=wo_code,
+                mo_code=mo.mo_code,
+                mo_name=mo.product_name,
+                product_code=mo.product_code,
+                product_name=mo.product_name,
+                process_code="PROC-001",
+                process_name="默认工序",
+                work_center_code="",
+                work_center_name="",
+                quantity=mo.quantity,
+                planned_start_date=mo.planned_start_date,
+                planned_end_date=mo.planned_end_date,
+                remark=f"由制造单{mo.mo_code}自动生成"
+            )
+            wo = await WorkOrderService.create_wo(wo_data)
+            work_orders.append(wo)
+
+        return work_orders
+
 
 class WorkOrderService:
     @staticmethod

@@ -169,6 +169,14 @@ async def cancel_mo(mo_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@production_router.post("/manufacturing-orders/{mo_id}/generate-work-orders", summary="从制造单生成工单")
+async def generate_work_orders(mo_id: int):
+    try:
+        work_orders = await ManufacturingOrderService.generate_work_orders(mo_id)
+        return success_response(data={"work_orders": work_orders, "count": len(work_orders)})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @production_router.get("/manufacturing-orders", summary="获取制造单列表")
 async def list_mos(
     page: int = 1,

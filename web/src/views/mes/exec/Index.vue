@@ -2,15 +2,25 @@
   <div class="mes-exec">
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="生产订单号">
-          <el-input v-model="searchForm.order_code" placeholder="请输入订单号" clearable />
+        <el-form-item label="工单编码">
+          <el-input v-model="searchForm.wo_code" placeholder="请输入工单编码" clearable />
+        </el-form-item>
+        <el-form-item label="制造单编码">
+          <el-input v-model="searchForm.mo_code" placeholder="请输入制造单编码" clearable />
+        </el-form-item>
+        <el-form-item label="产品编码">
+          <el-input v-model="searchForm.product_code" placeholder="请输入产品编码" clearable />
+        </el-form-item>
+        <el-form-item label="工作中心">
+          <el-input v-model="searchForm.work_center_code" placeholder="请输入工作中心" clearable />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px">
-            <el-option label="待生产" value="pending" />
-            <el-option label="生产中" value="producing" />
-            <el-option label="已完成" value="completed" />
-            <el-option label="已暂停" value="paused" />
+            <el-option label="待下发" value="pending" />
+            <el-option label="已下发" value="released" />
+            <el-option label="生产中" value="processing" />
+            <el-option label="已完工" value="completed" />
+            <el-option label="已关闭" value="closed" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -23,34 +33,45 @@
     <el-card shadow="never" class="table-card">
       <template #header>
         <div class="card-header">
-          <span>生产订单列表</span>
-          <el-button type="primary" :icon="Plus" @click="handleAdd">新增订单</el-button>
+          <span>工单列表</span>
+          <el-button type="primary" :icon="Plus" @click="handleAdd">新建工单</el-button>
         </div>
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="order_code" label="生产订单号" min-width="140" />
+        <el-table-column prop="wo_code" label="工单编码" min-width="140" />
+        <el-table-column prop="mo_code" label="制造单编码" min-width="140" />
+        <el-table-column prop="product_code" label="产品编码" min-width="120" />
         <el-table-column prop="product_name" label="产品名称" min-width="150" />
-        <el-table-column prop="quantity" label="生产数量" width="100" align="center" />
-        <el-table-column prop="completed_quantity" label="已完成数量" width="120" align="center" />
+        <el-table-column prop="process_code" label="工序编码" min-width="120" />
+        <el-table-column prop="process_name" label="工序名称" min-width="150" />
+        <el-table-column prop="work_center_code" label="工作中心" min-width="120" />
+        <el-table-column prop="work_center_name" label="工作中心名称" min-width="150" />
+        <el-table-column prop="quantity" label="计划数量" width="100" align="center" />
+        <el-table-column prop="actual_quantity" label="实际完成" width="100" align="center" />
+        <el-table-column prop="scrap_quantity" label="报废数量" width="100" align="center" />
         <el-table-column label="完成进度" width="180" align="center">
           <template #default="{ row }">
-            <el-progress :percentage="row.quantity ? Math.round((row.completed_quantity || 0) / row.quantity * 100) : 0" :stroke-width="12" />
+            <el-progress :percentage="row.quantity ? Math.round((row.actual_quantity || 0) / row.quantity * 100) : 0" :stroke-width="12" />
           </template>
         </el-table-column>
+        <el-table-column prop="operator" label="操作员" width="120" />
+        <el-table-column prop="planned_start_date" label="计划开始" width="150" />
+        <el-table-column prop="planned_end_date" label="计划结束" width="150" />
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="statusTypeMap[row.status] || 'info'">
-              {{ statusMap[row.status] || row.status }}
-            </el-tag>
+            <el-tag :type="statusTypeMap[row.status] || 'info'">{{ statusMap[row.status] || row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="150" align="center" fixed="right">
+        <el-table-column label="操作" width="300" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 'pending'" type="primary" link @click="handleRelease(row)">下发</el-button>
+            <el-button v-if="row.status === 'released'" type="primary" link @click="handleStart(row)">开工</el-button>
+            <el-button v-if="row.status === 'processing'" type="success" link @click="handleComplete(row)">完工</el-button>
+            <el-button v-if="row.status === 'completed'" type="primary" link @click="handleClose(row)">关闭</el-button>
+            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -68,51 +89,61 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑生产订单对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="600px"
-      :close-on-click-modal="false"
+      width="700px"
       @close="handleDialogClose"
     >
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px">
-        <el-form-item label="订单编号" prop="order_code">
-          <el-input v-model="formData.order_code" placeholder="请输入订单编号" />
+        <el-form-item label="工单编码" prop="wo_code">
+          <el-input v-model="formData.wo_code" placeholder="请输入工单编码" />
+        </el-form-item>
+        <el-form-item label="制造单编码" prop="mo_code">
+          <el-input v-model="formData.mo_code" placeholder="请输入制造单编码" />
+        </el-form-item>
+        <el-form-item label="产品编码" prop="product_code">
+          <el-input v-model="formData.product_code" placeholder="请输入产品编码" />
         </el-form-item>
         <el-form-item label="产品名称" prop="product_name">
           <el-input v-model="formData.product_name" placeholder="请输入产品名称" />
         </el-form-item>
-        <el-form-item label="生产数量" prop="quantity">
-          <el-input-number v-model="formData.quantity" :min="1" :max="999999" placeholder="请输入生产数量" style="width: 100%" />
+        <el-form-item label="工序编码" prop="process_code">
+          <el-input v-model="formData.process_code" placeholder="请输入工序编码" />
         </el-form-item>
-        <el-form-item label="计划开始日期" prop="plan_start_date">
+        <el-form-item label="工序名称" prop="process_name">
+          <el-input v-model="formData.process_name" placeholder="请输入工序名称" />
+        </el-form-item>
+        <el-form-item label="工作中心编码" prop="work_center_code">
+          <el-input v-model="formData.work_center_code" placeholder="请输入工作中心编码" />
+        </el-form-item>
+        <el-form-item label="工作中心名称">
+          <el-input v-model="formData.work_center_name" placeholder="请输入工作中心名称" />
+        </el-form-item>
+        <el-form-item label="计划数量" prop="quantity">
+          <el-input-number v-model="formData.quantity" :min="1" placeholder="请输入计划数量" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="计划开始日期">
           <el-date-picker
-            v-model="formData.plan_start_date"
-            type="date"
+            v-model="formData.planned_start_date"
+            type="datetime"
             placeholder="请选择计划开始日期"
-            value-format="YYYY-MM-DD"
             style="width: 100%"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
           />
         </el-form-item>
-        <el-form-item label="计划结束日期" prop="plan_end_date">
+        <el-form-item label="计划结束日期">
           <el-date-picker
-            v-model="formData.plan_end_date"
-            type="date"
+            v-model="formData.planned_end_date"
+            type="datetime"
             placeholder="请选择计划结束日期"
-            value-format="YYYY-MM-DD"
             style="width: 100%"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
           />
         </el-form-item>
-        <el-form-item label="优先级" prop="priority">
-          <el-select v-model="formData.priority" placeholder="请选择优先级" style="width: 100%">
-            <el-option label="低" :value="1" />
-            <el-option label="中" :value="2" />
-            <el-option label="高" :value="3" />
-            <el-option label="紧急" :value="4" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
+        <el-form-item label="备注">
           <el-input v-model="formData.remark" type="textarea" :rows="3" placeholder="请输入备注" />
         </el-form-item>
       </el-form>
@@ -121,82 +152,135 @@
         <el-button type="primary" :loading="saveLoading" @click="handleSave">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="completeDialogVisible"
+      title="完工确认"
+      width="400px"
+    >
+      <el-form ref="completeFormRef" :model="completeForm" :rules="completeRules" label-width="100px">
+        <el-form-item label="实际完成数量" prop="actual_quantity">
+          <el-input-number v-model="completeForm.actual_quantity" :min="0" :max="completeForm.max_quantity" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="报废数量" prop="scrap_quantity">
+          <el-input-number v-model="completeForm.scrap_quantity" :min="0" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="操作员">
+          <el-input v-model="completeForm.operator" placeholder="请输入操作员" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="completeDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="completeLoading" @click="doComplete">确定完工</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
-import { getProductionOrderList, createProductionOrder, updateProductionOrder, deleteProductionOrder } from '@/api/mes'
+import {
+  getWorkOrderList, createWorkOrder, updateWorkOrder, deleteWorkOrder,
+  releaseWorkOrder, startWorkOrder, completeWorkOrder, closeWorkOrder
+} from '@/api/mes'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const loading = ref(false)
 const tableData = ref([])
 const dialogVisible = ref(false)
-const dialogTitle = ref('新增生产订单')
+const dialogTitle = ref('新建工单')
 const saveLoading = ref(false)
 const formRef = ref(null)
 const isEdit = ref(false)
 const editId = ref(null)
 
+const completeDialogVisible = ref(false)
+const completeFormRef = ref(null)
+const completeLoading = ref(false)
+const completeForm = reactive({
+  actual_quantity: 0,
+  scrap_quantity: 0,
+  operator: '',
+  max_quantity: 0
+})
+const completeRules = {
+  actual_quantity: [{ required: true, message: '请输入实际完成数量', trigger: 'blur' }]
+}
+
 const searchForm = reactive({
-  order_code: '',
+  wo_code: '',
+  mo_code: '',
+  product_code: '',
+  work_center_code: '',
   status: null
 })
 
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 
 const formData = reactive({
-  order_code: '',
+  wo_code: '',
+  mo_code: '',
+  product_code: '',
   product_name: '',
+  process_code: '',
+  process_name: '',
+  work_center_code: '',
+  work_center_name: '',
   quantity: 1,
-  plan_start_date: '',
-  plan_end_date: '',
-  priority: 2,
+  planned_start_date: '',
+  planned_end_date: '',
   remark: ''
 })
 
 const formRules = {
-  order_code: [{ required: true, message: '请输入订单编号', trigger: 'blur' }],
+  wo_code: [{ required: true, message: '请输入工单编码', trigger: 'blur' }],
+  mo_code: [{ required: true, message: '请输入制造单编码', trigger: 'blur' }],
+  product_code: [{ required: true, message: '请输入产品编码', trigger: 'blur' }],
   product_name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
-  quantity: [{ required: true, message: '请输入生产数量', trigger: 'blur' }]
+  process_code: [{ required: true, message: '请输入工序编码', trigger: 'blur' }],
+  process_name: [{ required: true, message: '请输入工序名称', trigger: 'blur' }],
+  work_center_code: [{ required: true, message: '请输入工作中心编码', trigger: 'blur' }],
+  quantity: [{ required: true, message: '请输入计划数量', trigger: 'blur' }]
 }
 
 const statusMap = {
-  pending: '待生产',
-  producing: '生产中',
-  completed: '已完成',
-  paused: '已暂停'
+  pending: '待下发',
+  released: '已下发',
+  processing: '生产中',
+  completed: '已完工',
+  closed: '已关闭'
 }
 
 const statusTypeMap = {
   pending: 'info',
-  producing: 'warning',
+  released: 'warning',
+  processing: 'primary',
   completed: 'success',
-  paused: 'danger'
+  closed: 'info'
 }
 
 const fetchData = async () => {
   loading.value = true
   try {
-    const res = await getProductionOrderList({
+    const res = await getWorkOrderList({
       page: pagination.page,
       page_size: pagination.pageSize,
       ...searchForm
     })
     tableData.value = res.data.items || []
     pagination.total = res.data.total || 0
-  } catch (e) { console.error('获取生产订单失败:', e) }
+  } catch (e) { console.error('获取工单失败:', e) }
   finally { loading.value = false }
 }
 
 const handleSearch = () => { pagination.page = 1; fetchData() }
-const handleReset = () => { searchForm.order_code = ''; searchForm.status = null; handleSearch() }
+const handleReset = () => { searchForm.wo_code = ''; searchForm.mo_code = ''; searchForm.product_code = ''; searchForm.work_center_code = ''; searchForm.status = null; handleSearch() }
 
 const handleAdd = () => {
   isEdit.value = false
   editId.value = null
-  dialogTitle.value = '新增生产订单'
+  dialogTitle.value = '新建工单'
   resetForm()
   dialogVisible.value = true
 }
@@ -204,30 +288,86 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   isEdit.value = true
   editId.value = row.id
-  dialogTitle.value = '编辑生产订单'
-  formData.order_code = row.order_code || ''
-  formData.product_name = row.product_name || ''
-  formData.quantity = row.quantity || 1
-  formData.plan_start_date = row.plan_start_date || ''
-  formData.plan_end_date = row.plan_end_date || ''
-  formData.priority = row.priority || 2
-  formData.remark = row.remark || ''
+  dialogTitle.value = '编辑工单'
+  Object.assign(formData, row)
   dialogVisible.value = true
 }
 
-const handleDelete = (row) => {
-  ElMessageBox.confirm(`确定要删除订单 "${row.order_code}" 吗？`, '提示', {
+const handleRelease = async (row) => {
+  await ElMessageBox.confirm(`确定下发工单 ${row.wo_code}？`, '提示', { type: 'warning' })
+  try {
+    await releaseWorkOrder(row.id)
+    ElMessage.success('工单已下发')
+    fetchData()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '下发失败')
+  }
+}
+
+const handleStart = async (row) => {
+  await ElMessageBox.prompt('请输入操作员:', '开工确认', {
     confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
+    cancelButtonText: '取消'
+  }).then(async (operator) => {
     try {
-      await deleteProductionOrder(row.id)
+      await startWorkOrder(row.id, { operator: operator.value })
+      ElMessage.success('工单已开工')
+      fetchData()
+    } catch (e) {
+      ElMessage.error(e.response?.data?.detail || '开工失败')
+    }
+  }).catch(() => {})
+}
+
+const handleComplete = (row) => {
+  completeForm.actual_quantity = row.quantity - (row.scrap_quantity || 0)
+  completeForm.scrap_quantity = row.scrap_quantity || 0
+  completeForm.operator = row.operator || ''
+  completeForm.max_quantity = row.quantity
+  completeDialogVisible.value = true
+}
+
+const doComplete = async () => {
+  if (!completeFormRef.value) return
+  await completeFormRef.value.validate(async (valid) => {
+    if (valid) {
+      completeLoading.value = true
+      try {
+        await completeWorkOrder(editId.value, {
+          actual_quantity: completeForm.actual_quantity,
+          scrap_quantity: completeForm.scrap_quantity
+        })
+        ElMessage.success('工单已完工')
+        completeDialogVisible.value = false
+        fetchData()
+      } catch (e) {
+        ElMessage.error(e.response?.data?.detail || '完工失败')
+      } finally {
+        completeLoading.value = false
+      }
+    }
+  })
+}
+
+const handleClose = async (row) => {
+  await ElMessageBox.confirm(`确定关闭工单 ${row.wo_code}？`, '提示', { type: 'warning' })
+  try {
+    await closeWorkOrder(row.id)
+    ElMessage.success('工单已关闭')
+    fetchData()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '关闭失败')
+  }
+}
+
+const handleDelete = (row) => {
+  ElMessageBox.confirm(`确定删除工单 "${row.wo_code}" 吗？`, '提示', { type: 'warning' }).then(async () => {
+    try {
+      await deleteWorkOrder(row.id)
       ElMessage.success('删除成功')
       fetchData()
     } catch (e) {
-      console.error('删除失败:', e)
-      ElMessage.error('删除失败')
+      ElMessage.error(e.response?.data?.detail || '删除失败')
     }
   }).catch(() => {})
 }
@@ -239,17 +379,16 @@ const handleSave = async () => {
       saveLoading.value = true
       try {
         if (isEdit.value) {
-          await updateProductionOrder(editId.value, formData)
+          await updateWorkOrder(editId.value, formData)
           ElMessage.success('更新成功')
         } else {
-          await createProductionOrder(formData)
+          await createWorkOrder(formData)
           ElMessage.success('创建成功')
         }
         dialogVisible.value = false
         fetchData()
       } catch (e) {
-        console.error('保存失败:', e)
-        ElMessage.error('保存失败')
+        ElMessage.error(e.response?.data?.detail || '保存失败')
       } finally {
         saveLoading.value = false
       }
@@ -258,12 +397,17 @@ const handleSave = async () => {
 }
 
 const resetForm = () => {
-  formData.order_code = ''
+  formData.wo_code = ''
+  formData.mo_code = ''
+  formData.product_code = ''
   formData.product_name = ''
+  formData.process_code = ''
+  formData.process_name = ''
+  formData.work_center_code = ''
+  formData.work_center_name = ''
   formData.quantity = 1
-  formData.plan_start_date = ''
-  formData.plan_end_date = ''
-  formData.priority = 2
+  formData.planned_start_date = ''
+  formData.planned_end_date = ''
   formData.remark = ''
   formRef.value?.clearValidate()
 }
