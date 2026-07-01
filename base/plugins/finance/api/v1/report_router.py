@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from base.common.response import SuccessResponse
 from base.plugins.finance.schemas.finance_schema import (
     DailyJournalListResponse, GeneralLedgerListResponse, TrialBalanceListResponse,
-    ProfitLossReportOut, BalanceSheetReportOut
+    ProfitLossReportOut, BalanceSheetReportOut, CashFlowReportOut
 )
 from base.plugins.finance.services.report_service import ReportService
 
@@ -113,9 +113,21 @@ async def get_balance_sheet(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@report_router.get("/cash_flow", response_model=CashFlowReportOut, summary="获取现金流量表")
+async def get_cash_flow_report(
+    year: int = Query(..., description="年份"),
+    month: int = Query(..., description="月份")
+):
+    try:
+        data = await ReportService.generate_cash_flow_report(year, month)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @report_router.post("/generate", summary="生成财务报表")
 async def generate_financial_report(
-    report_type: str = Query(..., description="报表类型(trial_balance/profit_loss/balance_sheet)"),
+    report_type: str = Query(..., description="报表类型(trial_balance/profit_loss/balance_sheet/cash_flow)"),
     year: int = Query(..., description="年份"),
     month: int = Query(..., description="月份")
 ):

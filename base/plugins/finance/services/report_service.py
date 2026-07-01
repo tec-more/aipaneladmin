@@ -416,6 +416,204 @@ class ReportService:
         }
 
     @staticmethod
+    async def generate_cash_flow_report(year: int, month: int) -> Dict[str, Any]:
+        period = f"{year}-{month:02d}"
+        
+        prev_month = month - 1
+        prev_year = year
+        if prev_month <= 0:
+            prev_month = 12
+            prev_year -= 1
+        prev_period = f"{prev_year}-{prev_month:02d}"
+        
+        cash_accounts = await Account.filter(
+            account_type=AccountType.ASSET,
+            code__startswith="1001"
+        ).order_by("code")
+        
+        bank_accounts = await Account.filter(
+            account_type=AccountType.ASSET,
+            code__startswith="1002"
+        ).order_by("code")
+        
+        cash_and_bank = list(cash_accounts) + list(bank_accounts)
+        
+        cash_beginning_balance = Decimal("0.00")
+        cash_ending_balance = Decimal("0.00")
+        net_cash_flow = Decimal("0.00")
+        
+        operating_cash_inflow = Decimal("0.00")
+        operating_cash_outflow = Decimal("0.00")
+        investing_cash_inflow = Decimal("0.00")
+        investing_cash_outflow = Decimal("0.00")
+        financing_cash_inflow = Decimal("0.00")
+        financing_cash_outflow = Decimal("0.00")
+        
+        operating_items = []
+        investing_items = []
+        financing_items = []
+        
+        revenue_accounts = await Account.filter(account_type=AccountType.INCOME).order_by("code")
+        expense_accounts = await Account.filter(account_type=AccountType.EXPENSE).order_by("code")
+        asset_accounts = await Account.filter(account_type=AccountType.ASSET).order_by("code")
+        liability_accounts = await Account.filter(account_type=AccountType.LIABILITY).order_by("code")
+        equity_accounts = await Account.filter(account_type=AccountType.EQUITY).order_by("code")
+        
+        for account in revenue_accounts:
+            lines = await JournalLine.filter(
+                journal_entry__period=period,
+                journal_entry__status=JournalStatus.POSTED,
+                account=account
+            )
+            for line in lines:
+                operating_cash_inflow += line.credit
+                operating_items.append({
+                    "name": account.name,
+                    "type": "inflow",
+                    "amount": float(line.credit)
+                })
+        
+        for account in expense_accounts:
+            lines = await JournalLine.filter(
+                journal_entry__period=period,
+                journal_entry__status=JournalStatus.POSTED,
+                account=account
+            )
+            for line in lines:
+                operating_cash_outflow += line.debit
+                operating_items.append({
+                    "name": account.name,
+                    "type": "outflow",
+                    "amount": float(line.debit)
+                })
+        
+        non_current_assets = await Account.filter(
+            account_type=AccountType.ASSET,
+            code__startswith="15"
+        ).order_by("code")
+        
+        for account in non_current_assets:
+            lines = await JournalLine.filter(
+                journal_entry__period=period,
+                journal_entry__status=JournalStatus.POSTED,
+                account=account
+            )
+            for line in lines:
+                if line.debit > 0:
+                    investing_cash_outflow += line.debit
+                    investing_items.append({
+                        "name": account.name,
+                        "type": "outflow",
+                        "amount": float(line.debit)
+                    })
+                if line.credit > 0:
+                    investing_cash_inflow += line.credit
+                    investing_items.append({
+                        "name": account.name,
+                        "type": "inflow",
+                        "amount": float(line.credit)
+                    })
+        
+        long_term_liabilities = await Account.filter(
+            account_type=AccountType.LIABILITY,
+            code__startswith="25"
+        ).order_by("code")
+        
+        for account in long_term_liabilities:
+            lines = await JournalLine.filter(
+                journal_entry__period=period,
+                journal_entry__status=JournalStatus.POSTED,
+                account=account
+            )
+            for line in lines:
+                if line.credit > 0:
+                    financing_cash_inflow += line.credit
+                    financing_items.append({
+                        "name": account.name,
+                        "type": "inflow",
+                        "amount": float(line.credit)
+                    })
+                if line.debit > 0:
+                    financing_cash_outflow += line.debit
+                    financing_items.append({
+                        "name": account.name,
+                        "type": "outflow",
+                        "amount": float(line.debit)
+                    })
+        
+        for account in equity_accounts:
+            lines = await JournalLine.filter(
+                journal_entry__period=period,
+                journal_entry__status=JournalStatus.POSTED,
+                account=account
+            )
+            for line in lines:
+                if line.credit > 0:
+                    financing_cash_inflow += line.credit
+                    financing_items.append({
+                        "name": account.name,
+                        "type": "inflow",
+                        "amount": float(line.credit)
+                    })
+        
+        for account in cash_and_bank:
+            prev_lines = await JournalLine.filter(
+                journal_entry__period=prev_period,
+                journal_entry__status=JournalStatus.POSTED,
+                account=account
+            )
+            curr_lines = await JournalLine.filter(
+                journal_entry__period=period,
+                journal_entry__status=JournalStatus.POSTED,
+                account=account
+            )
+            
+            prev_balance = Decimal("0.00")
+            curr_balance = Decimal("0.00")
+            
+            for line in prev_lines:
+                prev_balance += line.debit - line.credit
+            
+            for line in curr_lines:
+                curr_balance += line.debit - line.credit
+            
+            cash_beginning_balance += prev_balance
+            cash_ending_balance += curr_balance
+        
+        net_operating_cash = operating_cash_inflow - operating_cash_outflow
+        net_investing_cash = investing_cash_inflow - investing_cash_outflow
+        net_financing_cash = financing_cash_inflow - financing_cash_outflow
+        net_cash_flow = net_operating_cash + net_investing_cash + net_financing_cash
+        
+        return {
+            "period": period,
+            "year": year,
+            "month": month,
+            "cash_beginning_balance": float(cash_beginning_balance),
+            "cash_ending_balance": float(cash_ending_balance),
+            "net_cash_flow": float(net_cash_flow),
+            "operating": {
+                "cash_inflow": float(operating_cash_inflow),
+                "cash_outflow": float(operating_cash_outflow),
+                "net_cash_flow": float(net_operating_cash),
+                "items": operating_items
+            },
+            "investing": {
+                "cash_inflow": float(investing_cash_inflow),
+                "cash_outflow": float(investing_cash_outflow),
+                "net_cash_flow": float(net_investing_cash),
+                "items": investing_items
+            },
+            "financing": {
+                "cash_inflow": float(financing_cash_inflow),
+                "cash_outflow": float(financing_cash_outflow),
+                "net_cash_flow": float(net_financing_cash),
+                "items": financing_items
+            },
+            "report_date": date.today().strftime("%Y-%m-%d")
+        }
+
+    @staticmethod
     @atomic()
     async def generate_financial_report(report_type: str, year: int, month: int) -> Dict[str, Any]:
         report_type_enum = ReportType(report_type)
@@ -426,6 +624,8 @@ class ReportService:
             data = await ReportService.generate_profit_loss_report(year, month)
         elif report_type_enum == ReportType.BALANCE_SHEET:
             data = await ReportService.generate_balance_sheet(year, month)
+        elif report_type_enum == ReportType.CASH_FLOW:
+            data = await ReportService.generate_cash_flow_report(year, month)
         else:
             data = {}
         

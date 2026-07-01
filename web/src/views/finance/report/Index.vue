@@ -8,6 +8,7 @@
       <button @click="activeTab = 'trial_balance'" :class="['tab-btn', { active: activeTab === 'trial_balance' }]">科目余额表</button>
       <button @click="activeTab = 'profit_loss'" :class="['tab-btn', { active: activeTab === 'profit_loss' }]">利润表</button>
       <button @click="activeTab = 'balance_sheet'" :class="['tab-btn', { active: activeTab === 'balance_sheet' }]">资产负债表</button>
+      <button @click="activeTab = 'cash_flow'" :class="['tab-btn', { active: activeTab === 'cash_flow' }]">现金流量表</button>
     </div>
     
     <div class="report-filters">
@@ -163,6 +164,80 @@
         </div>
       </div>
     </div>
+    
+    <div v-if="activeTab === 'cash_flow'" class="report-content">
+      <h3>现金流量表</h3>
+      <div class="cash-flow-container">
+        <div class="summary-row">
+          <span>期初现金余额</span>
+          <span>{{ cashFlowData.cash_beginning_balance }}</span>
+        </div>
+        
+        <div class="section">
+          <h4>一、经营活动产生的现金流量</h4>
+          <div class="section-row">
+            <span>现金流入</span>
+            <span>{{ cashFlowData.operating.cash_inflow }}</span>
+          </div>
+          <div class="section-row">
+            <span>现金流出</span>
+            <span>{{ cashFlowData.operating.cash_outflow }}</span>
+          </div>
+          <div class="net-row">
+            <span>经营活动净现金流</span>
+            <span>{{ cashFlowData.operating.net_cash_flow }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>二、投资活动产生的现金流量</h4>
+          <div class="section-row">
+            <span>现金流入</span>
+            <span>{{ cashFlowData.investing.cash_inflow }}</span>
+          </div>
+          <div class="section-row">
+            <span>现金流出</span>
+            <span>{{ cashFlowData.investing.cash_outflow }}</span>
+          </div>
+          <div class="net-row">
+            <span>投资活动净现金流</span>
+            <span>{{ cashFlowData.investing.net_cash_flow }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>三、筹资活动产生的现金流量</h4>
+          <div class="section-row">
+            <span>现金流入</span>
+            <span>{{ cashFlowData.financing.cash_inflow }}</span>
+          </div>
+          <div class="section-row">
+            <span>现金流出</span>
+            <span>{{ cashFlowData.financing.cash_outflow }}</span>
+          </div>
+          <div class="net-row">
+            <span>筹资活动净现金流</span>
+            <span>{{ cashFlowData.financing.net_cash_flow }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>四、现金净增加额</h4>
+          <div class="grand-total">
+            <span>现金净增加额</span>
+            <span>{{ cashFlowData.net_cash_flow }}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h4>五、期末现金余额</h4>
+          <div class="grand-total">
+            <span>期末现金余额</span>
+            <span>{{ cashFlowData.cash_ending_balance }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -207,6 +282,30 @@ const balanceSheetData = ref({
   total_liabilities_equity: 0
 })
 
+const cashFlowData = ref({
+  cash_beginning_balance: 0,
+  cash_ending_balance: 0,
+  net_cash_flow: 0,
+  operating: {
+    cash_inflow: 0,
+    cash_outflow: 0,
+    net_cash_flow: 0,
+    items: []
+  },
+  investing: {
+    cash_inflow: 0,
+    cash_outflow: 0,
+    net_cash_flow: 0,
+    items: []
+  },
+  financing: {
+    cash_inflow: 0,
+    cash_outflow: 0,
+    net_cash_flow: 0,
+    items: []
+  }
+})
+
 const generateReport = async () => {
   const response = await fetch(
     `/api/finance/reports/${activeTab.value}?year=${filterYear.value}&month=${filterMonth.value}`
@@ -220,6 +319,8 @@ const generateReport = async () => {
       profitLossData.value = data.data || data
     } else if (activeTab.value === 'balance_sheet') {
       balanceSheetData.value = data.data || data
+    } else if (activeTab.value === 'cash_flow') {
+      cashFlowData.value = data.data || data
     }
   } else {
     alert(data.msg || '生成报表失败')
@@ -332,6 +433,53 @@ onMounted(() => {
     
     .left-section, .right-section {
       flex: 1;
+    }
+  }
+  
+  .cash-flow-container {
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      font-weight: bold;
+      font-size: 1.1em;
+      border-bottom: 2px solid #333;
+      margin-bottom: 20px;
+    }
+    
+    .section {
+      margin-bottom: 20px;
+      
+      h4 {
+        margin: 0 0 10px 0;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+      }
+      
+      .section-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+      }
+      
+      .net-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        font-weight: bold;
+        border-top: 1px solid #eee;
+        margin-top: 5px;
+      }
+      
+      .grand-total {
+        display: flex;
+        justify-content: space-between;
+        padding: 15px 0;
+        font-weight: bold;
+        font-size: 1.2em;
+        border-top: 2px solid #333;
+        margin-top: 10px;
+      }
     }
   }
 }

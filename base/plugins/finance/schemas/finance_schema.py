@@ -283,3 +283,29 @@ class BalanceSheetReportOut(BaseModel):
     total_liabilities: float = Field(0, description="总负债")
     total_equity: float = Field(0, description="总权益")
     report_date: Optional[str] = None
+
+
+class CashFlowItem(BaseModel):
+    name: str = Field(..., description="项目名称")
+    type: str = Field(..., description="流入/流出")
+    amount: float = Field(0, description="金额")
+
+
+class CashFlowSection(BaseModel):
+    cash_inflow: float = Field(0, description="现金流入")
+    cash_outflow: float = Field(0, description="现金流出")
+    net_cash_flow: float = Field(0, description="净现金流")
+    items: List[CashFlowItem] = Field(default_factory=list, description="明细项目")
+
+
+class CashFlowReportOut(BaseModel):
+    period: str
+    year: int
+    month: int
+    cash_beginning_balance: float = Field(0, description="期初现金余额")
+    cash_ending_balance: float = Field(0, description="期末现金余额")
+    net_cash_flow: float = Field(0, description="现金净流量")
+    operating: CashFlowSection = Field(default_factory=CashFlowSection, description="经营活动")
+    investing: CashFlowSection = Field(default_factory=CashFlowSection, description="投资活动")
+    financing: CashFlowSection = Field(default_factory=CashFlowSection, description="筹资活动")
+    report_date: Optional[str] = None
