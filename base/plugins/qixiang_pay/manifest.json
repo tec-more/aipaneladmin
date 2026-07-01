@@ -14,7 +14,7 @@
     ],
     "dependencies": [
         "customer",
-        "order"
+        "sales"
     ],
     "is_installed": true,
     "is_enabled": true,
