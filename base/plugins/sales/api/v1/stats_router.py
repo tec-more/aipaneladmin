@@ -6,7 +6,7 @@ from decimal import Decimal
 from base.common.response import SuccessResponse
 from base.plugins.sales.services.sales_service import SalesService
 
-stats_router = APIRouter(prefix="", tags=["销售统计"])
+stats_router = APIRouter(prefix="/stats", tags=["销售统计"])
 
 
 @stats_router.get("/overview", summary="销售概览")
