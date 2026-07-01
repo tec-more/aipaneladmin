@@ -609,7 +609,8 @@ class RouteService:
         page: int = 1, page_size: int = 10,
         route_code: Optional[str] = None,
         route_name: Optional[str] = None,
-        product_code: Optional[str] = None
+        product_code: Optional[str] = None,
+        bom_code: Optional[str] = None
     ) -> Tuple[List[Route], int]:
         query = Route.all()
         if route_code:
@@ -618,6 +619,8 @@ class RouteService:
             query = query.filter(route_name__icontains=route_name)
         if product_code:
             query = query.filter(product_code__icontains=product_code)
+        if bom_code:
+            query = query.filter(bom_code__icontains=bom_code)
         total = await query.count()
         offset = (page - 1) * page_size
         items = await query.offset(offset).limit(page_size).order_by('-created_at')

@@ -261,6 +261,8 @@
             <el-table-column prop="route_name" label="路线名称" min-width="150" />
             <el-table-column prop="product_code" label="产品编码" min-width="120" />
             <el-table-column prop="product_name" label="产品名称" min-width="150" />
+            <el-table-column prop="bom_code" label="关联BOM" min-width="120" />
+            <el-table-column prop="bom_version" label="BOM版本" width="80" align="center" />
             <el-table-column prop="version" label="版本" width="80" align="center" />
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
@@ -427,6 +429,14 @@
           <el-form-item label="产品名称" prop="product_name">
             <el-input v-model="formData.product_name" placeholder="请输入产品名称" />
           </el-form-item>
+          <el-form-item label="关联BOM" prop="bom_code">
+            <el-select v-model="formData.bom_code" placeholder="请选择关联BOM" @change="handleBomChange">
+              <el-option v-for="bom in bomOptions" :key="bom.value + '-' + bom.version" :label="bom.label" :value="bom.value" :data="bom" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="BOM版本">
+            <el-input v-model="formData.bom_version" placeholder="BOM版本号" readonly />
+          </el-form-item>
           <el-form-item label="版本" prop="version">
             <el-input v-model="formData.version" placeholder="请输入版本号" />
           </el-form-item>
@@ -485,10 +495,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
 import {
   getMaterialList, createMaterial, updateMaterial, deleteMaterial,
-  getBomList, createBom, updateBom, deleteBom,
+  getBomList, createBom, updateBom, deleteBom, getBomOptions,
   getWorkcenterList, createWorkcenter, updateWorkcenter, deleteWorkcenter,
   getProcessList, createProcess, updateProcess, deleteProcess,
-  getRouteList, createRoute, updateRoute, deleteRoute
+  getRouteList, createRoute, updateRoute, deleteRoute, getRouteDetail
 } from '@/api/mes'
 
 const activeTab = ref('material')
@@ -517,6 +527,7 @@ const routeLoading = ref(false)
 const routeList = ref([])
 const routeSearch = reactive({ route_code: '', route_name: '' })
 const routePagination = reactive({ page: 1, pageSize: 10, total: 0 })
+const bomOptions = ref([])
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -636,6 +647,22 @@ const fetchRouteList = async () => {
   finally { routeLoading.value = false }
 }
 
+const fetchBomOptions = async () => {
+  try {
+    const res = await getBomOptions()
+    bomOptions.value = res.data || []
+  } catch (e) { console.error('获取BOM选项失败:', e) }
+}
+
+const handleBomChange = (value) => {
+  const bom = bomOptions.value.find(b => b.value === value)
+  if (bom) {
+    formData.bom_version = bom.version
+  } else {
+    formData.bom_version = ''
+  }
+}
+
 const resetRouteSearch = () => {
   routeSearch.route_code = ''
   routeSearch.route_name = ''
@@ -723,6 +750,8 @@ const resetRouteForm = () => {
   formData.route_name = ''
   formData.product_code = ''
   formData.product_name = ''
+  formData.bom_code = ''
+  formData.bom_version = ''
   formData.version = 'V1.0'
   formData.description = ''
   formData.is_active = true
@@ -847,11 +876,12 @@ const handleDeleteProcess = (row) => {
   }).catch(() => {})
 }
 
-const handleAddRoute = () => {
+const handleAddRoute = async () => {
   isEdit.value = false
   currentId.value = null
   dialogTitle.value = '新增工艺路线'
   resetRouteForm()
+  await fetchBomOptions()
   dialogVisible.value = true
 }
 
@@ -861,6 +891,8 @@ const handleEditRoute = async (row) => {
   dialogTitle.value = '编辑工艺路线'
   resetRouteForm()
   Object.assign(formData, row)
+  
+  await fetchBomOptions()
   
   try {
     const res = await getRouteDetail(row.id)

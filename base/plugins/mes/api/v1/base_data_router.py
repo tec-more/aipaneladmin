@@ -327,15 +327,34 @@ async def list_routes(
     page_size: int = 10,
     route_code: Optional[str] = None,
     route_name: Optional[str] = None,
-    product_code: Optional[str] = None
+    product_code: Optional[str] = None,
+    bom_code: Optional[str] = None
 ):
     items, total = await RouteService.get_list(
         page=page, page_size=page_size,
         route_code=route_code,
         route_name=route_name,
-        product_code=product_code
+        product_code=product_code,
+        bom_code=bom_code
     )
     return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
+
+@base_data_router.get("/boms/options", summary="获取BOM选项列表（用于下拉选择）")
+async def get_bom_options():
+    boms = await Bom.filter(is_active=True).distinct('product_code', 'version').order_by('product_code', 'version')
+    options = []
+    seen = set()
+    for bom in boms:
+        key = f"{bom.product_code}-{bom.version}"
+        if key not in seen:
+            seen.add(key)
+            options.append({
+                "value": bom.product_code,
+                "label": f"{bom.product_code} ({bom.product_name or ''}) - {bom.version}",
+                "version": bom.version,
+                "product_name": bom.product_name
+            })
+    return success_response(data=options)
 
 @base_data_router.get("/routes/{route_id}/processes", summary="获取工艺路线的工序列表")
 async def get_route_processes(route_id: int):

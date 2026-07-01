@@ -52,6 +52,10 @@ export const deleteBom = (id) => {
   return request.delete(`${BASE}/base-data/boms/${id}`)
 }
 
+export const getBomOptions = () => {
+  return request.get(`${BASE}/base-data/boms/options`)
+}
+
 export const getWorkcenterList = (params) => {
   return request.get(`${BASE}/base-data/work-centers`, { params })
 }

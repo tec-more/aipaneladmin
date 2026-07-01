@@ -197,6 +197,8 @@ class Route(BaseModel, TimestampMixin):
     route_name = fields.CharField(max_length=255, description="路线名称", index=True)
     product_code = fields.CharField(max_length=100, description="产品编码", index=True)
     product_name = fields.CharField(max_length=255, description="产品名称")
+    bom_code = fields.CharField(max_length=100, null=True, description="关联BOM编码（产品编码）", index=True)
+    bom_version = fields.CharField(max_length=20, null=True, description="关联BOM版本号")
     version = fields.CharField(max_length=20, default="V1.0", description="版本号")
     description = fields.TextField(null=True, description="描述")
     is_active = fields.BooleanField(default=True, description="是否启用", index=True)
@@ -211,6 +213,8 @@ class Route(BaseModel, TimestampMixin):
             "route_name": self.route_name,
             "product_code": self.product_code,
             "product_name": self.product_name,
+            "bom_code": self.bom_code,
+            "bom_version": self.bom_version,
             "version": self.version,
             "description": self.description,
             "is_active": self.is_active,
