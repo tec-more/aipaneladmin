@@ -8,7 +8,7 @@ from base.plugins.sales.schemas.order_schema import (
 )
 from base.plugins.sales.services.order_service import OrderService
 
-order_router = APIRouter(prefix="", tags=["订单管理"])
+order_router = APIRouter(prefix="/orders", tags=["订单管理"])
 
 
 @order_router.post("/create", response_model=OrderCreateResponse, summary="创建订单")

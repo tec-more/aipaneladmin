@@ -4,5 +4,5 @@ from base.plugins.sales.api.v1.stats_router import stats_router
 
 sales_v1_router = APIRouter()
 
-sales_v1_router.include_router(order_router, prefix="/orders", tags=["订单管理"])
+sales_v1_router.include_router(order_router, prefix="", tags=["订单管理"])
 sales_v1_router.include_router(stats_router, prefix="/stats", tags=["销售统计"])
