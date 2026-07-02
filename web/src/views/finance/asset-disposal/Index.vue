@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-container">
     <div class="search-form">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -173,8 +173,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const data = await request.get('/v1/finance/asset-disposal', { params: { page: pagination.page, page_size: pagination.page_size, ...searchForm } })
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     console.error('获取资产清理列表失败:', error)
   } finally {
@@ -185,7 +185,7 @@ const fetchData = async () => {
 const fetchAssets = async () => {
   try {
     const data = await request.get('/v1/finance/assets/', { params: { page_size: 100 } })
-    assets.value = data.data || []
+    assets.value = data.data?.data || []
   } catch (error) {
     console.error('获取资产列表失败:', error)
   }

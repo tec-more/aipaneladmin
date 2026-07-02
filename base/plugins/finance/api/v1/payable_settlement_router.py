@@ -13,12 +13,12 @@ async def get_payable_settlement(
     supplier_id: Optional[int] = Query(None, description="供应商ID"),
     status: Optional[str] = Query(None, description="状态")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @payable_settlement_router.post("/", summary="执行应付核销")

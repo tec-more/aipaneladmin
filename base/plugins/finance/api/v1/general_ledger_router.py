@@ -13,17 +13,17 @@ async def get_general_ledger(
     account_id: Optional[int] = Query(None, description="科目ID"),
     period: Optional[str] = Query(None, description="期间")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @general_ledger_router.get("/{account_id}", summary="获取科目总账")
 async def get_account_ledger(account_id: int):
-    return {
+    return SuccessResponse(data={
         "account_id": account_id,
         "transactions": []
-    }
+    })

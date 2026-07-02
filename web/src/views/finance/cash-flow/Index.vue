@@ -105,8 +105,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const data = await request.get('/v1/finance/cash-flow', { params: { page: pagination.page, page_size: pagination.page_size, account_id: searchForm.account_id, type: searchForm.type, start_date: searchForm.date_range?.[0], end_date: searchForm.date_range?.[1] } })
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -118,7 +118,7 @@ const fetchData = async () => {
 const fetchAccounts = async () => {
   try {
     const data = await request.get('/v1/finance/bank-accounts/', { params: { page_size: 100 } })
-    accountList.value = data.data || []
+    accountList.value = data.data?.data || []
   } catch (error) {
     accountList.value = []
   }

@@ -150,7 +150,7 @@ const fetchData = async () => {
 const fetchSuppliers = async () => {
   try {
     const data = await request.get('/v1/purchase/supplier/', { params: { page_size: 100 } })
-    supplierList.value = data.data || []
+    supplierList.value = data.data?.items || data.data || []
   } catch (error) {
     supplierList.value = []
   }

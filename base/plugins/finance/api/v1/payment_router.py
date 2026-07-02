@@ -15,22 +15,22 @@ async def get_payments(
     payment_date_start: Optional[str] = Query(None, description="付款日期开始"),
     payment_date_end: Optional[str] = Query(None, description="付款日期结束")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @payment_router.get("/{payment_id}", summary="获取付款单详情")
 async def get_payment(payment_id: int):
-    return {"id": payment_id, "detail": {}}
+    return SuccessResponse(data={"id": payment_id, "detail": {}})
 
 
 @payment_router.post("/", summary="创建付款单")
 async def create_payment():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @payment_router.post("/{payment_id}/confirm", summary="确认付款")

@@ -12,12 +12,12 @@ async def get_cost_transfer(
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     period: Optional[str] = Query(None, description="期间")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @cost_transfer_router.post("/", summary="执行成本结转")

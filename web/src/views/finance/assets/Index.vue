@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-container">
     <div class="search-form">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -248,8 +248,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const data = await request.get('/v1/finance/assets/', { params: { page: pagination.page, page_size: pagination.page_size, ...searchForm } })
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     console.error('获取资产列表失败:', error)
   } finally {
@@ -260,7 +260,7 @@ const fetchData = async () => {
 const fetchDepartments = async () => {
   try {
     const data = await request.get('/v1/departments/list', { params: { page_size: 100 } })
-    departments.value = data.data || []
+    departments.value = data.data?.items || data.data || []
   } catch (error) {
     console.error('获取部门列表失败:', error)
   }
@@ -269,7 +269,7 @@ const fetchDepartments = async () => {
 const fetchUsers = async () => {
   try {
     const data = await request.get('/v1/users/list', { params: { page_size: 100 } })
-    users.value = data.data || []
+    users.value = data.data?.items || data.data || []
   } catch (error) {
     console.error('获取用户列表失败:', error)
   }

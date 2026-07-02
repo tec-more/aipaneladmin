@@ -269,8 +269,8 @@ const fetchData = async () => {
       params: { page: pagination.page, page_size: pagination.page_size, asset_category: searchForm.asset_category, status: searchForm.status, department_id: searchForm.department_id }
     })
     
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -282,7 +282,7 @@ const fetchData = async () => {
 const fetchDepartments = async () => {
   try {
     const data = await request.get('/v1/departments/list', { params: { page_size: 100 } })
-    departmentList.value = data.data || []
+    departmentList.value = data.data?.items || data.data || []
   } catch (error) {
     departmentList.value = []
   }

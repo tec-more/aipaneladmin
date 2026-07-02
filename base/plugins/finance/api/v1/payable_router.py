@@ -16,27 +16,27 @@ async def get_payables(
     due_date_end: Optional[str] = Query(None, description="到期日期结束"),
     keyword: Optional[str] = Query(None, description="搜索关键词")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @payable_router.get("/{payable_id}", summary="获取应付单详情")
 async def get_payable(payable_id: int):
-    return {"id": payable_id, "detail": {}}
+    return SuccessResponse(data={"id": payable_id, "detail": {}})
 
 
 @payable_router.post("/", summary="创建应付单")
 async def create_payable():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @payable_router.put("/{payable_id}", summary="更新应付单")
 async def update_payable(payable_id: int):
-    return {"id": payable_id, "message": "更新成功"}
+    return SuccessResponse(data={"id": payable_id}, msg="更新成功")
 
 
 @payable_router.post("/{payable_id}/confirm", summary="确认应付单")

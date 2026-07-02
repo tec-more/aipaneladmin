@@ -102,8 +102,8 @@ const fetchData = async () => {
       params: { page: pagination.page, page_size: pagination.page_size, type: searchForm.type, party_id: searchForm.party_id }
     })
     
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -117,7 +117,7 @@ const fetchParties = async () => {
     const data = await request.get(searchForm.type === 'receivable' 
       ? '/v1/customer/list' 
       : '/v1/purchase/supplier/', { params: { page_size: 100 } })
-    partyList.value = data.data || []
+    partyList.value = data.data?.items || data.data || []
   } catch (error) {
     partyList.value = []
   }

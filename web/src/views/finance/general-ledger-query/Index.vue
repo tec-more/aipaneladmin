@@ -100,8 +100,8 @@ const fetchData = async () => {
       params: { page: pagination.page, page_size: pagination.page_size, account_id: searchForm.account_id, period: searchForm.period }
     })
     
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -113,7 +113,7 @@ const fetchData = async () => {
 const fetchAccounts = async () => {
   try {
     const data = await request.get('/v1/finance/accounts/', { params: { page_size: 100 } })
-    accountList.value = data.data || []
+    accountList.value = data.data?.data || []
   } catch (error) {
     accountList.value = []
   }

@@ -15,17 +15,17 @@ async def get_expense_reports(
     start_date: Optional[str] = Query(None, description="开始日期"),
     end_date: Optional[str] = Query(None, description="结束日期")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @expense_report_router.post("/", summary="创建报销单")
 async def create_expense_report():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @expense_report_router.post("/{report_id}/reimburse", summary="执行报销")

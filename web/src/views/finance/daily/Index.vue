@@ -163,7 +163,7 @@ const fetchData = async () => {
     }
     
     const data = await request.get('/v1/finance/reports/daily', { params: queryParams })
-    tableData.value = data.data || []
+    tableData.value = data.data?.data || []
     total.value = data.total || 0
   } catch (error) {
     console.error('查询日记账出错:', error)
@@ -178,7 +178,7 @@ const fetchData = async () => {
 const fetchAccountList = async () => {
   try {
     const data = await request.get('/v1/finance/accounts/', { params: { page_size: 100 } })
-    accountList.value = data.data || []
+    accountList.value = data.data?.data || []
   } catch (error) {
     console.error('获取科目列表失败:', error)
     accountList.value = []

@@ -14,9 +14,9 @@ async def get_aging_analysis(
     party_id: Optional[int] = Query(None, description="客户/供应商ID"),
     as_of_date: Optional[str] = Query(None, description="截止日期")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })

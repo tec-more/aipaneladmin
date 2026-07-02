@@ -13,12 +13,12 @@ async def get_opening_balance(
     account_id: Optional[int] = Query(None, description="科目ID"),
     year: Optional[int] = Query(None, description="年份")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @opening_balance_router.post("/", summary="设置期初余额")

@@ -15,12 +15,12 @@ async def get_asset_change(
     change_type: Optional[str] = Query(None, description="变动类型"),
     change_date: Optional[str] = Query(None, description="变动日期")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @asset_change_router.post("/", summary="新增资产变动")
@@ -35,7 +35,7 @@ async def update_asset_change():
 
 @asset_change_router.get("/{change_id}", summary="获取资产变动详情")
 async def get_asset_change_detail(change_id: int):
-    return {
+    return SuccessResponse(data={
         "id": change_id,
         "asset_code": "",
         "asset_name": "",
@@ -45,4 +45,4 @@ async def get_asset_change_detail(change_id: int):
         "after_value": "",
         "change_reason": "",
         "operator": ""
-    }
+    })

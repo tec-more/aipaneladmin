@@ -13,12 +13,12 @@ async def get_receivable_settlement(
     customer_id: Optional[int] = Query(None, description="客户ID"),
     status: Optional[str] = Query(None, description="状态")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @receivable_settlement_router.post("/", summary="执行应收核销")

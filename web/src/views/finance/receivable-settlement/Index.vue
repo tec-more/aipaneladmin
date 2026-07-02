@@ -167,7 +167,7 @@ const fetchParties = async () => {
   try {
     const path = props.isReceivable ? '/v1/customer/list' : '/v1/purchase/supplier/'
     const data = await request.get(path, { params: { page_size: 100 } })
-    partyList.value = data.data || []
+    partyList.value = data.data?.items || data.data || []
   } catch (error) {
     partyList.value = []
   }

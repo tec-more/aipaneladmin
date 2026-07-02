@@ -13,12 +13,12 @@ async def get_depreciation(
     period: Optional[str] = Query(None, description="期间"),
     asset_id: Optional[int] = Query(None, description="资产ID")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @depreciation_router.post("/", summary="执行折旧计提")

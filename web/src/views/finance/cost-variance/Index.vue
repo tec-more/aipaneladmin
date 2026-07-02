@@ -101,8 +101,8 @@ const fetchData = async () => {
       params: { page: pagination.page, page_size: pagination.page_size, product_id: searchForm.product_id, period: searchForm.period }
     })
     
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -114,7 +114,7 @@ const fetchData = async () => {
 const fetchProducts = async () => {
   try {
     const data = await request.get('/v1/product/list', { params: { page_size: 100 } })
-    productList.value = data.data || []
+    productList.value = data.data?.items || data.data || []
   } catch (error) {
     productList.value = []
   }

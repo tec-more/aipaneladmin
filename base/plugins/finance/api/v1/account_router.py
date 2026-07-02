@@ -8,7 +8,7 @@ from base.plugins.finance.services.account_service import AccountService
 account_router = APIRouter(prefix="/accounts", tags=["会计科目"])
 
 
-@account_router.get("/", response_model=AccountListResponse, summary="获取会计科目列表")
+@account_router.get("/", summary="获取会计科目列表")
 async def get_accounts(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -20,12 +20,12 @@ async def get_accounts(
     
     data = [await account.to_dict() for account in accounts]
     
-    return {
+    return SuccessResponse(data={
         "total": total,
         "page": page,
         "page_size": page_size,
         "data": data
-    }
+    })
 
 
 @account_router.get("/tree", summary="获取会计科目树")

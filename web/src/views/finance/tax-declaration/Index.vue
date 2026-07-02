@@ -139,8 +139,8 @@ const fetchData = async () => {
       params: { page: pagination.page, page_size: pagination.page_size, period: searchForm.period, tax_type: searchForm.tax_type, status: searchForm.status }
     })
     
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0

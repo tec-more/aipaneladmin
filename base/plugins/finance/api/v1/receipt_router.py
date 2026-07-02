@@ -15,22 +15,22 @@ async def get_receipts(
     receipt_date_start: Optional[str] = Query(None, description="收款日期开始"),
     receipt_date_end: Optional[str] = Query(None, description="收款日期结束")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @receipt_router.get("/{receipt_id}", summary="获取收款单详情")
 async def get_receipt(receipt_id: int):
-    return {"id": receipt_id, "detail": {}}
+    return SuccessResponse(data={"id": receipt_id, "detail": {}})
 
 
 @receipt_router.post("/", summary="创建收款单")
 async def create_receipt():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @receipt_router.post("/{receipt_id}/confirm", summary="确认收款")

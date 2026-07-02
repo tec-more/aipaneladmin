@@ -13,9 +13,9 @@ async def get_cost_variance(
     product_id: Optional[int] = Query(None, description="产品ID"),
     period: Optional[str] = Query(None, description="期间")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })

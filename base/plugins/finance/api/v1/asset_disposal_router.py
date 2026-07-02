@@ -15,12 +15,12 @@ async def get_asset_disposal(
     disposal_type: Optional[str] = Query(None, description="处置方式"),
     disposal_date: Optional[str] = Query(None, description="处置日期")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @asset_disposal_router.post("/", summary="新增资产清理")
@@ -35,7 +35,7 @@ async def update_asset_disposal():
 
 @asset_disposal_router.get("/{disposal_id}", summary="获取资产清理详情")
 async def get_asset_disposal_detail(disposal_id: int):
-    return {
+    return SuccessResponse(data={
         "id": disposal_id,
         "asset_code": "",
         "asset_name": "",
@@ -49,4 +49,4 @@ async def get_asset_disposal_detail(disposal_id: int):
         "disposal_result": "profit",
         "disposal_reason": "",
         "operator": ""
-    }
+    })

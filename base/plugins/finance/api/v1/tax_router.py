@@ -13,17 +13,17 @@ async def get_tax_out(
     customer_id: Optional[int] = Query(None, description="客户ID"),
     period: Optional[str] = Query(None, description="期间")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @tax_router.post("/out", summary="开具销项发票")
 async def create_tax_out():
-    return {"id": 1, "message": "开具成功"}
+    return SuccessResponse(data={"id": 1}, msg="开具成功")
 
 
 @tax_router.get("/in", summary="获取进项发票列表")
@@ -33,17 +33,17 @@ async def get_tax_in(
     supplier_id: Optional[int] = Query(None, description="供应商ID"),
     period: Optional[str] = Query(None, description="期间")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @tax_router.post("/in", summary="录入进项发票")
 async def create_tax_in():
-    return {"id": 1, "message": "录入成功"}
+    return SuccessResponse(data={"id": 1}, msg="录入成功")
 
 
 @tax_router.post("/in/{tax_id}/verify", summary="认证进项发票")

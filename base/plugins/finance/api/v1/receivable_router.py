@@ -16,27 +16,27 @@ async def get_receivables(
     due_date_end: Optional[str] = Query(None, description="到期日期结束"),
     keyword: Optional[str] = Query(None, description="搜索关键词")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @receivable_router.get("/{receivable_id}", summary="获取应收单详情")
 async def get_receivable(receivable_id: int):
-    return {"id": receivable_id, "detail": {}}
+    return SuccessResponse(data={"id": receivable_id, "detail": {}})
 
 
 @receivable_router.post("/", summary="创建应收单")
 async def create_receivable():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @receivable_router.put("/{receivable_id}", summary="更新应收单")
 async def update_receivable(receivable_id: int):
-    return {"id": receivable_id, "message": "更新成功"}
+    return SuccessResponse(data={"id": receivable_id}, msg="更新成功")
 
 
 @receivable_router.post("/{receivable_id}/confirm", summary="确认应收单")

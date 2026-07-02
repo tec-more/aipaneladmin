@@ -76,7 +76,7 @@ const handleCalculate = async () => {
   loading.value = true
   try {
     const data = await request.post(`/v1/finance/depreciation/calculate`, { period: filterForm.period })
-    tableData.value = data.data || []
+    tableData.value = data.data?.data || []
     summary.total_count = data.total_count || 0
     summary.total_amount = data.total_amount || 0
     ElMessage.success(`计提成功，共 ${summary.total_count} 项资产`)
@@ -91,7 +91,7 @@ const handleSearch = async () => {
   loading.value = true
   try {
     const data = await request.get('/v1/finance/depreciation', { params: { period: filterForm.period } })
-    tableData.value = data.data || []
+    tableData.value = data.data?.data || []
   } catch (error) {
     tableData.value = []
   } finally {

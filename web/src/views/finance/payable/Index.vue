@@ -232,8 +232,8 @@ const fetchData = async () => {
       params: { page: pagination.page, page_size: pagination.page_size, supplier_id: searchForm.supplier_id, status: searchForm.status, due_date_start: searchForm.due_date_start, due_date_end: searchForm.due_date_end }
     })
     
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -245,7 +245,7 @@ const fetchData = async () => {
 const fetchSuppliers = async () => {
   try {
     const data = await request.get('/v1/purchase/supplier/', { params: { page_size: 100 } })
-    supplierList.value = data.data || []
+    supplierList.value = data.data?.items || data.data || []
   } catch (error) {
     supplierList.value = []
   }

@@ -311,15 +311,10 @@ const fetchData = async () => {
   loading.value = true
   try {
     const data = await request.get('/v1/finance/journals/', { params: { page: pagination.page, page_size: pagination.page_size, journal_type: searchForm.journal_type, status: searchForm.status, journal_date_start: searchForm.journal_date_start, journal_date_end: searchForm.journal_date_end } })
-    if (data.code === 0) {
-      tableData.value = data.data
-      pagination.total = data.total
-      pagination.page = data.page
-      pagination.page_size = data.page_size
-    } else {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    }
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
+    pagination.page = data.data?.page || 1
+    pagination.page_size = data.data?.page_size || 20
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -329,11 +324,7 @@ const fetchData = async () => {
 
 const fetchAccountList = async () => {
   const data = await request.get('/v1/finance/accounts/', { params: { page_size: 100 } })
-  if (data.code === 0) {
-    accountList.value = data.data
-  } else {
-    accountList.value = data.data || []
-  }
+  accountList.value = data.data?.data || []
 }
 
 onMounted(() => {

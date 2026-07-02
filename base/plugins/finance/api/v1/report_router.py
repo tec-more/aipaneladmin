@@ -11,7 +11,7 @@ from base.plugins.finance.services.report_service import ReportService
 report_router = APIRouter(prefix="/reports", tags=["财务报表"])
 
 
-@report_router.get("/daily", response_model=DailyJournalListResponse, summary="获取日记账列表")
+@report_router.get("/daily", summary="获取日记账列表")
 async def get_daily_journal(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -25,15 +25,15 @@ async def get_daily_journal(
     
     data = [await journal.to_dict() for journal in journals]
     
-    return {
+    return SuccessResponse(data={
         "total": total,
         "page": page,
         "page_size": page_size,
         "data": data
-    }
+    })
 
 
-@report_router.get("/ledger", response_model=GeneralLedgerListResponse, summary="获取总账列表")
+@report_router.get("/ledger", summary="获取总账列表")
 async def get_general_ledger(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -47,15 +47,15 @@ async def get_general_ledger(
     
     data = [await ledger.to_dict() for ledger in ledgers]
     
-    return {
+    return SuccessResponse(data={
         "total": total,
         "page": page,
         "page_size": page_size,
         "data": data
-    }
+    })
 
 
-@report_router.get("/trial_balance", response_model=TrialBalanceListResponse, summary="获取科目余额表")
+@report_router.get("/trial_balance", summary="获取科目余额表")
 async def get_trial_balance(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -69,12 +69,12 @@ async def get_trial_balance(
     
     data = [await balance.to_dict() for balance in balances]
     
-    return {
+    return SuccessResponse(data={
         "total": total,
         "page": page,
         "page_size": page_size,
         "data": data
-    }
+    })
 
 
 @report_router.post("/trial_balance/generate", summary="生成科目余额表")
@@ -89,38 +89,38 @@ async def generate_trial_balance(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@report_router.get("/profit_loss", response_model=ProfitLossReportOut, summary="获取利润表")
+@report_router.get("/profit_loss", summary="获取利润表")
 async def get_profit_loss_report(
     year: int = Query(..., description="年份"),
     month: int = Query(..., description="月份")
 ):
     try:
         data = await ReportService.generate_profit_loss_report(year, month)
-        return data
+        return SuccessResponse(data=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@report_router.get("/balance_sheet", response_model=BalanceSheetReportOut, summary="获取资产负债表")
+@report_router.get("/balance_sheet", summary="获取资产负债表")
 async def get_balance_sheet(
     year: int = Query(..., description="年份"),
     month: int = Query(..., description="月份")
 ):
     try:
         data = await ReportService.generate_balance_sheet(year, month)
-        return data
+        return SuccessResponse(data=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@report_router.get("/cash_flow", response_model=CashFlowReportOut, summary="获取现金流量表")
+@report_router.get("/cash_flow", summary="获取现金流量表")
 async def get_cash_flow_report(
     year: int = Query(..., description="年份"),
     month: int = Query(..., description="月份")
 ):
     try:
         data = await ReportService.generate_cash_flow_report(year, month)
-        return data
+        return SuccessResponse(data=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

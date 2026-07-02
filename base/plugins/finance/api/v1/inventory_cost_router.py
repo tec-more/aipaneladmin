@@ -13,12 +13,12 @@ async def get_inventory_cost(
     product_id: Optional[int] = Query(None, description="产品ID"),
     cost_method: Optional[str] = Query(None, description="计价方法")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 cost_transfer_router = APIRouter(prefix="/cost-transfer", tags=["成本结转"])
@@ -30,12 +30,12 @@ async def get_cost_transfer(
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     period: Optional[str] = Query(None, description="期间")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @cost_transfer_router.post("/", summary="执行成本结转")
@@ -55,12 +55,12 @@ async def get_cost_variance(
     product_id: Optional[int] = Query(None, description="产品ID"),
     period: Optional[str] = Query(None, description="期间")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 __all__ = ["inventory_cost_router", "cost_transfer_router", "cost_variance_router"]

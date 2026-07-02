@@ -14,22 +14,22 @@ async def get_bills(
     status: Optional[str] = Query(None, description="状态"),
     maturity_date: Optional[str] = Query(None, description="到期日期")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @bill_router.get("/{bill_id}", summary="获取票据详情")
 async def get_bill(bill_id: int):
-    return {"id": bill_id, "detail": {}}
+    return SuccessResponse(data={"id": bill_id, "detail": {}})
 
 
 @bill_router.post("/", summary="创建票据")
 async def create_bill():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @bill_router.post("/{bill_id}/endorse", summary="背书票据")

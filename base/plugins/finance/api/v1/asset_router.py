@@ -15,27 +15,27 @@ async def get_assets(
     status: Optional[str] = Query(None, description="状态"),
     keyword: Optional[str] = Query(None, description="搜索关键词")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @asset_router.get("/{asset_id}", summary="获取资产详情")
 async def get_asset(asset_id: int):
-    return {"id": asset_id, "detail": {}}
+    return SuccessResponse(data={"id": asset_id, "detail": {}})
 
 
 @asset_router.post("/", summary="创建资产")
 async def create_asset():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @asset_router.put("/{asset_id}", summary="更新资产")
 async def update_asset(asset_id: int):
-    return {"id": asset_id, "message": "更新成功"}
+    return SuccessResponse(data={"id": asset_id}, msg="更新成功")
 
 
 @asset_router.post("/{asset_id}/depreciation", summary="计提折旧")

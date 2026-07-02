@@ -10,7 +10,7 @@ from base.plugins.finance.services.journal_service import JournalService
 journal_router = APIRouter(prefix="/journals", tags=["凭证管理"])
 
 
-@journal_router.get("/", response_model=JournalEntryListResponse, summary="获取凭证列表")
+@journal_router.get("/", summary="获取凭证列表")
 async def get_journals(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -30,12 +30,12 @@ async def get_journals(
     
     data = [await journal.to_dict() for journal in journals]
     
-    return {
+    return SuccessResponse(data={
         "total": total,
         "page": page,
         "page_size": page_size,
         "data": data
-    }
+    })
 
 
 @journal_router.get("/types", summary="获取凭证类型列表")

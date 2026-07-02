@@ -15,22 +15,22 @@ async def get_expenses(
     start_date: Optional[str] = Query(None, description="开始日期"),
     end_date: Optional[str] = Query(None, description="结束日期")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @expense_router.get("/{expense_id}", summary="获取费用申请详情")
 async def get_expense(expense_id: int):
-    return {"id": expense_id, "detail": {}}
+    return SuccessResponse(data={"id": expense_id, "detail": {}})
 
 
 @expense_router.post("/", summary="创建费用申请")
 async def create_expense():
-    return {"id": 1, "message": "创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="创建成功")
 
 
 @expense_router.post("/{expense_id}/approve", summary="审批费用申请")

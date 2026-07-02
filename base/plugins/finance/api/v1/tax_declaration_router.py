@@ -14,12 +14,12 @@ async def get_tax_declarations(
     tax_type: Optional[str] = Query(None, description="税种"),
     status: Optional[str] = Query(None, description="状态")
 ):
-    return {
+    return SuccessResponse(data={
         "total": 0,
         "page": page,
         "page_size": page_size,
         "data": []
-    }
+    })
 
 
 @tax_declaration_router.post("/", summary="创建税务申报")
@@ -27,7 +27,7 @@ async def create_tax_declaration(
     period: str = Query(..., description="期间"),
     tax_type: str = Query(..., description="税种")
 ):
-    return {"id": 1, "message": "申报创建成功"}
+    return SuccessResponse(data={"id": 1}, msg="申报创建成功")
 
 
 @tax_declaration_router.post("/{declaration_id}/declare", summary="执行申报")

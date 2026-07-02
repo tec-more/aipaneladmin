@@ -134,8 +134,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const data = await request.get('/v1/finance/expense-reports', { params: { page: pagination.page, page_size: pagination.page_size, applicant_id: searchForm.applicant_id, status: searchForm.status, start_date: searchForm.date_range?.[0], end_date: searchForm.date_range?.[1] } })
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+    tableData.value = data.data?.data || []
+    pagination.total = data.data?.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -147,7 +147,7 @@ const fetchData = async () => {
 const fetchUsers = async () => {
   try {
     const data = await request.get('/v1/users/list', { params: { page_size: 100 } })
-    userList.value = data.data || []
+    userList.value = data.data?.items || data.data || []
   } catch (error) {
     userList.value = []
   }
