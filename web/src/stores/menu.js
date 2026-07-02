@@ -222,17 +222,8 @@ export const useMenuStore = defineStore('menu', {
         // 移除重复的斜杠
         fullPath = fullPath.replace(/\/+/g, '/')
         
-        // 计算相对于父路径的路由 path
-        let routePath = fullPath
-        if (parentPath && fullPath.startsWith(parentPath + '/')) {
-          // 如果是子菜单，提取相对路径部分
-          routePath = fullPath.substring(parentPath.length + 1)
-        }
-        
-        console.log('[菜单Store] 处理后路径:', fullPath, '路由path:', routePath)
-
         const route = {
-          path: routePath,
+          path: fullPath,
           name: menu.name,
           meta: {
             title: menu.name,
@@ -254,23 +245,24 @@ export const useMenuStore = defineStore('menu', {
           }
         }
 
-        // 处理子菜单
-        if (menu.children && menu.children.length > 0) {
-          route.children = menu.children
-            .map(child => processMenu(child, fullPath))
-            .filter(Boolean)
-        }
-
         console.log('[菜单Store] 生成的路由:', route)
         return route
       }
 
-      this.menus.forEach(menu => {
-        const route = processMenu(menu)
-        if (route) {
-          routes.push(route)
-        }
-      })
+      const flattenMenus = (menus) => {
+        let result = []
+        menus.forEach(menu => {
+          if (menu.menu_type !== 'button') {
+            result.push(processMenu(menu))
+            if (menu.children && menu.children.length > 0) {
+              result = result.concat(flattenMenus(menu.children))
+            }
+          }
+        })
+        return result.filter(Boolean)
+      }
+
+      routes.push(...flattenMenus(this.menus))
 
       console.log('[菜单Store] generateRoutes 完成，生成的路由:', routes)
       return routes

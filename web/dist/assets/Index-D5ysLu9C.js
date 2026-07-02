@@ -1,0 +1,1 @@
+import{_ as c,an as o,c as n,o as t,b as s}from"./index-CsoZqGVP.js";const r={},a={class:"finance-index"};function _(d,i){const e=o("router-view");return t(),n("div",a,[s(e)])}const p=c(r,[["render",_],["__scopeId","data-v-cecc6489"]]);export{p as default};
