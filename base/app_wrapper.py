@@ -77,22 +77,25 @@ class ASGIAppWithPrefix:
                 scope["path"] = new_path
                 scope["root_path"] = self.prefix
 
-            # 如果路径不以 prefix 开头，添加 404 响应（API 路由必须带 /api）
-            elif not original_path.startswith("/static") and not original_path.startswith("/docs"):
-                # API 路由必须使用 /api 前缀
-                from starlette.responses import JSONResponse
+            else:
+                import os
+                from starlette.responses import FileResponse, HTMLResponse
 
-                response = JSONResponse(
-                    content={
-                        "error": "API routes must use /api prefix",
-                        "message": f"Please use /api{original_path} instead of {original_path}",
-                        "docs_url": "/docs",
-                        "api_prefix": "/api"
-                    },
-                    status_code=404
-                )
-
-                await response(scope, receive, send)
+                static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "dist")
+                
+                if original_path.startswith("/assets/"):
+                    file_path = os.path.join(static_dir, original_path.lstrip("/"))
+                    if os.path.exists(file_path):
+                        await FileResponse(file_path)(scope, receive, send)
+                    else:
+                        await HTMLResponse(status_code=404, content="Not Found")(scope, receive, send)
+                    return
+                
+                index_path = os.path.join(static_dir, "index.html")
+                if os.path.exists(index_path):
+                    await FileResponse(index_path)(scope, receive, send)
+                else:
+                    await HTMLResponse(status_code=500, content="Frontend index.html not found")(scope, receive, send)
                 return
 
         # 调用实际应用
