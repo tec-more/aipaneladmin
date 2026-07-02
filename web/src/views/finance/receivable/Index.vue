@@ -228,22 +228,12 @@ const handleSave = async () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.customer_id) params.append('customer_id', searchForm.customer_id)
-    if (searchForm.status) params.append('status', searchForm.status)
-    if (searchForm.due_date_start) params.append('due_date_start', searchForm.due_date_start)
-    if (searchForm.due_date_end) params.append('due_date_end', searchForm.due_date_end)
+    const data = await request.get('/v1/finance/receivables', {
+      params: { page: pagination.page, page_size: pagination.page_size, customer_id: searchForm.customer_id, status: searchForm.status, due_date_start: searchForm.due_date_start, due_date_end: searchForm.due_date_end }
+    })
     
-    const response = await fetch(`/api/v1/finance/receivables?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0

@@ -249,21 +249,12 @@ const handleSave = async () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size, is_input: false })
-    if (searchForm.customer_id) params.append('customer_id', searchForm.customer_id)
-    if (searchForm.invoice_type) params.append('invoice_type', searchForm.invoice_type)
-    if (searchForm.status) params.append('status', searchForm.status)
+    const data = await request.get('/v1/finance/tax-invoices', {
+      params: { page: pagination.page, page_size: pagination.page_size, is_input: false, customer_id: searchForm.customer_id, invoice_type: searchForm.invoice_type, status: searchForm.status }
+    })
     
-    const response = await fetch(`/api/v1/finance/tax-invoices?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -274,8 +265,7 @@ const fetchData = async () => {
 
 const fetchCustomers = async () => {
   try {
-    const response = await fetch('/api/v1/customer/list?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/customer/list', { params: { page_size: 100 } })
     customerList.value = data.data || []
   } catch (error) {
     customerList.value = []

@@ -191,10 +191,7 @@ const handleDelete = async (row) => {
       type: 'warning'
     }
   )
-  const response = await fetch(`/api/v1/finance/accounts/${row.id}`, {
-    method: 'DELETE'
-  })
-  const data = await response.json()
+  const data = await request.delete(`/v1/finance/accounts/${row.id}`)
   if (data.code === 0) {
     ElMessage.success(data.msg)
     fetchData()
@@ -209,22 +206,24 @@ const handleSave = async () => {
     return
   }
   
-  const url = isEdit.value ? `/api/v1/finance/accounts/${currentId.value}` : '/api/v1/finance/accounts/'
-  const method = isEdit.value ? 'PUT' : 'POST'
-  
-  const response = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(formData)
-  })
-  
-  const data = await response.json()
-  if (data.code === 0 || response.ok) {
-    ElMessage.success('保存成功')
-    dialogVisible.value = false
-    fetchData()
+  if (isEdit.value) {
+    const data = await request.put(`/v1/finance/accounts/${currentId.value}`, formData)
+    if (data.code === 0) {
+      ElMessage.success('保存成功')
+      dialogVisible.value = false
+      fetchData()
+    } else {
+      ElMessage.error(data.msg || '保存失败')
+    }
   } else {
-    ElMessage.error(data.msg || '保存失败')
+    const data = await request.post('/v1/finance/accounts/', formData)
+    if (data.code === 0) {
+      ElMessage.success('保存成功')
+      dialogVisible.value = false
+      fetchData()
+    } else {
+      ElMessage.error(data.msg || '保存失败')
+    }
   }
 }
 

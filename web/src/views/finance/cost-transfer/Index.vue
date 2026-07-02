@@ -68,19 +68,12 @@ const handleTransfer = async () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.period) params.append('period', searchForm.period)
+    const data = await request.get('/v1/finance/cost-transfer', {
+      params: { page: pagination.page, page_size: pagination.page_size, period: searchForm.period }
+    })
     
-    const response = await fetch(`/api/v1/finance/cost-transfer?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0

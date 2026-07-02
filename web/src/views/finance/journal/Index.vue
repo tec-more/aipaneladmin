@@ -227,10 +227,7 @@ const handleConfirm = async (row) => {
     cancelButtonText: '取消',
     type: 'warning'
   })
-  const response = await fetch(`/api/v1/finance/journals/${row.id}/confirm`, {
-    method: 'POST'
-  })
-  const data = await response.json()
+  const data = await request.post(`/v1/finance/journals/${row.id}/confirm`)
   if (data.code === 0) {
     ElMessage.success(data.msg)
     fetchData()
@@ -245,10 +242,7 @@ const handlePost = async (row) => {
     cancelButtonText: '取消',
     type: 'warning'
   })
-  const response = await fetch(`/api/v1/finance/journals/${row.id}/post`, {
-    method: 'POST'
-  })
-  const data = await response.json()
+  const data = await request.post(`/v1/finance/journals/${row.id}/post`)
   if (data.code === 0) {
     ElMessage.success(data.msg)
     fetchData()
@@ -263,10 +257,7 @@ const handleCancel = async (row) => {
     cancelButtonText: '取消',
     type: 'warning'
   })
-  const response = await fetch(`/api/v1/finance/journals/${row.id}/cancel`, {
-    method: 'POST'
-  })
-  const data = await response.json()
+  const data = await request.post(`/v1/finance/journals/${row.id}/cancel`)
   if (data.code === 0) {
     ElMessage.success(data.msg)
     fetchData()
@@ -281,22 +272,24 @@ const handleSave = async () => {
     return
   }
   
-  const url = isEdit.value ? `/api/v1/finance/journals/${currentId.value}` : '/api/v1/finance/journals/'
-  const method = isEdit.value ? 'PUT' : 'POST'
-  
-  const response = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(formData)
-  })
-  
-  const data = await response.json()
-  if (data.code === 0 || response.ok) {
-    ElMessage.success('保存成功')
-    dialogVisible.value = false
-    fetchData()
+  if (isEdit.value) {
+    const data = await request.put(`/v1/finance/journals/${currentId.value}`, formData)
+    if (data.code === 0) {
+      ElMessage.success('保存成功')
+      dialogVisible.value = false
+      fetchData()
+    } else {
+      ElMessage.error(data.msg || '保存失败')
+    }
   } else {
-    ElMessage.error(data.msg || '保存失败')
+    const data = await request.post('/v1/finance/journals/', formData)
+    if (data.code === 0) {
+      ElMessage.success('保存成功')
+      dialogVisible.value = false
+      fetchData()
+    } else {
+      ElMessage.error(data.msg || '保存失败')
+    }
   }
 }
 

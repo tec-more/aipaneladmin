@@ -75,19 +75,11 @@ const handleCalculate = async () => {
   
   loading.value = true
   try {
-    const response = await fetch(`/api/v1/finance/depreciation/calculate?period=${filterForm.period}`, {
-      method: 'POST'
-    })
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      summary.total_count = data.total_count || 0
-      summary.total_amount = data.total_amount || 0
-      ElMessage.success(`计提成功，共 ${summary.total_count} 项资产`)
-    } else {
-      ElMessage.error(data.msg || '计提失败')
-    }
+    const data = await request.post(`/v1/finance/depreciation/calculate`, { period: filterForm.period })
+    tableData.value = data.data || []
+    summary.total_count = data.total_count || 0
+    summary.total_amount = data.total_amount || 0
+    ElMessage.success(`计提成功，共 ${summary.total_count} 项资产`)
   } catch (error) {
     ElMessage.error('计提失败：' + (error.message || '网络错误'))
   } finally {
@@ -98,17 +90,8 @@ const handleCalculate = async () => {
 const handleSearch = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams()
-    if (filterForm.period) params.append('period', filterForm.period)
-    
-    const response = await fetch(`/api/v1/finance/depreciation?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-    } else {
-      tableData.value = []
-    }
+    const data = await request.get('/v1/finance/depreciation', { params: { period: filterForm.period } })
+    tableData.value = data.data || []
   } catch (error) {
     tableData.value = []
   } finally {

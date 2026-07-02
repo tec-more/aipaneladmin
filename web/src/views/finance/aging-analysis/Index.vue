@@ -66,6 +66,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const partyList = ref([])
@@ -97,19 +98,12 @@ const handleReset = () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size, type: searchForm.type })
-    if (searchForm.party_id) params.append('party_id', searchForm.party_id)
+    const data = await request.get('/v1/finance/aging-analysis', {
+      params: { page: pagination.page, page_size: pagination.page_size, type: searchForm.type, party_id: searchForm.party_id }
+    })
     
-    const response = await fetch(`/api/v1/finance/aging-analysis?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -120,10 +114,9 @@ const fetchData = async () => {
 
 const fetchParties = async () => {
   try {
-    const response = await fetch(searchForm.type === 'receivable' 
-      ? '/api/v1/customer/list?page_size=100' 
-      : '/api/v1/purchase/supplier/?page_size=100')
-    const data = await response.json()
+    const data = await request.get(searchForm.type === 'receivable' 
+      ? '/v1/customer/list' 
+      : '/v1/purchase/supplier/', { params: { page_size: 100 } })
     partyList.value = data.data || []
   } catch (error) {
     partyList.value = []

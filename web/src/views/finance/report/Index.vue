@@ -389,49 +389,42 @@ const switchTab = (key) => {
 const generateReport = async () => {
   loading.value = true
   try {
-    let response, data
+    const data = await request.get(`/v1/finance/reports/${activeTab.value}`, {
+      params: { year: filterForm.year, month: filterForm.month }
+    })
     
-    response = await fetch(
-      `/api/v1/finance/reports/${activeTab.value}?year=${filterForm.year}&month=${filterForm.month}`
-    )
-    data = await response.json()
-    
-    if (response.ok) {
-      if (activeTab.value === 'trial_balance') {
-        const records = data.data || []
-        if (records.length === 0) {
-          ElMessage.warning('报表生成失败：未查询到科目余额表数据')
-        } else {
-          ElMessage.success(`查询成功，共 ${records.length} 条记录`)
-        }
-        trialBalanceData.value = records
-      } else if (activeTab.value === 'profit_loss') {
-        const records = data.data || data
-        if (!records || (Array.isArray(records.revenue_items) && records.revenue_items.length === 0 && Number(records.total_revenue) === 0)) {
-          ElMessage.warning('报表生成失败：未查询到利润表数据')
-        } else {
-          ElMessage.success('利润表查询成功')
-        }
-        profitLossData.value = records
-      } else if (activeTab.value === 'balance_sheet') {
-        const records = data.data || data
-        if (!records || (Array.isArray(records.current_assets) && records.current_assets.length === 0 && Number(records.total_assets) === 0)) {
-          ElMessage.warning('报表生成失败：未查询到资产负债表数据')
-        } else {
-          ElMessage.success('资产负债表查询成功')
-        }
-        balanceSheetData.value = records
-      } else if (activeTab.value === 'cash_flow') {
-        const records = data.data || data
-        if (!records || (Number(records.cash_beginning_balance) === 0 && Number(records.net_cash_flow) === 0)) {
-          ElMessage.warning('报表生成失败：未查询到现金流量表数据')
-        } else {
-          ElMessage.success('现金流量表查询成功')
-        }
-        cashFlowData.value = records
+    if (activeTab.value === 'trial_balance') {
+      const records = data.data || []
+      if (records.length === 0) {
+        ElMessage.warning('报表生成失败：未查询到科目余额表数据')
+      } else {
+        ElMessage.success(`查询成功，共 ${records.length} 条记录`)
       }
-    } else {
-      ElMessage.error(data.msg || data.detail || '报表生成失败')
+      trialBalanceData.value = records
+    } else if (activeTab.value === 'profit_loss') {
+      const records = data.data || data
+      if (!records || (Array.isArray(records.revenue_items) && records.revenue_items.length === 0 && Number(records.total_revenue) === 0)) {
+        ElMessage.warning('报表生成失败：未查询到利润表数据')
+      } else {
+        ElMessage.success('利润表查询成功')
+      }
+      profitLossData.value = records
+    } else if (activeTab.value === 'balance_sheet') {
+      const records = data.data || data
+      if (!records || (Array.isArray(records.current_assets) && records.current_assets.length === 0 && Number(records.total_assets) === 0)) {
+        ElMessage.warning('报表生成失败：未查询到资产负债表数据')
+      } else {
+        ElMessage.success('资产负债表查询成功')
+      }
+      balanceSheetData.value = records
+    } else if (activeTab.value === 'cash_flow') {
+      const records = data.data || data
+      if (!records || (Number(records.cash_beginning_balance) === 0 && Number(records.net_cash_flow) === 0)) {
+        ElMessage.warning('报表生成失败：未查询到现金流量表数据')
+      } else {
+        ElMessage.success('现金流量表查询成功')
+      }
+      cashFlowData.value = records
     }
   } catch (error) {
     console.error('生成报表出错:', error)

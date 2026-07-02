@@ -98,20 +98,12 @@ const handleReset = () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.product_id) params.append('product_id', searchForm.product_id)
-    if (searchForm.cost_method) params.append('cost_method', searchForm.cost_method)
+    const data = await request.get('/v1/finance/inventory-cost', {
+      params: { page: pagination.page, page_size: pagination.page_size, product_id: searchForm.product_id, cost_method: searchForm.cost_method }
+    })
     
-    const response = await fetch(`/api/v1/finance/inventory-cost?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0

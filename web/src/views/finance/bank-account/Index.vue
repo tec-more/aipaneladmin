@@ -105,6 +105,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const loading = ref(false)
@@ -189,20 +190,12 @@ const handleSave = async () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.bank_name) params.append('bank_name', searchForm.bank_name)
-    if (searchForm.is_active !== '') params.append('is_active', searchForm.is_active)
+    const data = await request.get('/v1/finance/bank-accounts', {
+      params: { page: pagination.page, page_size: pagination.page_size, bank_name: searchForm.bank_name, is_active: searchForm.is_active }
+    })
     
-    const response = await fetch(`/api/v1/finance/bank-accounts?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0

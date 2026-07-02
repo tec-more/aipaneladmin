@@ -135,21 +135,12 @@ const handlePay = (row) => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.period) params.append('period', searchForm.period)
-    if (searchForm.tax_type) params.append('tax_type', searchForm.tax_type)
-    if (searchForm.status) params.append('status', searchForm.status)
+    const data = await request.get('/v1/finance/tax-declarations', {
+      params: { page: pagination.page, page_size: pagination.page_size, period: searchForm.period, tax_type: searchForm.tax_type, status: searchForm.status }
+    })
     
-    const response = await fetch(`/api/v1/finance/tax-declarations?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0

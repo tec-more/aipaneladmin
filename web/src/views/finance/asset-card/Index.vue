@@ -265,21 +265,12 @@ const handleSave = async () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.asset_category) params.append('asset_category', searchForm.asset_category)
-    if (searchForm.status) params.append('status', searchForm.status)
-    if (searchForm.department_id) params.append('department_id', searchForm.department_id)
+    const data = await request.get('/v1/finance/assets', {
+      params: { page: pagination.page, page_size: pagination.page_size, asset_category: searchForm.asset_category, status: searchForm.status, department_id: searchForm.department_id }
+    })
     
-    const response = await fetch(`/api/v1/finance/assets?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0

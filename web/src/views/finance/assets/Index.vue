@@ -367,10 +367,7 @@ const handleEdit = (row) => {
 
 const handleDepreciate = async (row) => {
   try {
-    const response = await fetch(`/api/v1/finance/assets/${row.id}/depreciation`, {
-      method: 'POST'
-    })
-    const data = await response.json()
+    const data = await request.post(`/v1/finance/assets/${row.id}/depreciation`)
     if (data.success) {
       fetchData()
     }

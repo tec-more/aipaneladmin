@@ -135,15 +135,14 @@ const fetchData = async () => {
     const params = new URLSearchParams()
     if (searchForm.customer_id) params.append('customer_id', searchForm.customer_id)
     
-    const docUrl = props.isReceivable ? '/api/v1/finance/receivables' : '/api/v1/finance/payables'
-    const payUrl = props.isReceivable ? '/api/v1/finance/receipts' : '/api/v1/finance/payments'
+    const docPath = props.isReceivable ? '/v1/finance/receivables' : '/v1/finance/payables'
+    const payPath = props.isReceivable ? '/v1/finance/receipts/' : '/v1/finance/payments'
+    const partyId = props.isReceivable ? searchForm.customer_id : searchForm.supplier_id
     
-    const [docResponse, payResponse] = await Promise.all([
-      fetch(`${docUrl}?status=confirmed&${params}`),
-      fetch(`${payUrl}?status=confirmed&${params}`)
+    const [docData, payData] = await Promise.all([
+      request.get(docPath, { params: { status: 'confirmed', customer_id: searchForm.customer_id, supplier_id: searchForm.supplier_id } }),
+      request.get(payPath, { params: { status: 'confirmed', customer_id: searchForm.customer_id, supplier_id: searchForm.supplier_id } })
     ])
-    
-    const [docData, payData] = await Promise.all([docResponse.json(), payResponse.json()])
     
     documentList.value = (docData.data || []).map(item => ({
       ...item,
@@ -166,9 +165,8 @@ const fetchData = async () => {
 
 const fetchParties = async () => {
   try {
-    const url = props.isReceivable ? '/api/v1/customer/list' : '/api/v1/purchase/supplier/'
-    const response = await fetch(`${url}/?page_size=100`)
-    const data = await response.json()
+    const path = props.isReceivable ? '/v1/customer/list' : '/v1/purchase/supplier/'
+    const data = await request.get(path, { params: { page_size: 100 } })
     partyList.value = data.data || []
   } catch (error) {
     partyList.value = []

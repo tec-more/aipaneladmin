@@ -132,12 +132,10 @@ const fetchData = async () => {
     const params = new URLSearchParams()
     if (searchForm.supplier_id) params.append('supplier_id', searchForm.supplier_id)
     
-    const [payableResponse, paymentResponse] = await Promise.all([
-      fetch(`/api/v1/finance/payables?status=confirmed&${params}`),
-      fetch(`/api/v1/finance/payments?status=confirmed&${params}`)
+    const [payableData, paymentData] = await Promise.all([
+      request.get('/v1/finance/payables', { params: { status: 'confirmed', supplier_id: searchForm.supplier_id } }),
+      request.get('/v1/finance/payments', { params: { status: 'confirmed', supplier_id: searchForm.supplier_id } })
     ])
-    
-    const [payableData, paymentData] = await Promise.all([payableResponse.json(), paymentResponse.json()])
     
     payableList.value = payableData.data || []
     paymentList.value = paymentData.data || []

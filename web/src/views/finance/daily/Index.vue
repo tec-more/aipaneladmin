@@ -150,35 +150,21 @@ const handleReset = () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({
+    const queryParams = {
       page: pagination.page,
-      page_size: pagination.page_size
-    })
+      page_size: pagination.page_size,
+      period: searchForm.period,
+      account_id: searchForm.account_id
+    }
     
     if (dateRange.value && dateRange.value.length === 2) {
-      params.append('journal_date_start', dateRange.value[0])
-      params.append('journal_date_end', dateRange.value[1])
+      queryParams.journal_date_start = dateRange.value[0]
+      queryParams.journal_date_end = dateRange.value[1]
     }
     
-    if (searchForm.period) {
-      params.append('period', searchForm.period)
-    }
-    
-    if (searchForm.account_id) {
-      params.append('account_id', searchForm.account_id)
-    }
-    
-    const response = await fetch(`/api/v1/finance/reports/daily?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      total.value = data.total || 0
-    } else {
-      ElMessage.error(data.detail || data.msg || '查询失败')
-      tableData.value = []
-      total.value = 0
-    }
+    const data = await request.get('/v1/finance/reports/daily', { params: queryParams })
+    tableData.value = data.data || []
+    total.value = data.total || 0
   } catch (error) {
     console.error('查询日记账出错:', error)
     ElMessage.error('查询失败：' + (error.message || '网络错误'))
