@@ -1,0 +1,1 @@
+import{_ as o,an as t,c,o as n,b as s}from"./index-PMLHfNkJ.js";const r={},_={class:"settings-index"};function a(d,i){const e=t("router-view");return n(),c("div",_,[s(e)])}const p=o(r,[["render",a],["__scopeId","data-v-f8f75c43"]]);export{p as default};

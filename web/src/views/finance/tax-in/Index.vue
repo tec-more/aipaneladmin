@@ -253,7 +253,7 @@ const handleSave = async () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const data = await request.get('/v1/finance/tax-invoices', {
+    const data = await request.get('/v1/finance/tax/invoices', {
       params: { page: pagination.page, page_size: pagination.page_size, is_input: true, supplier_id: searchForm.supplier_id, invoice_type: searchForm.invoice_type, status: searchForm.status }
     })
     
