@@ -70,6 +70,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const accountList = ref([])
@@ -103,22 +104,9 @@ const handleReset = () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.account_id) params.append('account_id', searchForm.account_id)
-    if (searchForm.type) params.append('type', searchForm.type)
-    if (searchForm.date_range && searchForm.date_range[0]) params.append('start_date', searchForm.date_range[0])
-    if (searchForm.date_range && searchForm.date_range[1]) params.append('end_date', searchForm.date_range[1])
-    
-    const response = await fetch(`/api/v1/finance/cash-flow?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    const data = await request.get('/v1/finance/cash-flow', { params: { page: pagination.page, page_size: pagination.page_size, account_id: searchForm.account_id, type: searchForm.type, start_date: searchForm.date_range?.[0], end_date: searchForm.date_range?.[1] } })
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -129,8 +117,7 @@ const fetchData = async () => {
 
 const fetchAccounts = async () => {
   try {
-    const response = await fetch('/api/v1/finance/bank-accounts/?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/finance/bank-accounts/', { params: { page_size: 100 } })
     accountList.value = data.data || []
   } catch (error) {
     accountList.value = []

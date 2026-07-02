@@ -62,6 +62,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const departmentList = ref([])
@@ -93,20 +94,9 @@ const handleReset = () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.department_id) params.append('department_id', searchForm.department_id)
-    if (searchForm.period) params.append('period', searchForm.period)
-    
-    const response = await fetch(`/api/v1/finance/expense-analysis?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    const data = await request.get('/v1/finance/expense-analysis', { params: { page: pagination.page, page_size: pagination.page_size, department_id: searchForm.department_id, period: searchForm.period } })
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -117,8 +107,7 @@ const fetchData = async () => {
 
 const fetchDepartments = async () => {
   try {
-    const response = await fetch('/api/v1/departments/list?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/departments/list', { params: { page_size: 100 } })
     departmentList.value = data.data || []
   } catch (error) {
     departmentList.value = []

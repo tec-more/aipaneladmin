@@ -138,6 +138,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const departmentList = ref([])
@@ -289,8 +290,7 @@ const fetchData = async () => {
 
 const fetchDepartments = async () => {
   try {
-    const response = await fetch('/api/v1/admin/departments/?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/departments/list', { params: { page_size: 100 } })
     departmentList.value = data.data || []
   } catch (error) {
     departmentList.value = []

@@ -167,6 +167,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import request from '@/utils/request'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -245,14 +246,8 @@ const formatMoney = (value) => {
 
 const fetchData = async () => {
   loading.value = true
-  const params = new URLSearchParams({
-    page: pagination.page,
-    page_size: pagination.page_size,
-    ...searchForm
-  })
   try {
-    const response = await fetch(`/api/v1/finance/assets/?${params}`)
-    const data = await response.json()
+    const data = await request.get('/v1/finance/assets/', { params: { page: pagination.page, page_size: pagination.page_size, ...searchForm } })
     tableData.value = data.data || []
     pagination.total = data.total || 0
   } catch (error) {
@@ -264,8 +259,7 @@ const fetchData = async () => {
 
 const fetchDepartments = async () => {
   try {
-    const response = await fetch('/api/v1/departments/list?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/departments/list', { params: { page_size: 100 } })
     departments.value = data.data || []
   } catch (error) {
     console.error('获取部门列表失败:', error)
@@ -274,8 +268,7 @@ const fetchDepartments = async () => {
 
 const fetchUsers = async () => {
   try {
-    const response = await fetch('/api/v1/users/list?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/users/list', { params: { page_size: 100 } })
     users.value = data.data || []
   } catch (error) {
     console.error('获取用户列表失败:', error)
@@ -388,14 +381,7 @@ const handleDepreciate = async (row) => {
 
 const handleSubmit = async () => {
   try {
-    const response = await fetch('/api/v1/finance/assets/', {
-      method: formData.id ? 'PUT' : 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(formData)
-    })
-    const data = await response.json()
+    const data = await (formData.id ? request.put('/v1/finance/assets/', formData) : request.post('/v1/finance/assets/', formData))
     if (data.success || data.id) {
       dialogVisible.value = false
       fetchData()

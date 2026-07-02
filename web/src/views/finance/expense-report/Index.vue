@@ -76,6 +76,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const userList = ref([])
@@ -132,22 +133,9 @@ const handleReimburse = (row) => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
-    if (searchForm.applicant_id) params.append('applicant_id', searchForm.applicant_id)
-    if (searchForm.status) params.append('status', searchForm.status)
-    if (searchForm.date_range && searchForm.date_range[0]) params.append('start_date', searchForm.date_range[0])
-    if (searchForm.date_range && searchForm.date_range[1]) params.append('end_date', searchForm.date_range[1])
-    
-    const response = await fetch(`/api/v1/finance/expense-reports?${params}`)
-    const data = await response.json()
-    
-    if (response.ok) {
-      tableData.value = data.data || []
-      pagination.total = data.total || 0
-    } else {
-      tableData.value = []
-      pagination.total = 0
-    }
+    const data = await request.get('/v1/finance/expense-reports', { params: { page: pagination.page, page_size: pagination.page_size, applicant_id: searchForm.applicant_id, status: searchForm.status, start_date: searchForm.date_range?.[0], end_date: searchForm.date_range?.[1] } })
+    tableData.value = data.data || []
+    pagination.total = data.total || 0
   } catch (error) {
     tableData.value = []
     pagination.total = 0
@@ -158,8 +146,7 @@ const fetchData = async () => {
 
 const fetchUsers = async () => {
   try {
-    const response = await fetch('/api/v1/users/list?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/users/list', { params: { page_size: 100 } })
     userList.value = data.data || []
   } catch (error) {
     userList.value = []

@@ -114,6 +114,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const customerList = ref([])
@@ -262,8 +263,7 @@ const fetchData = async () => {
 
 const fetchCustomers = async () => {
   try {
-    const response = await fetch('/api/v1/customer/list?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/customer/list', { params: { page_size: 100 } })
     customerList.value = data.data || []
   } catch (error) {
     customerList.value = []
@@ -272,8 +272,7 @@ const fetchCustomers = async () => {
 
 const fetchBankAccounts = async () => {
   try {
-    const response = await fetch('/api/v1/finance/bank-accounts/?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/finance/bank-accounts/', { params: { page_size: 100 } })
     bankAccountList.value = data.data || []
   } catch (error) {
     bankAccountList.value = []

@@ -61,6 +61,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const productList = ref([])
@@ -121,8 +122,7 @@ const fetchData = async () => {
 
 const fetchProducts = async () => {
   try {
-    const response = await fetch('/api/v1/product/list?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/product/list', { params: { page_size: 100 } })
     productList.value = data.data || []
   } catch (error) {
     productList.value = []

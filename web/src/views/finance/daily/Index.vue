@@ -116,6 +116,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const accountList = ref([])
@@ -190,8 +191,7 @@ const fetchData = async () => {
 
 const fetchAccountList = async () => {
   try {
-    const response = await fetch('/api/v1/finance/accounts/?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/finance/accounts/', { params: { page_size: 100 } })
     accountList.value = data.data || []
   } catch (error) {
     console.error('获取科目列表失败:', error)

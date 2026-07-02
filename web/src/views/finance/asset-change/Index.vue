@@ -99,6 +99,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import request from '@/utils/request'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -152,14 +153,8 @@ const getChangeTypeTag = (type) => {
 
 const fetchData = async () => {
   loading.value = true
-  const params = new URLSearchParams({
-    page: pagination.page,
-    page_size: pagination.page_size,
-    ...searchForm
-  })
   try {
-    const response = await fetch(`/api/v1/finance/asset-change?${params}`)
-    const data = await response.json()
+    const data = await request.get('/v1/finance/asset-change', { params: { page: pagination.page, page_size: pagination.page_size, ...searchForm } })
     tableData.value = data.data || []
     pagination.total = data.total || 0
   } catch (error) {
@@ -171,8 +166,7 @@ const fetchData = async () => {
 
 const fetchAssets = async () => {
   try {
-    const response = await fetch('/api/v1/finance/assets/?page_size=100')
-    const data = await response.json()
+    const data = await request.get('/v1/finance/assets/', { params: { page_size: 100 } })
     assets.value = data.data || []
   } catch (error) {
     console.error('获取资产列表失败:', error)
@@ -228,14 +222,7 @@ const handleView = (row) => {
 
 const handleSubmit = async () => {
   try {
-    const response = await fetch('/api/v1/finance/asset-change', {
-      method: formData.id ? 'PUT' : 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(formData)
-    })
-    const data = await response.json()
+    const data = await (formData.id ? request.put('/v1/finance/asset-change', formData) : request.post('/v1/finance/asset-change', formData))
     if (data.success) {
       dialogVisible.value = false
       fetchData()

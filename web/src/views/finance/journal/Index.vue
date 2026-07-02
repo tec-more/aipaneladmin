@@ -116,6 +116,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import request from '@/utils/request'
 
 const tableData = ref([])
 const journalTypes = ref([])
@@ -300,16 +301,14 @@ const handleSave = async () => {
 }
 
 const loadJournalTypes = async () => {
-  const response = await fetch('/api/v1/finance/journals/types')
-  const data = await response.json()
+  const data = await request.get('/v1/finance/journals/types')
   if (data.code === 0) {
     journalTypes.value = data.data
   }
 }
 
 const loadJournalStatuses = async () => {
-  const response = await fetch('/api/v1/finance/journals/statuses')
-  const data = await response.json()
+  const data = await request.get('/v1/finance/journals/statuses')
   if (data.code === 0) {
     journalStatuses.value = data.data
   }
@@ -317,33 +316,26 @@ const loadJournalStatuses = async () => {
 
 const fetchData = async () => {
   loading.value = true
-  const params = new URLSearchParams({
-    page: pagination.page,
-    page_size: pagination.page_size,
-    journal_type: searchForm.journal_type,
-    status: searchForm.status,
-    journal_date_start: searchForm.journal_date_start,
-    journal_date_end: searchForm.journal_date_end
-  })
-  
-  const response = await fetch(`/api/v1/finance/journals/?${params}`)
-  const data = await response.json()
-  
-  if (data.code === 0) {
-    tableData.value = data.data
-    pagination.total = data.total
-    pagination.page = data.page
-    pagination.page_size = data.page_size
-  } else {
-    tableData.value = data.data || []
-    pagination.total = data.total || 0
+  try {
+    const data = await request.get('/v1/finance/journals/', { params: { page: pagination.page, page_size: pagination.page_size, journal_type: searchForm.journal_type, status: searchForm.status, journal_date_start: searchForm.journal_date_start, journal_date_end: searchForm.journal_date_end } })
+    if (data.code === 0) {
+      tableData.value = data.data
+      pagination.total = data.total
+      pagination.page = data.page
+      pagination.page_size = data.page_size
+    } else {
+      tableData.value = data.data || []
+      pagination.total = data.total || 0
+    }
+  } catch (error) {
+    tableData.value = []
+    pagination.total = 0
   }
   loading.value = false
 }
 
 const fetchAccountList = async () => {
-  const response = await fetch('/api/v1/finance/accounts/?page_size=100')
-  const data = await response.json()
+  const data = await request.get('/v1/finance/accounts/', { params: { page_size: 100 } })
   if (data.code === 0) {
     accountList.value = data.data
   } else {
