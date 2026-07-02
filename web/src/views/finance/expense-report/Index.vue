@@ -158,7 +158,7 @@ const fetchData = async () => {
 
 const fetchUsers = async () => {
   try {
-    const response = await fetch('/api/v1/users/?page_size=100')
+    const response = await fetch('/api/v1/users/list?page_size=100')
     const data = await response.json()
     userList.value = data.data || []
   } catch (error) {

@@ -208,11 +208,21 @@
                     "permission_code": "finance:asset:list",
                     "children": [
                         {
+                            "name": "固定资产",
+                            "path": "/finance/assets",
+                            "icon": "Building",
+                            "component": "finance/assets/Index",
+                            "sort": 1,
+                            "is_hidden": false,
+                            "menu_type": "menu",
+                            "permission_code": "finance:assets:list"
+                        },
+                        {
                             "name": "资产卡片",
                             "path": "/finance/asset-card",
                             "icon": "CreditCard",
                             "component": "finance/asset-card/Index",
-                            "sort": 1,
+                            "sort": 2,
                             "is_hidden": false,
                             "menu_type": "menu",
                             "permission_code": "finance:asset-card:list"

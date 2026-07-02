@@ -117,7 +117,7 @@ const fetchData = async () => {
 
 const fetchDepartments = async () => {
   try {
-    const response = await fetch('/api/v1/departments/?page_size=100')
+    const response = await fetch('/api/v1/departments/list?page_size=100')
     const data = await response.json()
     departmentList.value = data.data || []
   } catch (error) {

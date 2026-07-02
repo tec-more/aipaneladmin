@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from base.common.response import SuccessResponse
 
-expense_router = APIRouter(prefix="/expenses", tags=["费用管理"])
+expense_router = APIRouter(prefix="/expense-applies", tags=["费用管理"])
 
 
 @expense_router.get("/", summary="获取费用申请列表")

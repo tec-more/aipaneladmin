@@ -277,7 +277,7 @@ const fetchData = async () => {
 
 const fetchSuppliers = async () => {
   try {
-    const response = await fetch('/api/v1/purchase/suppliers/?page_size=100')
+    const response = await fetch('/api/v1/purchase/supplier/?page_size=100')
     const data = await response.json()
     supplierList.value = data.data || []
   } catch (error) {

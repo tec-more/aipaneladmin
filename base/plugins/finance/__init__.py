@@ -1,12 +1,7 @@
 from fastapi import FastAPI
 from base.common.log import log
 
-try:
-    from base.plugins.finance.api.v1 import finance_api_router
-    router = finance_api_router
-except ImportError:
-    router = None
-    log.warning("finance_api_router模块未找到")
+pass
 
 
 async def on_enable(app: FastAPI) -> bool:
