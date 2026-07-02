@@ -1,8 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin, SoftDeleteMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
 class ReceivableStatus(str, Enum):
@@ -13,7 +12,7 @@ class ReceivableStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class Receivable(models.Model, TimestampMixin):
+class Receivable(BaseModel, TimestampMixin):
     receivable_no = fields.CharField(max_length=64, unique=True, description="应收单号")
     customer = fields.ForeignKeyField("models.Customer", related_name="receivables", on_delete=fields.SET_NULL, null=True, description="客户")
     customer_name = fields.CharField(max_length=128, description="客户名称")
@@ -45,7 +44,7 @@ class ReceiptStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class Receipt(models.Model, TimestampMixin):
+class Receipt(BaseModel, TimestampMixin):
     receipt_no = fields.CharField(max_length=64, unique=True, description="收款单号")
     customer = fields.ForeignKeyField("models.Customer", related_name="receipts", on_delete=fields.SET_NULL, null=True, description="客户")
     customer_name = fields.CharField(max_length=128, description="客户名称")
@@ -63,7 +62,7 @@ class Receipt(models.Model, TimestampMixin):
         table = "finance_receipts"
 
 
-class ReceivableSettlement(models.Model, TimestampMixin):
+class ReceivableSettlement(BaseModel, TimestampMixin):
     receivable = fields.ForeignKeyField("models.Receivable", related_name="settlements", on_delete=fields.CASCADE, description="应收单")
     receipt = fields.ForeignKeyField("models.Receipt", related_name="settlements", on_delete=fields.CASCADE, description="收款单")
     amount = fields.DecimalField(max_digits=18, decimal_places=2, description="核销金额")
@@ -72,7 +71,3 @@ class ReceivableSettlement(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_receivable_settlements"
-
-
-ReceivablePydantic = pydantic_model_creator(Receivable, name="Receivable")
-ReceiptPydantic = pydantic_model_creator(Receipt, name="Receipt")

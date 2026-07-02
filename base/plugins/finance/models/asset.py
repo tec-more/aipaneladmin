@@ -1,8 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
 class AssetStatus(str, Enum):
@@ -18,7 +17,7 @@ class AssetDepreciationMethod(str, Enum):
     UNITS_OF_PRODUCTION = "units_of_production"
 
 
-class Asset(models.Model, TimestampMixin):
+class Asset(BaseModel, TimestampMixin):
     asset_code = fields.CharField(max_length=64, unique=True, description="资产编码")
     asset_name = fields.CharField(max_length=128, description="资产名称")
     asset_category = fields.CharField(max_length=64, description="资产类别")
@@ -56,7 +55,7 @@ class AssetChangeType(str, Enum):
     OTHER = "other"
 
 
-class AssetChange(models.Model, TimestampMixin):
+class AssetChange(BaseModel, TimestampMixin):
     asset = fields.ForeignKeyField("models.Asset", related_name="changes", on_delete=fields.CASCADE, description="资产")
     change_type = fields.CharEnumField(AssetChangeType, max_length=32, description="变动类型")
     change_date = fields.DateField(default=datetime.now, description="变动日期")
@@ -69,7 +68,7 @@ class AssetChange(models.Model, TimestampMixin):
         table = "finance_asset_changes"
 
 
-class AssetDisposal(models.Model, TimestampMixin):
+class AssetDisposal(BaseModel, TimestampMixin):
     asset = fields.ForeignKeyField("models.Asset", related_name="disposals", on_delete=fields.CASCADE, description="资产")
     disposal_date = fields.DateField(default=datetime.now, description="清理日期")
     disposal_method = fields.CharField(max_length=32, description="清理方式")
@@ -82,7 +81,7 @@ class AssetDisposal(models.Model, TimestampMixin):
         table = "finance_asset_disposals"
 
 
-class DepreciationRecord(models.Model, TimestampMixin):
+class DepreciationRecord(BaseModel, TimestampMixin):
     asset = fields.ForeignKeyField("models.Asset", related_name="depreciation_records", on_delete=fields.CASCADE, description="资产")
     period = fields.CharField(max_length=10, description="会计期间")
     depreciation_amount = fields.DecimalField(max_digits=18, decimal_places=2, description="折旧金额")
@@ -92,6 +91,3 @@ class DepreciationRecord(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_depreciation_records"
-
-
-AssetPydantic = pydantic_model_creator(Asset, name="Asset")

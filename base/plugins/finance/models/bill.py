@@ -1,8 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
 class BillType(str, Enum):
@@ -21,7 +20,7 @@ class BillStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class Bill(models.Model, TimestampMixin):
+class Bill(BaseModel, TimestampMixin):
     bill_no = fields.CharField(max_length=64, unique=True, description="票据编号")
     bill_type = fields.CharEnumField(BillType, max_length=32, description="票据类型")
     amount = fields.DecimalField(max_digits=18, decimal_places=2, description="金额")
@@ -36,6 +35,3 @@ class Bill(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_bills"
-
-
-BillPydantic = pydantic_model_creator(Bill, name="Bill")

@@ -1,0 +1,1 @@
+import{_ as o,an as c,c as n,o as t,b as s}from"./index-CUzeTFxT.js";const r={},a={class:"expense-index"};function _(d,i){const e=c("router-view");return t(),n("div",a,[s(e)])}const f=o(r,[["render",_],["__scopeId","data-v-c5a16916"]]);export{f as default};

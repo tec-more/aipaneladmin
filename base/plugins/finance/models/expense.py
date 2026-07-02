@@ -1,8 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
 class ExpenseType(str, Enum):
@@ -21,7 +20,7 @@ class ExpenseStatus(str, Enum):
     PAID = "paid"
 
 
-class ExpenseApply(models.Model, TimestampMixin):
+class ExpenseApply(BaseModel, TimestampMixin):
     apply_no = fields.CharField(max_length=64, unique=True, description="申请单号")
     applicant = fields.ForeignKeyField("models.User", related_name="expense_applies", on_delete=fields.SET_NULL, null=True, description="申请人")
     applicant_name = fields.CharField(max_length=64, description="申请人姓名")
@@ -39,7 +38,7 @@ class ExpenseApply(models.Model, TimestampMixin):
         table = "finance_expense_applies"
 
 
-class ExpenseReport(models.Model, TimestampMixin):
+class ExpenseReport(BaseModel, TimestampMixin):
     report_no = fields.CharField(max_length=64, unique=True, description="报销单号")
     apply = fields.ForeignKeyField("models.ExpenseApply", related_name="reports", on_delete=fields.CASCADE, description="关联申请")
     applicant = fields.ForeignKeyField("models.User", related_name="expense_reports", on_delete=fields.SET_NULL, null=True, description="报销人")
@@ -55,7 +54,7 @@ class ExpenseReport(models.Model, TimestampMixin):
         table = "finance_expense_reports"
 
 
-class ExpenseItem(models.Model, TimestampMixin):
+class ExpenseItem(BaseModel, TimestampMixin):
     report = fields.ForeignKeyField("models.ExpenseReport", related_name="items", on_delete=fields.CASCADE, description="报销单")
     expense_date = fields.DateField(description="费用日期")
     description = fields.CharField(max_length=256, description="费用说明")
@@ -64,6 +63,3 @@ class ExpenseItem(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_expense_items"
-
-
-ExpenseApplyPydantic = pydantic_model_creator(ExpenseApply, name="ExpenseApply")

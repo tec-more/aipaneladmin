@@ -1,8 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
 class CostMethod(str, Enum):
@@ -12,7 +11,7 @@ class CostMethod(str, Enum):
     SPECIFIC_IDENTIFICATION = "specific_identification"
 
 
-class InventoryCost(models.Model, TimestampMixin):
+class InventoryCost(BaseModel, TimestampMixin):
     product = fields.ForeignKeyField("models.Product", related_name="costs", on_delete=fields.SET_NULL, null=True, description="产品")
     product_code = fields.CharField(max_length=64, description="产品编码")
     product_name = fields.CharField(max_length=128, description="产品名称")
@@ -29,7 +28,7 @@ class InventoryCost(models.Model, TimestampMixin):
         table = "finance_inventory_costs"
 
 
-class CostTransfer(models.Model, TimestampMixin):
+class CostTransfer(BaseModel, TimestampMixin):
     transfer_no = fields.CharField(max_length=64, unique=True, description="结转单号")
     period = fields.CharField(max_length=10, description="会计期间")
     total_amount = fields.DecimalField(max_digits=18, decimal_places=2, description="结转金额")
@@ -42,7 +41,7 @@ class CostTransfer(models.Model, TimestampMixin):
         table = "finance_cost_transfers"
 
 
-class CostVariance(models.Model, TimestampMixin):
+class CostVariance(BaseModel, TimestampMixin):
     product = fields.ForeignKeyField("models.Product", related_name="variances", on_delete=fields.SET_NULL, null=True, description="产品")
     period = fields.CharField(max_length=10, description="会计期间")
     standard_cost = fields.DecimalField(max_digits=18, decimal_places=4, description="标准成本")
@@ -53,6 +52,3 @@ class CostVariance(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_cost_variances"
-
-
-InventoryCostPydantic = pydantic_model_creator(InventoryCost, name="InventoryCost")

@@ -1,0 +1,1 @@
+import{_ as o,an as t,c,o as n,b as s}from"./index-CUzeTFxT.js";const a={},r={class:"quality-index"};function _(d,i){const e=t("router-view");return n(),c("div",r,[s(e)])}const l=o(a,[["render",_],["__scopeId","data-v-f7a5f35c"]]);export{l as default};

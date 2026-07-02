@@ -1,8 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
 class InvoiceType(str, Enum):
@@ -18,7 +17,7 @@ class InvoiceStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class TaxInvoice(models.Model, TimestampMixin):
+class TaxInvoice(BaseModel, TimestampMixin):
     invoice_no = fields.CharField(max_length=64, unique=True, description="发票号码")
     invoice_code = fields.CharField(max_length=64, description="发票代码")
     invoice_type = fields.CharEnumField(InvoiceType, max_length=32, description="发票类型")
@@ -43,7 +42,7 @@ class TaxInvoice(models.Model, TimestampMixin):
         table = "finance_tax_invoices"
 
 
-class TaxDeclaration(models.Model, TimestampMixin):
+class TaxDeclaration(BaseModel, TimestampMixin):
     declaration_no = fields.CharField(max_length=64, unique=True, description="申报编号")
     period = fields.CharField(max_length=10, description="申报期间")
     declaration_date = fields.DateField(default=datetime.now, description="申报日期")
@@ -59,7 +58,7 @@ class TaxDeclaration(models.Model, TimestampMixin):
         table = "finance_tax_declarations"
 
 
-class TaxSummary(models.Model, TimestampMixin):
+class TaxSummary(BaseModel, TimestampMixin):
     period = fields.CharField(max_length=10, unique=True, description="会计期间")
     output_tax = fields.DecimalField(max_digits=18, decimal_places=2, description="销项税额")
     input_tax = fields.DecimalField(max_digits=18, decimal_places=2, description="进项税额")
@@ -69,6 +68,3 @@ class TaxSummary(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_tax_summaries"
-
-
-TaxInvoicePydantic = pydantic_model_creator(TaxInvoice, name="TaxInvoice")

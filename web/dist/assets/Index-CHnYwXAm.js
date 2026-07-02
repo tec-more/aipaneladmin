@@ -1,0 +1,1 @@
+import{_ as o,an as t,c,o as n,b as s}from"./index-CUzeTFxT.js";const a={},r={class:"tax-index"};function _(d,i){const e=t("router-view");return n(),c("div",r,[s(e)])}const f=o(a,[["render",_],["__scopeId","data-v-d5e7ca5e"]]);export{f as default};

@@ -266,17 +266,34 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
+const route = useRoute()
+
 const tabs = [
-  { key: 'trial_balance', label: '科目余额表' },
-  { key: 'profit_loss', label: '利润表' },
-  { key: 'balance_sheet', label: '资产负债表' },
-  { key: 'cash_flow', label: '现金流量表' }
+  { key: 'trial_balance', label: '科目余额表', path: '/finance/report/trial-balance' },
+  { key: 'profit_loss', label: '利润表', path: '/finance/report/profit-loss' },
+  { key: 'balance_sheet', label: '资产负债表', path: '/finance/report/balance-sheet' },
+  { key: 'cash_flow', label: '现金流量表', path: '/finance/report/cash-flow' }
 ]
 
 const activeTab = ref('trial_balance')
+
+const getActiveTabFromPath = () => {
+  const fullPath = route.fullPath
+  const tab = tabs.find(t => fullPath.includes(t.path))
+  return tab ? tab.key : 'trial_balance'
+}
+
+watch(() => route.fullPath, () => {
+  activeTab.value = getActiveTabFromPath()
+}, { immediate: true })
+
+onMounted(() => {
+  activeTab.value = getActiveTabFromPath()
+})
 const loading = ref(false)
 
 const currentTabLabel = computed(() => {

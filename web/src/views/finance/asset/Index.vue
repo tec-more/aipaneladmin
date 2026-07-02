@@ -1,11 +1,6 @@
 <template>
   <div class="asset-index">
-    <el-card shadow="never">
-      <template #header>
-        <span>资产管理</span>
-      </template>
-      <el-empty description="请从左侧菜单选择具体功能" />
-    </el-card>
+    <router-view />
   </div>
 </template>
 
@@ -14,6 +9,6 @@
 
 <style lang="scss" scoped>
 .asset-index {
-  padding: 20px;
+  min-height: 100%;
 }
 </style>

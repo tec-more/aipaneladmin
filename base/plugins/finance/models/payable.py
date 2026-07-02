@@ -1,8 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
 class PayableStatus(str, Enum):
@@ -13,7 +12,7 @@ class PayableStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class Payable(models.Model, TimestampMixin):
+class Payable(BaseModel, TimestampMixin):
     payable_no = fields.CharField(max_length=64, unique=True, description="应付单号")
     supplier = fields.ForeignKeyField("models.Supplier", related_name="payables", on_delete=fields.SET_NULL, null=True, description="供应商")
     supplier_name = fields.CharField(max_length=128, description="供应商名称")
@@ -45,7 +44,7 @@ class PaymentStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class Payment(models.Model, TimestampMixin):
+class Payment(BaseModel, TimestampMixin):
     payment_no = fields.CharField(max_length=64, unique=True, description="付款单号")
     supplier = fields.ForeignKeyField("models.Supplier", related_name="payments", on_delete=fields.SET_NULL, null=True, description="供应商")
     supplier_name = fields.CharField(max_length=128, description="供应商名称")
@@ -63,7 +62,7 @@ class Payment(models.Model, TimestampMixin):
         table = "finance_payments"
 
 
-class PayableSettlement(models.Model, TimestampMixin):
+class PayableSettlement(BaseModel, TimestampMixin):
     payable = fields.ForeignKeyField("models.Payable", related_name="settlements", on_delete=fields.CASCADE, description="应付单")
     payment = fields.ForeignKeyField("models.Payment", related_name="settlements", on_delete=fields.CASCADE, description="付款单")
     amount = fields.DecimalField(max_digits=18, decimal_places=2, description="核销金额")
@@ -72,7 +71,3 @@ class PayableSettlement(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_payable_settlements"
-
-
-PayablePydantic = pydantic_model_creator(Payable, name="Payable")
-PaymentPydantic = pydantic_model_creator(Payment, name="Payment")

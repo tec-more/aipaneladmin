@@ -1,10 +1,9 @@
 from datetime import datetime
 from tortoise import fields, models
-from tortoise.contrib.pydantic import pydantic_model_creator
-from base.plugins.base.mixins import TimestampMixin
+from base.common.model import BaseModel, TimestampMixin
 
 
-class BankAccount(models.Model, TimestampMixin):
+class BankAccount(BaseModel, TimestampMixin):
     account_name = fields.CharField(max_length=128, description="账户名称")
     bank_name = fields.CharField(max_length=128, description="银行名称")
     account_no = fields.CharField(max_length=64, unique=True, description="银行账号")
@@ -17,7 +16,7 @@ class BankAccount(models.Model, TimestampMixin):
         table = "finance_bank_accounts"
 
 
-class CashFlowRecord(models.Model, TimestampMixin):
+class CashFlowRecord(BaseModel, TimestampMixin):
     bank_account = fields.ForeignKeyField("models.BankAccount", related_name="cash_flows", on_delete=fields.CASCADE, description="银行账户")
     flow_date = fields.DateField(default=datetime.now, description="流水日期")
     amount = fields.DecimalField(max_digits=18, decimal_places=2, description="金额")
@@ -30,7 +29,7 @@ class CashFlowRecord(models.Model, TimestampMixin):
         table = "finance_cash_flow_records"
 
 
-class CashPlan(models.Model, TimestampMixin):
+class CashPlan(BaseModel, TimestampMixin):
     plan_no = fields.CharField(max_length=64, unique=True, description="计划编号")
     period = fields.CharField(max_length=10, description="计划期间")
     inflow_amount = fields.DecimalField(max_digits=18, decimal_places=2, description="预计流入")
@@ -42,6 +41,3 @@ class CashPlan(models.Model, TimestampMixin):
     
     class Meta:
         table = "finance_cash_plans"
-
-
-BankAccountPydantic = pydantic_model_creator(BankAccount, name="BankAccount")
