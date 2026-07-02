@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",
+    "connect-history-api-fallback": "^2.0.0",
     "sass": "^1.69.0",
     "unplugin-auto-import": "^0.17.0",
     "unplugin-vue-components": "^0.26.0",

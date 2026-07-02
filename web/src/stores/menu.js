@@ -191,7 +191,9 @@ export const useMenuStore = defineStore('menu', {
           routePath = routePath.substring(1)
         }
         
-        routePath = routePath.replace(/\/+/g, '/')
+        routePath = routePath.replace(/\/+/g, '/').replace(/\/$/, '')
+        
+        console.log('[菜单Store] 菜单路径:', menu.path, '转换后:', routePath)
 
         if (menu.component) {
           const route = {

@@ -197,6 +197,97 @@ const routes = [
         component: () => import('@/views/finance/report/Index.vue'),
         meta: { title: '财务报表' }
       },
+      // 库存管理模块
+      {
+        path: 'inventory',
+        name: 'Inventory',
+        component: () => import('@/views/inventory/Index.vue'),
+        meta: { title: '库存管理', icon: 'Box' }
+      },
+      {
+        path: 'inventory/settings',
+        name: 'InventorySettings',
+        component: () => import('@/views/inventory/settings/Index.vue'),
+        meta: { title: '基础设置' }
+      },
+      {
+        path: 'inventory/settings/warehouse',
+        name: 'Warehouse',
+        component: () => import('@/views/inventory/settings/warehouse/Index.vue'),
+        meta: { title: '仓库管理' }
+      },
+      {
+        path: 'inventory/settings/location',
+        name: 'Location',
+        component: () => import('@/views/inventory/settings/location/Index.vue'),
+        meta: { title: '库位管理' }
+      },
+      {
+        path: 'inventory/settings/picking-type',
+        name: 'PickingType',
+        component: () => import('@/views/inventory/settings/picking-type/Index.vue'),
+        meta: { title: '调拨类型' }
+      },
+      {
+        path: 'inventory/settings/lot',
+        name: 'Lot',
+        component: () => import('@/views/inventory/settings/lot/Index.vue'),
+        meta: { title: '批次管理' }
+      },
+      {
+        path: 'inventory/settings/package',
+        name: 'Package',
+        component: () => import('@/views/inventory/settings/package/Index.vue'),
+        meta: { title: '包裹管理' }
+      },
+      {
+        path: 'inventory/picking',
+        name: 'Picking',
+        component: () => import('@/views/inventory/picking/Index.vue'),
+        meta: { title: '调拨管理' }
+      },
+      {
+        path: 'inventory/picking/incoming',
+        name: 'PickingIncoming',
+        component: () => import('@/views/inventory/picking/incoming/Index.vue'),
+        meta: { title: '入库调拨' }
+      },
+      {
+        path: 'inventory/picking/outgoing',
+        name: 'PickingOutgoing',
+        component: () => import('@/views/inventory/picking/outgoing/Index.vue'),
+        meta: { title: '出库调拨' }
+      },
+      {
+        path: 'inventory/picking/internal',
+        name: 'PickingInternal',
+        component: () => import('@/views/inventory/picking/internal/Index.vue'),
+        meta: { title: '内部调拨' }
+      },
+      {
+        path: 'inventory/quant',
+        name: 'Quant',
+        component: () => import('@/views/inventory/quant/Index.vue'),
+        meta: { title: '库存查询' }
+      },
+      {
+        path: 'inventory/quant/list',
+        name: 'QuantList',
+        component: () => import('@/views/inventory/quant/list/Index.vue'),
+        meta: { title: '库存列表' }
+      },
+      {
+        path: 'inventory/quant/summary',
+        name: 'QuantSummary',
+        component: () => import('@/views/inventory/quant/summary/Index.vue'),
+        meta: { title: '库存汇总' }
+      },
+      {
+        path: 'inventory/quant/reservation',
+        name: 'QuantReservation',
+        component: () => import('@/views/inventory/quant/reservation/Index.vue'),
+        meta: { title: '预留查询' }
+      },
 
     ]
   },
@@ -209,21 +300,16 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 
-// 路由守卫
 router.beforeEach(async (to, from, next) => {
   document.title = `${to.meta.title || ''} - 笑话面对面`
   
-  console.log('[路由守卫] 目标路径:', to.path, '当前路由列表:', router.getRoutes().map(r => r.path))
-
-  // 直接从 localStorage 读取 token 判断登录状态
   const token = localStorage.getItem('token')
   const isLoggedIn = !!token
 
-  // 已登录用户访问登录页，直接跳转到后台首页
   if (to.path === '/panel/login' && isLoggedIn) {
     next({ path: '/panel/dashboard' })
     return
@@ -231,38 +317,31 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.meta.public) {
     next()
-  } else if (!isLoggedIn) {
-    next({ path: '/panel/login', query: { redirect: to.fullPath } })
-  } else {
-    const menuStore = useMenuStore()
-    
-    if (!menuStore.isLoaded && !menuStore.loading) {
-      try {
-        await menuStore.fetchUserMenus()
+    return
+  }
 
-        const dynamicRoutes = menuStore.generateRoutes()
-        console.log('[路由守卫] 生成的动态路由:', dynamicRoutes)
-        
-        dynamicRoutes.forEach(route => {
-          if (!router.hasRoute(route.name)) {
-            router.addRoute('panel', route)
-            menuStore.dynamicRouteNames.push(route.name)
-          }
-        })
-        
-        menuStore.routesReady = true
-        console.log('[路由守卫] 添加路由后路由列表:', router.getRoutes().map(r => r.path))
-        
-        next({ ...to, replace: true })
-        return
-      } catch (error) {
-        console.error('加载菜单失败:', error)
-        menuStore.routesReady = true
-        next()
+  if (!isLoggedIn) {
+    next({ path: '/panel/login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  const menuStore = useMenuStore()
+  
+  const resolved = router.resolve(to)
+  const fullMatchedPath = resolved.matched.length > 0 
+    ? resolved.matched[resolved.matched.length - 1].path 
+    : ''
+  
+  const pathMatches = fullMatchedPath === to.path || fullMatchedPath === to.fullPath
+  
+  if (!pathMatches || !menuStore.routesReady) {
+    try {
+      if (!menuStore.isLoaded) {
+        await menuStore.fetchUserMenus()
       }
-    } else if (!menuStore.routesReady) {
+      
       const dynamicRoutes = menuStore.generateRoutes()
-      console.log('[路由守卫] 补充动态路由:', dynamicRoutes)
+      console.log('[路由守卫] 路由未完全匹配或未就绪，注入动态路由:', to.path, '生成:', dynamicRoutes.length, '个路由')
       
       dynamicRoutes.forEach(route => {
         if (!router.hasRoute(route.name)) {
@@ -272,26 +351,19 @@ router.beforeEach(async (to, from, next) => {
       })
       
       menuStore.routesReady = true
+      console.log('[路由守卫] 添加路由后路由列表:', router.getRoutes().map(r => r.path))
+      
       next({ ...to, replace: true })
-    } else {
-      const resolved = router.resolve(to)
-      if (resolved.matched.length === 0) {
-        const dynamicRoutes = menuStore.generateRoutes()
-        console.log('[路由守卫] 尝试重新注入动态路由:', dynamicRoutes)
-        
-        dynamicRoutes.forEach(route => {
-          if (!router.hasRoute(route.name)) {
-            router.addRoute('panel', route)
-            menuStore.dynamicRouteNames.push(route.name)
-          }
-        })
-        
-        next({ ...to, replace: true })
-      } else {
-        next()
-      }
+      return
+    } catch (error) {
+      console.error('加载菜单失败:', error)
+      menuStore.routesReady = true
+      next()
+      return
     }
   }
+
+  next()
 })
 
 export default router

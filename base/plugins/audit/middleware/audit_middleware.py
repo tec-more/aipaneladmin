@@ -50,6 +50,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body = await request.body()
                 if body:
                     request_body = json.loads(body.decode("utf-8"))
+                    request._body = body
             except Exception:
                 pass
         
