@@ -10,41 +10,6 @@ from base.common.response import success_response
 
 mps_router = APIRouter(prefix="/mps", tags=["主生产计划"])
 
-@mps_router.get("/{mps_id}", summary="获取主生产计划详情")
-async def get_mps(mps_id: int):
-    mps = await MPSService.get_by_id(mps_id)
-    if not mps:
-        raise HTTPException(status_code=404, detail="主生产计划不存在")
-    details = await MPSService.get_mps_details(mps_id)
-    result = await mps.to_dict()
-    result['details'] = [await d.to_dict() for d in details]
-    return success_response(data=result)
-
-@mps_router.post("", summary="创建主生产计划")
-async def create_mps(data: MPSCreate):
-    try:
-        mps = await MPSService.create_mps(data)
-        return success_response(data=mps)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@mps_router.put("/{mps_id}", summary="更新主生产计划")
-async def update_mps(mps_id: int, data: MPSUpdate):
-    try:
-        mps = await MPSService.update_mps(mps_id, data)
-        if not mps:
-            raise HTTPException(status_code=404, detail="主生产计划不存在")
-        return success_response(data=mps)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@mps_router.delete("/{mps_id}", summary="删除主生产计划")
-async def delete_mps(mps_id: int):
-    success = await MPSService.delete_mps(mps_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="主生产计划不存在")
-    return success_response(data={"message": "主生产计划删除成功"}, msg="主生产计划删除成功")
-
 @mps_router.get("", summary="获取主生产计划列表")
 async def list_mps(
     page: int = 1,
@@ -119,6 +84,14 @@ async def release_mps(mps_id: int):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@mps_router.post("", summary="创建主生产计划")
+async def create_mps(data: MPSCreate):
+    try:
+        mps = await MPSService.create_mps(data)
+        return success_response(data=mps)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @mps_router.post("/generate", summary="基于销售预测生成MPS")
 async def generate_mps(data: dict):
     forecast_id = data.get('forecast_id')
@@ -129,3 +102,30 @@ async def generate_mps(data: dict):
         return success_response(data=result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@mps_router.get("/{mps_id}", summary="获取主生产计划详情")
+async def get_mps(mps_id: int):
+    mps = await MPSService.get_by_id(mps_id)
+    if not mps:
+        raise HTTPException(status_code=404, detail="主生产计划不存在")
+    details = await MPSService.get_mps_details(mps_id)
+    result = await mps.to_dict()
+    result['details'] = [await d.to_dict() for d in details]
+    return success_response(data=result)
+
+@mps_router.put("/{mps_id}", summary="更新主生产计划")
+async def update_mps(mps_id: int, data: MPSUpdate):
+    try:
+        mps = await MPSService.update_mps(mps_id, data)
+        if not mps:
+            raise HTTPException(status_code=404, detail="主生产计划不存在")
+        return success_response(data=mps)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@mps_router.delete("/{mps_id}", summary="删除主生产计划")
+async def delete_mps(mps_id: int):
+    success = await MPSService.delete_mps(mps_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="主生产计划不存在")
+    return success_response(data={"message": "主生产计划删除成功"}, msg="主生产计划删除成功")

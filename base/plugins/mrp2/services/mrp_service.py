@@ -894,6 +894,45 @@ class MonitorService:
 
         return monitor
 
+    @staticmethod
+    async def pause_monitor(monitor_id: int) -> Optional[PlanExecutionMonitor]:
+        monitor = await MonitorService.get_by_id(monitor_id)
+        if not monitor:
+            return None
+        if monitor.status != "running":
+            raise ValueError("只能暂停运行中的监控")
+        monitor.status = "paused"
+        await monitor.save()
+        return monitor
+
+    @staticmethod
+    async def resume_monitor(monitor_id: int) -> Optional[PlanExecutionMonitor]:
+        monitor = await MonitorService.get_by_id(monitor_id)
+        if not monitor:
+            return None
+        if monitor.status != "paused":
+            raise ValueError("只能恢复已暂停的监控")
+        monitor.status = "running"
+        await monitor.save()
+        return monitor
+
+    @staticmethod
+    async def get_stats() -> Dict[str, Any]:
+        total_plans = await PlanExecutionMonitor.all().count()
+        completed_plans = await PlanExecutionMonitor.filter(status="completed").count()
+        exception_count = await MRPExceptionAlert.filter(alert_status="active").count()
+        
+        all_monitors = await PlanExecutionMonitor.all()
+        total_progress = sum(m.overall_progress for m in all_monitors)
+        progress_rate = int(total_progress / len(all_monitors)) if all_monitors else 0
+
+        return {
+            "total_plans": total_plans,
+            "completed_plans": completed_plans,
+            "exception_count": exception_count,
+            "progress_rate": progress_rate
+        }
+
 
 class AlertService:
     @staticmethod

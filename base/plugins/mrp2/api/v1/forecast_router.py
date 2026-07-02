@@ -10,41 +10,6 @@ from base.common.response import success_response
 
 forecast_router = APIRouter(prefix="/forecast", tags=["销售预测"])
 
-@forecast_router.get("/{forecast_id}", summary="获取销售预测详情")
-async def get_forecast(forecast_id: int):
-    forecast = await SalesForecastService.get_by_id(forecast_id)
-    if not forecast:
-        raise HTTPException(status_code=404, detail="销售预测不存在")
-    details = await SalesForecastService.get_forecast_details(forecast_id)
-    result = await forecast.to_dict()
-    result['details'] = [await d.to_dict() for d in details]
-    return success_response(data=result)
-
-@forecast_router.post("", summary="创建销售预测")
-async def create_forecast(data: SalesForecastCreate):
-    try:
-        forecast = await SalesForecastService.create_forecast(data)
-        return success_response(data=forecast)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@forecast_router.put("/{forecast_id}", summary="更新销售预测")
-async def update_forecast(forecast_id: int, data: SalesForecastUpdate):
-    try:
-        forecast = await SalesForecastService.update_forecast(forecast_id, data)
-        if not forecast:
-            raise HTTPException(status_code=404, detail="销售预测不存在")
-        return success_response(data=forecast)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@forecast_router.delete("/{forecast_id}", summary="删除销售预测")
-async def delete_forecast(forecast_id: int):
-    success = await SalesForecastService.delete_forecast(forecast_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="销售预测不存在")
-    return success_response(data={"message": "销售预测删除成功"}, msg="销售预测删除成功")
-
 @forecast_router.get("", summary="获取销售预测列表")
 async def list_forecasts(
     page: int = 1,
@@ -120,6 +85,41 @@ async def reject_forecast(forecast_id: int):
         return success_response(data=forecast)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@forecast_router.post("", summary="创建销售预测")
+async def create_forecast(data: SalesForecastCreate):
+    try:
+        forecast = await SalesForecastService.create_forecast(data)
+        return success_response(data=forecast)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@forecast_router.get("/{forecast_id}", summary="获取销售预测详情")
+async def get_forecast(forecast_id: int):
+    forecast = await SalesForecastService.get_by_id(forecast_id)
+    if not forecast:
+        raise HTTPException(status_code=404, detail="销售预测不存在")
+    details = await SalesForecastService.get_forecast_details(forecast_id)
+    result = await forecast.to_dict()
+    result['details'] = [await d.to_dict() for d in details]
+    return success_response(data=result)
+
+@forecast_router.put("/{forecast_id}", summary="更新销售预测")
+async def update_forecast(forecast_id: int, data: SalesForecastUpdate):
+    try:
+        forecast = await SalesForecastService.update_forecast(forecast_id, data)
+        if not forecast:
+            raise HTTPException(status_code=404, detail="销售预测不存在")
+        return success_response(data=forecast)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@forecast_router.delete("/{forecast_id}", summary="删除销售预测")
+async def delete_forecast(forecast_id: int):
+    success = await SalesForecastService.delete_forecast(forecast_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="销售预测不存在")
+    return success_response(data={"message": "销售预测删除成功"}, msg="销售预测删除成功")
 
 @forecast_router.get("/generate/{product_code}", summary="根据历史数据生成预测")
 async def generate_forecast(product_code: str, months: int = 6):
