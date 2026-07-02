@@ -3,7 +3,13 @@
 """
 from typing import Optional, List
 from datetime import datetime
+from enum import Enum
 from pydantic import BaseModel, Field
+
+
+class OrgType(str, Enum):
+    COMPANY = "company"
+    DEPARTMENT = "department"
 
 
 class DepartmentBase(BaseModel):
@@ -11,6 +17,7 @@ class DepartmentBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="部门名称")
     code: str = Field(..., min_length=1, max_length=50, description="部门编码")
     parent_id: Optional[int] = Field(None, description="父部门ID")
+    type: OrgType = Field(default=OrgType.DEPARTMENT, description="组织类型: company-公司, department-部门")
     leader_id: Optional[int] = Field(None, description="部门负责人ID")
     phone: Optional[str] = Field(None, max_length=20, description="联系电话")
     email: Optional[str] = Field(None, description="邮箱")
@@ -27,6 +34,7 @@ class DepartmentUpdate(BaseModel):
     """更新部门模型"""
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="部门名称")
     parent_id: Optional[int] = Field(None, description="父部门ID")
+    type: Optional[OrgType] = Field(None, description="组织类型: company-公司, department-部门")
     leader_id: Optional[int] = Field(None, description="部门负责人ID")
     phone: Optional[str] = Field(None, max_length=20, description="联系电话")
     email: Optional[str] = Field(None, description="邮箱")
@@ -41,6 +49,8 @@ class DepartmentResponse(BaseModel):
     name: str
     code: str
     parent_id: Optional[int] = None
+    type: OrgType
+    level: int
     leader_id: Optional[int] = None
     phone: Optional[str] = None
     email: Optional[str] = None

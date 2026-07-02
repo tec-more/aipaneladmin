@@ -9,6 +9,7 @@ from base.core.dept.schemas.department import (
     DepartmentUpdate,
     DepartmentResponse,
     DepartmentTree,
+    OrgType,
 )
 from base.core.dept.services.department_service import DepartmentService
 from base.core.users.services.user_service import UserService
@@ -24,6 +25,7 @@ async def get_department_list(
         page_size: int = Query(10, ge=1, le=100, description="每页数量"),
         name: Optional[str] = Query(None, description="部门名称(模糊搜索)"),
         is_active: Optional[bool] = Query(None, description="是否激活"),
+        type: Optional[OrgType] = Query(None, description="组织类型"),
         current_user_id: int = Depends(get_current_user_id)
 ):
     """获取部门列表(分页)"""
@@ -32,6 +34,7 @@ async def get_department_list(
         page_size=page_size,
         name=name,
         is_active=is_active,
+        type=type,
     )
 
     dept_list = []
@@ -47,6 +50,16 @@ async def get_department_list(
     }
 
     return SuccessResponse(data=response_data)
+
+
+@router.get("/companies", summary="获取公司列表")
+async def get_company_list(
+        current_user_id: int = Depends(get_current_user_id)
+):
+    """获取所有公司列表(level=1, type=company)"""
+    companies = await DepartmentService.get_companies()
+    company_list = [await company.to_dict() for company in companies]
+    return SuccessResponse(data=company_list)
 
 
 @router.get("/tree", summary="获取部门树形结构")

@@ -2,7 +2,7 @@
 部门服务层
 """
 from typing import Optional, List, Tuple
-from base.core.dept.models.department import Department
+from base.core.dept.models.department import Department, OrgType
 from base.core.dept.schemas.department import DepartmentCreate, DepartmentUpdate
 
 
@@ -20,12 +20,38 @@ class DepartmentService:
         return await Department.filter(code=code).first()
 
     @staticmethod
+    async def _calculate_level(parent_id: Optional[int]) -> int:
+        """计算层级深度"""
+        if not parent_id:
+            return 1
+        parent_dept = await Department.filter(id=parent_id).first()
+        if not parent_dept:
+            return 1
+        return parent_dept.level + 1
+
+    @staticmethod
+    async def _update_subtree_levels(dept_id: int, new_base_level: int):
+        """更新子部门的层级"""
+        async def update_children(parent_id: int, current_level: int):
+            children = await Department.filter(parent_id=parent_id).all()
+            for child in children:
+                child.level = current_level
+                await child.save()
+                await update_children(child.id, current_level + 1)
+
+        await update_children(dept_id, new_base_level + 1)
+
+    @staticmethod
     async def create_department(dept_data: DepartmentCreate) -> Department:
         """创建部门"""
+        level = await DepartmentService._calculate_level(dept_data.parent_id)
+
         dept = await Department.create(
             name=dept_data.name,
             code=dept_data.code,
             parent_id=dept_data.parent_id,
+            type=dept_data.type,
+            level=level,
             leader_id=dept_data.leader_id,
             phone=dept_data.phone,
             email=dept_data.email,
@@ -42,7 +68,20 @@ class DepartmentService:
             return None
 
         update_data = dept_data.model_dump(exclude_unset=True)
+        old_parent_id = dept.parent_id
+        old_level = dept.level
+
         await dept.update_from_dict(update_data).save()
+
+        new_parent_id = dept.parent_id
+        if new_parent_id != old_parent_id:
+            new_level = await DepartmentService._calculate_level(new_parent_id)
+            dept.level = new_level
+            await dept.save()
+
+            if old_level != new_level:
+                await DepartmentService._update_subtree_levels(dept_id, new_level)
+
         return dept
 
     @staticmethod
@@ -62,6 +101,7 @@ class DepartmentService:
             page_size: int = 10,
             name: Optional[str] = None,
             is_active: Optional[bool] = None,
+            type: Optional[OrgType] = None,
     ) -> Tuple[List[Department], int]:
         """获取部门列表(分页)"""
         query = Department.all()
@@ -70,6 +110,8 @@ class DepartmentService:
             query = query.filter(name__icontains=name)
         if is_active is not None:
             query = query.filter(is_active=is_active)
+        if type:
+            query = query.filter(type=type)
 
         total = await query.count()
 
@@ -82,6 +124,11 @@ class DepartmentService:
     async def get_all_departments() -> List[Department]:
         """获取所有部门"""
         return await Department.filter(is_active=True).order_by('sort', 'id')
+
+    @staticmethod
+    async def get_companies() -> List[Department]:
+        """获取所有公司"""
+        return await Department.filter(type=OrgType.COMPANY, is_active=True).order_by('sort', 'id')
 
     @staticmethod
     async def build_department_tree(departments: List[Department] = None) -> List[dict]:
