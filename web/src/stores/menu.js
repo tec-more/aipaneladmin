@@ -135,7 +135,9 @@ export const useMenuStore = defineStore('menu', {
     // 动态路由是否已注入
     routesReady: false,
     // 动态路由名称列表（用于追踪已添加的路由）
-    dynamicRouteNames: []
+    dynamicRouteNames: [],
+    // 路由重试计数器（防止无限重定向循环）
+    routeRetryCount: 0
   }),
 
   getters: {
@@ -248,6 +250,7 @@ export const useMenuStore = defineStore('menu', {
       this.loading = false
       this.routesReady = false
       this.dynamicRouteNames = []
+      this.routeRetryCount = 0
     }
   }
 })

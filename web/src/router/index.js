@@ -315,52 +315,61 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
+  // ---- 动态路由加载（必须在 public 检查之前，因为 NotFound 也是 public） ----
+  const menuStore = useMenuStore()
+  const resolved = router.resolve(to)
+  // 只有非公开路由才需要加载动态路由，但 NotFound 除外（它需要有机会匹配动态路由）
+  const isNotFound = resolved.name === 'NotFound'
+  
+  if (isNotFound || !menuStore.routesReady) {
+    // 防止动态路由加载失败时的无限重定向循环
+    if (menuStore.routeRetryCount >= 3) {
+      console.warn('[路由守卫] 已达最大重试次数(3次)，停止重定向，放行到当前路由')
+      menuStore.routesReady = true
+      // 不调用 next()，继续往下走让后续逻辑处理
+    } else {
+      try {
+        if (!menuStore.isLoaded) {
+          await menuStore.fetchUserMenus()
+        }
+        
+        const dynamicRoutes = menuStore.generateRoutes()
+        
+        if (dynamicRoutes.length > 0) {
+          dynamicRoutes.forEach(route => {
+            if (!router.hasRoute(route.name)) {
+              router.addRoute('panel', route)
+              menuStore.dynamicRouteNames.push(route.name)
+            }
+          })
+        }
+        
+        menuStore.routesReady = true
+        menuStore.routeRetryCount++
+        
+        // 重新导航：只传 path，不能展开 to（否则 name: 'NotFound' 会覆盖 path 指向 404）
+        next({ path: to.path, query: to.query, hash: to.hash, replace: true })
+        return
+      } catch (error) {
+        console.error('加载菜单失败:', error)
+        menuStore.routesReady = true
+        // 失败后继续往下走
+      }
+    }
+  }
+  
+  menuStore.routeRetryCount = 0
+
+  // ---- 公开页面直接放行 ----
   if (to.meta.public) {
     next()
     return
   }
 
+  // ---- 需要登录的页面 ----
   if (!isLoggedIn) {
     next({ path: '/panel/login', query: { redirect: to.fullPath } })
     return
-  }
-
-  const menuStore = useMenuStore()
-  
-  const resolved = router.resolve(to)
-  const fullMatchedPath = resolved.matched.length > 0 
-    ? resolved.matched[resolved.matched.length - 1].path 
-    : ''
-  
-  const pathMatches = fullMatchedPath === to.path || fullMatchedPath === to.fullPath
-  
-  if (!pathMatches || !menuStore.routesReady) {
-    try {
-      if (!menuStore.isLoaded) {
-        await menuStore.fetchUserMenus()
-      }
-      
-      const dynamicRoutes = menuStore.generateRoutes()
-      console.log('[路由守卫] 路由未完全匹配或未就绪，注入动态路由:', to.path, '生成:', dynamicRoutes.length, '个路由')
-      
-      dynamicRoutes.forEach(route => {
-        if (!router.hasRoute(route.name)) {
-          router.addRoute('panel', route)
-          menuStore.dynamicRouteNames.push(route.name)
-        }
-      })
-      
-      menuStore.routesReady = true
-      console.log('[路由守卫] 添加路由后路由列表:', router.getRoutes().map(r => r.path))
-      
-      next({ ...to, replace: true })
-      return
-    } catch (error) {
-      console.error('加载菜单失败:', error)
-      menuStore.routesReady = true
-      next()
-      return
-    }
   }
 
   next()
