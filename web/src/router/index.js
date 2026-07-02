@@ -2,21 +2,18 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useMenuStore } from '@/stores/menu'
 
 const routes = [
-  // 主页：笑话面对面介绍页面
   {
     path: '/',
     name: 'LandingPage',
     component: () => import('@/views/LandingPage.vue'),
     meta: { title: '笑话面对面', public: true }
   },
-  // 管理后台登录
   {
-    path: '/panel',
+    path: '/panel/login',
     name: 'Login',
     component: () => import('@/views/auth/Login.vue'),
     meta: { title: '管理后台登录', public: true }
   },
-  // 管理后台主界面
   {
     path: '/panel',
     name: 'panel',
@@ -227,7 +224,7 @@ router.beforeEach(async (to, from, next) => {
   const isLoggedIn = !!token
 
   // 已登录用户访问登录页，直接跳转到后台首页
-  if (to.path === '/panel' && isLoggedIn) {
+  if (to.path === '/panel/login' && isLoggedIn) {
     next({ path: '/panel/dashboard' })
     return
   }
@@ -235,42 +232,64 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.public) {
     next()
   } else if (!isLoggedIn) {
-    next({ path: '/panel', query: { redirect: to.fullPath } })
+    next({ path: '/panel/login', query: { redirect: to.fullPath } })
   } else {
-    // 已登录，加载用户菜单并添加动态路由
     const menuStore = useMenuStore()
+    
     if (!menuStore.isLoaded && !menuStore.loading) {
       try {
         await menuStore.fetchUserMenus()
 
-        // 添加动态路由到 router
         const dynamicRoutes = menuStore.generateRoutes()
         console.log('[路由守卫] 生成的动态路由:', dynamicRoutes)
+        
         dynamicRoutes.forEach(route => {
-          // 直接添加到 panel 路由下
-          router.addRoute('panel', route)
+          if (!router.hasRoute(route.name)) {
+            router.addRoute('panel', route)
+            menuStore.dynamicRouteNames.push(route.name)
+          }
         })
+        
+        menuStore.routesReady = true
         console.log('[路由守卫] 添加路由后路由列表:', router.getRoutes().map(r => r.path))
         
-        // 重新进行路由匹配
         next({ ...to, replace: true })
         return
       } catch (error) {
         console.error('加载菜单失败:', error)
+        menuStore.routesReady = true
+        next()
       }
-    } else if (menuStore.isLoaded) {
+    } else if (!menuStore.routesReady) {
+      const dynamicRoutes = menuStore.generateRoutes()
+      console.log('[路由守卫] 补充动态路由:', dynamicRoutes)
+      
+      dynamicRoutes.forEach(route => {
+        if (!router.hasRoute(route.name)) {
+          router.addRoute('panel', route)
+          menuStore.dynamicRouteNames.push(route.name)
+        }
+      })
+      
+      menuStore.routesReady = true
+      next({ ...to, replace: true })
+    } else {
       const resolved = router.resolve(to)
       if (resolved.matched.length === 0) {
         const dynamicRoutes = menuStore.generateRoutes()
+        console.log('[路由守卫] 尝试重新注入动态路由:', dynamicRoutes)
+        
         dynamicRoutes.forEach(route => {
-          router.addRoute('panel', route)
+          if (!router.hasRoute(route.name)) {
+            router.addRoute('panel', route)
+            menuStore.dynamicRouteNames.push(route.name)
+          }
         })
+        
         next({ ...to, replace: true })
       } else {
         next()
       }
-    } else if (menuStore.loading) {
-      next(false)
     }
   }
 })

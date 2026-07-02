@@ -44,7 +44,7 @@ export function createRequestWithTimeout(timeout) {
           localStorage.removeItem('token')
           localStorage.removeItem('userInfo')
           ElMessage.error('登录已过期，请重新登录')
-          router.push('/panel')
+          router.push('/panel/login')
         } else {
           ElMessage.error(data?.msg || data?.message || error.message || `请求失败 (${status})`)
         }
@@ -114,7 +114,7 @@ request.interceptors.response.use(
         localStorage.removeItem('token')
         localStorage.removeItem('userInfo')
         ElMessage.error('登录已过期，请重新登录')
-        router.push('/panel')
+        router.push('/panel/login')
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
       } else if (status === 400) {

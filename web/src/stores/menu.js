@@ -98,49 +98,29 @@ const viewModules = import.meta.glob('@/views/**/*.vue', { eager: false })
 function loadComponent(component) {
   if (!component) return null
 
-  // 处理 component 路径
-  let path = component
-  if (!path.startsWith('/')) {
-    path = '/' + path
-  }
+  const normalizedComponent = component.replace(/^\//, '')
 
-  // 尝试匹配视图组件的不同格式
-  const possiblePaths = [
-    // 直接路径（带.vue后缀）
-    `${path}.vue`,
-    // 子目录index格式
-    `${path}/index.vue`,
-    // 无前缀路径
-    path,
-    // 子目录index格式（无前缀）
-    `${path}/index`
+  const possiblePatterns = [
+    `${normalizedComponent}.vue`,
+    `${normalizedComponent}/index.vue`,
+    normalizedComponent,
+    `${normalizedComponent}/index`
   ]
 
-  for (const possiblePath of possiblePaths) {
-    const componentPath = `@/views${possiblePath}`
-    if (viewModules[componentPath]) {
-      return viewModules[componentPath]
+  for (const pattern of possiblePatterns) {
+    const searchKey = `@/views/${pattern}`
+    if (viewModules[searchKey]) {
+      return viewModules[searchKey]
     }
 
-    // 尝试其他可能的路径格式
     for (const [key, value] of Object.entries(viewModules)) {
-      if (key.endsWith(possiblePath)) {
+      if (key.endsWith(`/${pattern}`) || key === searchKey) {
         return value
       }
     }
   }
 
-  // 尝试移除 src/ 前缀的路径
-  for (const possiblePath of possiblePaths) {
-    const srcPath = possiblePath.replace(/^\/src\/views/, '')
-    for (const [key, value] of Object.entries(viewModules)) {
-      if (key.endsWith(srcPath)) {
-        return value
-      }
-    }
-  }
-
-  // 如果找不到组件，返回一个默认的组件
+  console.warn(`[菜单Store] 找不到组件: ${component}，返回 NotFound`)
   return () => import('@/views/NotFound.vue')
 }
 
@@ -151,7 +131,11 @@ export const useMenuStore = defineStore('menu', {
     // 是否已加载菜单
     isLoaded: false,
     // 加载中状态
-    loading: false
+    loading: false,
+    // 动态路由是否已注入
+    routesReady: false,
+    // 动态路由名称列表（用于追踪已添加的路由）
+    dynamicRouteNames: []
   }),
 
   getters: {
@@ -260,6 +244,8 @@ export const useMenuStore = defineStore('menu', {
       this.menus = []
       this.isLoaded = false
       this.loading = false
+      this.routesReady = false
+      this.dynamicRouteNames = []
     }
   }
 })
