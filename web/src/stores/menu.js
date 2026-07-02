@@ -192,9 +192,11 @@ export const useMenuStore = defineStore('menu', {
       const routes = []
       console.log('[菜单Store] generateRoutes 开始处理菜单:', this.menus)
 
-      const processMenu = (menu, parentPath = '') => {
-        console.log('[菜单Store] 处理菜单:', menu, '父路径:', parentPath)
-        if (menu.menu_type === 'button') return null
+      const flattenMenu = (menu) => {
+        console.log('[菜单Store] 处理菜单:', menu)
+        if (menu.menu_type === 'button') return []
+
+        const result = []
 
         let routePath = menu.path || ''
         
@@ -205,24 +207,20 @@ export const useMenuStore = defineStore('menu', {
           routePath = routePath.substring(1)
         }
         
-        if (parentPath && routePath.startsWith(parentPath + '/')) {
-          routePath = routePath.substring(parentPath.length + 1)
-        }
-        
         routePath = routePath.replace(/\/+/g, '/')
 
-        const route = {
-          path: routePath,
-          name: menu.name,
-          meta: {
-            title: menu.name,
-            icon: menu.icon,
-            permission: menu.permission,
-            cached: menu.is_cached
-          }
-        }
-
         if (menu.component) {
+          const route = {
+            path: routePath,
+            name: menu.name,
+            meta: {
+              title: menu.name,
+              icon: menu.icon,
+              permission: menu.permission,
+              cached: menu.is_cached
+            }
+          }
+
           const component = loadComponent(menu.component)
           console.log('[菜单Store] 加载组件:', menu.component, '结果:', component)
           if (component) {
@@ -230,29 +228,22 @@ export const useMenuStore = defineStore('menu', {
           } else {
             route.component = () => import('@/views/NotFound.vue')
           }
+
+          result.push(route)
         }
 
         if (menu.children && menu.children.length > 0) {
-          const parentFullPath = menu.path || ''
-          const cleanParentPath = parentFullPath.replace(/^\/panel/, '').replace(/^\//, '')
-          const childRoutes = menu.children
-            .map(child => processMenu(child, cleanParentPath))
-            .filter(Boolean)
-          if (childRoutes.length > 0) {
-            route.children = childRoutes
-          }
+          menu.children.forEach(child => {
+            result.push(...flattenMenu(child))
+          })
         }
 
-        console.log('[菜单Store] 生成的路由:', route)
-        return route
+        return result
       }
 
       this.menus.forEach(menu => {
         if (menu.menu_type !== 'button') {
-          const route = processMenu(menu)
-          if (route) {
-            routes.push(route)
-          }
+          routes.push(...flattenMenu(menu))
         }
       })
 
