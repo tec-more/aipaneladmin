@@ -247,6 +247,10 @@ export const useMenuStore = defineStore('menu', {
         }
       })
 
+      routes.sort((a, b) => {
+        return b.path.split('/').length - a.path.split('/').length
+      })
+
       console.log('[菜单Store] generateRoutes 完成，生成的路由:', routes)
       return routes
     },
