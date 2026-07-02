@@ -1,66 +1,12 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 
-try:
-    from base.plugins.mrp2.services.mrp_service import MRPService
-    from base.plugins.mrp2.schemas.mrp_schema import (
-        MRPCalculationCreate,
-        MRPCalculateRequest
-    )
-    from base.common.response import success_response
-except ImportError:
-    class BaseModel:
-        pass
-
-    class APIRouter:
-        def __init__(self, prefix="", tags=None):
-            self.prefix = prefix
-            self.tags = tags or []
-
-        def get(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def post(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def delete(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-    class HTTPException(Exception):
-        def __init__(self, status_code, detail):
-            pass
-
-    class MRPService:
-        @staticmethod
-        async def get_by_id(id):
-            return None
-        @staticmethod
-        async def create_mrp(data):
-            return None
-        @staticmethod
-        async def delete_mrp(id):
-            return False
-        @staticmethod
-        async def get_list(**kwargs):
-            return [], 0
-        @staticmethod
-        async def get_mrp_details(id):
-            return []
-        @staticmethod
-        async def calculate_mrp(request):
-            return None
-
-    class MRPCalculationCreate(BaseModel): pass
-    class MRPCalculateRequest(BaseModel): pass
-
-    def success_response(data=None, msg="", code=0, status_code=200, success=True):
-        return {"code": code, "msg": msg, "data": data, "success": success}
+from base.plugins.mrp2.services.mrp_service import MRPService
+from base.plugins.mrp2.schemas.mrp_schema import (
+    MRPCalculationCreate,
+    MRPCalculateRequest
+)
+from base.common.response import success_response
 
 mrp_router = APIRouter(prefix="/mrp", tags=["物料需求计划"])
 

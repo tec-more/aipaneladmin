@@ -1,6 +1,6 @@
 {
     "name": "mrp2",
-    "display_name": "MRPII计划管理",
+    "display_name": "MRPII计划",
     "version": "1.0.0",
     "description": "MRPII制造资源计划模块，包含销售预测、主生产计划、物料需求计划、能力需求计划和计划执行监控",
     "author": "hepan",
@@ -18,7 +18,7 @@
     ],
     "menus": [
         {
-            "name": "MRPII计划管理",
+            "name": "MRPII计划",
             "path": "/mrp2",
             "icon": "TrendingUp",
             "component": "mrp2/Index",

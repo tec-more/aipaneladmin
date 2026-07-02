@@ -1,94 +1,12 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 
-try:
-    from base.plugins.mrp2.services.mrp_service import MonitorService, AlertService
-    from base.plugins.mrp2.schemas.mrp_schema import (
-        MonitorCreate,
-        AlertCreate
-    )
-    from base.common.response import success_response
-except ImportError:
-    class BaseModel:
-        pass
-
-    class APIRouter:
-        def __init__(self, prefix="", tags=None):
-            self.prefix = prefix
-            self.tags = tags or []
-
-        def get(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def post(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def put(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def delete(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-    class HTTPException(Exception):
-        def __init__(self, status_code, detail):
-            pass
-
-    class MonitorService:
-        @staticmethod
-        async def get_by_id(id):
-            return None
-        @staticmethod
-        async def create_monitor(data):
-            return None
-        @staticmethod
-        async def update_monitor(id, data):
-            return None
-        @staticmethod
-        async def delete_monitor(id):
-            return False
-        @staticmethod
-        async def get_list(**kwargs):
-            return [], 0
-        @staticmethod
-        async def update_metrics(id):
-            return None
-
-    class AlertService:
-        @staticmethod
-        async def get_by_id(id):
-            return None
-        @staticmethod
-        async def create_alert(data):
-            return None
-        @staticmethod
-        async def update_alert(id, data):
-            return None
-        @staticmethod
-        async def delete_alert(id):
-            return False
-        @staticmethod
-        async def get_list(**kwargs):
-            return [], 0
-        @staticmethod
-        async def resolve_alert(id, resolved_by, resolved_note=""):
-            return None
-        @staticmethod
-        async def get_active_alerts(monitor_id=None):
-            return []
-
-    class MonitorCreate(BaseModel): pass
-    class AlertCreate(BaseModel): pass
-
-    def success_response(data=None, msg="", code=0, status_code=200, success=True):
-        return {"code": code, "msg": msg, "data": data, "success": success}
+from base.plugins.mrp2.services.mrp_service import MonitorService, AlertService
+from base.plugins.mrp2.schemas.mrp_schema import (
+    MonitorCreate,
+    AlertCreate
+)
+from base.common.response import success_response
 
 monitor_router = APIRouter(prefix="/monitor", tags=["计划执行监控"])
 

@@ -1,93 +1,12 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 
-try:
-    from base.plugins.mrp2.services.mrp_service import SalesForecastService
-    from base.plugins.mrp2.schemas.mrp_schema import (
-        SalesForecastCreate, SalesForecastUpdate,
-        SalesForecastDetailCreate
-    )
-    from base.common.response import success_response
-except ImportError:
-    class BaseModel:
-        pass
-
-    class APIRouter:
-        def __init__(self, prefix="", tags=None):
-            self.prefix = prefix
-            self.tags = tags or []
-
-        def get(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def post(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def put(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-        def delete(self, path):
-            def decorator(func):
-                return func
-            return decorator
-
-    class HTTPException(Exception):
-        def __init__(self, status_code, detail):
-            pass
-
-    class SalesForecastService:
-        @staticmethod
-        async def get_by_id(id):
-            return None
-        @staticmethod
-        async def create_forecast(data):
-            return None
-        @staticmethod
-        async def update_forecast(id, data):
-            return None
-        @staticmethod
-        async def delete_forecast(id):
-            return False
-        @staticmethod
-        async def get_list(**kwargs):
-            return [], 0
-        @staticmethod
-        async def get_forecast_details(id):
-            return []
-        @staticmethod
-        async def create_forecast_detail(data):
-            return None
-        @staticmethod
-        async def update_forecast_detail(id, data):
-            return None
-        @staticmethod
-        async def delete_forecast_detail(id):
-            return False
-        @staticmethod
-        async def submit_for_review(id):
-            return None
-        @staticmethod
-        async def approve_forecast(id):
-            return None
-        @staticmethod
-        async def reject_forecast(id):
-            return None
-        @staticmethod
-        async def generate_from_history(product_code, months):
-            return {}
-
-    class SalesForecastCreate(BaseModel): pass
-    class SalesForecastUpdate(BaseModel): pass
-    class SalesForecastDetailCreate(BaseModel): pass
-
-    def success_response(data=None, msg="", code=0, status_code=200, success=True):
-        return {"code": code, "msg": msg, "data": data, "success": success}
+from base.plugins.mrp2.services.mrp_service import SalesForecastService
+from base.plugins.mrp2.schemas.mrp_schema import (
+    SalesForecastCreate, SalesForecastUpdate,
+    SalesForecastDetailCreate
+)
+from base.common.response import success_response
 
 forecast_router = APIRouter(prefix="/forecast", tags=["销售预测"])
 
