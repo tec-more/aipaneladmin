@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="opening-balance-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -162,7 +162,7 @@ const fetchData = async () => {
     if (searchForm.period) params.append('period', searchForm.period)
     if (searchForm.account_type) params.append('account_type', searchForm.account_type)
     
-    const response = await fetch(`/api/finance/opening-balance?${params}`)
+    const response = await fetch(`/api/v1/finance/opening-balance?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -191,3 +191,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

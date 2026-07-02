@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="joke-agent-debug">
     <el-card class="main-card">
       <template #header>
@@ -477,3 +477,5 @@ onMounted(() => {
   line-height: 1.5;
 }
 </style>
+
+

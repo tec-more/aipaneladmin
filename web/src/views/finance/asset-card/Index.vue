@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="asset-card-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -269,7 +269,7 @@ const fetchData = async () => {
     if (searchForm.status) params.append('status', searchForm.status)
     if (searchForm.department_id) params.append('department_id', searchForm.department_id)
     
-    const response = await fetch(`/api/finance/assets?${params}`)
+    const response = await fetch(`/api/v1/finance/assets?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -289,7 +289,7 @@ const fetchData = async () => {
 
 const fetchDepartments = async () => {
   try {
-    const response = await fetch('/api/admin/departments/?page_size=1000')
+    const response = await fetch('/api/v1/admin/departments/?page_size=100')
     const data = await response.json()
     departmentList.value = data.data || []
   } catch (error) {
@@ -325,3 +325,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

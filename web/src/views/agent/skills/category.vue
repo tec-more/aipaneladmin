@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="skill-category-list">
     <el-card>
       <template #header>
@@ -298,3 +298,5 @@ onMounted(() => {
   color: #999;
 }
 </style>
+
+

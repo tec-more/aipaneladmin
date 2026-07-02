@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="data-changes">
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-card">
@@ -235,3 +235,5 @@ fetchData()
   }
 }
 </style>
+
+

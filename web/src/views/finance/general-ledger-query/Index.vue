@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="general-ledger-query-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -99,7 +99,7 @@ const fetchData = async () => {
     if (searchForm.account_id) params.append('account_id', searchForm.account_id)
     if (searchForm.period) params.append('period', searchForm.period)
     
-    const response = await fetch(`/api/finance/general-ledger?${params}`)
+    const response = await fetch(`/api/v1/finance/general-ledger?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -119,7 +119,7 @@ const fetchData = async () => {
 
 const fetchAccounts = async () => {
   try {
-    const response = await fetch('/api/finance/accounts/?page_size=1000')
+    const response = await fetch('/api/v1/finance/accounts/?page_size=100')
     const data = await response.json()
     accountList.value = data.data || []
   } catch (error) {
@@ -138,3 +138,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="payments-container">
     <el-card>
       <template #header>
@@ -214,3 +214,5 @@ onMounted(() => {
   color: #909399;
 }
 </style>
+
+

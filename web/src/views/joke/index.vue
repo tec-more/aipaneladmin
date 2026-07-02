@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="joke-translator">
     <el-card class="main-card">
       <template #header>
@@ -302,3 +302,5 @@ onMounted(() => {
   gap: 5px;
 }
 </style>
+
+

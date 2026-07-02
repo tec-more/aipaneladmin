@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="settlement-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -132,8 +132,8 @@ const fetchData = async () => {
     if (searchForm.supplier_id) params.append('supplier_id', searchForm.supplier_id)
     
     const [payableResponse, paymentResponse] = await Promise.all([
-      fetch(`/api/finance/payables?status=confirmed&${params}`),
-      fetch(`/api/finance/payments?status=confirmed&${params}`)
+      fetch(`/api/v1/finance/payables?status=confirmed&${params}`),
+      fetch(`/api/v1/finance/payments?status=confirmed&${params}`)
     ])
     
     const [payableData, paymentData] = await Promise.all([payableResponse.json(), paymentResponse.json()])
@@ -150,7 +150,7 @@ const fetchData = async () => {
 
 const fetchSuppliers = async () => {
   try {
-    const response = await fetch('/api/purchase/suppliers/?page_size=1000')
+    const response = await fetch('/api/v1/purchase/suppliers/?page_size=100')
     const data = await response.json()
     supplierList.value = data.data || []
   } catch (error) {
@@ -193,3 +193,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

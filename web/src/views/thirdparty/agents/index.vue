@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="thirdparty-agents">
     <el-card>
       <template #header>
@@ -320,3 +320,4 @@ const handleTest = async (id) => {
   text-align: right;
 }
 </style>
+

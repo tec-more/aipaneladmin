@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="agent-list">
     <el-card>
       <template #header>
@@ -347,3 +347,4 @@ onMounted(() => {
   gap: 4px;
 }
 </style>
+

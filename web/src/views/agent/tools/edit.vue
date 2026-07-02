@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="tool-edit">
         <el-card>
             <template #header>
@@ -274,3 +274,5 @@ onMounted(() => {
     padding:5px;
 }
 </style>
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="tax-out-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -253,7 +253,7 @@ const fetchData = async () => {
     if (searchForm.invoice_type) params.append('invoice_type', searchForm.invoice_type)
     if (searchForm.status) params.append('status', searchForm.status)
     
-    const response = await fetch(`/api/finance/tax-invoices?${params}`)
+    const response = await fetch(`/api/v1/finance/tax-invoices?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -273,7 +273,7 @@ const fetchData = async () => {
 
 const fetchCustomers = async () => {
   try {
-    const response = await fetch('/api/sales/customers/?page_size=1000')
+    const response = await fetch('/api/v1/sales/customers/?page_size=100')
     const data = await response.json()
     customerList.value = data.data || []
   } catch (error) {
@@ -309,3 +309,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

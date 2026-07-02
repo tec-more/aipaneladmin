@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="langgraph-edit-page">
     <LangGraphEditor
       v-if="workflowId"
@@ -133,3 +133,5 @@ onMounted(() => {
   color: #303133;
 }
 </style>
+
+

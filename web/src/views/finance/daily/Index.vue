@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="daily-journal-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -167,7 +167,7 @@ const fetchData = async () => {
       params.append('account_id', searchForm.account_id)
     }
     
-    const response = await fetch(`/api/finance/reports/daily?${params}`)
+    const response = await fetch(`/api/v1/finance/reports/daily?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -190,7 +190,7 @@ const fetchData = async () => {
 
 const fetchAccountList = async () => {
   try {
-    const response = await fetch('/api/finance/accounts/?page_size=1000')
+    const response = await fetch('/api/v1/finance/accounts/?page_size=100')
     const data = await response.json()
     accountList.value = data.data || []
   } catch (error) {
@@ -220,3 +220,6 @@ onMounted(() => {
   }
 }
 </style>
+
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="account-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -190,7 +190,7 @@ const handleDelete = async (row) => {
       type: 'warning'
     }
   )
-  const response = await fetch(`/api/finance/accounts/${row.id}`, {
+  const response = await fetch(`/api/v1/finance/accounts/${row.id}`, {
     method: 'DELETE'
   })
   const data = await response.json()
@@ -208,7 +208,7 @@ const handleSave = async () => {
     return
   }
   
-  const url = isEdit.value ? `/api/finance/accounts/${currentId.value}` : '/api/finance/accounts/'
+  const url = isEdit.value ? `/api/v1/finance/accounts/${currentId.value}` : '/api/v1/finance/accounts/'
   const method = isEdit.value ? 'PUT' : 'POST'
   
   const response = await fetch(url, {
@@ -228,7 +228,7 @@ const handleSave = async () => {
 }
 
 const loadAccountTypes = async () => {
-  const response = await fetch('/api/finance/accounts/types')
+  const response = await fetch('/api/v1/finance/accounts/types')
   const data = await response.json()
   if (data.code === 0) {
     accountTypes.value = data.data
@@ -244,7 +244,7 @@ const fetchData = async () => {
     account_type: searchForm.account_type
   })
   
-  const response = await fetch(`/api/finance/accounts/?${params}`)
+  const response = await fetch(`/api/v1/finance/accounts/?${params}`)
   const data = await response.json()
   
   if (data.code === 0) {
@@ -260,7 +260,7 @@ const fetchData = async () => {
 }
 
 const fetchAccountList = async () => {
-  const response = await fetch('/api/finance/accounts/?page_size=1000')
+  const response = await fetch('/api/v1/finance/accounts/?page_size=100')
   const data = await response.json()
   if (data.code === 0) {
     accountList.value = data.data
@@ -298,3 +298,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

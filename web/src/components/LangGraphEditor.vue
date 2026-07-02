@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="langgraph-editor">
     <div class="toolbar">
       <span class="title">{{ title || 'LangGraph 工程图编辑器' }}</span>
@@ -2390,3 +2390,4 @@ watch(() => props.initialEdges, (newEdges) => {
   }
 }
 </style>
+

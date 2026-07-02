@@ -178,6 +178,7 @@ const routes = [
       {
         path: 'finance',
         name: 'Finance',
+        component: () => import('@/views/finance/Index.vue'),
         redirect: 'finance/account',
         meta: { title: '财务管理', icon: 'Wallet' }
       },

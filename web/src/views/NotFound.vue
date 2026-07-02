@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="not-found">
     <div class="content">
       <h1>404</h1>
@@ -36,3 +36,5 @@
   }
 }
 </style>
+
+

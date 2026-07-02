@@ -1,14 +1,14 @@
-<template>
+﻿<template>
   <div class="expense-report-index">
     <el-card shadow="never" class="search-card">
       <template #header>
         <div class="card-header">
           <span>报销单</span>
-          <el-button type="primary" @click="handleAdd" class="search-actions">新增报销</el-button>
         </div>
       </template>
       
-      <el-form :inline="true" :model="searchForm" class="search-form">
+      <div class="search-row">
+        <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="申请人">
           <el-select v-model="searchForm.applicant_id" placeholder="全部" clearable filterable style="width: 150px">
             <el-option v-for="u in userList" :key="u.id" :label="u.name" :value="u.id" />
@@ -29,7 +29,11 @@
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
-      </el-form>
+        </el-form>
+        <div class="search-actions">
+          <el-button @click="handleAdd" type="primary">新增报销</el-button>
+        </div>
+      </div>
     </el-card>
     
     <el-card shadow="never" class="table-card">
@@ -134,7 +138,7 @@ const fetchData = async () => {
     if (searchForm.date_range && searchForm.date_range[0]) params.append('start_date', searchForm.date_range[0])
     if (searchForm.date_range && searchForm.date_range[1]) params.append('end_date', searchForm.date_range[1])
     
-    const response = await fetch(`/api/finance/expense-reports?${params}`)
+    const response = await fetch(`/api/v1/finance/expense-reports?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -154,7 +158,7 @@ const fetchData = async () => {
 
 const fetchUsers = async () => {
   try {
-    const response = await fetch('/api/users/?page_size=1000')
+    const response = await fetch('/api/v1/users/?page_size=100')
     const data = await response.json()
     userList.value = data.data || []
   } catch (error) {
@@ -171,5 +175,24 @@ onMounted(() => {
 <style lang="scss" scoped>
 .expense-report-index {
   padding: 20px;
+  
+  .search-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    
+    .search-form {
+      flex: 1;
+      margin: 0;
+    }
+    
+    .search-actions {
+      flex-shrink: 0;
+    }
+  }
 }
 </style>
+
+

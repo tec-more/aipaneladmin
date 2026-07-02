@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="bank-account-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -193,7 +193,7 @@ const fetchData = async () => {
     if (searchForm.bank_name) params.append('bank_name', searchForm.bank_name)
     if (searchForm.is_active !== '') params.append('is_active', searchForm.is_active)
     
-    const response = await fetch(`/api/finance/bank-accounts?${params}`)
+    const response = await fetch(`/api/v1/finance/bank-accounts?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -238,3 +238,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="quality-index">
     <router-view />
   </div>
@@ -12,3 +12,5 @@
   height: 100%;
 }
 </style>
+
+

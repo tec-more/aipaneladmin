@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="customer-detail">
     <el-card shadow="never" class="detail-card">
       <template #header>
@@ -492,3 +492,4 @@ onMounted(() => {
   }
 }
 </style>
+

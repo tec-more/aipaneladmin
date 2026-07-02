@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="report-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -392,7 +392,7 @@ const generateReport = async () => {
     let response, data
     
     response = await fetch(
-      `/api/finance/reports/${activeTab.value}?year=${filterForm.year}&month=${filterForm.month}`
+      `/api/v1/finance/reports/${activeTab.value}?year=${filterForm.year}&month=${filterForm.month}`
     )
     data = await response.json()
     
@@ -520,3 +520,6 @@ const generateReport = async () => {
   }
 }
 </style>
+
+
+

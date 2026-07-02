@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="journal-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -226,7 +226,7 @@ const handleConfirm = async (row) => {
     cancelButtonText: '取消',
     type: 'warning'
   })
-  const response = await fetch(`/api/finance/journals/${row.id}/confirm`, {
+  const response = await fetch(`/api/v1/finance/journals/${row.id}/confirm`, {
     method: 'POST'
   })
   const data = await response.json()
@@ -244,7 +244,7 @@ const handlePost = async (row) => {
     cancelButtonText: '取消',
     type: 'warning'
   })
-  const response = await fetch(`/api/finance/journals/${row.id}/post`, {
+  const response = await fetch(`/api/v1/finance/journals/${row.id}/post`, {
     method: 'POST'
   })
   const data = await response.json()
@@ -262,7 +262,7 @@ const handleCancel = async (row) => {
     cancelButtonText: '取消',
     type: 'warning'
   })
-  const response = await fetch(`/api/finance/journals/${row.id}/cancel`, {
+  const response = await fetch(`/api/v1/finance/journals/${row.id}/cancel`, {
     method: 'POST'
   })
   const data = await response.json()
@@ -280,7 +280,7 @@ const handleSave = async () => {
     return
   }
   
-  const url = isEdit.value ? `/api/finance/journals/${currentId.value}` : '/api/finance/journals/'
+  const url = isEdit.value ? `/api/v1/finance/journals/${currentId.value}` : '/api/v1/finance/journals/'
   const method = isEdit.value ? 'PUT' : 'POST'
   
   const response = await fetch(url, {
@@ -300,7 +300,7 @@ const handleSave = async () => {
 }
 
 const loadJournalTypes = async () => {
-  const response = await fetch('/api/finance/journals/types')
+  const response = await fetch('/api/v1/finance/journals/types')
   const data = await response.json()
   if (data.code === 0) {
     journalTypes.value = data.data
@@ -308,7 +308,7 @@ const loadJournalTypes = async () => {
 }
 
 const loadJournalStatuses = async () => {
-  const response = await fetch('/api/finance/journals/statuses')
+  const response = await fetch('/api/v1/finance/journals/statuses')
   const data = await response.json()
   if (data.code === 0) {
     journalStatuses.value = data.data
@@ -326,7 +326,7 @@ const fetchData = async () => {
     journal_date_end: searchForm.journal_date_end
   })
   
-  const response = await fetch(`/api/finance/journals/?${params}`)
+  const response = await fetch(`/api/v1/finance/journals/?${params}`)
   const data = await response.json()
   
   if (data.code === 0) {
@@ -342,7 +342,7 @@ const fetchData = async () => {
 }
 
 const fetchAccountList = async () => {
-  const response = await fetch('/api/finance/accounts/?page_size=1000')
+  const response = await fetch('/api/v1/finance/accounts/?page_size=100')
   const data = await response.json()
   if (data.code === 0) {
     accountList.value = data.data
@@ -388,3 +388,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

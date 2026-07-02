@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="cost-transfer-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -71,7 +71,7 @@ const fetchData = async () => {
     const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
     if (searchForm.period) params.append('period', searchForm.period)
     
-    const response = await fetch(`/api/finance/cost-transfer?${params}`)
+    const response = await fetch(`/api/v1/finance/cost-transfer?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -99,3 +99,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

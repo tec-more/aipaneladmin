@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="skill-list">
     <el-card>
       <template #header>
@@ -661,3 +661,5 @@ onMounted(() => {
   justify-content: flex-end;
 }
 </style>
+
+

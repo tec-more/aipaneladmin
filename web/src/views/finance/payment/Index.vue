@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="payment-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -242,7 +242,7 @@ const fetchData = async () => {
     if (searchForm.payment_date_start) params.append('payment_date_start', searchForm.payment_date_start)
     if (searchForm.payment_date_end) params.append('payment_date_end', searchForm.payment_date_end)
     
-    const response = await fetch(`/api/finance/payments?${params}`)
+    const response = await fetch(`/api/v1/finance/payments?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -262,7 +262,7 @@ const fetchData = async () => {
 
 const fetchSuppliers = async () => {
   try {
-    const response = await fetch('/api/purchase/suppliers/?page_size=1000')
+    const response = await fetch('/api/v1/purchase/suppliers/?page_size=100')
     const data = await response.json()
     supplierList.value = data.data || []
   } catch (error) {
@@ -272,7 +272,7 @@ const fetchSuppliers = async () => {
 
 const fetchBankAccounts = async () => {
   try {
-    const response = await fetch('/api/finance/bank-accounts/?page_size=1000')
+    const response = await fetch('/api/v1/finance/bank-accounts/?page_size=100')
     const data = await response.json()
     bankAccountList.value = data.data || []
   } catch (error) {
@@ -309,3 +309,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

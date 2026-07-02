@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="tax-declaration-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -140,7 +140,7 @@ const fetchData = async () => {
     if (searchForm.tax_type) params.append('tax_type', searchForm.tax_type)
     if (searchForm.status) params.append('status', searchForm.status)
     
-    const response = await fetch(`/api/finance/tax-declarations?${params}`)
+    const response = await fetch(`/api/v1/finance/tax-declarations?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -168,3 +168,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="cash-flow-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -109,7 +109,7 @@ const fetchData = async () => {
     if (searchForm.date_range && searchForm.date_range[0]) params.append('start_date', searchForm.date_range[0])
     if (searchForm.date_range && searchForm.date_range[1]) params.append('end_date', searchForm.date_range[1])
     
-    const response = await fetch(`/api/finance/cash-flow?${params}`)
+    const response = await fetch(`/api/v1/finance/cash-flow?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -129,7 +129,7 @@ const fetchData = async () => {
 
 const fetchAccounts = async () => {
   try {
-    const response = await fetch('/api/finance/bank-accounts/?page_size=1000')
+    const response = await fetch('/api/v1/finance/bank-accounts/?page_size=100')
     const data = await response.json()
     accountList.value = data.data || []
   } catch (error) {
@@ -148,3 +148,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

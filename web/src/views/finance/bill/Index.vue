@@ -1,14 +1,14 @@
-<template>
+﻿<template>
   <div class="bill-index">
     <el-card shadow="never" class="search-card">
       <template #header>
         <div class="card-header">
           <span>票据管理</span>
-          <el-button type="primary" @click="handleAdd" class="search-actions">新增票据</el-button>
         </div>
       </template>
       
-      <el-form :inline="true" :model="searchForm" class="search-form">
+      <div class="search-row">
+        <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="票据类型">
           <el-select v-model="searchForm.bill_type" placeholder="全部类型" clearable style="width: 120px">
             <el-option label="汇票" value="draft" />
@@ -32,7 +32,11 @@
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
-      </el-form>
+        </el-form>
+        <div class="search-actions">
+          <el-button @click="handleAdd" type="primary">新增票据</el-button>
+        </div>
+      </div>
     </el-card>
     
     <el-card shadow="never" class="table-card">
@@ -150,7 +154,7 @@ const fetchData = async () => {
     if (searchForm.status) params.append('status', searchForm.status)
     if (searchForm.maturity_date) params.append('maturity_date', searchForm.maturity_date)
     
-    const response = await fetch(`/api/finance/bills?${params}`)
+    const response = await fetch(`/api/v1/finance/bills?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -176,5 +180,24 @@ onMounted(() => {
 <style lang="scss" scoped>
 .bill-index {
   padding: 20px;
+  
+  .search-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    
+    .search-form {
+      flex: 1;
+      margin: 0;
+    }
+    
+    .search-actions {
+      flex-shrink: 0;
+    }
+  }
 }
 </style>
+
+

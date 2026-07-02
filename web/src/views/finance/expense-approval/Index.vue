@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="expense-approval-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -120,7 +120,7 @@ const fetchData = async () => {
     if (searchForm.applicant_name) params.append('applicant_name', searchForm.applicant_name)
     if (searchForm.expense_type) params.append('expense_type', searchForm.expense_type)
     
-    const response = await fetch(`/api/finance/expense-applies?${params}`)
+    const response = await fetch(`/api/v1/finance/expense-applies?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -148,3 +148,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

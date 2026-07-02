@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="thirdparty-platforms">
     <el-card>
       <template #header>
@@ -274,3 +274,4 @@ const handleTest = async (id) => {
   text-align: right;
 }
 </style>
+

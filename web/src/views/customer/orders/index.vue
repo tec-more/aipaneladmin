@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="customer-orders-container">
     <el-card>
       <template #header>
@@ -246,3 +246,5 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 </style>
+
+

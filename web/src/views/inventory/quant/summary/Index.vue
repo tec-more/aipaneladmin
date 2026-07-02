@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="quant-summary">
     <el-row :gutter="20">
       <el-col :span="8">
@@ -137,3 +137,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

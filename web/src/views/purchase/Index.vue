@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="purchase-index">
     <router-view />
   </div>
@@ -12,3 +12,4 @@
   height: 100%;
 }
 </style>
+

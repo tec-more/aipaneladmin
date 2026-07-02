@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="dialog-flow-editor">
     <div class="toolbar">
       <span class="flow-name">{{ dialogFlow?.name || '对话流编辑' }}</span>
@@ -2325,3 +2325,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="order-detail" v-loading="loading">
     <el-card shadow="never" class="detail-card">
       <template #header>
@@ -197,3 +197,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

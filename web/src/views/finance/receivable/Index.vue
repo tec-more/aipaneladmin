@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="receivable-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -233,7 +233,7 @@ const fetchData = async () => {
     if (searchForm.due_date_start) params.append('due_date_start', searchForm.due_date_start)
     if (searchForm.due_date_end) params.append('due_date_end', searchForm.due_date_end)
     
-    const response = await fetch(`/api/finance/receivables?${params}`)
+    const response = await fetch(`/api/v1/finance/receivables?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -253,7 +253,7 @@ const fetchData = async () => {
 
 const fetchCustomers = async () => {
   try {
-    const response = await fetch('/api/sales/customers/?page_size=1000')
+    const response = await fetch('/api/v1/sales/customers/?page_size=100')
     const data = await response.json()
     customerList.value = data.data || []
   } catch (error) {
@@ -289,3 +289,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="skill-edit">
     <el-card>
       <template #header>
@@ -287,3 +287,5 @@ onMounted(() => {
   padding: 40px;
 }
 </style>
+
+

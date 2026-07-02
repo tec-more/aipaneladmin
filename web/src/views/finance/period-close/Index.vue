@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="period-close-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -88,7 +88,7 @@ const fetchData = async () => {
     const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
     if (searchForm.period) params.append('period', searchForm.period)
     
-    const response = await fetch(`/api/finance/period-close?${params}`)
+    const response = await fetch(`/api/v1/finance/period-close?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -116,3 +116,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

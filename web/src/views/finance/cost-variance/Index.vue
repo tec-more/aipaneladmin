@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="cost-variance-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -100,7 +100,7 @@ const fetchData = async () => {
     if (searchForm.product_id) params.append('product_id', searchForm.product_id)
     if (searchForm.period) params.append('period', searchForm.period)
     
-    const response = await fetch(`/api/finance/cost-variance?${params}`)
+    const response = await fetch(`/api/v1/finance/cost-variance?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -120,7 +120,7 @@ const fetchData = async () => {
 
 const fetchProducts = async () => {
   try {
-    const response = await fetch('/api/product/products/?page_size=1000')
+    const response = await fetch('/api/v1/product/products/?page_size=100')
     const data = await response.json()
     productList.value = data.data || []
   } catch (error) {
@@ -139,3 +139,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

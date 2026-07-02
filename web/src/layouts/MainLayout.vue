@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-container class="main-layout">
     <!-- 侧边栏 -->
     <el-aside :width="isCollapse ? '64px' : '220px'" class="aside">
@@ -470,3 +470,5 @@ onMounted(async () => {
   opacity: 0;
 }
 </style>
+
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="mes-base">
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
       <el-tab-pane label="物料管理" name="material">
@@ -1152,3 +1152,5 @@ onMounted(() => {
   .pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 }
 </style>
+
+

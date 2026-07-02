@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="dashboard">
     <!-- 统计卡片 -->
     <el-row :gutter="20">
@@ -500,3 +500,5 @@ onUnmounted(() => {
   }
 }
 </style>
+
+

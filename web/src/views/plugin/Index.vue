@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="plugin-management">
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-card">
@@ -449,3 +449,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

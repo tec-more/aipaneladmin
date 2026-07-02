@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="tool-list">
         <el-card>
             <template #header>
@@ -259,3 +259,5 @@ onMounted(() => {
     align-items: center;
 }
 </style>
+
+

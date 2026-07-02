@@ -1,14 +1,14 @@
-<template>
+﻿<template>
   <div class="cash-plan-index">
     <el-card shadow="never" class="search-card">
       <template #header>
         <div class="card-header">
           <span>资金计划</span>
-          <el-button type="primary" @click="handleAdd" class="search-actions">新增计划</el-button>
         </div>
       </template>
       
-      <el-form :inline="true" :model="searchForm" class="search-form">
+      <div class="search-row">
+        <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="期间">
           <el-date-picker v-model="searchForm.period" type="month" placeholder="选择月份" style="width: 160px" />
         </el-form-item>
@@ -16,7 +16,11 @@
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
-      </el-form>
+        </el-form>
+        <div class="search-actions">
+          <el-button @click="handleAdd" type="primary">新增计划</el-button>
+        </div>
+      </div>
     </el-card>
     
     <el-card shadow="never" class="table-card">
@@ -112,7 +116,7 @@ const fetchData = async () => {
     const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size })
     if (searchForm.period) params.append('period', searchForm.period)
     
-    const response = await fetch(`/api/finance/cash-plan?${params}`)
+    const response = await fetch(`/api/v1/finance/cash-plan?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -138,5 +142,24 @@ onMounted(() => {
 <style lang="scss" scoped>
 .cash-plan-index {
   padding: 20px;
+  
+  .search-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    
+    .search-form {
+      flex: 1;
+      margin: 0;
+    }
+    
+    .search-actions {
+      flex-shrink: 0;
+    }
+  }
 }
 </style>
+
+

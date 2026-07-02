@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="inventory-management">
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -134,3 +134,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

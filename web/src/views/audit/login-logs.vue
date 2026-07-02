@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="login-logs">
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-card">
@@ -266,3 +266,5 @@ fetchData()
   }
 }
 </style>
+
+

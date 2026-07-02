@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="equipment-maintenance">
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -206,3 +206,4 @@ onMounted(() => { fetchData() })
   .pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 }
 </style>
+

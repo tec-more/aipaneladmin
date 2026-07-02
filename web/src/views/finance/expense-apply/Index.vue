@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="expense-apply-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -208,7 +208,7 @@ const fetchData = async () => {
     if (searchForm.expense_type) params.append('expense_type', searchForm.expense_type)
     if (searchForm.status) params.append('status', searchForm.status)
     
-    const response = await fetch(`/api/finance/expense-applies?${params}`)
+    const response = await fetch(`/api/v1/finance/expense-applies?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -253,3 +253,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

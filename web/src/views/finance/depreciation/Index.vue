@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="depreciation-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -75,7 +75,7 @@ const handleCalculate = async () => {
   
   loading.value = true
   try {
-    const response = await fetch(`/api/finance/depreciation/calculate?period=${filterForm.period}`, {
+    const response = await fetch(`/api/v1/finance/depreciation/calculate?period=${filterForm.period}`, {
       method: 'POST'
     })
     const data = await response.json()
@@ -101,7 +101,7 @@ const handleSearch = async () => {
     const params = new URLSearchParams()
     if (filterForm.period) params.append('period', filterForm.period)
     
-    const response = await fetch(`/api/finance/depreciation?${params}`)
+    const response = await fetch(`/api/v1/finance/depreciation?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -150,3 +150,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

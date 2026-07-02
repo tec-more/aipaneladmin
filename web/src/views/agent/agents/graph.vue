@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="agent-graph-editor">
     <LangGraphEditor 
       :title="`${agentName} - 结构图`"
@@ -105,3 +105,5 @@ onMounted(() => {
   height: 100%;
 }
 </style>
+
+

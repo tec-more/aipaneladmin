@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="expense-analysis-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -97,7 +97,7 @@ const fetchData = async () => {
     if (searchForm.department_id) params.append('department_id', searchForm.department_id)
     if (searchForm.period) params.append('period', searchForm.period)
     
-    const response = await fetch(`/api/finance/expense-analysis?${params}`)
+    const response = await fetch(`/api/v1/finance/expense-analysis?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -117,7 +117,7 @@ const fetchData = async () => {
 
 const fetchDepartments = async () => {
   try {
-    const response = await fetch('/api/departments/?page_size=1000')
+    const response = await fetch('/api/v1/departments/?page_size=100')
     const data = await response.json()
     departmentList.value = data.data || []
   } catch (error) {
@@ -136,3 +136,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

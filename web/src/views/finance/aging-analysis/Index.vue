@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="aging-analysis-index">
     <el-card shadow="never" class="search-card">
       <template #header>
@@ -100,7 +100,7 @@ const fetchData = async () => {
     const params = new URLSearchParams({ page: pagination.page, page_size: pagination.page_size, type: searchForm.type })
     if (searchForm.party_id) params.append('party_id', searchForm.party_id)
     
-    const response = await fetch(`/api/finance/aging-analysis?${params}`)
+    const response = await fetch(`/api/v1/finance/aging-analysis?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -121,8 +121,8 @@ const fetchData = async () => {
 const fetchParties = async () => {
   try {
     const response = await fetch(searchForm.type === 'receivable' 
-      ? '/api/sales/customers/?page_size=1000' 
-      : '/api/purchase/suppliers/?page_size=1000')
+      ? '/api/v1/sales/customers/?page_size=100' 
+      : '/api/v1/purchase/suppliers/?page_size=100')
     const data = await response.json()
     partyList.value = data.data || []
   } catch (error) {
@@ -141,3 +141,5 @@ onMounted(() => {
   padding: 20px;
 }
 </style>
+
+

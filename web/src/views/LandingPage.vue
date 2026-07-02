@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="landing-page">
     <!-- 导航栏 -->
     <header class="header">
@@ -429,3 +429,5 @@ section {
   }
 }
 </style>
+
+
