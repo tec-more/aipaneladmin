@@ -166,7 +166,7 @@ const fetchData = async () => {
 
 const fetchParties = async () => {
   try {
-    const url = props.isReceivable ? '/api/v1/sales/customers' : '/api/v1/purchase/suppliers'
+    const url = props.isReceivable ? '/api/v1/customer/list' : '/api/v1/purchase/supplier/'
     const response = await fetch(`${url}/?page_size=100`)
     const data = await response.json()
     partyList.value = data.data || []

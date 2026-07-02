@@ -120,7 +120,7 @@ const fetchData = async () => {
 
 const fetchProducts = async () => {
   try {
-    const response = await fetch('/api/v1/product/products/?page_size=100')
+    const response = await fetch('/api/v1/product/list?page_size=100')
     const data = await response.json()
     productList.value = data.data || []
   } catch (error) {

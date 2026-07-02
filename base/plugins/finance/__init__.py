@@ -3,9 +3,9 @@ from base.common.log import log
 
 try:
     from base.plugins.finance.api.v1 import finance_api_router
-    finance_router = finance_api_router
+    router = finance_api_router
 except ImportError:
-    finance_router = None
+    router = None
     log.warning("finance_api_router模块未找到")
 
 

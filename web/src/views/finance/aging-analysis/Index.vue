@@ -121,8 +121,8 @@ const fetchData = async () => {
 const fetchParties = async () => {
   try {
     const response = await fetch(searchForm.type === 'receivable' 
-      ? '/api/v1/sales/customers/?page_size=100' 
-      : '/api/v1/purchase/suppliers/?page_size=100')
+      ? '/api/v1/customer/list?page_size=100' 
+      : '/api/v1/purchase/supplier/?page_size=100')
     const data = await response.json()
     partyList.value = data.data || []
   } catch (error) {

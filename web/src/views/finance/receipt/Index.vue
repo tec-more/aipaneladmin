@@ -242,7 +242,7 @@ const fetchData = async () => {
     if (searchForm.receipt_date_start) params.append('receipt_date_start', searchForm.receipt_date_start)
     if (searchForm.receipt_date_end) params.append('receipt_date_end', searchForm.receipt_date_end)
     
-    const response = await fetch(`/api/v1/finance/receipts?${params}`)
+    const response = await fetch(`/api/v1/finance/receipts/?${params}`)
     const data = await response.json()
     
     if (response.ok) {
@@ -262,7 +262,7 @@ const fetchData = async () => {
 
 const fetchCustomers = async () => {
   try {
-    const response = await fetch('/api/v1/sales/customers/?page_size=100')
+    const response = await fetch('/api/v1/customer/list?page_size=100')
     const data = await response.json()
     customerList.value = data.data || []
   } catch (error) {

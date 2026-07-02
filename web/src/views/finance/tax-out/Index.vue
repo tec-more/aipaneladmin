@@ -273,7 +273,7 @@ const fetchData = async () => {
 
 const fetchCustomers = async () => {
   try {
-    const response = await fetch('/api/v1/sales/customers/?page_size=100')
+    const response = await fetch('/api/v1/customer/list?page_size=100')
     const data = await response.json()
     customerList.value = data.data || []
   } catch (error) {
