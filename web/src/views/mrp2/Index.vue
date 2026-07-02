@@ -1,5 +1,6 @@
 <template>
   <div class="mrp2-index">
+    <router-view />
     <el-card shadow="never" class="welcome-card">
       <div class="welcome-content">
         <div class="welcome-header">
@@ -135,6 +136,9 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import request from '@/utils/request'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const planStats = reactive({
   total: 0,
@@ -146,7 +150,7 @@ const planStats = reactive({
 const alerts = ref([])
 
 const navigateTo = (path) => {
-  window.location.href = `/panel${path}`
+  router.push(`/panel${path}`)
 }
 
 const fetchStats = async () => {

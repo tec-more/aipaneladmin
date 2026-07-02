@@ -194,36 +194,25 @@ export const useMenuStore = defineStore('menu', {
 
       const processMenu = (menu, parentPath = '') => {
         console.log('[菜单Store] 处理菜单:', menu, '父路径:', parentPath)
-        // 跳过按钮类型
         if (menu.menu_type === 'button') return null
 
-        // 处理路径
-        let fullPath = ''
-        if (menu.path) {
-          if (menu.path.startsWith('/')) {
-            fullPath = menu.path
-          } else {
-            fullPath = `${parentPath}/${menu.path}`
-          }
-        } else {
-          fullPath = parentPath
+        let routePath = menu.path || ''
+        
+        if (routePath.startsWith('/panel')) {
+          routePath = routePath.replace(/^\/panel/, '')
+        }
+        if (routePath.startsWith('/')) {
+          routePath = routePath.substring(1)
         }
         
-        // 移除 /panel 前缀，因为这些路由会被添加到 panel 路由下
-        if (fullPath.startsWith('/panel')) {
-          fullPath = fullPath.replace(/^\/panel/, '')
+        if (parentPath && routePath.startsWith(parentPath + '/')) {
+          routePath = routePath.substring(parentPath.length + 1)
         }
         
-        // 移除开头的 / （因为 addRoute('panel', ...) 会将此作为子路由）
-        if (fullPath.startsWith('/')) {
-          fullPath = fullPath.substring(1)
-        }
+        routePath = routePath.replace(/\/+/g, '/')
 
-        // 移除重复的斜杠
-        fullPath = fullPath.replace(/\/+/g, '/')
-        
         const route = {
-          path: fullPath,
+          path: routePath,
           name: menu.name,
           meta: {
             title: menu.name,
@@ -233,15 +222,24 @@ export const useMenuStore = defineStore('menu', {
           }
         }
 
-        // 如果有组件路径，加载组件
         if (menu.component) {
           const component = loadComponent(menu.component)
           console.log('[菜单Store] 加载组件:', menu.component, '结果:', component)
           if (component) {
             route.component = component
           } else {
-            // 如果组件加载失败，使用404页面
             route.component = () => import('@/views/NotFound.vue')
+          }
+        }
+
+        if (menu.children && menu.children.length > 0) {
+          const parentFullPath = menu.path || ''
+          const cleanParentPath = parentFullPath.replace(/^\/panel/, '').replace(/^\//, '')
+          const childRoutes = menu.children
+            .map(child => processMenu(child, cleanParentPath))
+            .filter(Boolean)
+          if (childRoutes.length > 0) {
+            route.children = childRoutes
           }
         }
 
@@ -249,20 +247,14 @@ export const useMenuStore = defineStore('menu', {
         return route
       }
 
-      const flattenMenus = (menus) => {
-        let result = []
-        menus.forEach(menu => {
-          if (menu.menu_type !== 'button') {
-            result.push(processMenu(menu))
-            if (menu.children && menu.children.length > 0) {
-              result = result.concat(flattenMenus(menu.children))
-            }
+      this.menus.forEach(menu => {
+        if (menu.menu_type !== 'button') {
+          const route = processMenu(menu)
+          if (route) {
+            routes.push(route)
           }
-        })
-        return result.filter(Boolean)
-      }
-
-      routes.push(...flattenMenus(this.menus))
+        }
+      })
 
       console.log('[菜单Store] generateRoutes 完成，生成的路由:', routes)
       return routes

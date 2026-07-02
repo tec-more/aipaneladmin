@@ -259,7 +259,16 @@ router.beforeEach(async (to, from, next) => {
         console.error('加载菜单失败:', error)
       }
     } else if (menuStore.isLoaded) {
-      next()
+      const resolved = router.resolve(to)
+      if (resolved.matched.length === 0) {
+        const dynamicRoutes = menuStore.generateRoutes()
+        dynamicRoutes.forEach(route => {
+          router.addRoute('panel', route)
+        })
+        next({ ...to, replace: true })
+      } else {
+        next()
+      }
     } else if (menuStore.loading) {
       next(false)
     }
