@@ -66,7 +66,29 @@ const iconMap = {
   'Bot': 'Bot',
   'Management': 'Management',
   'DataAnalysis': 'DataAnalysis',
-  'UserFilled': 'UserFilled'
+  'UserFilled': 'UserFilled',
+  'BookMark': 'BookMark',
+  'CreditCard': 'CreditCard',
+  'TrendingDown': 'TrendingDown',
+  'Banknote': 'Banknote',
+  'CheckCircle': 'CheckCircle',
+  'Building2': 'Building2',
+  'Calculator': 'Calculator',
+  'RefreshCw': 'RefreshCw',
+  'Trash2': 'Trash2',
+  'Package': 'Package',
+  'FileSpreadsheet': 'FileSpreadsheet',
+  'ArrowRightLeft': 'ArrowRightLeft',
+  'Bank': 'Bank',
+  'Landmark': 'Landmark',
+  'CalendarCheck': 'CalendarCheck',
+  'Table': 'Table',
+  'Layout': 'Layout',
+  'Receipt': 'Receipt',
+  'FileEdit': 'FileEdit',
+  'CheckSquare': 'CheckSquare',
+  'Send': 'Send',
+  'Inbox': 'Inbox'
 }
 
 // 视图组件映射 - 根据后端返回的 component 路径映射到实际组件
