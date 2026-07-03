@@ -71,6 +71,8 @@ class Equipment(BaseModel, TimestampMixin):
     status = fields.CharField(max_length=20, default="idle", description="状态：idle/running/maintenance/fault/down", index=True)
     purchase_date = fields.DatetimeField(null=True, description="购入日期")
     warranty_date = fields.DatetimeField(null=True, description="保修到期日期")
+    daily_capacity = fields.DecimalField(max_digits=15, decimal_places=2, default=0, description="日产能")
+    next_maintenance_date = fields.DateField(null=True, description="下次保养日期")
     description = fields.TextField(null=True, description="描述")
     is_active = fields.BooleanField(default=True, description="是否启用", index=True)
 
@@ -90,6 +92,8 @@ class Equipment(BaseModel, TimestampMixin):
             "status": self.status,
             "purchase_date": self.purchase_date.strftime("%Y-%m-%d %H:%M:%S") if self.purchase_date else None,
             "warranty_date": self.warranty_date.strftime("%Y-%m-%d %H:%M:%S") if self.warranty_date else None,
+            "daily_capacity": float(self.daily_capacity) if self.daily_capacity and hasattr(self.daily_capacity, "__float__") else self.daily_capacity,
+            "next_maintenance_date": self.next_maintenance_date.strftime("%Y-%m-%d") if self.next_maintenance_date else None,
             "description": self.description,
             "is_active": self.is_active,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,

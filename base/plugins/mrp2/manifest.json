@@ -14,7 +14,9 @@
         "mrp_models"
     ],
     "schemas": [
-        "mrp_schema"
+        "mrp_schema",
+        "mps_plan_line_schema",
+        "planned_order_schema"
     ],
     "menus": [
         {

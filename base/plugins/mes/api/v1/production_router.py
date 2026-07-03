@@ -10,6 +10,7 @@ try:
     from base.plugins.mes.schemas.mes_schema import (
         ManufacturingOrderCreate, ManufacturingOrderUpdate, ManufacturingOrderResponse, ManufacturingOrderListQuery,
         WorkOrderCreate, WorkOrderUpdate, WorkOrderResponse, WorkOrderListQuery,
+        StartWORequest, SuspendWORequest, ResumeWORequest,
         ListResponse
     )
     from base.common.response import success_response
@@ -256,12 +257,32 @@ async def release_wo(wo_id: int):
         raise HTTPException(status_code=400, detail=str(e))
 
 @production_router.post("/work-orders/{wo_id}/start", summary="开工工单")
-async def start_wo(wo_id: int, operator: Optional[str] = None):
+async def start_wo(wo_id: int, data: StartWORequest):
     try:
-        wo = await WorkOrderService.start_wo(wo_id, operator)
+        wo = await WorkOrderService.start_wo(wo_id, data)
         if not wo:
             raise HTTPException(status_code=404, detail="工单不存在")
-        return success_response(data=wo)
+        return success_response(data=wo, msg="工单已开工")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@production_router.post("/work-orders/{wo_id}/suspend", summary="暂停工单")
+async def suspend_wo(wo_id: int, data: SuspendWORequest):
+    try:
+        wo = await WorkOrderService.suspend_wo(wo_id, data)
+        if not wo:
+            raise HTTPException(status_code=404, detail="工单不存在")
+        return success_response(data=wo, msg="工单已暂停")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@production_router.post("/work-orders/{wo_id}/resume", summary="恢复工单")
+async def resume_wo(wo_id: int, data: ResumeWORequest = None):
+    try:
+        wo = await WorkOrderService.resume_wo(wo_id, data)
+        if not wo:
+            raise HTTPException(status_code=404, detail="工单不存在")
+        return success_response(data=wo, msg="工单已恢复")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

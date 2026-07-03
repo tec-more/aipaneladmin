@@ -74,6 +74,12 @@ class ManufacturingOrder(BaseModel, TimestampMixin):
     planned_end_date = fields.DatetimeField(null=True, description="计划结束日期")
     actual_start_date = fields.DatetimeField(null=True, description="实际开始日期")
     actual_end_date = fields.DatetimeField(null=True, description="实际结束日期")
+    source_mps_id = fields.IntField(null=True, description="来源MPS ID")
+    source_mps_code = fields.CharField(max_length=100, null=True, description="来源MPS编号")
+    source_mps_line_id = fields.IntField(null=True, description="来源MPS计划行ID")
+    source_planned_order_code = fields.CharField(max_length=100, null=True, description="来源计划订单编号")
+    warehouse_code = fields.CharField(max_length=100, null=True, description="入库仓库编码")
+    barcode = fields.CharField(max_length=100, unique=True, null=True, description="条码")
     remark = fields.TextField(null=True, description="备注")
 
     class Meta:
@@ -95,6 +101,12 @@ class ManufacturingOrder(BaseModel, TimestampMixin):
             "planned_end_date": self.planned_end_date.strftime("%Y-%m-%d %H:%M:%S") if self.planned_end_date else None,
             "actual_start_date": self.actual_start_date.strftime("%Y-%m-%d %H:%M:%S") if self.actual_start_date else None,
             "actual_end_date": self.actual_end_date.strftime("%Y-%m-%d %H:%M:%S") if self.actual_end_date else None,
+            "source_mps_id": self.source_mps_id,
+            "source_mps_code": self.source_mps_code,
+            "source_mps_line_id": self.source_mps_line_id,
+            "source_planned_order_code": self.source_planned_order_code,
+            "warehouse_code": self.warehouse_code,
+            "barcode": self.barcode,
             "remark": self.remark,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
@@ -115,8 +127,15 @@ class WorkOrder(BaseModel, TimestampMixin):
     quantity = fields.IntField(description="计划数量")
     actual_quantity = fields.IntField(default=0, description="实际完成数量")
     scrap_quantity = fields.IntField(default=0, description="报废数量")
-    status = fields.CharField(max_length=20, default="pending", description="状态：pending/released/processing/completed/closed", index=True)
+    status = fields.CharField(max_length=20, default="pending", description="状态：pending/released/processing/suspended/completed/closed", index=True)
     operator = fields.CharField(max_length=100, null=True, description="操作员")
+    equipment_code = fields.CharField(max_length=100, null=True, description="设备编码")
+    shift_code = fields.CharField(max_length=100, null=True, description="班次编码")
+    batch_no = fields.CharField(max_length=100, null=True, description="批次号")
+    barcode = fields.CharField(max_length=100, unique=True, null=True, description="条码")
+    suspend_reason = fields.CharField(max_length=50, null=True, description="暂停原因：equipment/quality/exception")
+    suspend_source = fields.CharField(max_length=100, null=True, description="暂停来源编码")
+    suspended_at = fields.DatetimeField(null=True, description="暂停时间")
     planned_start_date = fields.DatetimeField(null=True, description="计划开始日期")
     planned_end_date = fields.DatetimeField(null=True, description="计划结束日期")
     actual_start_date = fields.DatetimeField(null=True, description="实际开始日期")
@@ -143,6 +162,13 @@ class WorkOrder(BaseModel, TimestampMixin):
             "scrap_quantity": self.scrap_quantity,
             "status": self.status,
             "operator": self.operator,
+            "equipment_code": self.equipment_code,
+            "shift_code": self.shift_code,
+            "batch_no": self.batch_no,
+            "barcode": self.barcode,
+            "suspend_reason": self.suspend_reason,
+            "suspend_source": self.suspend_source,
+            "suspended_at": self.suspended_at.strftime("%Y-%m-%d %H:%M:%S") if self.suspended_at else None,
             "planned_start_date": self.planned_start_date.strftime("%Y-%m-%d %H:%M:%S") if self.planned_start_date else None,
             "planned_end_date": self.planned_end_date.strftime("%Y-%m-%d %H:%M:%S") if self.planned_end_date else None,
             "actual_start_date": self.actual_start_date.strftime("%Y-%m-%d %H:%M:%S") if self.actual_start_date else None,

@@ -12,10 +12,27 @@
     ],
     "models": [
         "base_data",
-        "production"
+        "production",
+        "production_report",
+        "material_flow",
+        "trace",
+        "barcode",
+        "shift",
+        "exception",
+        "tooling",
+        "energy",
+        "operation_log"
     ],
     "schemas": [
-        "mes_schema"
+        "mes_schema",
+        "production_report_schema",
+        "material_flow_schema",
+        "trace_schema",
+        "barcode_schema",
+        "shift_schema",
+        "exception_schema",
+        "tooling_schema",
+        "energy_schema"
     ],
     "menus": [
         {

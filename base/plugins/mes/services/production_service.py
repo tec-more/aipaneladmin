@@ -1,5 +1,6 @@
 from typing import Optional, List, Tuple, Dict, Any
 from decimal import Decimal
+from datetime import datetime
 from tortoise.expressions import Q
 
 try:
@@ -7,7 +8,22 @@ try:
     from base.plugins.mes.schemas.mes_schema import (
         ManufacturingOrderCreate, ManufacturingOrderUpdate,
         WorkOrderCreate, WorkOrderUpdate,
+        StartWORequest, SuspendWORequest, ResumeWORequest,
     )
+    try:
+        from base.plugins.mes.models.base_data import Bom, Route, RouteProcess
+        BASE_DATA_AVAILABLE = True
+    except ImportError:
+        Bom = None
+        Route = None
+        RouteProcess = None
+        BASE_DATA_AVAILABLE = False
+    try:
+        from base.plugins.equipment.models.equipment import Equipment
+        EQUIPMENT_AVAILABLE = True
+    except ImportError:
+        Equipment = None
+        EQUIPMENT_AVAILABLE = False
 except ImportError:
     from typing import Any
     from datetime import datetime
@@ -108,8 +124,21 @@ class ManufacturingOrderService:
             return None
         if mo.status != "planned":
             raise ValueError(f"制造单当前状态为{mo.status}，无法下达")
+
+        if BASE_DATA_AVAILABLE and Bom is not None:
+            bom_exists = await Bom.filter(product_code=mo.product_code, is_active=True).exists()
+            if not bom_exists:
+                raise ValueError("产品BOM未维护或已失效，无法下达")
+
         mo.status = "released"
+        mo.actual_start_date = datetime.now()
         await mo.save()
+
+        work_orders = await ManufacturingOrderService.generate_work_orders(mo_id)
+
+        mo.barcode = f"MO-{mo.mo_code}"
+        await mo.save()
+
         return mo
 
     @staticmethod
@@ -266,14 +295,56 @@ class WorkOrderService:
         return wo
 
     @staticmethod
-    async def start_wo(wo_id: int, operator: str = None) -> Optional[WorkOrder]:
+    async def start_wo(wo_id: int, data: StartWORequest = None) -> Optional[WorkOrder]:
         wo = await WorkOrder.filter(id=wo_id).first()
         if not wo:
             return None
-        if wo.status != "released":
+        if wo.status not in ("released",):
             raise ValueError(f"工单当前状态为{wo.status}，无法开始")
+
+        if data and data.equipment_code and EQUIPMENT_AVAILABLE and Equipment is not None:
+            equip = await Equipment.filter(equipment_code=data.equipment_code).first()
+            if not equip:
+                raise ValueError(f"设备{data.equipment_code}不存在")
+            if equip.status not in ("idle", "running"):
+                raise ValueError(f"设备{data.equipment_code}状态为{equip.status}，无法开工")
+
         wo.status = "processing"
-        wo.operator = operator
+        wo.actual_start_date = datetime.now()
+        if data:
+            wo.operator = data.operator
+            wo.equipment_code = data.equipment_code
+            wo.shift_code = data.shift_code
+        wo.barcode = f"WO-{wo.wo_code}"
+        await wo.save()
+        return wo
+
+    @staticmethod
+    async def suspend_wo(wo_id: int, data: SuspendWORequest = None) -> Optional[WorkOrder]:
+        wo = await WorkOrder.filter(id=wo_id).first()
+        if not wo:
+            return None
+        if wo.status != "processing":
+            raise ValueError(f"工单当前状态为{wo.status}，无法暂停")
+        wo.status = "suspended"
+        if data:
+            wo.suspend_reason = data.suspend_reason
+            wo.suspend_source = data.suspend_source
+        wo.suspended_at = datetime.now()
+        await wo.save()
+        return wo
+
+    @staticmethod
+    async def resume_wo(wo_id: int, data: ResumeWORequest = None) -> Optional[WorkOrder]:
+        wo = await WorkOrder.filter(id=wo_id).first()
+        if not wo:
+            return None
+        if wo.status != "suspended":
+            raise ValueError(f"工单当前状态为{wo.status}，无法恢复")
+        wo.status = "processing"
+        wo.suspend_reason = None
+        wo.suspend_source = None
+        wo.suspended_at = None
         await wo.save()
         return wo
 

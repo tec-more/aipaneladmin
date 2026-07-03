@@ -444,3 +444,18 @@ class ListResponse(BaseModel, Generic[T]):
     page: int = Field(..., description="当前页")
     page_size: int = Field(..., description="每页数量")
     items: List[T] = Field(..., description="数据列表")
+
+
+class StartWORequest(BaseModel):
+    operator: str = Field(..., max_length=100, description="操作员")
+    equipment_code: str = Field(..., max_length=100, description="设备编码")
+    shift_code: Optional[str] = Field(None, max_length=100, description="班次编码")
+
+
+class SuspendWORequest(BaseModel):
+    suspend_reason: str = Field(..., max_length=50, description="暂停原因：equipment/quality/exception")
+    suspend_source: Optional[str] = Field(None, max_length=100, description="暂停来源编码")
+
+
+class ResumeWORequest(BaseModel):
+    operator: Optional[str] = Field(None, max_length=100, description="确认恢复的操作员")

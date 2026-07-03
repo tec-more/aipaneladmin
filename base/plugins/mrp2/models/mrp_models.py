@@ -138,9 +138,16 @@ class MasterProductionSchedule(BaseModel, TimestampMixin):
     start_date = fields.DateField(description="计划开始日期")
     end_date = fields.DateField(description="计划结束日期")
     period_type = fields.CharField(max_length=20, default="week", description="计划周期：week/month")
-    status = fields.CharField(max_length=20, default="draft", description="状态：draft/review/approved/released/executed", index=True)
+    status = fields.CharField(max_length=20, default="draft", description="状态：draft/submitted/approved/released/closed/canceled", index=True)
     forecast_id = fields.IntField(null=True, description="关联销售预测ID")
     forecast_code = fields.CharField(max_length=100, null=True, description="关联销售预测编号")
+    plan_name = fields.CharField(max_length=255, null=True, description="计划名称")
+    approved_by = fields.CharField(max_length=100, null=True, description="审核人")
+    approved_at = fields.DatetimeField(null=True, description="审核时间")
+    released_by = fields.CharField(max_length=100, null=True, description="下达人")
+    released_at = fields.DatetimeField(null=True, description="下达时间")
+    demand_time_fence = fields.IntField(default=7, description="需求时界(天)")
+    planning_time_fence = fields.IntField(default=14, description="计划时界(天)")
     description = fields.TextField(null=True, description="描述")
     created_by = fields.CharField(max_length=100, null=True, description="创建人")
 
@@ -158,6 +165,13 @@ class MasterProductionSchedule(BaseModel, TimestampMixin):
             "status": self.status,
             "forecast_id": self.forecast_id,
             "forecast_code": self.forecast_code,
+            "plan_name": self.plan_name,
+            "approved_by": self.approved_by,
+            "approved_at": self.approved_at.strftime("%Y-%m-%d %H:%M:%S") if self.approved_at else None,
+            "released_by": self.released_by,
+            "released_at": self.released_at.strftime("%Y-%m-%d %H:%M:%S") if self.released_at else None,
+            "demand_time_fence": self.demand_time_fence,
+            "planning_time_fence": self.planning_time_fence,
             "description": self.description,
             "created_by": self.created_by,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
@@ -205,6 +219,56 @@ class MPSDetail(BaseModel, TimestampMixin):
             "unit": self.unit,
             "safety_stock": float(self.safety_stock) if self.safety_stock and hasattr(self.safety_stock, "__float__") else self.safety_stock,
             "planned_inventory": float(self.planned_inventory) if self.planned_inventory and hasattr(self.planned_inventory, "__float__") else self.planned_inventory,
+            "remark": self.remark,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+
+
+class MPSPlanLine(BaseModel, TimestampMixin):
+    """主生产计划行模型"""
+    mps_id = fields.IntField(description="MPS ID", index=True)
+    mps_code = fields.CharField(max_length=100, description="MPS编号", index=True)
+    line_no = fields.IntField(description="行号")
+    product_code = fields.CharField(max_length=100, description="产品编码", index=True)
+    product_name = fields.CharField(max_length=255, description="产品名称")
+    plan_quantity = fields.DecimalField(max_digits=15, decimal_places=6, description="计划数量")
+    plan_start_date = fields.DateField(description="计划开始日期")
+    plan_end_date = fields.DateField(description="计划结束日期")
+    priority = fields.IntField(default=5, description="优先级(1-10，数字越小优先级越高)")
+    sales_order_no = fields.CharField(max_length=100, null=True, description="关联销售订单号")
+    sales_order_line_no = fields.IntField(null=True, description="关联销售订单行号")
+    bom_code = fields.CharField(max_length=100, null=True, description="BOM编码")
+    route_code = fields.CharField(max_length=100, null=True, description="工艺路线编码")
+    capacity_check_result = fields.CharField(max_length=20, default="pass", description="产能校验结果：pass/warning/overload")
+    capacity_check_remark = fields.TextField(null=True, description="产能校验备注")
+    actual_quantity = fields.DecimalField(max_digits=15, decimal_places=6, default=0, description="实际完成数量")
+    status = fields.CharField(max_length=20, default="planned", description="状态：planned/released/completed/canceled", index=True)
+    remark = fields.TextField(null=True, description="备注")
+
+    class Meta:
+        table = "mrp2_mps_plan_line"
+
+    async def to_dict(self):
+        return {
+            "id": self.id,
+            "mps_id": self.mps_id,
+            "mps_code": self.mps_code,
+            "line_no": self.line_no,
+            "product_code": self.product_code,
+            "product_name": self.product_name,
+            "plan_quantity": float(self.plan_quantity) if self.plan_quantity and hasattr(self.plan_quantity, "__float__") else self.plan_quantity,
+            "plan_start_date": self.plan_start_date.strftime("%Y-%m-%d") if self.plan_start_date else None,
+            "plan_end_date": self.plan_end_date.strftime("%Y-%m-%d") if self.plan_end_date else None,
+            "priority": self.priority,
+            "sales_order_no": self.sales_order_no,
+            "sales_order_line_no": self.sales_order_line_no,
+            "bom_code": self.bom_code,
+            "route_code": self.route_code,
+            "capacity_check_result": self.capacity_check_result,
+            "capacity_check_remark": self.capacity_check_remark,
+            "actual_quantity": float(self.actual_quantity) if self.actual_quantity and hasattr(self.actual_quantity, "__float__") else self.actual_quantity,
+            "status": self.status,
             "remark": self.remark,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
@@ -478,6 +542,72 @@ class MRPExceptionAlert(BaseModel, TimestampMixin):
             "resolved_by": self.resolved_by,
             "resolved_at": self.resolved_at.strftime("%Y-%m-%d %H:%M:%S") if self.resolved_at else None,
             "resolved_note": self.resolved_note,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+
+
+class PlannedOrder(BaseModel, TimestampMixin):
+    """计划订单模型"""
+    order_code = fields.CharField(max_length=100, unique=True, description="计划订单编号", index=True)
+    mrp_id = fields.IntField(null=True, description="关联MRP计算ID", index=True)
+    mrp_code = fields.CharField(max_length=100, null=True, description="关联MRP编号")
+    order_type = fields.CharField(max_length=20, description="订单类型：manufacture/purchase", index=True)
+    material_code = fields.CharField(max_length=100, description="物料编码", index=True)
+    material_name = fields.CharField(max_length=255, description="物料名称")
+    net_quantity = fields.DecimalField(max_digits=15, decimal_places=6, description="净需求数量")
+    plan_quantity = fields.DecimalField(max_digits=15, decimal_places=6, description="计划数量")
+    unit = fields.CharField(max_length=20, description="计量单位")
+    require_date = fields.DateField(description="需求日期")
+    plan_release_date = fields.DateField(null=True, description="计划下达日期")
+    lead_time = fields.IntField(default=0, description="提前期(天)")
+    batch_rule = fields.CharField(max_length=20, default="lot_for_lot", description="批量规则：lot_for_lot/fixed/multiple")
+    batch_size = fields.DecimalField(max_digits=15, decimal_places=6, default=1, description="批量大小")
+    safety_stock = fields.DecimalField(max_digits=15, decimal_places=6, default=0, description="安全库存")
+    current_stock = fields.DecimalField(max_digits=15, decimal_places=6, default=0, description="当前库存")
+    on_order_quantity = fields.DecimalField(max_digits=15, decimal_places=6, default=0, description="在途量")
+    gross_requirement = fields.DecimalField(max_digits=15, decimal_places=6, default=0, description="毛需求")
+    net_requirement = fields.DecimalField(max_digits=15, decimal_places=6, default=0, description="净需求")
+    bom_level = fields.IntField(default=0, description="BOM层级")
+    parent_material_code = fields.CharField(max_length=100, null=True, description="父项物料编码")
+    status = fields.CharField(max_length=20, default="planned", description="状态：planned/confirmed/canceled", index=True)
+    source_mps_id = fields.IntField(null=True, description="来源MPS ID")
+    source_mps_line_id = fields.IntField(null=True, description="来源MPS计划行ID")
+    converted_mo_code = fields.CharField(max_length=100, null=True, description="转化后的制造单编码")
+    remark = fields.TextField(null=True, description="备注")
+
+    class Meta:
+        table = "mrp2_planned_order"
+
+    async def to_dict(self):
+        return {
+            "id": self.id,
+            "order_code": self.order_code,
+            "mrp_id": self.mrp_id,
+            "mrp_code": self.mrp_code,
+            "order_type": self.order_type,
+            "material_code": self.material_code,
+            "material_name": self.material_name,
+            "net_quantity": float(self.net_quantity) if self.net_quantity and hasattr(self.net_quantity, "__float__") else self.net_quantity,
+            "plan_quantity": float(self.plan_quantity) if self.plan_quantity and hasattr(self.plan_quantity, "__float__") else self.plan_quantity,
+            "unit": self.unit,
+            "require_date": self.require_date.strftime("%Y-%m-%d") if self.require_date else None,
+            "plan_release_date": self.plan_release_date.strftime("%Y-%m-%d") if self.plan_release_date else None,
+            "lead_time": self.lead_time,
+            "batch_rule": self.batch_rule,
+            "batch_size": float(self.batch_size) if self.batch_size and hasattr(self.batch_size, "__float__") else self.batch_size,
+            "safety_stock": float(self.safety_stock) if self.safety_stock and hasattr(self.safety_stock, "__float__") else self.safety_stock,
+            "current_stock": float(self.current_stock) if self.current_stock and hasattr(self.current_stock, "__float__") else self.current_stock,
+            "on_order_quantity": float(self.on_order_quantity) if self.on_order_quantity and hasattr(self.on_order_quantity, "__float__") else self.on_order_quantity,
+            "gross_requirement": float(self.gross_requirement) if self.gross_requirement and hasattr(self.gross_requirement, "__float__") else self.gross_requirement,
+            "net_requirement": float(self.net_requirement) if self.net_requirement and hasattr(self.net_requirement, "__float__") else self.net_requirement,
+            "bom_level": self.bom_level,
+            "parent_material_code": self.parent_material_code,
+            "status": self.status,
+            "source_mps_id": self.source_mps_id,
+            "source_mps_line_id": self.source_mps_line_id,
+            "converted_mo_code": self.converted_mo_code,
+            "remark": self.remark,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
         }

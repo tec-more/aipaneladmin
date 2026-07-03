@@ -2,6 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 from base.plugins.mrp2.services.mrp_service import MRPService
+from base.plugins.mrp2.services.planned_order_service import PlannedOrderService
 from base.plugins.mrp2.schemas.mrp_schema import (
     MRPCalculationCreate,
     MRPCalculateRequest
@@ -32,6 +33,11 @@ async def list_mrp(
 async def get_mrp_details(mrp_id: int):
     details = await MRPService.get_mrp_details(mrp_id)
     return success_response(data=details)
+
+@mrp_router.get("/{mrp_id}/planned-orders", summary="获取MRP计划订单列表")
+async def get_mrp_planned_orders(mrp_id: int):
+    items, total = await PlannedOrderService.get_list(mrp_id=mrp_id, page_size=1000)
+    return success_response(data={"items": items, "total": total})
 
 @mrp_router.post("", summary="创建MRP计算")
 async def create_mrp(data: MRPCalculationCreate):
