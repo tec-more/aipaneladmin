@@ -177,3 +177,12 @@ async def get_statistics(
 ):
     data = await EnergyService.get_statistics(work_center_code, energy_type, start_date, end_date)
     return success_response(data=data)
+
+mes_support_router = APIRouter()
+mes_support_router.include_router(trace_router)
+mes_support_router.include_router(dashboard_router)
+mes_support_router.include_router(barcode_router)
+mes_support_router.include_router(shift_router)
+mes_support_router.include_router(exception_router)
+mes_support_router.include_router(tooling_router)
+mes_support_router.include_router(energy_router)

@@ -19,6 +19,7 @@
             <el-option label="待下发" value="pending" />
             <el-option label="已下发" value="released" />
             <el-option label="生产中" value="processing" />
+            <el-option label="已暂停" value="suspended" />
             <el-option label="已完工" value="completed" />
             <el-option label="已关闭" value="closed" />
           </el-select>
@@ -68,6 +69,8 @@
           <template #default="{ row }">
             <el-button v-if="row.status === 'pending'" type="primary" link @click="handleRelease(row)">下发</el-button>
             <el-button v-if="row.status === 'released'" type="primary" link @click="handleStart(row)">开工</el-button>
+            <el-button v-if="row.status === 'processing'" type="warning" link @click="handleSuspend(row)">暂停</el-button>
+            <el-button v-if="row.status === 'suspended'" type="success" link @click="handleResume(row)">恢复</el-button>
             <el-button v-if="row.status === 'processing'" type="success" link @click="handleComplete(row)">完工</el-button>
             <el-button v-if="row.status === 'completed'" type="primary" link @click="handleClose(row)">关闭</el-button>
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
@@ -182,7 +185,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
 import {
   getWorkOrderList, createWorkOrder, updateWorkOrder, deleteWorkOrder,
-  releaseWorkOrder, startWorkOrder, completeWorkOrder, closeWorkOrder
+  releaseWorkOrder, startWorkOrder, completeWorkOrder, closeWorkOrder,
+  suspendWorkOrder, resumeWorkOrder
 } from '@/api/mes'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -248,6 +252,7 @@ const statusMap = {
   pending: '待下发',
   released: '已下发',
   processing: '生产中',
+  suspended: '已暂停',
   completed: '已完工',
   closed: '已关闭'
 }
@@ -256,6 +261,7 @@ const statusTypeMap = {
   pending: 'info',
   released: 'warning',
   processing: 'primary',
+  suspended: 'danger',
   completed: 'success',
   closed: 'info'
 }
@@ -347,6 +353,33 @@ const doComplete = async () => {
       }
     }
   })
+}
+
+const handleSuspend = async (row) => {
+  await ElMessageBox.prompt('请输入暂停原因:', '暂停工单', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPlaceholder: '暂停原因'
+  }).then(async (input) => {
+    try {
+      await suspendWorkOrder(row.id, { reason: input.value })
+      ElMessage.success('工单已暂停')
+      fetchData()
+    } catch (e) {
+      ElMessage.error(e.response?.data?.detail || '暂停失败')
+    }
+  }).catch(() => {})
+}
+
+const handleResume = async (row) => {
+  await ElMessageBox.confirm(`确定恢复工单 ${row.wo_code}？`, '提示', { type: 'warning' })
+  try {
+    await resumeWorkOrder(row.id, {})
+    ElMessage.success('工单已恢复')
+    fetchData()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '恢复失败')
+  }
 }
 
 const handleClose = async (row) => {

@@ -111,3 +111,8 @@ async def list_receipts(
         page=page, page_size=page_size, mo_code=mo_code, status=status
     )
     return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size})
+
+material_flow_router = APIRouter()
+material_flow_router.include_router(material_requisition_router)
+material_flow_router.include_router(material_return_router)
+material_flow_router.include_router(production_receipt_router)

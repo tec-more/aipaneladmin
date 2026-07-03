@@ -215,3 +215,139 @@ export const completeWorkOrder = (id, data) => {
 export const closeWorkOrder = (id) => {
   return request.put(`${BASE}/production/work-orders/${id}/close`)
 }
+
+export const suspendWorkOrder = (id, data) => {
+  return request.post(`${BASE}/production/work-orders/${id}/suspend`, data)
+}
+
+export const resumeWorkOrder = (id, data) => {
+  return request.post(`${BASE}/production/work-orders/${id}/resume`, data)
+}
+
+export const submitProductionReport = (data) => {
+  return request.post(`${BASE}/production-report`, data)
+}
+
+export const batchProductionReport = (data) => {
+  return request.post(`${BASE}/production-report/batch`, data)
+}
+
+export const getProductionReportList = (params) => {
+  return request.get(`${BASE}/production-report`, { params })
+}
+
+export const createMaterialRequisition = (data) => {
+  return request.post(`${BASE}/material-requisition`, data)
+}
+
+export const autoGenerateRequisition = (data) => {
+  return request.post(`${BASE}/material-requisition/auto-generate`, data)
+}
+
+export const confirmMaterialRequisition = (id) => {
+  return request.post(`${BASE}/material-requisition/${id}/confirm`)
+}
+
+export const getMaterialRequisitionList = (params) => {
+  return request.get(`${BASE}/material-requisition`, { params })
+}
+
+export const createMaterialReturn = (data) => {
+  return request.post(`${BASE}/material-return`, data)
+}
+
+export const confirmMaterialReturn = (id) => {
+  return request.post(`${BASE}/material-return/${id}/confirm`)
+}
+
+export const getMaterialReturnList = (params) => {
+  return request.get(`${BASE}/material-return`, { params })
+}
+
+export const createProductionReceipt = (data) => {
+  return request.post(`${BASE}/production-receipt`, data)
+}
+
+export const confirmProductionReceipt = (id) => {
+  return request.post(`${BASE}/production-receipt/${id}/confirm`)
+}
+
+export const getProductionReceiptList = (params) => {
+  return request.get(`${BASE}/production-receipt`, { params })
+}
+
+export const forwardTrace = (materialBatchNo) => {
+  return request.get(`${BASE}/trace/forward`, { params: { material_batch_no: materialBatchNo } })
+}
+
+export const backwardTrace = (productBatchNo) => {
+  return request.get(`${BASE}/trace/backward`, { params: { product_batch_no: productBatchNo } })
+}
+
+export const getDashboardOee = (params) => {
+  return request.get(`${BASE}/dashboard/oee`, { params })
+}
+
+export const getDashboardProduction = (params) => {
+  return request.get(`${BASE}/dashboard/production`, { params })
+}
+
+export const getDashboardProgress = () => {
+  return request.get(`${BASE}/dashboard/progress`)
+}
+
+export const generateBarcode = (data) => {
+  return request.post(`${BASE}/barcode/generate`, data)
+}
+
+export const parseBarcode = (data) => {
+  return request.post(`${BASE}/barcode/parse`, data)
+}
+
+export const createShift = (data) => {
+  return request.post(`${BASE}/shift/definition`, data)
+}
+
+export const getShiftList = (params) => {
+  return request.get(`${BASE}/shift/definition`, { params })
+}
+
+export const createSchedule = (data) => {
+  return request.post(`${BASE}/shift/schedule`, data)
+}
+
+export const createHandover = (data) => {
+  return request.post(`${BASE}/shift/handover`, data)
+}
+
+export const reportException = (data) => {
+  return request.post(`${BASE}/exception`, data)
+}
+
+export const handleException = (id, data) => {
+  return request.post(`${BASE}/exception/${id}/handle`, data)
+}
+
+export const getExceptionList = (params) => {
+  return request.get(`${BASE}/exception`, { params })
+}
+
+export const createTooling = (data) => {
+  return request.post(`${BASE}/tooling`, data)
+}
+
+export const validateTooling = (id) => {
+  return request.post(`${BASE}/tooling/${id}/validate`)
+}
+
+export const getToolingList = (params) => {
+  return request.get(`${BASE}/tooling`, { params })
+}
+
+export const recordEnergy = (data) => {
+  return request.post(`${BASE}/energy/record`, data)
+}
+
+export const getEnergyStatistics = (params) => {
+  return request.get(`${BASE}/energy/statistics`, { params })
+}
