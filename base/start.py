@@ -45,13 +45,15 @@ def register_audit_handlers():
         event_bus.subscribe("model.updated", data_change_handler.handle)
         event_bus.subscribe("model.deleted", data_change_handler.handle)
         print(f"[审计] 数据变更处理器已订阅, is_enabled: {data_change_handler.is_enabled()}")
-        print(f"[审计] model.created 订阅者数量: {len(event_bus._handlers.get('model.created', []))}")
+        handlers_list = event_bus._handlers.get('model.created', []) if hasattr(event_bus, '_handlers') else event_bus.get_handlers('model.created')
+        print(f"[审计] model.created 订阅者数量: {len(handlers_list)}")
 
         login_event_handler = LoginEventHandler()
         event_bus.subscribe("user.login", login_event_handler.handle)
         event_bus.subscribe("user.logout", login_event_handler.handle)
         print(f"[审计] 登录事件处理器已订阅, is_enabled: {login_event_handler.is_enabled()}")
-        print(f"[审计] user.login 订阅者数量: {len(event_bus._handlers.get('user.login', []))}")
+        login_handlers = event_bus._handlers.get('user.login', []) if hasattr(event_bus, '_handlers') else event_bus.get_handlers('user.login')
+        print(f"[审计] user.login 订阅者数量: {len(login_handlers)}")
 
         print("[审计] 事件处理器注册完成")
     except Exception as e:
@@ -69,6 +71,32 @@ async def lifespan(app: FastAPI):
 
     try:
         await init_data()
+
+        # 初始化EventBusAdapter（RabbitMQ事件总线）
+        try:
+            from base.common.events.event_bus import event_bus
+            if hasattr(event_bus, 'initialize'):
+                await event_bus.initialize()
+                print("EventBusAdapter初始化完成")
+        except Exception as e:
+            print(f"EventBusAdapter初始化失败(将使用内存模式): {e}")
+
+        # 启动ConsumerWorker
+        try:
+            from base.common.events.event_bus import event_bus
+            from base.common.events.consumer_worker import ConsumerWorker
+            if hasattr(event_bus, 'is_rabbitmq_available') and event_bus.is_rabbitmq_available():
+                consumer_worker = ConsumerWorker(event_bus)
+                await consumer_worker.start()
+                app.state.consumer_worker = consumer_worker
+                event_bus._consumer_worker = consumer_worker
+                print("ConsumerWorker已启动")
+            else:
+                app.state.consumer_worker = None
+                print("ConsumerWorker未启动(RabbitMQ不可用)")
+        except Exception as e:
+            print(f"ConsumerWorker启动失败: {e}")
+            app.state.consumer_worker = None
 
         # 审计事件处理器已在 init_app 中注册
 
@@ -115,6 +143,21 @@ async def lifespan(app: FastAPI):
                     await asyncio.wait_for(task, timeout=2.0)
                 except (asyncio.CancelledError, asyncio.TimeoutError):
                     pass
+
+        # 1.5 停止ConsumerWorker和EventBusAdapter
+        try:
+            if hasattr(app.state, 'consumer_worker') and app.state.consumer_worker:
+                await asyncio.wait_for(app.state.consumer_worker.stop(), timeout=5.0)
+                print("ConsumerWorker已停止")
+        except Exception as e:
+            print(f"停止ConsumerWorker时出错: {e}")
+        try:
+            from base.common.events.event_bus import event_bus
+            if hasattr(event_bus, 'shutdown'):
+                await event_bus.shutdown()
+                print("EventBusAdapter已关闭")
+        except Exception as e:
+            print(f"关闭EventBusAdapter时出错: {e}")
 
         # 2. 关闭插件系统
         print("正在关闭插件系统...")
@@ -412,6 +455,14 @@ def init_app() -> FastAPI:
         print("[手动注册] WebSocket路由已注册: /v1/llm/voice/translation/streaming")
     except ImportError as e:
         print(f"[警告] 无法导入voice_websocket: {e}")
+
+    # 注册事件系统API路由
+    try:
+        from base.common.events.api import events_api_router
+        app.include_router(events_api_router, prefix="/api")
+        print("[手动注册] 事件系统API路由已注册: /api/v1/events/")
+    except ImportError as e:
+        print(f"[警告] 无法导入事件系统API路由: {e}")
     
     return app
 

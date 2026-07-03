@@ -82,7 +82,10 @@ def get_model_list() -> List[str]:
 		models = get_plugin_models_from_manifest(plugin_name)
 		plugin_models.extend(models)
 
-	model_list = core_models + plugin_models + ['aerich.models']
+	model_list = core_models + plugin_models + [
+		"base.common.events.models.event_record",
+		"base.common.events.models.replay_audit_log",
+	] + ['aerich.models']
 	return model_list
 
 # 数据库配置
@@ -264,6 +267,24 @@ class Settings(BaseSettings):
 	JAEGER_ENABLED: bool = config.config.getboolean("jaeger", "enabled", fallback=False)
 	JAEGER_HOST: str = config.config.get("jaeger", "host", fallback="localhost")
 	JAEGER_PORT: int = config.config.getint("jaeger", "port", fallback=6831)
+
+	# ================================================= #
+	# ******************* RabbitMQ配置 ******************* #
+	# ================================================= #
+	RABBITMQ_ENABLED: bool = config.config.getboolean("rabbitmq", "enabled", fallback=False)
+	RABBITMQ_HOST: str = config.config.get("rabbitmq", "host", fallback="127.0.0.1")
+	RABBITMQ_PORT: int = config.config.getint("rabbitmq", "port", fallback=5672)
+	RABBITMQ_VIRTUAL_HOST: str = config.config.get("rabbitmq", "virtual_host", fallback="/")
+	RABBITMQ_USERNAME: str = config.config.get("rabbitmq", "username", fallback="guest")
+	RABBITMQ_PASSWORD: str = config.config.get("rabbitmq", "password", fallback="guest")
+	RABBITMQ_EXCHANGE: str = config.config.get("rabbitmq", "exchange", fallback="event_bus.exchange")
+	RABBITMQ_QUEUE_PREFIX: str = config.config.get("rabbitmq", "queue_prefix", fallback="event_bus")
+	RABBITMQ_DLQ_NAME: str = config.config.get("rabbitmq", "dlq_name", fallback="event_bus.dlq")
+	RABBITMQ_PREFETCH_COUNT: int = config.config.getint("rabbitmq", "prefetch_count", fallback=10)
+	RABBITMQ_MAX_RETRIES: int = config.config.getint("rabbitmq", "max_retries", fallback=3)
+	RABBITMQ_PUBLISH_CONFIRM_TIMEOUT: int = config.config.getint("rabbitmq", "publish_confirm_timeout", fallback=5)
+	RABBITMQ_CONNECTION_RETRY_INTERVAL: int = config.config.getint("rabbitmq", "connection_retry_interval", fallback=5)
+	RABBITMQ_DEGRADED_COOLDOWN: int = config.config.getint("rabbitmq", "degraded_cooldown", fallback=30)
 
 
 settings = Settings()

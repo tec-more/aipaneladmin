@@ -34,8 +34,12 @@ class EventBus:
             except Exception as e:
                 logger.error(f"事件 {event_name} 处理失败: {e}", exc_info=True)
 
-# 全局事件总线实例
-event_bus = EventBus()
-print(f"[EventBus] 创建全局事件总线实例: {id(event_bus)}")
+try:
+    from base.common.events.event_bus_adapter import EventBusAdapter
+    event_bus = EventBusAdapter()
+    print(f"[EventBus] 创建全局EventBusAdapter实例: {id(event_bus)}")
+except ImportError:
+    event_bus = EventBus()
+    print(f"[EventBus] 创建全局EventBus实例(内存模式): {id(event_bus)}")
 
 
