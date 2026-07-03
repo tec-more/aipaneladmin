@@ -2,6 +2,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
 from tortoise.exceptions import DoesNotExist
+from loguru import logger
+
+try:
+    from base.common.events.event_bus import event_bus
+except ImportError:
+    event_bus = None
 
 try:
     from base.plugins.purchase.models.supplier import Supplier, SupplierType, SupplierStatus
@@ -220,6 +226,22 @@ class PurchaseOrderService:
 
         order.status = PurchaseOrderStatus.CONFIRMED
         await order.save()
+
+        if event_bus:
+            try:
+                await event_bus.publish(
+                    "purchase.confirmed",
+                    order_id=order.id,
+                    order_no=order.order_no,
+                    supplier_id=order.supplier_id,
+                    supplier_name=(await order.supplier).supplier_name if order.supplier else "",
+                    total_amount=float(order.total_amount),
+                    tax_amount=float(order.tax_amount) if hasattr(order, 'tax_amount') else 0,
+                    created_by=order.created_by or "system",
+                )
+            except Exception as e:
+                logger.error(f"发布采购确认事件失败: {e}")
+
         return order
 
     @staticmethod
@@ -298,6 +320,29 @@ class PurchaseReceiptService:
         await PurchaseOrderService.update_order_status(purchase_order_id)
 
         await PurchaseReceiptService._create_inventory_stock_move(receipt)
+
+        if event_bus:
+            try:
+                receipt_items = await receipt.items.all()
+                items_data = []
+                for ri in receipt_items:
+                    items_data.append({
+                        "product_id": ri.product_id,
+                        "product_code": ri.product_code,
+                        "product_name": ri.product_name,
+                        "quantity": ri.quantity,
+                        "unit_price": float(ri.unit_price),
+                    })
+                await event_bus.publish(
+                    "purchase.received",
+                    receipt_id=receipt.id,
+                    receipt_no=receipt.receipt_no,
+                    order_id=receipt.purchase_order_id,
+                    items=items_data,
+                    created_by=receipt.created_by or "system",
+                )
+            except Exception as e:
+                logger.error(f"发布采购收货事件失败: {e}")
 
         return receipt
 

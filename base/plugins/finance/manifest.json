@@ -20,7 +20,10 @@
         "bank",
         "bill",
         "expense",
-        "tax"
+        "tax",
+        "integration_account_mapping",
+        "integration_log",
+        "integration_config"
     ],
     "schemas": [
         "finance_schema"

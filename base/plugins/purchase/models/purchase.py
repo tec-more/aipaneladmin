@@ -69,6 +69,7 @@ class PurchaseOrder(BaseModel, TimestampMixin):
     actual_delivery_date = fields.DatetimeField(null=True, description="实际交货日期")
 
     total_amount = fields.DecimalField(max_digits=12, decimal_places=2, default=0, description="订单总金额")
+    tax_amount = fields.DecimalField(max_digits=12, decimal_places=2, default=0, description="税额")
     paid_amount = fields.DecimalField(max_digits=12, decimal_places=2, default=0, description="已付金额")
 
     currency = fields.CharField(max_length=10, default="CNY", description="货币类型")
@@ -106,6 +107,7 @@ class PurchaseOrder(BaseModel, TimestampMixin):
             "expected_delivery_date": self.expected_delivery_date.strftime("%Y-%m-%d %H:%M:%S") if self.expected_delivery_date else None,
             "actual_delivery_date": self.actual_delivery_date.strftime("%Y-%m-%d %H:%M:%S") if self.actual_delivery_date else None,
             "total_amount": float(self.total_amount),
+            "tax_amount": float(self.tax_amount),
             "paid_amount": float(self.paid_amount),
             "currency": self.currency,
             "exchange_rate": float(self.exchange_rate),

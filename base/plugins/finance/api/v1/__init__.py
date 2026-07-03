@@ -26,6 +26,9 @@ from .expense_analysis_router import expense_analysis_router
 from .tax_router import tax_router
 from .tax_declaration_router import tax_declaration_router
 from .tax_summary_router import tax_summary_router
+from .integration_account_mapping_router import integration_account_mapping_router
+from .integration_log_router import integration_log_router
+from .integration_config_router import integration_config_router
 
 finance_api_router = APIRouter()
 
@@ -57,5 +60,8 @@ finance_api_router.include_router(expense_analysis_router)
 finance_api_router.include_router(tax_router)
 finance_api_router.include_router(tax_declaration_router)
 finance_api_router.include_router(tax_summary_router)
+finance_api_router.include_router(integration_account_mapping_router)
+finance_api_router.include_router(integration_log_router)
+finance_api_router.include_router(integration_config_router)
 
 __all__ = ["finance_api_router"]

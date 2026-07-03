@@ -10,3 +10,6 @@ from .bank import BankAccount, CashFlowRecord, CashPlan
 from .bill import Bill, BillType, BillStatus
 from .expense import ExpenseApply, ExpenseType, ExpenseStatus, ExpenseReport, ExpenseItem
 from .tax import TaxInvoice, InvoiceType, InvoiceStatus, TaxDeclaration, TaxSummary
+from .integration_account_mapping import IntegrationAccountMapping
+from .integration_log import IntegrationLog
+from .integration_config import IntegrationConfig

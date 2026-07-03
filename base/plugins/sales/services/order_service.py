@@ -2,6 +2,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from tortoise.transactions import atomic
 from decimal import Decimal
+from loguru import logger
+
+try:
+    from base.common.events.event_bus import event_bus
+except ImportError:
+    event_bus = None
 
 try:
     from base.plugins.sales.models.order import (
@@ -254,6 +260,24 @@ class OrderService:
             update_data["trade_no"] = transaction_id
 
         result = await CustomerOrder.filter(id=order_id).update(**update_data)
+
+        if payment_status_enum == PaymentStatus.PAID and event_bus:
+            try:
+                order = await CustomerOrder.get_or_none(id=order_id)
+                if order:
+                    await event_bus.publish(
+                        "sales.paid",
+                        order_id=order.id,
+                        order_no=order.order_no,
+                        customer_id=order.customer_id,
+                        customer_name=str(order.customer) if order.customer else "",
+                        total_amount=float(order.total_amount),
+                        tax_amount=float(order.tax_amount) if hasattr(order, 'tax_amount') else 0,
+                        created_by="system",
+                    )
+            except Exception as e:
+                logger.error(f"发布销售支付事件失败: {e}")
+
         return result > 0
 
     @staticmethod
@@ -317,6 +341,21 @@ class OrderService:
                     membership_level_id=extra.get("membership_level_id"),
                     hours=extra.get("total_hours")
                 )
+
+        if event_bus:
+            try:
+                await event_bus.publish(
+                    "sales.paid",
+                    order_id=order.id,
+                    order_no=order.order_no,
+                    customer_id=order.customer_id,
+                    customer_name=str(order.customer) if order.customer else "",
+                    total_amount=float(order.total_amount),
+                    tax_amount=float(order.tax_amount) if hasattr(order, 'tax_amount') else 0,
+                    created_by="system",
+                )
+            except Exception as e:
+                logger.error(f"发布销售支付事件失败: {e}")
 
         return True
 

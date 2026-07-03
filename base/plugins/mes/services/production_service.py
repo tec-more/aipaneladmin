@@ -2,6 +2,12 @@ from typing import Optional, List, Tuple, Dict, Any
 from decimal import Decimal
 from datetime import datetime
 from tortoise.expressions import Q
+from loguru import logger
+
+try:
+    from base.common.events.event_bus import event_bus
+except ImportError:
+    event_bus = None
 
 try:
     from base.plugins.mes.models.production import ManufacturingOrder, WorkOrder
@@ -359,6 +365,24 @@ class WorkOrderService:
         wo.actual_quantity = actual_quantity
         wo.scrap_quantity = scrap_quantity
         await wo.save()
+
+        if event_bus:
+            try:
+                await event_bus.publish(
+                    "work_order.completed",
+                    work_order_id=wo.id,
+                    work_order_no=wo.wo_code,
+                    mo_code=wo.mo_code,
+                    product_id=getattr(wo, 'product_id', None),
+                    product_code=wo.product_code,
+                    product_name=wo.product_name,
+                    completed_quantity=actual_quantity,
+                    unit_cost=float(getattr(wo, 'unit_cost', 0) or 0),
+                    created_by=getattr(wo, 'created_by', 'system'),
+                )
+            except Exception as e:
+                logger.error(f"发布工单完工事件失败: {e}")
+
         return wo
 
     @staticmethod

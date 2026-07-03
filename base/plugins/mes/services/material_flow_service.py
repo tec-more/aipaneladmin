@@ -1,6 +1,12 @@
 from typing import Optional, List, Tuple
 from datetime import datetime
 from decimal import Decimal
+from loguru import logger
+
+try:
+    from base.common.events.event_bus import event_bus
+except ImportError:
+    event_bus = None
 
 try:
     from base.plugins.mes.models.material_flow import (
@@ -105,6 +111,29 @@ class MaterialRequisitionService:
             raise ValueError("只能确认草稿状态的领料单")
         req.status = "confirmed"
         await req.save()
+
+        if event_bus:
+            try:
+                details = await MaterialRequisitionDetail.filter(requisition_id=requisition_id)
+                items_data = []
+                for d in details:
+                    items_data.append({
+                        "product_id": None,
+                        "product_code": d.material_code,
+                        "product_name": d.material_name,
+                        "quantity": float(d.required_quantity),
+                        "unit_cost": 0,
+                    })
+                await event_bus.publish(
+                    "material.picked",
+                    pick_id=req.id,
+                    pick_no=req.requisition_code,
+                    items=items_data,
+                    created_by=req.applicant or "system",
+                )
+            except Exception as e:
+                logger.error(f"发布领料事件失败: {e}")
+
         return req
 
     @staticmethod
@@ -235,6 +264,25 @@ class ProductionReceiptService:
             raise ValueError("未经质检合格的产品不允许入库")
         receipt.status = "confirmed"
         await receipt.save()
+
+        if event_bus:
+            try:
+                await event_bus.publish(
+                    "production.receipt",
+                    receipt_id=receipt.id,
+                    receipt_no=receipt.receipt_code,
+                    items=[{
+                        "product_id": None,
+                        "product_code": receipt.product_code,
+                        "product_name": receipt.product_name,
+                        "quantity": float(receipt.quantity),
+                        "unit_cost": 0,
+                    }],
+                    created_by="system",
+                )
+            except Exception as e:
+                logger.error(f"发布生产入库事件失败: {e}")
+
         return receipt
 
     @staticmethod

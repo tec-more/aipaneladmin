@@ -92,6 +92,7 @@ class CustomerOrder(BaseModel, TimestampMixin):
     )
 
     total_amount = fields.DecimalField(max_digits=10, decimal_places=2, description="订单总金额")
+    tax_amount = fields.DecimalField(max_digits=10, decimal_places=2, default=0, description="税额")
     discount_amount = fields.DecimalField(max_digits=10, decimal_places=2, default=0, description="优惠金额")
     final_amount = fields.DecimalField(max_digits=10, decimal_places=2, description="实际支付金额")
 
@@ -193,6 +194,7 @@ class CustomerOrder(BaseModel, TimestampMixin):
             "customer_id": self.customer_id,
             "customer_name": str(self.customer) if self.customer else None,
             "total_amount": float(self.total_amount),
+            "tax_amount": float(self.tax_amount),
             "discount_amount": float(self.discount_amount),
             "final_amount": float(self.final_amount),
             "payment_method": self.payment_method.value if isinstance(self.payment_method, Enum) else self.payment_method,
