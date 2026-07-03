@@ -7,7 +7,7 @@ from base.plugins.mrp2.schemas.mrp_schema import (
     MPSDetailCreate
 )
 from base.plugins.mrp2.schemas.mps_plan_line_schema import (
-    CompileMPSRequest, ApproveMPSRequest, MPSLineAdjustment
+    CompileMPSRequest, ApproveMPSRequest, MPSLineAdjustment, MPSPlanLineCreate
 )
 from base.common.response import success_response
 from base.common.security import get_current_user_id
@@ -133,6 +133,14 @@ async def adjust_plan_line(line_id: int, data: MPSLineAdjustment):
         if not line:
             raise HTTPException(status_code=404, detail="计划行不存在")
         return success_response(data=line, msg="计划行调整成功")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@mps_router.post("/{mps_id}/plan-lines", summary="添加MPS计划行")
+async def add_plan_line(mps_id: int, data: MPSPlanLineCreate):
+    try:
+        line = await MPSService.add_plan_line(mps_id, data)
+        return success_response(data=line, msg="计划行添加成功")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

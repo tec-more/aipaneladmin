@@ -42,20 +42,25 @@ class SuccessResponse(JSONResponse):
         """
         # 确保数据中的datetime对象被序列化
         def serialize_datetime(obj):
-            # 处理Pydantic模型
-            if hasattr(obj, 'model_dump'):
-                return serialize_datetime(obj.model_dump())
-            # 处理字典
-            elif isinstance(obj, dict):
+            if isinstance(obj, dict):
                 return {k: serialize_datetime(v) for k, v in obj.items()}
-            # 处理列表
-            elif isinstance(obj, list):
+            elif isinstance(obj, (list, tuple)):
                 return [serialize_datetime(item) for item in obj]
-            # 处理datetime对象
             elif isinstance(obj, datetime):
                 return obj.isoformat()
-            # 其他类型直接返回
-            return obj
+            elif isinstance(obj, (str, int, float, bool, type(None))):
+                return obj
+            elif hasattr(obj, 'model_dump'):
+                return serialize_datetime(obj.model_dump())
+            elif hasattr(obj, '_meta') and hasattr(obj, 'pk'):
+                data = {}
+                for key, value in obj.__dict__.items():
+                    if not key.startswith('_'):
+                        data[key] = serialize_datetime(value)
+                return data
+            elif hasattr(obj, '__dict__'):
+                return serialize_datetime(obj.__dict__)
+            return str(obj)
         
         serialized_data = serialize_datetime(data)
         
@@ -95,20 +100,25 @@ class ErrorResponse(JSONResponse):
         """
         # 确保数据中的datetime对象被序列化
         def serialize_datetime(obj):
-            # 处理Pydantic模型
-            if hasattr(obj, 'model_dump'):
-                return serialize_datetime(obj.model_dump())
-            # 处理字典
-            elif isinstance(obj, dict):
+            if isinstance(obj, dict):
                 return {k: serialize_datetime(v) for k, v in obj.items()}
-            # 处理列表
-            elif isinstance(obj, list):
+            elif isinstance(obj, (list, tuple)):
                 return [serialize_datetime(item) for item in obj]
-            # 处理datetime对象
             elif isinstance(obj, datetime):
                 return obj.isoformat()
-            # 其他类型直接返回
-            return obj
+            elif isinstance(obj, (str, int, float, bool, type(None))):
+                return obj
+            elif hasattr(obj, 'model_dump'):
+                return serialize_datetime(obj.model_dump())
+            elif hasattr(obj, '_meta') and hasattr(obj, 'pk'):
+                data = {}
+                for key, value in obj.__dict__.items():
+                    if not key.startswith('_'):
+                        data[key] = serialize_datetime(value)
+                return data
+            elif hasattr(obj, '__dict__'):
+                return serialize_datetime(obj.__dict__)
+            return str(obj)
         
         serialized_data = serialize_datetime(data)
         

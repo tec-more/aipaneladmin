@@ -568,6 +568,25 @@ class MPSService:
         return line
 
     @staticmethod
+    async def add_plan_line(mps_id: int, data: MPSLineAdjustment) -> MPSPlanLine:
+        mps = await MasterProductionSchedule.filter(id=mps_id).first()
+        if not mps:
+            raise ValueError("MPS不存在")
+        if mps.status not in ("draft",):
+            raise ValueError("只能在草稿状态的MPS中添加计划行")
+        line_data = data.model_dump(exclude_none=True, exclude={"line_id"})
+        line_data["mps_id"] = mps_id
+        line_data["mps_code"] = mps.mps_code
+        if "product_code" not in line_data:
+            raise ValueError("产品编码不能为空")
+        if "product_name" not in line_data:
+            line_data["product_name"] = line_data.get("product_code", "")
+        existing = await MPSPlanLine.filter(mps_id=mps_id).count()
+        line_data["line_no"] = existing + 1
+        line = await MPSPlanLine.create(**line_data)
+        return line
+
+    @staticmethod
     async def generate_from_forecast(forecast_id: int) -> Dict[str, Any]:
         forecast = await SalesForecastService.get_by_id(forecast_id)
         if not forecast:

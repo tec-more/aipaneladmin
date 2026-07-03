@@ -171,7 +171,8 @@ class ShiftService:
 class ExceptionService:
     @staticmethod
     async def report_exception(data: ProductionExceptionCreate) -> ProductionException:
-        exception_code = f"EXC{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        import random
+        exception_code = f"EXC{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(100,999)}"
         exception = await ProductionException.create(
             exception_code=exception_code,
             exception_type=data.exception_type,

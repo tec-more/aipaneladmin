@@ -78,6 +78,7 @@ class ProductionReportService:
 
         await TraceRecord.create(
             trace_code=f"TRC{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            trace_type="production",
             product_batch_no=data.batch_no,
             material_batch_no=data.batch_no,
             mo_code=data.mo_code,
