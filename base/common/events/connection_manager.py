@@ -42,7 +42,7 @@ class RabbitMQConnectionManager:
             self._status = "connecting"
             self._notify_status_change()
 
-            self._connection = await aio_pika.connect_robust(
+            self._connection = await aio_pika.connect(
                 host=settings.RABBITMQ_HOST,
                 port=settings.RABBITMQ_PORT,
                 virtualhost=settings.RABBITMQ_VIRTUAL_HOST,
@@ -109,7 +109,11 @@ class RabbitMQConnectionManager:
 
     async def _reconnect_loop(self):
         interval = settings.RABBITMQ_CONNECTION_RETRY_INTERVAL
+        max_retries = settings.RABBITMQ_MAX_RETRIES
         while self._status != "connected":
+            if max_retries > 0 and self._reconnect_count >= max_retries:
+                logger.warning(f"RabbitMQ重连已达最大次数({max_retries})，停止重连")
+                return
             await asyncio.sleep(interval)
             if self._is_in_cooldown:
                 continue
@@ -144,7 +148,12 @@ class RabbitMQConnectionManager:
                 pass
 
     def is_connected(self) -> bool:
-        return self._status == "connected" and self._connection is not None and not self._connection.is_closed
+        if self._status != "connected" or self._connection is None:
+            return False
+        try:
+            return not self._connection.is_closed
+        except Exception:
+            return False
 
     def get_connection_status(self) -> Dict[str, Any]:
         return {
@@ -174,8 +183,12 @@ class RabbitMQConnectionManager:
             except asyncio.CancelledError:
                 pass
         try:
-            if self._connection and not self._connection.is_closed:
-                await self._connection.close()
+            if self._connection:
+                try:
+                    if not self._connection.is_closed:
+                        await self._connection.close()
+                except Exception:
+                    await self._connection.close()
         except Exception as e:
             logger.warning(f"关闭RabbitMQ连接时出错: {e}")
         self._status = "disconnected"

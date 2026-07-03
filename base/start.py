@@ -459,8 +459,8 @@ def init_app() -> FastAPI:
     # 注册事件系统API路由
     try:
         from base.common.events.api import events_api_router
-        app.include_router(events_api_router, prefix="/api")
-        print("[手动注册] 事件系统API路由已注册: /api/v1/events/")
+        app.include_router(events_api_router)
+        print("[手动注册] 事件系统API路由已注册: /v1/events/")
     except ImportError as e:
         print(f"[警告] 无法导入事件系统API路由: {e}")
     

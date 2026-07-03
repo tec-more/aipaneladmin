@@ -89,11 +89,11 @@ def get_model_list() -> List[str]:
 	return model_list
 
 # 数据库配置
-db_host: str = config.config.get("db", "host", fallback="127.0.0.1")
-db_name: str = config.config.get("db", "name", fallback="aipaneladmin")
-db_user: str = config.config.get("db", "user", fallback="admin")
-db_password: str = config.config.get("db", "password", fallback="123456")
-db_port: int = config.config.getint("db", "port", fallback=5432)
+db_host: str = config.config.get("db", "db_host", fallback="127.0.0.1")
+db_name: str = config.config.get("db", "db_name", fallback="aipaneladmin")
+db_user: str = config.config.get("db", "db_user", fallback="admin")
+db_password: str = config.config.get("db", "db_password", fallback="123456")
+db_port: int = config.config.getint("db", "db_port", fallback=15432)
 minsize: int = config.config.getint("db", "minsize", fallback=5)
 maxsize: int = config.config.getint("db", "maxsize", fallback=20)
 timeout: int = config.config.getint("db", "timeout", fallback=30)

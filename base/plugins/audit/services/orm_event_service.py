@@ -11,7 +11,8 @@ import functools
 AUDIT_EXCLUDE_MODELS = [
     'AuditLog', 'InputLayerLog', 'DecisionLayerLog', 'ExecutionLayerLog',
     'OutputLayerLog', 'SystemLayerLog', 'DataChangeLog', 'LoginLog',
-    'RiskAuditRecord', 'AuditReport', 'AuditConfig'
+    'RiskAuditRecord', 'AuditReport', 'AuditConfig',
+    'EventRecord', 'ReplayAuditLog',
 ]
 
 

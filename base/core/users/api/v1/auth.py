@@ -91,7 +91,8 @@ async def login(login_data: UserLogin, request: Request):
         if not is_login_log_enabled():
             return
         event_bus = get_event_bus()
-        print(f"[登录] 获取事件总线实例ID: {id(event_bus)}, user.login 订阅者: {len(event_bus._handlers.get('user.login', []))}")
+        handlers = event_bus.get_handlers('user.login') if hasattr(event_bus, 'get_handlers') else event_bus._handlers.get('user.login', [])
+        print(f"[登录] 获取事件总线实例ID: {id(event_bus)}, user.login 订阅者: {len(handlers)}")
         await event_bus.publish(
             "user.login",
             user_id=user_id,

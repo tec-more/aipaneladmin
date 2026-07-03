@@ -9,6 +9,29 @@ from tortoise.expressions import Q
 from base.common.setting import settings, TORTOISE_ORM
 
 
+def _patch_asyncpg_for_gaussdb():
+    try:
+        import asyncpg
+        _original_reset = asyncpg.connection.Connection.reset
+
+        async def _patched_reset(self, *, timeout=None):
+            try:
+                await _original_reset(self, timeout=timeout)
+            except Exception:
+                try:
+                    await self.execute("ROLLBACK")
+                except Exception:
+                    pass
+
+        asyncpg.connection.Connection.reset = _patched_reset
+        print("[DB] asyncpg reset补丁已应用(GaussDB兼容)")
+    except Exception as e:
+        print(f"[DB] asyncpg补丁应用失败: {e}")
+
+
+_patch_asyncpg_for_gaussdb()
+
+
 async def init_db():
     print("开始初始化数据库...")
     print(f"模型列表: {TORTOISE_ORM['apps']['models']['models']}")
@@ -58,8 +81,42 @@ async def init_data():
         is_main_worker = os.environ.get("UVICORN_WORKER_ID") is None
         if is_main_worker:
             print("生成数据库表（主进程）...")
-            await Tortoise.generate_schemas(safe=True)
-            print("数据库表生成完成")
+            try:
+                await Tortoise.generate_schemas(safe=True)
+                print("数据库表生成完成")
+            except Exception as schema_err:
+                print(f"数据库表生成部分失败: {schema_err}")
+                print("尝试逐表创建缺失的表...")
+                try:
+                    import asyncpg as _asyncpg
+                    _raw_conn = await _asyncpg.connect(
+                        host=settings.db_host, port=settings.db_port,
+                        user=settings.db_user, password=settings.db_password,
+                        database=settings.db_name
+                    )
+                    from tortoise.backends.asyncpg.schema_generator import AsyncpgSchemaGenerator
+                    _conn = Tortoise.get_connection('postgres')
+                    _generator = AsyncpgSchemaGenerator(_conn)
+                    for _app_name, _app in Tortoise.apps.items():
+                        for _model_name, _model in _app.items():
+                            _tbl = _model._meta.db_table
+                            try:
+                                _exists = await _raw_conn.fetchval(
+                                    "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1)",
+                                    _tbl
+                                )
+                                if not _exists:
+                                    _table_sql = _generator._get_table_sql(_model, True)
+                                    _create_sql = _table_sql[0] if isinstance(_table_sql, tuple) else str(_table_sql)
+                                    _create_sql = _create_sql.format("")
+                                    await _raw_conn.execute(_create_sql)
+                                    print(f"  创建表: {_tbl}")
+                            except Exception as e:
+                                print(f"  跳过表 {_tbl}: {str(e)[:80]}")
+                    await _raw_conn.close()
+                except Exception as e2:
+                    print(f"逐表创建也失败: {e2}")
+                print("数据库表处理完成")
         else:
             worker_id = os.environ.get("UVICORN_WORKER_ID", "unknown")
             print(f"跳过数据库表生成（worker {worker_id}，由主进程已完成）")
