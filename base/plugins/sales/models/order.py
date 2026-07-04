@@ -19,6 +19,7 @@ class PaymentStatus(str, Enum):
     FAILED = "failed"
     REFUNDED = "refunded"
     EXPIRED = "expired"
+    CANCELLED = "cancelled"
 
     @classmethod
     def get_status_color(cls, status: str) -> str:
@@ -28,6 +29,7 @@ class PaymentStatus(str, Enum):
             cls.FAILED.value: "danger",
             cls.REFUNDED.value: "secondary",
             cls.EXPIRED.value: "default",
+            cls.CANCELLED.value: "danger",
         }
         return colors.get(status, "default")
 
@@ -39,6 +41,7 @@ class PaymentStatus(str, Enum):
             cls.FAILED.value: "支付失败",
             cls.REFUNDED.value: "已退款",
             cls.EXPIRED.value: "已过期",
+            cls.CANCELLED.value: "已取消",
         }
         return labels.get(status, "未知")
 
