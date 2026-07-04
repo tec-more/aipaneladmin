@@ -32,10 +32,11 @@ class CrmStatsService:
             if data_filter:
                 query = query.filter(**data_filter)
             count = await query.count()
-            amount_result = await Opportunity.filter(stage=stage.code, status=OpportunityStatus.ACTIVE)
+            amount_query = Opportunity.filter(stage=stage.code, status=OpportunityStatus.ACTIVE)
             if data_filter:
-                amount_result = amount_result.filter(**data_filter)
-            amounts = [float(o.expected_amount) for o in await amount_result]
+                amount_query = amount_query.filter(**data_filter)
+            opps_for_amount = await amount_query
+            amounts = [float(o.expected_amount) for o in opps_for_amount]
             total = Decimal(str(sum(amounts)))
             total_opportunities += count
             total_amount += total
@@ -67,10 +68,10 @@ class CrmStatsService:
             if data_filter:
                 query = query.filter(**data_filter)
             lead_count = await query.count()
-            converted_count = await Lead.filter(source=source.code, status=LeadStatus.CONVERTED)
+            converted_query = Lead.filter(source=source.code, status=LeadStatus.CONVERTED)
             if data_filter:
-                converted_count = converted_count.filter(**data_filter)
-            converted = await converted_count.count()
+                converted_query = converted_query.filter(**data_filter)
+            converted = await converted_query.count()
             conversion_rate = round(converted / lead_count * 100, 2) if lead_count > 0 else 0.0
             source_stats.append(LeadSourceStats(
                 source_code=source.code,

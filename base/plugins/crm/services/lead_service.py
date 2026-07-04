@@ -91,18 +91,17 @@ class LeadService:
             raise ValueError("CRM_LEAD_NOT_FOUND: 线索不存在")
         if lead.status != LeadStatus.CONTACTED:
             raise ValueError("CRM_LEAD_STATUS_ERROR: 仅已联系状态的线索可转化")
-        from tortoise.transactions import atomic
-        from base.plugins.customer.services.customer_service import CustomerService
+        from base.plugins.customer.models.customer import Customer
+        from base.common.security import get_password_hash
         try:
-            customer = await CustomerService.get_by_phone(lead.phone) if lead.phone else None
+            customer = await Customer.filter(phone=lead.phone).first() if lead.phone else None
             if not customer and lead.email:
-                customer = await CustomerService.get_by_email(lead.email)
+                customer = await Customer.filter(email=lead.email).first()
             if not customer:
                 import time
                 import secrets
                 username = f"lead_{lead.phone or int(time.time())}"
                 password = secrets.token_urlsafe(16)
-                from base.common.security import get_password_hash
                 customer = await Customer.create(
                     username=username,
                     email=lead.email or f"{username}@crm.placeholder",
