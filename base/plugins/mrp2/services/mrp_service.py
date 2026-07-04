@@ -493,12 +493,24 @@ class MPSService:
         if mps.status not in ("draft", "submitted"):
             raise ValueError("只能编制草稿或已提交状态的MPS")
 
-        await MPSPlanLine.filter(mps_id=mps_id).delete()
-
         mps_details = await MPSDetail.filter(mps_id=mps_id).order_by('period_start', 'product_code')
+
+        if mps_details:
+            await MPSPlanLine.filter(mps_id=mps_id).delete()
+
         plan_lines = []
         line_no = 1
         capacity_warnings = []
+
+        if not mps_details:
+            existing_lines = await MPSPlanLine.filter(mps_id=mps_id).order_by('line_no')
+            if existing_lines:
+                return {
+                    "mps_id": mps_id,
+                    "mps_code": mps.mps_code,
+                    "plan_lines": existing_lines,
+                    "capacity_warnings": []
+                }
 
         for detail in mps_details:
             capacity_check_result = "pass"
@@ -1315,7 +1327,7 @@ class MonitorService:
         monitor = await MonitorService.get_by_id(monitor_id)
         if not monitor:
             return None
-        if monitor.status != "running":
+        if monitor.status not in ("running", "monitoring"):
             raise ValueError("只能暂停运行中的监控")
         monitor.status = "paused"
         await monitor.save()

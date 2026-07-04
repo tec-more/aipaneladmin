@@ -288,8 +288,8 @@ class WorkOrderBase(BaseModel):
     product_name: str = Field(..., min_length=1, max_length=255, description="产品名称")
     process_code: str = Field(..., min_length=1, max_length=100, description="工序编码")
     process_name: str = Field(..., min_length=1, max_length=255, description="工序名称")
-    work_center_code: str = Field(..., min_length=1, max_length=100, description="工作中心编码")
-    work_center_name: str = Field(..., min_length=1, max_length=255, description="工作中心名称")
+    work_center_code: Optional[str] = Field(None, max_length=100, description="工作中心编码")
+    work_center_name: Optional[str] = Field(None, max_length=255, description="工作中心名称")
     quantity: int = Field(..., ge=1, description="计划数量")
     status: str = Field(default="pending", max_length=20, description="状态：pending/released/processing/completed/closed")
     operator: Optional[str] = Field(None, max_length=100, description="操作员")
@@ -448,7 +448,7 @@ class ListResponse(BaseModel, Generic[T]):
 
 class StartWORequest(BaseModel):
     operator: str = Field(..., max_length=100, description="操作员")
-    equipment_code: str = Field(..., max_length=100, description="设备编码")
+    equipment_code: Optional[str] = Field(None, max_length=100, description="设备编码")
     shift_code: Optional[str] = Field(None, max_length=100, description="班次编码")
 
 

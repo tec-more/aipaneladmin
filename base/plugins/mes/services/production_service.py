@@ -207,16 +207,24 @@ class ManufacturingOrderService:
             raise ValueError("只有已下发或生产中的制造单才能生成工单")
 
         try:
-            from base.plugins.mes.models.base_data import Route
+            from base.plugins.mes.models.base_data import Route, RouteProcess
             route = await Route.filter(product_code=mo.product_code).first()
         except ImportError:
             route = None
 
         work_orders = []
-        if route and hasattr(route, 'route_details'):
-            details = await route.route_details.all()
-            for idx, detail in enumerate(details):
+        route_processes = []
+        if route:
+            try:
+                route_processes = await RouteProcess.filter(route_code=route.route_code).order_by('sequence')
+            except Exception:
+                route_processes = []
+
+        if route_processes:
+            for idx, detail in enumerate(route_processes):
                 wo_code = f"WO-{mo.mo_code}-{idx + 1:03d}"
+                wc_code = getattr(detail, 'work_center_code', None) or None
+                wc_name = getattr(detail, 'work_center_name', None) or None
                 wo_data = WorkOrderCreate(
                     wo_code=wo_code,
                     mo_code=mo.mo_code,
@@ -225,8 +233,8 @@ class ManufacturingOrderService:
                     product_name=mo.product_name,
                     process_code=getattr(detail, 'process_code', f'PROC-{idx + 1}'),
                     process_name=getattr(detail, 'process_name', f'工序{idx + 1}'),
-                    work_center_code=getattr(detail, 'work_center_code', ''),
-                    work_center_name=getattr(detail, 'work_center_name', ''),
+                    work_center_code=wc_code,
+                    work_center_name=wc_name,
                     quantity=mo.quantity,
                     planned_start_date=mo.planned_start_date,
                     planned_end_date=mo.planned_end_date,
@@ -244,8 +252,8 @@ class ManufacturingOrderService:
                 product_name=mo.product_name,
                 process_code="PROC-001",
                 process_name="默认工序",
-                work_center_code="",
-                work_center_name="",
+                work_center_code=None,
+                work_center_name=None,
                 quantity=mo.quantity,
                 planned_start_date=mo.planned_start_date,
                 planned_end_date=mo.planned_end_date,
@@ -361,6 +369,12 @@ class WorkOrderService:
             return None
         if wo.status != "processing":
             raise ValueError(f"工单当前状态为{wo.status}，无法完成")
+        if actual_quantity <= 0 and scrap_quantity <= 0:
+            raise ValueError("完工数量和报废数量不能同时为零或负数")
+        if actual_quantity < 0:
+            raise ValueError("完工数量不能为负数")
+        if scrap_quantity < 0:
+            raise ValueError("报废数量不能为负数")
         wo.status = "completed"
         wo.actual_quantity = actual_quantity
         wo.scrap_quantity = scrap_quantity

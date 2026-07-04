@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 try:
     from base.plugins.mes.services.base_data_service import (
-        MaterialService, BomService, WorkCenterService, ProcessService, RouteService
+        MaterialService, BomService, WorkCenterService, ProcessService, RouteService, BomVersionService
     )
     from base.plugins.mes.schemas.mes_schema import (
         MaterialCreate, MaterialUpdate, MaterialResponse, MaterialListQuery,
