@@ -10,9 +10,16 @@ try:
     except ImportError:
         ManufacturingOrder = None
         MES_AVAILABLE = False
+    try:
+        from base.plugins.subcontracting.services.subcontracting_order_service import SubcontractingOrderService
+        SC_AVAILABLE = True
+    except ImportError:
+        SubcontractingOrderService = None
+        SC_AVAILABLE = False
 except ImportError:
     PlannedOrder = None
     MES_AVAILABLE = False
+    SC_AVAILABLE = False
 
 
 class PlannedOrderService:
@@ -67,6 +74,19 @@ class PlannedOrderService:
                 remark=data.remark if data else None
             )
             order.converted_mo_code = mo_code
+
+        if order.order_type == "subcontracting" and SC_AVAILABLE and SubcontractingOrderService is not None:
+            sc_order = await SubcontractingOrderService.create_order({
+                "product_code": order.material_code,
+                "product_name": order.material_name,
+                "plan_quantity": float(order.plan_quantity),
+                "supplier_code": "",
+                "supplier_name": "",
+                "source_planned_order_code": order.order_code,
+                "source_mps_code": order.mrp_code or "",
+                "remark": data.remark if data else None,
+            })
+            order.converted_sc_code = sc_order.sc_code
 
         order.status = "confirmed"
         await order.save()

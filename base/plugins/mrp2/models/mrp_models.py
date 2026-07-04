@@ -552,7 +552,7 @@ class PlannedOrder(BaseModel, TimestampMixin):
     order_code = fields.CharField(max_length=100, unique=True, description="计划订单编号", index=True)
     mrp_id = fields.IntField(null=True, description="关联MRP计算ID", index=True)
     mrp_code = fields.CharField(max_length=100, null=True, description="关联MRP编号")
-    order_type = fields.CharField(max_length=20, description="订单类型：manufacture/purchase", index=True)
+    order_type = fields.CharField(max_length=20, description="订单类型：manufacture/purchase/subcontracting", index=True)
     material_code = fields.CharField(max_length=100, description="物料编码", index=True)
     material_name = fields.CharField(max_length=255, description="物料名称")
     net_quantity = fields.DecimalField(max_digits=15, decimal_places=6, description="净需求数量")
@@ -574,6 +574,7 @@ class PlannedOrder(BaseModel, TimestampMixin):
     source_mps_id = fields.IntField(null=True, description="来源MPS ID")
     source_mps_line_id = fields.IntField(null=True, description="来源MPS计划行ID")
     converted_mo_code = fields.CharField(max_length=100, null=True, description="转化后的制造单编码")
+    converted_sc_code = fields.CharField(max_length=100, null=True, description="转化后的委外工单编码")
     remark = fields.TextField(null=True, description="备注")
 
     class Meta:
@@ -607,6 +608,7 @@ class PlannedOrder(BaseModel, TimestampMixin):
             "source_mps_id": self.source_mps_id,
             "source_mps_line_id": self.source_mps_line_id,
             "converted_mo_code": self.converted_mo_code,
+            "converted_sc_code": self.converted_sc_code,
             "remark": self.remark,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,

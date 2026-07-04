@@ -210,6 +210,7 @@ class Process(BaseModel, TimestampMixin):
     drawing_code = fields.CharField(max_length=100, null=True, description="图纸编号", index=True)
     description = fields.TextField(null=True, description="描述")
     is_active = fields.BooleanField(default=True, description="是否启用", index=True)
+    is_subcontracting = fields.BooleanField(default=False, description="是否委外工序")
 
     class Meta:
         table = "mes_process"
@@ -227,6 +228,7 @@ class Process(BaseModel, TimestampMixin):
             "drawing_code": self.drawing_code,
             "description": self.description,
             "is_active": self.is_active,
+            "is_subcontracting": self.is_subcontracting,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
         }
@@ -272,6 +274,7 @@ class RouteProcess(BaseModel, TimestampMixin):
     sequence = fields.IntField(default=0, description="工序顺序", index=True)
     work_center_code = fields.CharField(max_length=100, null=True, description="工作中心编码")
     work_center_name = fields.CharField(max_length=255, null=True, description="工作中心名称")
+    is_subcontracting = fields.BooleanField(default=False, description="是否委外工序")
 
     class Meta:
         table = "mes_route_process"
@@ -285,6 +288,7 @@ class RouteProcess(BaseModel, TimestampMixin):
             "sequence": self.sequence,
             "work_center_code": self.work_center_code,
             "work_center_name": self.work_center_name,
+            "is_subcontracting": self.is_subcontracting,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
         }

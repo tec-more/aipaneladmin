@@ -9,6 +9,7 @@ class SupplierType(str, Enum):
     DISTRIBUTOR = "distributor"
     RETAILER = "retailer"
     AGENT = "agent"
+    SUBCONTRACTING = "subcontracting"
 
     @classmethod
     def get_label(cls, value: str) -> str:
@@ -17,6 +18,7 @@ class SupplierType(str, Enum):
             cls.DISTRIBUTOR.value: "经销商",
             cls.RETAILER.value: "零售商",
             cls.AGENT.value: "代理商",
+            cls.SUBCONTRACTING.value: "委外加工",
         }
         return labels.get(value, value)
 
@@ -69,6 +71,7 @@ class Supplier(BaseModel, TimestampMixin):
 
     remark = fields.TextField(null=True, description="备注")
     is_preferred = fields.BooleanField(default=False, description="是否首选供应商")
+    is_subcontracting_qualified = fields.BooleanField(default=False, description="是否具备委外加工资质")
 
     class Meta:
         table = "suppliers"
@@ -98,6 +101,7 @@ class Supplier(BaseModel, TimestampMixin):
             "delivery_days": self.delivery_days,
             "remark": self.remark,
             "is_preferred": self.is_preferred,
+            "is_subcontracting_qualified": self.is_subcontracting_qualified,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
         }
