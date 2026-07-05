@@ -53,7 +53,10 @@ class RabbitMQConnectionManager:
             self._channel = await self._connection.channel()
             await self._channel.set_qos(prefetch_count=settings.RABBITMQ_PREFETCH_COUNT)
 
-            await self._channel.set_confirm(True)
+            try:
+                await self._channel.set_confirm(True)
+            except AttributeError:
+                pass
 
             self._dlq_exchange = await self._channel.declare_exchange(
                 f"{settings.RABBITMQ_DLQ_NAME}.exchange",

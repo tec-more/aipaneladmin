@@ -4,24 +4,24 @@ from loguru import logger
 async def init_subcontracting_data():
     try:
         from base.plugins.inventory.models.inventory_models import StockPickingType
-        existing = await StockPickingType.filter(code="subcontracting_issue").first()
+        existing = await StockPickingType.filter(picking_type_code="subcontracting_issue").first()
         if not existing:
             await StockPickingType.create(
-                name="委外发料",
-                code="subcontracting_issue",
-                type_code="outgoing",
-                sequence_code="SCI",
+                picking_type_code="subcontracting_issue",
+                picking_type_name="委外发料",
+                code="outgoing",
+                sequence_code="SCI/{year}/{month}",
                 is_active=True,
             )
             logger.info("初始化委外发料调拨类型")
 
-        existing = await StockPickingType.filter(code="subcontracting_receipt").first()
+        existing = await StockPickingType.filter(picking_type_code="subcontracting_receipt").first()
         if not existing:
             await StockPickingType.create(
-                name="委外收货",
-                code="subcontracting_receipt",
-                type_code="incoming",
-                sequence_code="SCR",
+                picking_type_code="subcontracting_receipt",
+                picking_type_name="委外收货",
+                code="incoming",
+                sequence_code="SCR/{year}/{month}",
                 is_active=True,
             )
             logger.info("初始化委外收货调拨类型")
