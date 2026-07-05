@@ -107,10 +107,22 @@ async def init_data():
                                 )
                                 if not _exists:
                                     _table_sql = _generator._get_table_sql(_model, True)
-                                    _create_sql = _table_sql[0] if isinstance(_table_sql, tuple) else str(_table_sql)
-                                    _create_sql = _create_sql.format("")
-                                    await _raw_conn.execute(_create_sql)
-                                    print(f"  创建表: {_tbl}")
+                                    # 正确处理 _get_table_sql 的返回值
+                                    # 返回值可能是：dict（包含 table_creation_string）、tuple、或 str
+                                    if isinstance(_table_sql, dict):
+                                        _create_sql = _table_sql.get('table_creation_string', '')
+                                    elif isinstance(_table_sql, tuple):
+                                        _create_sql = _table_sql[0]
+                                    else:
+                                        _create_sql = str(_table_sql)
+                                    
+                                    try:
+                                        await _raw_conn.execute(_create_sql)
+                                        print(f"  创建表: {_tbl}")
+                                    except Exception as exec_err:
+                                        print(f"  创建表 {_tbl} 失败: {exec_err}")
+                                        print(f"  SQL: {_create_sql[:300]}")
+                                        raise
                             except Exception as e:
                                 print(f"  跳过表 {_tbl}: {str(e)[:80]}")
                     await _raw_conn.close()
