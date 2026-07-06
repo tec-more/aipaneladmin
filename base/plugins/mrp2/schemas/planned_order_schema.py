@@ -45,7 +45,7 @@ class PlannedOrderConfirmRequest(BaseModel):
 
 class PlannedOrderListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mrp_id: Optional[int] = Field(None, description="MRP计算ID")
     order_type: Optional[str] = Field(None, description="订单类型")
     material_code: Optional[str] = Field(None, description="物料编码")

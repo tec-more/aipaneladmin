@@ -44,7 +44,7 @@ class QualityInspectionResponse(QualityInspectionBase):
 
 class QualityInspectionListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     inspection_code: Optional[str] = Field(None, description="检验单号")
     inspection_type: Optional[str] = Field(None, description="检验类型")
     material_code: Optional[str] = Field(None, description="物料编码")
@@ -85,7 +85,7 @@ class InspectionStandardResponse(InspectionStandardBase):
 
 class InspectionStandardListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     standard_code: Optional[str] = Field(None, description="标准编码")
     standard_name: Optional[str] = Field(None, description="标准名称")
     inspection_type: Optional[str] = Field(None, description="检验类型")

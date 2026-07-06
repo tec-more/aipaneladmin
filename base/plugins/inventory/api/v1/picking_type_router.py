@@ -111,7 +111,7 @@ async def delete_picking_type(picking_type_id: int):
 @picking_type_router.get("", summary="获取调拨类型列表")
 async def list_picking_types(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     picking_type_code: Optional[str] = Query(None, description="调拨类型编码"),
     picking_type_name: Optional[str] = Query(None, description="调拨类型名称"),
     code: Optional[str] = Query(None, description="类型代码"),

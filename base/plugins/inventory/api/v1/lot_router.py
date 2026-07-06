@@ -111,7 +111,7 @@ async def delete_lot(lot_id: int):
 @lot_router.get("", summary="获取批次列表")
 async def list_lots(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     lot_code: Optional[str] = Query(None, description="批次编码"),
     lot_name: Optional[str] = Query(None, description="批次名称"),
     product_code: Optional[str] = Query(None, description="产品编码"),

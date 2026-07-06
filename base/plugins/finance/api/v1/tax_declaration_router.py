@@ -9,7 +9,7 @@ tax_declaration_router = APIRouter(prefix="/tax-declarations", tags=["税务申�
 @tax_declaration_router.get("/", summary="获取税务申报列表")
 async def get_tax_declarations(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     period: Optional[str] = Query(None, description="期间"),
     tax_type: Optional[str] = Query(None, description="税种"),
     status: Optional[str] = Query(None, description="状态")

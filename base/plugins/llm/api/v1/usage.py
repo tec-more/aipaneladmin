@@ -31,7 +31,7 @@ async def get_usage_records(
     start_date: Optional[str] = Query(None, description="开始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量")
+    page_size: int = Query(10, ge=1, le=200, description="每页数量")
 ):
     """获取使用记录列表"""
     query = LLMUsageRecord.all()
@@ -251,7 +251,7 @@ async def get_unified_usage_records(
     record_type: Optional[str] = Query(None, description="记录类型筛选: voice/tts/voice_clone/conversation"),
     status: Optional[str] = Query(None, description="状态筛选"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量")
+    page_size: int = Query(10, ge=1, le=200, description="每页数量")
 ):
     """获取统一使用记录列表"""
     query = LLMUsageRecord.all()

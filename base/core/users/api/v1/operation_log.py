@@ -17,7 +17,7 @@ router = APIRouter(prefix="/v1/logs", tags=["操作日志"])
 @router.get("/list", summary="获取操作日志列表")
 async def get_log_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=200, description="每页数量"),
         username: Optional[str] = Query(None, description="用户名(模糊搜索)"),
         module: Optional[str] = Query(None, description="操作模块"),
         operation: Optional[str] = Query(None, description="操作类型(模糊搜索)"),

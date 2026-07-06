@@ -28,7 +28,7 @@ async def check_admin(current_user_id: int) -> bool:
 @router.get("/list", summary="获取插件列表")
 async def get_plugin_list(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     keyword: Optional[str] = Query(None, description="搜索关键词"),
     current_user_id: int = Depends(get_current_user_id),

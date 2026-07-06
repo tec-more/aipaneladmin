@@ -101,7 +101,7 @@ class ProductionReceiptResponse(BaseModel):
 
 class MaterialRequisitionListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mo_code: Optional[str] = Field(None, description="制造单编码")
     status: Optional[str] = Field(None, description="状态")
     requisition_type: Optional[str] = Field(None, description="领料类型")
@@ -109,13 +109,13 @@ class MaterialRequisitionListQuery(BaseModel):
 
 class MaterialReturnListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mo_code: Optional[str] = Field(None, description="制造单编码")
     status: Optional[str] = Field(None, description="状态")
 
 
 class ProductionReceiptListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mo_code: Optional[str] = Field(None, description="制造单编码")
     status: Optional[str] = Field(None, description="状态")

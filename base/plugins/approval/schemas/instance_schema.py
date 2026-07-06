@@ -35,7 +35,7 @@ class InstanceResponse(BaseModel):
 class InstanceListQuery(BaseModel):
     """审批实例列表查询"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     status: Optional[str] = Field(None, description="审批状态")
     business_type: Optional[str] = Field(None, description="业务类型")
     applicant_id: Optional[int] = Field(None, description="申请人ID")

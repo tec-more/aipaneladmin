@@ -191,7 +191,7 @@ async def create_product(
 @product_router.get("/list", summary="获取产品列表(分页)")
 async def get_product_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=2000, description="每页数量"),
         name: Optional[str] = Query(None, description="产品名称(模糊搜索)"),
         category: Optional[str] = Query(None, description="产品分类"),
         is_active: Optional[bool] = Query(None, description="是否上架"),
@@ -589,7 +589,7 @@ async def get_product_inventory(
 @product_router.get("/inventory/list", summary="批量获取产品库存")
 async def get_product_inventory_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量")
+        page_size: int = Query(10, ge=1, le=200, description="每页数量")
 ):
     """
     批量获取产品库存信息
@@ -740,7 +740,7 @@ async def get_product_bom(
 @product_router.get("/bom/list", summary="获取所有BOM列表")
 async def get_product_bom_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=200, description="每页数量"),
         product_code: Optional[str] = Query(None, description="成品编码")
 ):
     """

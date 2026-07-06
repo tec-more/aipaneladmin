@@ -9,7 +9,7 @@ opening_balance_router = APIRouter(prefix="/opening-balance", tags=["期初余�
 @opening_balance_router.get("/", summary="获取期初余额列表")
 async def get_opening_balance(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     account_id: Optional[int] = Query(None, description="科目ID"),
     year: Optional[int] = Query(None, description="年份")
 ):

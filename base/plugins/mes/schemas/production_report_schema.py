@@ -56,7 +56,7 @@ class BatchReportResponse(BaseModel):
 
 class ProductionReportListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     wo_code: Optional[str] = Field(None, description="工单编码")
     mo_code: Optional[str] = Field(None, description="制造单编码")
     operator: Optional[str] = Field(None, description="操作员")

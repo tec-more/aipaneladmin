@@ -115,7 +115,7 @@ async def delete_location(location_id: int):
 @location_router.get("", summary="获取库位列表")
 async def list_locations(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     location_code: Optional[str] = Query(None, description="库位编码"),
     location_name: Optional[str] = Query(None, description="库位名称"),
     parent_id: Optional[int] = Query(None, description="父库位ID"),

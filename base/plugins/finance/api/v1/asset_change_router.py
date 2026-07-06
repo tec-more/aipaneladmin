@@ -9,7 +9,7 @@ asset_change_router = APIRouter(prefix="/asset-change", tags=["资产变动"])
 @asset_change_router.get("/", summary="获取资产变动列表")
 async def get_asset_change(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     asset_code: Optional[str] = Query(None, description="资产编号"),
     asset_name: Optional[str] = Query(None, description="资产名称"),
     change_type: Optional[str] = Query(None, description="变动类型"),

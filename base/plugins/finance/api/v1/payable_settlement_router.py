@@ -9,7 +9,7 @@ payable_settlement_router = APIRouter(prefix="/payable-settlement", tags=["应�
 @payable_settlement_router.get("/", summary="获取应付核销列表")
 async def get_payable_settlement(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     supplier_id: Optional[int] = Query(None, description="供应商ID"),
     status: Optional[str] = Query(None, description="状态")
 ):

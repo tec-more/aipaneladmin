@@ -43,6 +43,6 @@ class ContactResponse(BaseModel):
 
 class ContactListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     customer_id: Optional[int] = Field(None, description="客户ID过滤")
     keyword: Optional[str] = Field(None, description="关键词搜索(姓名/手机号)")

@@ -9,7 +9,7 @@ asset_disposal_router = APIRouter(prefix="/asset-disposal", tags=["资产清理"
 @asset_disposal_router.get("/", summary="获取资产清理列表")
 async def get_asset_disposal(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     asset_code: Optional[str] = Query(None, description="资产编号"),
     asset_name: Optional[str] = Query(None, description="资产名称"),
     disposal_type: Optional[str] = Query(None, description="处置方式"),

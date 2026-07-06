@@ -96,7 +96,7 @@ class CustomerTokenResponse(BaseModel):
 class CustomerListQuery(BaseModel):
     """用户列表查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     username: Optional[str] = Field(None, description="用户名(模糊搜索)")
     email: Optional[str] = Field(None, description="邮箱(模糊搜索)")
     phone: Optional[str] = Field(None, description="手机号(模糊搜索)")

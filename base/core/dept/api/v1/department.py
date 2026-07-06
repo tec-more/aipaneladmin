@@ -22,7 +22,7 @@ router = APIRouter(prefix="/v1/departments", tags=["部门管理"])
 @router.get("/list", summary="获取部门列表(分页)")
 async def get_department_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=200, description="每页数量"),
         name: Optional[str] = Query(None, description="部门名称(模糊搜索)"),
         is_active: Optional[bool] = Query(None, description="是否激活"),
         type: Optional[OrgType] = Query(None, description="组织类型"),

@@ -13,7 +13,7 @@ risks_router = APIRouter(prefix="/risks", tags=["风险审计"])
 @risks_router.get("/list")
 async def get_risk_list(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     risk_level: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     risk_type: Optional[str] = Query(None),

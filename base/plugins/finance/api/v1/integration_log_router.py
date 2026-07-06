@@ -16,7 +16,7 @@ integration_log_router = APIRouter(prefix="/integration-logs", tags=["集成日�
 @integration_log_router.get("/", summary="获取集成日志列表")
 async def get_logs(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     event_name: Optional[str] = Query(None),
     source_type: Optional[str] = Query(None),
     result: Optional[str] = Query(None),
@@ -32,7 +32,7 @@ async def get_logs(
 @integration_log_router.get("/failed", summary="获取失败日志列表")
 async def get_failed_logs(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
 ):
     if not FINANCE_AVAILABLE:
         raise HTTPException(status_code=503, detail="财务模块不可用")

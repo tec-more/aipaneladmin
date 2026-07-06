@@ -9,7 +9,7 @@ bill_router = APIRouter(prefix="/bills", tags=["票据管理"])
 @bill_router.get("/", summary="获取票据列表")
 async def get_bills(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     bill_type: Optional[str] = Query(None, description="票据类型"),
     status: Optional[str] = Query(None, description="状态"),
     maturity_date: Optional[str] = Query(None, description="到期日期")

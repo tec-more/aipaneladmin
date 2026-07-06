@@ -111,7 +111,7 @@ async def delete_warehouse(warehouse_id: int):
 @warehouse_router.get("", summary="获取仓库列表")
 async def list_warehouses(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     warehouse_code: Optional[str] = Query(None, description="仓库编码"),
     warehouse_name: Optional[str] = Query(None, description="仓库名称"),
     warehouse_type: Optional[str] = Query(None, description="仓库类型"),

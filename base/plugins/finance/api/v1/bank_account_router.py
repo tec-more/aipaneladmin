@@ -9,7 +9,7 @@ bank_account_router = APIRouter(prefix="/bank-accounts", tags=["银行账户"])
 @bank_account_router.get("/", summary="获取银行账户列表")
 async def get_bank_accounts(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     keyword: Optional[str] = Query(None, description="搜索关键词")
 ):
     return SuccessResponse(data={

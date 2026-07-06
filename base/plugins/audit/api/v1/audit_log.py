@@ -37,7 +37,7 @@ audit_log_router = APIRouter(prefix="/audit-logs", tags=["审计日志"])
 @audit_log_router.get("/trace/list")
 async def get_trace_list(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     trace_id: Optional[str] = Query(None, description="追踪ID"),
     user_id: Optional[int] = Query(None, description="用户ID"),
     module: Optional[str] = Query(None, description="模块"),

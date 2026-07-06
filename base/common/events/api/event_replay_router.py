@@ -48,7 +48,7 @@ async def query_replay_audit_logs(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
 ):
     if not SERVICES_AVAILABLE:
         raise HTTPException(status_code=503, detail="事件服务不可用")

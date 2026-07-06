@@ -91,7 +91,7 @@ async def get_order_by_no(order_no: str):
 async def get_customer_orders(
         customer_id: int,
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(20, ge=1, le=1000, description="每页数量")
+        page_size: int = Query(20, ge=1, le=2000, description="每页数量")
 ):
     orders = await OrderService.get_orders_by_customer(customer_id, page, page_size)
 
@@ -132,7 +132,7 @@ async def get_customer_orders(
 @order_router.get("/", response_model=OrderListResponse, summary="获取所有订单列表")
 async def get_all_orders(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=1000, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=2000, description="每页数量"),
     order_no: Optional[str] = Query(None, description="订单号"),
     customer_name: Optional[str] = Query(None, description="客户名称"),
     product_name: Optional[str] = Query(None, description="产品名称"),
@@ -183,7 +183,7 @@ async def get_all_orders(
 @order_router.get("/list", response_model=OrderListResponse, summary="获取所有订单列表(别名路由)")
 async def get_all_orders_alias(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=1000, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=2000, description="每页数量"),
     order_no: Optional[str] = Query(None, description="订单号"),
     customer_name: Optional[str] = Query(None, description="客户名称"),
     product_name: Optional[str] = Query(None, description="产品名称"),

@@ -53,7 +53,7 @@ class PluginResponse(BaseModel):
 class PluginListQuery(BaseModel):
     """插件列表查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     is_enabled: Optional[bool] = Field(None, description="是否启用")
     keyword: Optional[str] = Field(None, description="搜索关键词")
 

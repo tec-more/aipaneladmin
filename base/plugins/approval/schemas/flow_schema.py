@@ -46,7 +46,7 @@ class FlowResponse(BaseModel):
 class FlowListQuery(BaseModel):
     """流程列表查询"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     name: Optional[str] = Field(None, description="流程名称(模糊搜索)")
     business_type: Optional[str] = Field(None, description="业务类型")
     is_active: Optional[bool] = Field(None, description="是否启用")

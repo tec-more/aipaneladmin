@@ -21,7 +21,7 @@ router = APIRouter(prefix="/v1/users", tags=["用户管理"])
 @router.get("/list", summary="获取用户列表(分页)")
 async def get_user_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=200, description="每页数量"),
         username: Optional[str] = Query(None, description="用户名(模糊搜索)"),
         email: Optional[str] = Query(None, description="邮箱(模糊搜索)"),
         is_active: Optional[bool] = Query(None, description="是否激活"),

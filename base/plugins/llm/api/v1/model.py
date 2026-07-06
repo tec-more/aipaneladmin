@@ -34,7 +34,7 @@ async def get_models(
     provider_id: Optional[int] = Query(None, description="厂商ID筛选"),
     status: Optional[str] = Query(None, description="状态筛选"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(1000, ge=1, le=10000, description="每页数量")
+    page_size: int = Query(1000, ge=1, le=20000, description="每页数量")
 ):
     """获取大模型列表"""
     query = LLMModel.all()

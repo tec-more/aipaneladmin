@@ -16,7 +16,7 @@ trace_router = APIRouter(prefix="/trace", tags=["全链路追踪"])
 @trace_router.get("/list")
 async def get_trace_list(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     trace_id: Optional[str] = Query(None),
     user_id: Optional[str] = Query(None),
     module: Optional[str] = Query(None),

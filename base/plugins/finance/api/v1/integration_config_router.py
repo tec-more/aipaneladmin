@@ -34,7 +34,7 @@ class SetConfigRequest(BaseModel):
 @integration_config_router.get("/", summary="获取集成配置列表")
 async def get_configs(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
 ):
     if not FINANCE_AVAILABLE:
         raise HTTPException(status_code=503, detail="财务模块不可用")

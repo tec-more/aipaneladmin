@@ -32,7 +32,7 @@ class UpdateMappingRequest(BaseModel):
 @integration_account_mapping_router.get("/", summary="获取科目映射列表")
 async def get_mappings(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     event_type: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
 ):

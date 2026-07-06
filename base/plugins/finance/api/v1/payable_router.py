@@ -9,7 +9,7 @@ payable_router = APIRouter(prefix="/payables", tags=["应付管理"])
 @payable_router.get("/", summary="获取应付单列表")
 async def get_payables(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     supplier_id: Optional[int] = Query(None, description="供应商ID"),
     status: Optional[str] = Query(None, description="状态"),
     due_date_start: Optional[str] = Query(None, description="到期日期开始"),

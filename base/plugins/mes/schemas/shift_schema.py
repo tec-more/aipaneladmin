@@ -81,6 +81,6 @@ class ShiftHandoverResponse(BaseModel):
 
 class ShiftListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     shift_code: Optional[str] = Field(None, description="班次编码")
     work_center_code: Optional[str] = Field(None, description="工作中心编码")

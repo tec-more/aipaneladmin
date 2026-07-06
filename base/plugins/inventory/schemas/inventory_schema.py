@@ -70,7 +70,7 @@ class StockLocationResponse(StockLocationBase):
 class StockLocationQuery(BaseModel):
     """库位查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     location_code: Optional[str] = Field(None, description="库位编码")
     location_name: Optional[str] = Field(None, description="库位名称")
     parent_id: Optional[int] = Field(None, description="父库位ID")
@@ -155,7 +155,7 @@ class StockWarehouseResponse(StockWarehouseBase):
 class StockWarehouseQuery(BaseModel):
     """仓库查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     warehouse_code: Optional[str] = Field(None, description="仓库编码")
     warehouse_name: Optional[str] = Field(None, description="仓库名称")
     warehouse_type: Optional[str] = Field(None, description="仓库类型")
@@ -221,7 +221,7 @@ class StockPickingTypeResponse(StockPickingTypeBase):
 class StockPickingTypeQuery(BaseModel):
     """调拨类型查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     picking_type_code: Optional[str] = Field(None, description="调拨类型编码")
     picking_type_name: Optional[str] = Field(None, description="调拨类型名称")
     code: Optional[str] = Field(None, description="类型代码")
@@ -311,7 +311,7 @@ class StockPickingResponse(StockPickingBase):
 class StockPickingQuery(BaseModel):
     """调拨单查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     picking_code: Optional[str] = Field(None, description="调拨单编码")
     picking_type_id: Optional[int] = Field(None, description="调拨类型ID")
     picking_type_code: Optional[str] = Field(None, description="调拨类型编码")
@@ -416,7 +416,7 @@ class StockMoveResponse(StockMoveBase):
 class StockMoveQuery(BaseModel):
     """移动明细查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     move_code: Optional[str] = Field(None, description="移动编码")
     picking_id: Optional[int] = Field(None, description="调拨单ID")
     picking_code: Optional[str] = Field(None, description="调拨单编码")
@@ -522,7 +522,7 @@ class StockMoveLineResponse(StockMoveLineBase):
 class StockMoveLineQuery(BaseModel):
     """移动明细行查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     move_line_code: Optional[str] = Field(None, description="明细行编码")
     picking_id: Optional[int] = Field(None, description="调拨单ID")
     move_id: Optional[int] = Field(None, description="移动明细ID")
@@ -616,7 +616,7 @@ class StockQuantResponse(StockQuantBase):
 class StockQuantQuery(BaseModel):
     """库存数量查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     quant_code: Optional[str] = Field(None, description="库存编码")
     product_code: Optional[str] = Field(None, description="产品编码")
     location_id: Optional[int] = Field(None, description="库位ID")
@@ -674,7 +674,7 @@ class StockQuantReservationResponse(StockQuantReservationBase):
 class StockQuantReservationQuery(BaseModel):
     """库存预留查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     reservation_code: Optional[str] = Field(None, description="预留编码")
     quant_id: Optional[int] = Field(None, description="库存ID")
     move_id: Optional[int] = Field(None, description="移动明细ID")
@@ -739,7 +739,7 @@ class StockLotResponse(StockLotBase):
 class StockLotQuery(BaseModel):
     """批次查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     lot_code: Optional[str] = Field(None, description="批次编码")
     lot_name: Optional[str] = Field(None, description="批次名称")
     product_code: Optional[str] = Field(None, description="产品编码")
@@ -810,7 +810,7 @@ class StockPackageResponse(StockPackageBase):
 class StockPackageQuery(BaseModel):
     """包裹查询参数"""
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     package_code: Optional[str] = Field(None, description="包裹编码")
     package_name: Optional[str] = Field(None, description="包裹名称")
     package_type: Optional[str] = Field(None, description="包裹类型")

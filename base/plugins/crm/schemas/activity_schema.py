@@ -37,7 +37,7 @@ class ActivityResponse(BaseModel):
 
 class ActivityListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     lead_id: Optional[int] = Field(None, description="线索ID过滤")
     opportunity_id: Optional[int] = Field(None, description="商机ID过滤")
     type: Optional[str] = Field(None, description="活动类型过滤")
@@ -45,6 +45,6 @@ class ActivityListQuery(BaseModel):
 
 class TimelineQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=20, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=20, ge=1, le=200, description="每页数量")
     lead_id: Optional[int] = Field(None, description="线索ID")
     opportunity_id: Optional[int] = Field(None, description="商机ID")

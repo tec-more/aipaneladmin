@@ -50,7 +50,7 @@ quant_router = APIRouter(prefix="/quants", tags=["库存查询"])
 @quant_router.get("", response_model=ListResponse, summary="获取库存列表")
 async def list_quants(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     quant_code: Optional[str] = Query(None, description="库存编码"),
     product_code: Optional[str] = Query(None, description="产品编码"),
     location_id: Optional[int] = Query(None, description="库位ID"),
@@ -98,7 +98,7 @@ async def get_quants_by_location(location_id: int):
 @quant_router.get("/reservations", summary="获取库存预留列表")
 async def list_reservations(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     product_code: Optional[str] = Query(None, description="产品编码"),
     location_name: Optional[str] = Query(None, description="库位名称")
 ):

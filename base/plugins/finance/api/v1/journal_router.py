@@ -13,7 +13,7 @@ journal_router = APIRouter(prefix="/journals", tags=["凭证管理"])
 @journal_router.get("/", summary="获取凭证列表")
 async def get_journals(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     journal_type: Optional[str] = Query(None, description="凭证类型"),
     status: Optional[str] = Query(None, description="凭证状态"),
     period: Optional[str] = Query(None, description="会计期间"),

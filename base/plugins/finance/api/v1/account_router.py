@@ -11,7 +11,7 @@ account_router = APIRouter(prefix="/accounts", tags=["会计科目"])
 @account_router.get("/", summary="获取会计科目列表")
 async def get_accounts(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     account_type: Optional[str] = Query(None, description="科目类型"),
     keyword: Optional[str] = Query(None, description="搜索关键词")
 ):

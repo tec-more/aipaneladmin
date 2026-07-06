@@ -232,7 +232,7 @@ async def print_picking(picking_id: int):
 @picking_router.get("", summary="获取调拨单列表")
 async def list_pickings(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
     picking_code: Optional[str] = Query(None, description="调拨单编码"),
     picking_type_id: Optional[int] = Query(None, description="调拨类型ID"),
     picking_type_code: Optional[str] = Query(None, description="调拨类型编码"),

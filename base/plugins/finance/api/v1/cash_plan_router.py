@@ -9,7 +9,7 @@ cash_plan_router = APIRouter(prefix="/cash-plan", tags=["资金计划"])
 @cash_plan_router.get("/", summary="获取资金计划列表")
 async def get_cash_plan(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     period: Optional[str] = Query(None, description="期间")
 ):
     return SuccessResponse(data={

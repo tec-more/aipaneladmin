@@ -13,7 +13,7 @@ reports_router = APIRouter(prefix="/reports", tags=["audit reports"])
 @reports_router.get("/list")
 async def get_report_list(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     report_type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     start_time: Optional[datetime] = Query(None),

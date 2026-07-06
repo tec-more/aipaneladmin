@@ -9,7 +9,7 @@ tax_router = APIRouter(prefix="/tax", tags=["税务管理"])
 @tax_router.get("/invoices", summary="获取发票列表")
 async def get_tax_invoices(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     is_input: bool = Query(True, description="是否进项"),
     customer_id: Optional[int] = Query(None, description="客户ID"),
     supplier_id: Optional[int] = Query(None, description="供应商ID"),
@@ -37,7 +37,7 @@ async def verify_tax_invoice(tax_id: int):
 @tax_router.get("/out", summary="获取销项发票列表")
 async def get_tax_out(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     customer_id: Optional[int] = Query(None, description="客户ID"),
     period: Optional[str] = Query(None, description="期间")
 ):
@@ -57,7 +57,7 @@ async def create_tax_out():
 @tax_router.get("/in", summary="获取进项发票列表")
 async def get_tax_in(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     supplier_id: Optional[int] = Query(None, description="供应商ID"),
     period: Optional[str] = Query(None, description="期间")
 ):

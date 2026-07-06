@@ -14,7 +14,7 @@ report_router = APIRouter(prefix="/reports", tags=["财务报表"])
 @report_router.get("/daily", summary="获取日记账列表")
 async def get_daily_journal(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     journal_date_start: Optional[str] = Query(None, description="开始日期"),
     journal_date_end: Optional[str] = Query(None, description="结束日期"),
     account_id: Optional[int] = Query(None, description="科目ID"),
@@ -36,7 +36,7 @@ async def get_daily_journal(
 @report_router.get("/ledger", summary="获取总账列表")
 async def get_general_ledger(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     period: Optional[str] = Query(None, description="会计期间"),
     account_id: Optional[int] = Query(None, description="科目ID"),
     year: Optional[int] = Query(None, description="年份"),
@@ -58,7 +58,7 @@ async def get_general_ledger(
 @report_router.get("/trial_balance", summary="获取科目余额表")
 async def get_trial_balance(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     period: Optional[str] = Query(None, description="会计期间"),
     account_type: Optional[str] = Query(None, description="科目类型"),
     year: Optional[int] = Query(None, description="年份"),

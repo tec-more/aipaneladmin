@@ -13,7 +13,7 @@ data_change_log_router = APIRouter(prefix="/data-changes", tags=["数据变更�
 @data_change_log_router.get("/list")
 async def get_data_change_log_list(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     table_name: Optional[str] = Query(None, description="表名"),
     record_id: Optional[str] = Query(None, description="记录ID"),
     change_type: Optional[str] = Query(None, description="变更类型"),

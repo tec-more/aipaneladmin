@@ -44,7 +44,7 @@ router = APIRouter(prefix="/v1/rbac", tags=["角色权限管理"])
 @router.get("/roles/list", summary="获取角色列表")
 async def get_role_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=200, description="每页数量"),
         name: Optional[str] = Query(None, description="角色名称(模糊搜索)"),
         is_active: Optional[bool] = Query(None, description="是否激活"),
         user_id: int = require_permission("role:list")
@@ -189,7 +189,7 @@ async def assign_permission_groups(
 @router.get("/permissions/list", summary="获取权限列表")
 async def get_permission_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=200, description="每页数量"),
         module: Optional[str] = Query(None, description="所属模块"),
         is_active: Optional[bool] = Query(None, description="是否激活"),
         user_id: int = require_permission("permission:list")
@@ -281,7 +281,7 @@ async def delete_permission(
 @router.get("/permission-groups/list", summary="获取权限组列表")
 async def get_permission_group_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=200, description="每页数量"),
         name: Optional[str] = Query(None, description="权限组名称(模糊搜索)"),
         is_active: Optional[bool] = Query(None, description="是否激活"),
         user_id: int = require_permission("permission_group:list")

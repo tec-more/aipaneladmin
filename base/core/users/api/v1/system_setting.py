@@ -21,7 +21,7 @@ router = APIRouter(prefix="/v1/system-settings", tags=["系统设置"])
 @router.get("/list", summary="获取系统设置列表(分页)")
 async def get_system_setting_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(100, ge=1, le=100, description="每页数量"),
+        page_size: int = Query(100, ge=1, le=200, description="每页数量"),
         key: Optional[str] = Query(None, description="设置键(模糊搜索)"),
         name: Optional[str] = Query(None, description="设置名称(模糊搜索)"),
         is_active: Optional[bool] = Query(None, description="是否激活"),

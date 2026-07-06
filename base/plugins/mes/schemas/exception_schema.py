@@ -42,7 +42,7 @@ class ProductionExceptionResponse(BaseModel):
 
 class ProductionExceptionListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     exception_type: Optional[str] = Field(None, description="异常类型")
     severity: Optional[str] = Field(None, description="严重程度")
     status: Optional[str] = Field(None, description="状态")

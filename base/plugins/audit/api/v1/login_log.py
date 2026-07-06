@@ -13,7 +13,7 @@ login_log_router = APIRouter(prefix="/login-logs", tags=["登录日志"])
 @login_log_router.get("/list")
 async def get_login_log_list(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     username: Optional[str] = Query(None, description="用户名"),
     login_type: Optional[str] = Query(None, description="登录类型"),
     login_method: Optional[str] = Query(None, description="登录方式"),

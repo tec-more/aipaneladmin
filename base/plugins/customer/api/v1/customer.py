@@ -112,7 +112,7 @@ customer_router = APIRouter(
 @customer_router.get("/list", summary="获取客户列表(分页)")
 async def get_customer_list(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=2000, description="每页数量"),
         username: Optional[str] = Query(None, description="用户名(模糊搜索)"),
         email: Optional[str] = Query(None, description="邮箱(模糊搜索)"),
         phone: Optional[str] = Query(None, description="手机号(模糊搜索)"),
@@ -198,7 +198,7 @@ async def get_customer_list(
 async def get_membership_levels_alias(
         active_only: bool = Query(True, description="只显示启用的等级"),
         page: Optional[int] = Query(None, ge=1, description="页码"),
-        page_size: Optional[int] = Query(None, ge=1, le=100, description="每页数量")
+        page_size: Optional[int] = Query(None, ge=1, le=200, description="每页数量")
 ):
     """获取会员等级列表 (兼容前端调用，支持分页参数但不使用)"""
     try:
@@ -222,7 +222,7 @@ async def get_membership_levels_alias(
 @customer_router.get("/usage", summary="获取使用记录列表(别名路由)")
 async def get_usage_logs_alias(
         page: int = Query(1, ge=1, description="页码"),
-        page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+        page_size: int = Query(10, ge=1, le=2000, description="每页数量"),
         customer_id: Optional[int] = Query(None, description="客户ID"),
         service_type: Optional[str] = Query(None, description="服务类型"),
         current_user_id: int = Depends(get_current_user_id)
@@ -371,7 +371,7 @@ async def create_test_usage_log(
 @customer_router.get("/usage-logs", summary="获取所有使用记录列表(管理员)")
 async def get_all_usage_logs(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=2000, description="每页数量"),
     customer_id: Optional[int] = Query(None, description="客户ID"),
     service_type: Optional[str] = Query(None, description="服务类型"),
     current_user_id: int = Depends(get_current_user_id)
@@ -534,7 +534,7 @@ async def toggle_membership_level_status_alias(
 @customer_router.get("/payment-transactions", summary="获取支付交易记录列表(别名路由)")
 async def get_payment_transactions_alias(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=2000, description="每页数量"),
     trade_no: Optional[str] = Query(None, description="交易号(模糊搜索)"),
     payment_method: Optional[str] = Query(None, description="支付方式(wechat/alipay)"),
     payment_status: Optional[str] = Query(None, description="交易状态"),

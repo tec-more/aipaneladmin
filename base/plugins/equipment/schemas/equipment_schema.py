@@ -48,7 +48,7 @@ class EquipmentResponse(EquipmentBase):
 
 class EquipmentListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     equipment_code: Optional[str] = Field(None, description="设备编码")
     equipment_name: Optional[str] = Field(None, description="设备名称")
     equipment_type: Optional[str] = Field(None, description="设备类型")
@@ -91,7 +91,7 @@ class EquipmentMaintenanceResponse(EquipmentMaintenanceBase):
 
 class EquipmentMaintenanceListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     maintenance_code: Optional[str] = Field(None, description="保养单号")
     equipment_code: Optional[str] = Field(None, description="设备编码")
     maintenance_type: Optional[str] = Field(None, description="保养类型")
@@ -134,7 +134,7 @@ class EquipmentFaultResponse(EquipmentFaultBase):
 
 class EquipmentFaultListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     fault_code: Optional[str] = Field(None, description="故障单号")
     equipment_code: Optional[str] = Field(None, description="设备编码")
     fault_level: Optional[str] = Field(None, description="故障级别")

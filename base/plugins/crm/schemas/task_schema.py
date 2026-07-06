@@ -46,7 +46,7 @@ class FollowUpTaskResponse(BaseModel):
 
 class TaskListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     status: Optional[str] = Field(None, description="任务状态过滤")
     assigned_to: Optional[int] = Field(None, description="执行人过滤")
     lead_id: Optional[int] = Field(None, description="线索ID过滤")

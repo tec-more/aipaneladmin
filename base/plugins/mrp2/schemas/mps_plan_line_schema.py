@@ -40,7 +40,7 @@ class MPSPlanLineResponse(MPSPlanLineBase):
 
 class MPSPlanLineListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mps_id: Optional[int] = Field(None, description="MPS ID")
     product_code: Optional[str] = Field(None, description="产品编码")
     status: Optional[str] = Field(None, description="状态")

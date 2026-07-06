@@ -72,7 +72,7 @@ class SalesForecastDetailResponse(SalesForecastDetailBase):
 
 class SalesForecastListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     forecast_code: Optional[str] = Field(None, description="预测编号")
     forecast_name: Optional[str] = Field(None, description="预测名称")
     forecast_type: Optional[str] = Field(None, description="预测类型")
@@ -153,7 +153,7 @@ class MPSDetailResponse(MPSDetailBase):
 
 class MPSListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mps_code: Optional[str] = Field(None, description="MPS编号")
     mps_name: Optional[str] = Field(None, description="MPS名称")
     status: Optional[str] = Field(None, description="状态")
@@ -224,7 +224,7 @@ class MRPResultDetailResponse(BaseModel):
 
 class MRPListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mrp_code: Optional[str] = Field(None, description="MRP编号")
     mrp_name: Optional[str] = Field(None, description="MRP名称")
     status: Optional[str] = Field(None, description="状态")
@@ -287,7 +287,7 @@ class CRPDetailResponse(BaseModel):
 
 class CRPListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     crp_code: Optional[str] = Field(None, description="CRP编号")
     crp_name: Optional[str] = Field(None, description="CRP名称")
     status: Optional[str] = Field(None, description="状态")
@@ -328,7 +328,7 @@ class MonitorResponse(PlanExecutionMonitorBase):
 
 class MonitorListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     monitor_code: Optional[str] = Field(None, description="监控编号")
     monitor_name: Optional[str] = Field(None, description="监控名称")
     status: Optional[str] = Field(None, description="状态")
@@ -364,7 +364,7 @@ class AlertResponse(MRPExceptionAlertBase):
 
 class AlertListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     alert_code: Optional[str] = Field(None, description="告警编号")
     alert_type: Optional[str] = Field(None, description="告警类型")
     alert_level: Optional[str] = Field(None, description="告警级别")

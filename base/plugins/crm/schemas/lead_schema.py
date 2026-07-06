@@ -51,7 +51,7 @@ class LeadResponse(BaseModel):
 
 class LeadListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     status: Optional[str] = Field(None, description="线索状态过滤")
     source: Optional[str] = Field(None, description="线索来源过滤")
     assigned_to: Optional[int] = Field(None, description="负责人过滤")

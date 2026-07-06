@@ -9,7 +9,7 @@ receipt_router = APIRouter(prefix="/receipts", tags=["收款管理"])
 @receipt_router.get("/", summary="获取收款单列表")
 async def get_receipts(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=200, description="每页数量"),
     customer_id: Optional[int] = Query(None, description="客户ID"),
     status: Optional[str] = Query(None, description="状态"),
     receipt_date_start: Optional[str] = Query(None, description="收款日期开始"),

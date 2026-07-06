@@ -45,7 +45,7 @@ async def get_api_keys(
     model_service_type: Optional[str] = Query(None, description="服务类型筛选"),
     status: Optional[str] = Query(None, description="状态筛选"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量")
+    page_size: int = Query(10, ge=1, le=200, description="每页数量")
 ):
     """获取API密钥列表"""
     query = LLMApiKey.all()

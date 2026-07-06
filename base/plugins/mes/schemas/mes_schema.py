@@ -40,7 +40,7 @@ class MaterialResponse(MaterialBase):
 
 class MaterialListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     material_code: Optional[str] = Field(None, description="物料编码")
     material_name: Optional[str] = Field(None, description="物料名称")
     material_type: Optional[str] = Field(None, description="物料类型")
@@ -94,7 +94,7 @@ class BomResponse(BomBase):
 
 class BomListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     product_code: Optional[str] = Field(None, description="成品编码")
     item_code: Optional[str] = Field(None, description="物料编码")
     version: Optional[str] = Field(None, description="版本号")
@@ -135,7 +135,7 @@ class WorkCenterResponse(WorkCenterBase):
 
 class WorkCenterListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     work_center_code: Optional[str] = Field(None, description="工作中心编码")
     work_center_name: Optional[str] = Field(None, description="工作中心名称")
     department: Optional[str] = Field(None, description="所属部门")
@@ -180,7 +180,7 @@ class ProcessResponse(ProcessBase):
 
 class ProcessListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     process_code: Optional[str] = Field(None, description="工序编码")
     process_name: Optional[str] = Field(None, description="工序名称")
     work_center_code: Optional[str] = Field(None, description="工作中心编码")
@@ -221,7 +221,7 @@ class RouteResponse(RouteBase):
 
 class RouteListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     route_code: Optional[str] = Field(None, description="路线编码")
     route_name: Optional[str] = Field(None, description="路线名称")
     product_code: Optional[str] = Field(None, description="产品编码")
@@ -273,7 +273,7 @@ class ManufacturingOrderResponse(ManufacturingOrderBase):
 
 class ManufacturingOrderListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     mo_code: Optional[str] = Field(None, description="制造单编码")
     product_code: Optional[str] = Field(None, description="产品编码")
     status: Optional[str] = Field(None, description="状态")
@@ -329,7 +329,7 @@ class WorkOrderResponse(WorkOrderBase):
 
 class WorkOrderListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     wo_code: Optional[str] = Field(None, description="工单编码")
     mo_code: Optional[str] = Field(None, description="制造单编码")
     product_code: Optional[str] = Field(None, description="产品编码")
@@ -378,7 +378,7 @@ class QualityInspectionResponse(QualityInspectionBase):
 
 class QualityInspectionListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     inspection_code: Optional[str] = Field(None, description="检验单号")
     inspection_type: Optional[str] = Field(None, description="检验类型")
     material_code: Optional[str] = Field(None, description="物料编码")
@@ -430,7 +430,7 @@ class EquipmentResponse(EquipmentBase):
 
 class EquipmentListQuery(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    page_size: int = Field(default=10, ge=1, le=200, description="每页数量")
     equipment_code: Optional[str] = Field(None, description="设备编码")
     equipment_name: Optional[str] = Field(None, description="设备名称")
     equipment_type: Optional[str] = Field(None, description="设备类型")
