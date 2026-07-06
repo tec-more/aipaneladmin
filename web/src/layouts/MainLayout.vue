@@ -116,6 +116,9 @@
         </router-view>
       </el-main>
     </el-container>
+
+    <!-- 全局审批提示组件 -->
+    <ApprovalPrompt />
   </el-container>
 
   <!-- 修改密码弹窗 -->
@@ -153,6 +156,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useMenuStore } from '@/stores/menu'
 import { changePassword } from '@/api/auth'
+import ApprovalPrompt from '@/views/approval/ApprovalPrompt.vue'
 
 // 图标组件映射
 const iconComponents = {

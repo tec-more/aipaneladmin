@@ -87,6 +87,12 @@ request.interceptors.response.use(
       return response
     }
     const res = response.data
+    // 审批拦截响应：code=40001，需要引导用户提交审批
+    if (res && res.code === 40001 && res.require_approval) {
+      // 触发全局审批提示事件
+      window.dispatchEvent(new CustomEvent('approval-required', { detail: res }))
+      return Promise.reject(new Error('NEED_APPROVAL'))
+    }
     // 后端成功响应码为 0 或 success 为 true
     // 兼容直接返回数据的格式（如分页响应 {items, total}）
     if (res.code === 0 || res.code === 200 || res.success === true || (res.items !== undefined)) {
@@ -117,6 +123,10 @@ request.interceptors.response.use(
         router.push('/panel/login')
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
+      } else if (status === 400 && data?.code === 40001 && data?.require_approval) {
+        // 审批拦截：触发全局审批提示事件，不显示错误提示
+        window.dispatchEvent(new CustomEvent('approval-required', { detail: data }))
+        return Promise.reject(new Error('NEED_APPROVAL'))
       } else if (status === 400) {
         // 400 Bad Request - 显示详细错误信息
         const errorMsg = data?.msg || data?.message || error.message || '请求参数错误'
