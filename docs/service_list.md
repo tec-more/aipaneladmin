@@ -41,8 +41,7 @@
 | 文件 | 类名 | model | 说明 |
 |------|------|-------|------|
 | `approval/services/approval_gate.py` | - | - | 审批门禁 + 执行器（核心，不继承 BaseBusinessService） |
-| `approval/services/flow_service.py` | `FlowService` | - | 审批流程 CRUD |
-| `approval/services/rule_service.py` | `RuleService` | - | 审批规则 CRUD + 匹配 |
+| `approval/services/flow_service.py` | `FlowService` | - | 审批流程规则 CRUD + 模型匹配（流程本身即审批规则） |
 | `approval/services/instance_service.py` | `InstanceService` | - | 审批实例管理 |
 | `approval/services/task_service.py` | `TaskService` | - | 审批任务管理 |
 

@@ -6,8 +6,8 @@
    转成与原中间件一致的 ``code=40001`` JSON，前端拦截器零改动。
 2. 提供 ``gate_write(model, action, payload, business_id, applicant_id, title)`` ——
    service 在写操作前调用（由 BaseBusinessService 的 create/update/delete 自动触发）：
-   按模型+动作查 approval_rule 表，命中则自动创建审批实例并抛 NeedApprovalError；
-   否则静默放行（判定异常默认放行）。
+   按模型+动作查 approval_flow 表（流程本身即审批规则），命中则自动创建审批实例并抛
+   NeedApprovalError；否则静默放行（判定异常默认放行）。
 3. ``register_executor`` / ``APPROVAL_EXECUTORS`` —— 执行器注册表，存
    ``(model, action) → (service_cls, method_name)``。BaseBusinessService 的
    ``__init_subclass__`` 自动登记 ``_do_create/_do_update/_do_delete``。
@@ -17,8 +17,9 @@
 设计要点：
 - 门禁与执行分离：BaseBusinessService 的 ``create`` 是「门禁→_do_create」，
   注册表存的是 ``_do_*``（不带门禁），executor 只调 ``_do_*``，杜绝递归。
-- 审批决策来源：``RuleService.check_approval_required_by_model`` 查询
-  ``approval_rule`` 表（后台配置），不依赖任何代码注解/装饰器。
+- 审批决策来源：``FlowService.check_approval_required_by_model`` 查询
+  流程（approval_flow）表的 model/action/methods/priority 字段（后台配置），
+  不依赖任何代码注解/装饰器。
 - 参数约定：
   create  -> method(payload)
   update  -> method(business_id, payload)
@@ -111,12 +112,12 @@ async def gate_write(
             logger.warning("审批门禁：缺少申请人上下文，跳过审批判定（放行）")
             return
 
-        from base.plugins.approval.services.rule_service import RuleService
+        from base.plugins.approval.services.flow_service import FlowService
         from base.plugins.approval.services.instance_service import InstanceService
         from base.plugins.approval.schemas.instance_schema import InstanceCreate
 
         method = ACTION_TO_METHOD.get(action, "POST")
-        check = await RuleService.check_approval_required_by_model(model, method)
+        check = await FlowService.check_approval_required_by_model(model, method)
         if not check.get("require_approval"):
             return
 

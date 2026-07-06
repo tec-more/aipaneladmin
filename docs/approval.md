@@ -66,18 +66,18 @@ graph TD
 
 - id, instance_id, task_id, node_id, operator_id, action, comment, before_status, after_status, created_at
 
-6. **ApprovalRule**（审批规则配置）
+6. 审批规则已合并进流程（ApprovalFlow）
 
-- id, business_type, path_pattern, methods(JSON), flow_id, is_active, priority, created_at, updated_at
+- 业务模型匹配（model / action / methods / priority）直接作为 `approval_flow` 表的字段，流程本身即审批规则，不再单独维护 approval_rule 表。
+- ApprovalFlow 新增字段：model（业务模型标识）、action（执行动作 create/update/delete，NULL 表示匹配全部）、methods（拦截 HTTP 方法 JSON）、priority（优先级，越大越高）。
 
-### 全局中间件实现
+### 审批门禁实现
 
-利用项目现有的中间件自动发现机制，在 `base/plugins/approval/middleware/approval_middleware.py` 中实现：
+审批判定下沉到 Service 层，由 `base/plugins/approval/services/approval_gate.py` 的 `gate_write` 触发（BaseBusinessService 的写操作自动调用）：
 
-- 中间件在请求到达路由之前执行
-- 根据请求的 path 和 method 查询 ApprovalRule 表
-- 如果匹配到启用的规则，检查对应的审批流程
-- 如果需要审批，返回 JSON 响应：`{"code": 40001, "msg": "该操作需要审批", "require_approval": true, "flow_id": 1, "flow_name": "采购审批"}`
+- 根据业务模型（model）与 HTTP 方法（method）查询 `approval_flow` 表
+- 仅匹配启用流程；method 需在流程 methods 列表；流程指定了 action 时仅匹配该动作；同一 model+action 命中多条流程按 priority 取最高
+- 如果匹配到流程，自动创建审批实例并抛 `NeedApprovalError`，由全局异常处理器返回 JSON：`{"code": 40001, "msg": "该操作需要审批", "require_approval": true, "flow_id": 1, "flow_name": "采购审批"}`
 - 前端 response 拦截器捕获该响应，引导用户提交审批
 
 ### 审批引擎核心逻辑
@@ -99,14 +99,12 @@ base/plugins/approval/
 │   ├── approval_flow.py
 │   ├── approval_instance.py
 │   ├── approval_task.py
-│   ├── approval_record.py
-│   └── approval_rule.py
+│   └── approval_record.py
 ├── schemas/
 │   ├── __init__.py
 │   ├── flow_schema.py
 │   ├── instance_schema.py
-│   ├── task_schema.py
-│   └── rule_schema.py
+│   └── task_schema.py
 ├── services/
 │   ├── __init__.py
 │   ├── flow_service.py
@@ -137,15 +135,15 @@ web/src/views/approval/
 
 ## 实施要点
 
-1. **中间件优先级**：确保审批中间件在业务路由之前执行，通过设置较高的优先级实现
-2. **性能优化**：ApprovalRule 查询结果缓存至 Redis 或内存，避免每次请求都查询数据库
+1. **门禁优先级**：审批门禁在 BaseBusinessService 写操作中主动调用，命中即创建实例并抛 NeedApprovalError
+2. **性能优化**：按模型匹配的流程查询结果走 model 索引，命中流程数小，无需缓存；插件扫描结果已缓存
 3. **前端集成**：修改 `web/src/utils/request.js` 的响应拦截器，处理 code=40001 的情况
 4. **审批与业务解耦**：业务数据只存储审批实例 ID 和状态，不直接依赖审批模块的数据结构
-5. **向后兼容**：未配置审批规则的业务操作保持原有行为不变
+5. **向后兼容**：未配置流程规则的业务操作保持原有行为不变
 
 ## 设计风格
 
-采用与现有系统一致的 Element Plus 企业级设计风格，保持界面风格统一。审批模块作为独立的菜单模块，包含审批中心、流程配置、我的待办等功能页面。
+采用与现有系统一致的 Element Plus 企业级设计风格，保持界面风格统一。审批模块作为独立的菜单模块，包含审批中心、流程规则、我的待办等功能页面。
 
 ## 页面规划
 

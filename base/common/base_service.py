@@ -4,7 +4,7 @@
 继承方式：:
 
     class PurchaseOrderService(BaseBusinessService):
-        model = "purchase_order"  # 必填：与 approval_rule.model 对应
+        model = "purchase_order"  # 必填：与审批流程规则(approval_flow.model)对应
 
         # 可选：覆盖 _do_* 实现单号生成 / 级联写子表等定制逻辑。
         # 不覆盖时，基类提供通用默认实现（按 model 解析 ORM 直接落库）。
@@ -23,7 +23,7 @@
     success = await PurchaseOrderService.delete(order_id)
 
 设计要点：
-- ``model`` 决定查哪条 approval_rule；命中则自动建审批实例并抛 NeedApprovalError。
+- ``model`` 决定查哪条审批流程规则(approval_flow)；命中则自动建审批实例并抛 NeedApprovalError。
 - ``_do_create/_do_update/_do_delete`` 在基类提供通用默认实现（按 ``cls.model``
   解析 Tortoise ORM 模型直接 CRUD）；子类覆盖则优先使用子类版本。
 - ``_do_*`` 在 ``__init_subclass__`` 时自动注册到执行器，审批通过后回调（不经过门禁）。
@@ -47,7 +47,7 @@ class BaseBusinessService:
     """业务 Service 基类 —— 声明 model 即可自动接入审批门禁与执行器。"""
 
     model: Optional[str] = None
-    """业务模型标识，对应 approval_rule.model，子类必须重写。"""
+    """业务模型标识，对应审批流程规则(approval_flow.model)，子类必须重写。"""
 
     # ------------------------------------------------------------------
     # 自动注册执行器（__init_subclass__）

@@ -1,1 +1,0 @@
-import{_ as o,c,b as n,an as t,o as r}from"./index-B3di9lvH.js";const s={},a={class:"inventory-index"};function _(d,i){const e=t("router-view");return r(),c("div",a,[n(e)])}const f=o(s,[["render",_],["__scopeId","data-v-9ecc8a50"]]);export{f as default};

@@ -14,14 +14,12 @@
         "approval_flow",
         "approval_instance",
         "approval_task",
-        "approval_record",
-        "approval_rule"
+        "approval_record"
     ],
     "schemas": [
         "flow_schema",
         "instance_schema",
-        "task_schema",
-        "rule_schema"
+        "task_schema"
     ],
     "menus": [
         {
@@ -41,20 +39,12 @@
                     "permission_code": "approval:center:view"
                 },
                 {
-                    "name": "流程配置",
-                    "path": "/approval/flows",
+                    "name": "流程规则",
+                    "path": "/approval/flow-rules",
                     "icon": "SetUp",
-                    "component": "approval/FlowConfig",
+                    "component": "approval/FlowRule",
                     "sort": 2,
-                    "permission_code": "approval:flow:view"
-                },
-                {
-                    "name": "规则配置",
-                    "path": "/approval/rules",
-                    "icon": "Connection",
-                    "component": "approval/RuleConfig",
-                    "sort": 3,
-                    "permission_code": "approval:rule:view"
+                    "permission_code": "approval:flowrule:view"
                 }
             ]
         }
@@ -67,28 +57,16 @@
             "description": "查看我的待办/已办审批"
         },
         {
-            "name": "审批流程查看",
-            "code": "approval:flow:view",
+            "name": "审批流程规则查看",
+            "code": "approval:flowrule:view",
             "module": "approval",
-            "description": "查看审批流程配置"
+            "description": "查看审批流程规则配置"
         },
         {
-            "name": "审批流程管理",
-            "code": "approval:flow:manage",
+            "name": "审批流程规则管理",
+            "code": "approval:flowrule:manage",
             "module": "approval",
-            "description": "创建/编辑/启用审批流程"
-        },
-        {
-            "name": "审批规则查看",
-            "code": "approval:rule:view",
-            "module": "approval",
-            "description": "查看审批规则配置"
-        },
-        {
-            "name": "审批规则管理",
-            "code": "approval:rule:manage",
-            "module": "approval",
-            "description": "创建/编辑审批规则"
+            "description": "创建/编辑/启用审批流程规则"
         },
         {
             "name": "审批操作",

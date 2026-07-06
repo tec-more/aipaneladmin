@@ -1,33 +1,33 @@
 import request from '@/utils/request'
 
-// ==================== 流程配置 ====================
+// ==================== 流程规则 ====================
 
 export const getFlowList = (params) => {
-  return request.get('/v1/approval/flows', { params })
+  return request.get('/v1/approval/flow-rules', { params })
 }
 
 export const getFlowDetail = (id) => {
-  return request.get(`/v1/approval/flows/${id}`)
+  return request.get(`/v1/approval/flow-rules/${id}`)
 }
 
 export const createFlow = (data) => {
-  return request.post('/v1/approval/flows', data)
+  return request.post('/v1/approval/flow-rules', data)
 }
 
 export const updateFlow = (id, data) => {
-  return request.put(`/v1/approval/flows/${id}`, data)
+  return request.put(`/v1/approval/flow-rules/${id}`, data)
 }
 
 export const deleteFlow = (id) => {
-  return request.delete(`/v1/approval/flows/${id}`)
+  return request.delete(`/v1/approval/flow-rules/${id}`)
 }
 
 export const toggleFlowStatus = (id, isActive) => {
-  return request.post(`/v1/approval/flows/${id}/toggle`, { is_active: isActive })
+  return request.post(`/v1/approval/flow-rules/${id}/toggle`, { is_active: isActive })
 }
 
 export const getFlowByBusinessType = (businessType) => {
-  return request.get(`/v1/approval/flows/business-type/${businessType}`)
+  return request.get(`/v1/approval/flow-rules/business-type/${businessType}`)
 }
 
 // ==================== 审批实例 ====================
@@ -70,46 +70,19 @@ export const transferTask = (id, data) => {
   return request.post(`/v1/approval/tasks/${id}/transfer`, data)
 }
 
-// ==================== 审批规则 ====================
+// ==================== 流程规则的模型/动作元信息 ====================
 
-export const getRuleList = (params) => {
-  return request.get('/v1/approval/rules', { params })
-}
-
-export const getRuleDetail = (id) => {
-  return request.get(`/v1/approval/rules/${id}`)
-}
-
-export const createRule = (data) => {
-  return request.post('/v1/approval/rules', data)
-}
-
-export const updateRule = (id, data) => {
-  return request.put(`/v1/approval/rules/${id}`, data)
-}
-
-export const deleteRule = (id) => {
-  return request.delete(`/v1/approval/rules/${id}`)
-}
-
-export const toggleRuleStatus = (id, isActive) => {
-  return request.post(`/v1/approval/rules/${id}/toggle`, null, { params: { is_active: isActive } })
-}
-
-export const checkApprovalRequired = (params) => {
-  return request.post('/v1/approval/rules/check', null, { params })
-}
-
+// 获取所有可用的业务模型（用于流程规则配置），返回模型列表
 export const getAvailableModels = () => {
-  return request.get('/v1/approval/rules/models')
+  return request.get('/v1/approval/flow-rules/models')
 }
 
 // 获取指定业务模型对应的 service 执行动作列表（create/update/delete）
 export const getModelActions = (model) => {
-  return request.get('/v1/approval/rules/actions', { params: { model } })
+  return request.get('/v1/approval/flow-rules/actions', { params: { model } })
 }
 
 // 校验流程配置结构（不落库）
 export const validateFlow = (data) => {
-  return request.post('/v1/approval/flows/validate', data)
+  return request.post('/v1/approval/flow-rules/validate', data)
 }
