@@ -99,29 +99,144 @@
         }
     ],
     "permissions": [
-        {"name": "线索创建", "code": "crm:lead:create", "module": "crm", "description": "创建线索"},
-        {"name": "线索查看", "code": "crm:lead:view", "module": "crm", "description": "查看线索"},
-        {"name": "线索编辑", "code": "crm:lead:edit", "module": "crm", "description": "编辑线索"},
-        {"name": "线索删除", "code": "crm:lead:delete", "module": "crm", "description": "删除线索"},
-        {"name": "线索转化", "code": "crm:lead:convert", "module": "crm", "description": "转化线索为客户"},
-        {"name": "线索分配", "code": "crm:lead:assign", "module": "crm", "description": "分配线索给销售人员"},
-        {"name": "商机创建", "code": "crm:opportunity:create", "module": "crm", "description": "创建商机"},
-        {"name": "商机查看", "code": "crm:opportunity:view", "module": "crm", "description": "查看商机"},
-        {"name": "商机编辑", "code": "crm:opportunity:edit", "module": "crm", "description": "编辑商机"},
-        {"name": "商机删除", "code": "crm:opportunity:delete", "module": "crm", "description": "删除商机"},
-        {"name": "活动创建", "code": "crm:activity:create", "module": "crm", "description": "创建活动记录"},
-        {"name": "活动查看", "code": "crm:activity:view", "module": "crm", "description": "查看活动记录"},
-        {"name": "活动删除", "code": "crm:activity:delete", "module": "crm", "description": "删除活动记录"},
-        {"name": "联系人创建", "code": "crm:contact:create", "module": "crm", "description": "创建联系人"},
-        {"name": "联系人查看", "code": "crm:contact:view", "module": "crm", "description": "查看联系人"},
-        {"name": "联系人编辑", "code": "crm:contact:edit", "module": "crm", "description": "编辑联系人"},
-        {"name": "联系人删除", "code": "crm:contact:delete", "module": "crm", "description": "删除联系人"},
-        {"name": "跟进任务创建", "code": "crm:task:create", "module": "crm", "description": "创建跟进任务"},
-        {"name": "跟进任务查看", "code": "crm:task:view", "module": "crm", "description": "查看跟进任务"},
-        {"name": "跟进任务编辑", "code": "crm:task:edit", "module": "crm", "description": "编辑跟进任务"},
-        {"name": "统计分析查看", "code": "crm:stats:view", "module": "crm", "description": "查看CRM统计分析"},
-        {"name": "系统配置查看", "code": "crm:config:view", "module": "crm", "description": "查看CRM系统配置"},
-        {"name": "系统配置管理", "code": "crm:config:manage", "module": "crm", "description": "管理CRM系统配置"}
+        {
+            "name": "线索创建",
+            "code": "crm:lead:create",
+            "module": "crm",
+            "description": "创建线索"
+        },
+        {
+            "name": "线索查看",
+            "code": "crm:lead:view",
+            "module": "crm",
+            "description": "查看线索"
+        },
+        {
+            "name": "线索编辑",
+            "code": "crm:lead:edit",
+            "module": "crm",
+            "description": "编辑线索"
+        },
+        {
+            "name": "线索删除",
+            "code": "crm:lead:delete",
+            "module": "crm",
+            "description": "删除线索"
+        },
+        {
+            "name": "线索转化",
+            "code": "crm:lead:convert",
+            "module": "crm",
+            "description": "转化线索为客户"
+        },
+        {
+            "name": "线索分配",
+            "code": "crm:lead:assign",
+            "module": "crm",
+            "description": "分配线索给销售人员"
+        },
+        {
+            "name": "商机创建",
+            "code": "crm:opportunity:create",
+            "module": "crm",
+            "description": "创建商机"
+        },
+        {
+            "name": "商机查看",
+            "code": "crm:opportunity:view",
+            "module": "crm",
+            "description": "查看商机"
+        },
+        {
+            "name": "商机编辑",
+            "code": "crm:opportunity:edit",
+            "module": "crm",
+            "description": "编辑商机"
+        },
+        {
+            "name": "商机删除",
+            "code": "crm:opportunity:delete",
+            "module": "crm",
+            "description": "删除商机"
+        },
+        {
+            "name": "活动创建",
+            "code": "crm:activity:create",
+            "module": "crm",
+            "description": "创建活动记录"
+        },
+        {
+            "name": "活动查看",
+            "code": "crm:activity:view",
+            "module": "crm",
+            "description": "查看活动记录"
+        },
+        {
+            "name": "活动删除",
+            "code": "crm:activity:delete",
+            "module": "crm",
+            "description": "删除活动记录"
+        },
+        {
+            "name": "联系人创建",
+            "code": "crm:contact:create",
+            "module": "crm",
+            "description": "创建联系人"
+        },
+        {
+            "name": "联系人查看",
+            "code": "crm:contact:view",
+            "module": "crm",
+            "description": "查看联系人"
+        },
+        {
+            "name": "联系人编辑",
+            "code": "crm:contact:edit",
+            "module": "crm",
+            "description": "编辑联系人"
+        },
+        {
+            "name": "联系人删除",
+            "code": "crm:contact:delete",
+            "module": "crm",
+            "description": "删除联系人"
+        },
+        {
+            "name": "跟进任务创建",
+            "code": "crm:task:create",
+            "module": "crm",
+            "description": "创建跟进任务"
+        },
+        {
+            "name": "跟进任务查看",
+            "code": "crm:task:view",
+            "module": "crm",
+            "description": "查看跟进任务"
+        },
+        {
+            "name": "跟进任务编辑",
+            "code": "crm:task:edit",
+            "module": "crm",
+            "description": "编辑跟进任务"
+        },
+        {
+            "name": "统计分析查看",
+            "code": "crm:stats:view",
+            "module": "crm",
+            "description": "查看CRM统计分析"
+        },
+        {
+            "name": "系统配置查看",
+            "code": "crm:config:view",
+            "module": "crm",
+            "description": "查看CRM系统配置"
+        },
+        {
+            "name": "系统配置管理",
+            "code": "crm:config:manage",
+            "module": "crm",
+            "description": "管理CRM系统配置"
+        }
     ],
     "dependencies": [
         "customer",

@@ -5,11 +5,12 @@ CRM Plugin - CRM模块
 from loguru import logger
 
 
-async def on_enable():
+async def on_enable(app):
     logger.info("CRM插件启用，初始化默认数据...")
     from base.plugins.crm.services.crm_config_service import CrmConfigService
     await CrmConfigService.initialize_default_data()
     logger.info("CRM插件默认数据初始化完成")
+    return True
 
 
 async def on_disable():
