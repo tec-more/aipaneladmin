@@ -2,6 +2,7 @@ from typing import Optional, List, Tuple
 from datetime import datetime
 from decimal import Decimal
 from loguru import logger
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.common.events.event_bus import event_bus
@@ -32,7 +33,8 @@ except ImportError:
     BOM_AVAILABLE = False
 
 
-class MaterialRequisitionService:
+class MaterialRequisitionService(BaseBusinessService):
+    model = "material_requisition"
     @staticmethod
     async def create_requisition(data: MaterialRequisitionCreate) -> MaterialRequisition:
         mo = await ManufacturingOrder.filter(mo_code=data.mo_code).first()
@@ -156,7 +158,8 @@ class MaterialRequisitionService:
         return items, total
 
 
-class MaterialReturnService:
+class MaterialReturnService(BaseBusinessService):
+    model = "material_return"
     @staticmethod
     async def create_return(data: MaterialReturnCreate) -> MaterialReturn:
         req = await MaterialRequisition.filter(requisition_code=data.requisition_code).first()
@@ -202,7 +205,8 @@ class MaterialReturnService:
         return items, total
 
 
-class ProductionReceiptService:
+class ProductionReceiptService(BaseBusinessService):
+    model = "production_receipt"
     @staticmethod
     async def create_receipt(data: ProductionReceiptCreate) -> ProductionReceipt:
         mo = await ManufacturingOrder.filter(mo_code=data.mo_code).first()

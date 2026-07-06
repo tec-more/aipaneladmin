@@ -24,6 +24,7 @@ class RuleService:
 
         rule = await ApprovalRule.create(
             business_type=data.business_type,
+            model=data.model or data.business_type,
             path_pattern=data.path_pattern,
             methods=data.methods,
             flow_id=data.flow_id,
@@ -176,4 +177,55 @@ class RuleService:
             "flow_id": flow.id,
             "flow_name": flow.name,
             "rule_id": rule.id
+        }
+
+    @staticmethod
+    async def get_matched_rule_by_model(model: str, method: str) -> Optional[ApprovalRule]:
+        """
+        根据业务模型和方法获取匹配的规则（按 model + methods 匹配，废弃 path_pattern）。
+        """
+        rules = await ApprovalRule.filter(is_active=True, model=model).order_by("-priority").all()
+        for rule in rules:
+            if method in rule.methods:
+                return rule
+        return None
+
+    @staticmethod
+    async def check_approval_required_by_model(model: str, method: str) -> Dict[str, Any]:
+        """
+        根据业务模型和方法检查是否需要审批（基于模型匹配的核心入口）。
+        返回: {
+            "require_approval": bool,
+            "flow_id": int,
+            "flow_name": str,
+            "rule_id": int,
+            "model": str
+        }
+        """
+        rule = await RuleService.get_matched_rule_by_model(model, method)
+        if not rule:
+            return {
+                "require_approval": False,
+                "flow_id": None,
+                "flow_name": None,
+                "rule_id": None,
+                "model": model
+            }
+
+        flow = await ApprovalFlow.get_or_none(id=rule.flow_id)
+        if not flow or not flow.is_active:
+            return {
+                "require_approval": False,
+                "flow_id": None,
+                "flow_name": None,
+                "rule_id": None,
+                "model": model
+            }
+
+        return {
+            "require_approval": True,
+            "flow_id": flow.id,
+            "flow_name": flow.name,
+            "rule_id": rule.id,
+            "model": model
         }

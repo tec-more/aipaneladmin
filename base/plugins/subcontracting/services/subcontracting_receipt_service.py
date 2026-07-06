@@ -6,6 +6,7 @@ from loguru import logger
 from base.plugins.subcontracting.models.subcontracting_receipt import SubcontractingReceipt, SubcontractingReceiptLine
 from base.plugins.subcontracting.services.subcontracting_order_service import SubcontractingOrderService
 from base.common.events.event_bus import event_bus
+from base.common.base_service import BaseBusinessService
 
 RECEIPT_STATUS_LABELS = {
     "draft": "待确认",
@@ -20,7 +21,8 @@ INSPECTION_LABELS = {
 }
 
 
-class SubcontractingReceiptService:
+class SubcontractingReceiptService(BaseBusinessService):
+    model = "subcontracting_receipt"
 
     @staticmethod
     async def get_by_id(receipt_id: int) -> Optional[SubcontractingReceipt]:

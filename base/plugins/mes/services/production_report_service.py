@@ -1,6 +1,7 @@
 from typing import Optional, List, Tuple
 from datetime import datetime, timedelta
 from decimal import Decimal
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.mes.models.production import WorkOrder, ManufacturingOrder
@@ -22,7 +23,8 @@ except ImportError:
     EQUIPMENT_AVAILABLE = False
 
 
-class ProductionReportService:
+class ProductionReportService(BaseBusinessService):
+    model = "production_report"
     @staticmethod
     async def submit_report(data: ProductionReportCreate, operator: str = None) -> ProductionReport:
         wo = await WorkOrder.filter(wo_code=data.wo_code).first()

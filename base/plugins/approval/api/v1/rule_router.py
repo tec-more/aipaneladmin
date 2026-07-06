@@ -85,12 +85,16 @@ async def delete_rule(
 
 @rule_router.post("/check")
 async def check_approval_required(
-    path: str,
-    method: str,
+    model: str = None,
+    path: str = None,
+    method: str = "POST",
     user_id: int = require_permission("approval:rule:view"),
 ):
-    """检查指定路径和方法是否需要审批"""
-    result = await RuleService.check_approval_required(path, method)
+    """检查指定模型（或路径）和方法是否需要审批；优先按模型匹配"""
+    if model:
+        result = await RuleService.check_approval_required_by_model(model, method)
+    else:
+        result = await RuleService.check_approval_required(path, method)
     return success_response(data=result)
 
 

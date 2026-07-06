@@ -6,6 +6,7 @@ from loguru import logger
 from base.plugins.subcontracting.models.subcontracting_issue import SubcontractingIssue, SubcontractingIssueLine
 from base.plugins.subcontracting.services.subcontracting_order_service import SubcontractingOrderService
 from base.common.events.event_bus import event_bus
+from base.common.base_service import BaseBusinessService
 
 ISSUE_STATUS_LABELS = {
     "draft": "待确认",
@@ -14,7 +15,8 @@ ISSUE_STATUS_LABELS = {
 }
 
 
-class SubcontractingIssueService:
+class SubcontractingIssueService(BaseBusinessService):
+    model = "subcontracting_issue"
 
     @staticmethod
     async def get_by_id(issue_id: int) -> Optional[SubcontractingIssue]:

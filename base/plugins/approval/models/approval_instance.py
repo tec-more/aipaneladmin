@@ -14,6 +14,8 @@ class ApprovalInstance(BaseModel, TimestampMixin):
     business_id = fields.IntField(null=True, description="业务对象ID", index=True)
     # 业务数据快照（JSON格式）
     business_data = fields.JSONField(null=True, description="业务数据快照")
+    # 业务动作（供审批通过后的执行器回调）：create / update / delete
+    action = fields.CharField(max_length=20, null=True, description="业务动作（create/update/delete）", index=True)
     # 审批标题
     title = fields.CharField(max_length=255, description="审批标题", index=True)
     # 申请人ID
@@ -41,6 +43,7 @@ class ApprovalInstance(BaseModel, TimestampMixin):
             "business_type": self.business_type,
             "business_id": self.business_id,
             "business_data": self.business_data,
+            "action": self.action,
             "title": self.title,
             "applicant_id": self.applicant_id,
             "status": self.status,

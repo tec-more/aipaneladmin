@@ -10,6 +10,11 @@ except ImportError:
     event_bus = None
 
 try:
+    from base.common.base_service import BaseBusinessService
+except ImportError:
+    BaseBusinessService = object
+
+try:
     from base.plugins.sales.models.order import (
         CustomerOrder, OrderItem, OrderStatus, PaymentStatus, PaymentMethod, generate_order_no
     )
@@ -27,7 +32,8 @@ except ImportError:
     Product = None
 
 
-class OrderService:
+class OrderService(BaseBusinessService):
+    model = "order"
     @staticmethod
     async def generate_order_no() -> str:
         from base.plugins.sales.models.order import generate_order_no

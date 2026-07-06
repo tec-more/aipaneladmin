@@ -6,6 +6,7 @@ from loguru import logger
 from base.plugins.subcontracting.models.subcontracting_order import SubcontractingOrder
 from base.plugins.subcontracting.models.supplier_material_price import SupplierMaterialPrice
 from base.common.events.event_bus import event_bus
+from base.common.base_service import BaseBusinessService
 
 STATUS_LABELS = {
     "draft": "新建",
@@ -19,7 +20,8 @@ STATUS_LABELS = {
 }
 
 
-class SubcontractingOrderService:
+class SubcontractingOrderService(BaseBusinessService):
+    model = "subcontracting_order"
 
     @staticmethod
     async def get_by_id(order_id: int) -> Optional[SubcontractingOrder]:

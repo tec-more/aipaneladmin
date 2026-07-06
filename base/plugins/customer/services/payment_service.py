@@ -15,9 +15,11 @@ from base.plugins.customer.models import (
 )
 from base.plugins.sales.models.order import CustomerOrder, PaymentStatus, OrderStatus
 from base.plugins.customer.models.membership import MembershipLevel
+from base.common.base_service import BaseBusinessService
 
 
-class PaymentService:
+class PaymentService(BaseBusinessService):
+    model = "payment"
     """支付服务基类"""
 
     def __init__(self):

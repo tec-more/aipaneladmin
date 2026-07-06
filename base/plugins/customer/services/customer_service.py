@@ -10,9 +10,11 @@ from tortoise.queryset import QuerySet
 from base.plugins.customer.models.customer import Customer
 from base.plugins.customer.schemas.customer_schema import CustomerCreate, CustomerUpdate
 from base.common.security import get_password_hash, verify_password
+from base.common.base_service import BaseBusinessService
 
 
-class CustomerService:
+class CustomerService(BaseBusinessService):
+    model = "customer"
     """客户服务类"""
 
     @staticmethod

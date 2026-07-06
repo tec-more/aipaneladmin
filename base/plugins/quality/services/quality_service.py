@@ -1,6 +1,7 @@
 from typing import Optional, List, Tuple, Dict, Any
 from decimal import Decimal
 from tortoise.expressions import Q
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.quality.models.quality import QualityInspection, InspectionStandard
@@ -73,7 +74,8 @@ except ImportError:
         pass
 
 
-class QualityInspectionService:
+class QualityInspectionService(BaseBusinessService):
+    model = "quality_inspection"
     @staticmethod
     async def get_by_id(inspection_id: int) -> Optional[QualityInspection]:
         return await QualityInspection.filter(id=inspection_id).first()
@@ -159,7 +161,8 @@ class QualityInspectionService:
         return await query.exists()
 
 
-class InspectionStandardService:
+class InspectionStandardService(BaseBusinessService):
+    model = "inspection_standard"
     @staticmethod
     async def get_by_id(standard_id: int) -> Optional[InspectionStandard]:
         return await InspectionStandard.filter(id=standard_id).first()

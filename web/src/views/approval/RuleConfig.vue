@@ -17,7 +17,7 @@
 
       <el-table v-loading="loading" :data="tableData" border stripe class="table-margin">
         <el-table-column prop="business_type" label="业务类型" width="140" />
-        <el-table-column prop="path_pattern" label="拦截路径" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="model" label="业务模型" width="160" show-overflow-tooltip />
         <el-table-column prop="methods" label="拦截方法" width="160">
           <template #default="{ row }">
             <el-tag v-for="m in row.methods" :key="m" size="small" class="method-tag">{{ m }}</el-tag>
@@ -56,9 +56,11 @@
         <el-form-item label="业务类型">
           <el-input v-model="formData.business_type" placeholder="如：purchase_order" />
         </el-form-item>
-        <el-form-item label="拦截路径">
-          <el-input v-model="formData.path_pattern" placeholder="如：/v1/purchase/order*" />
-          <div class="form-tip">支持通配符 *，匹配对应的业务接口路径</div>
+        <el-form-item label="业务模型">
+          <el-select v-model="formData.model" placeholder="选择或输入业务模型" filterable allow-create default-first-option style="width: 100%">
+            <el-option v-for="m in MODEL_OPTIONS" :key="m" :label="m" :value="m" />
+          </el-select>
+          <div class="form-tip">由框架从 Pydantic Model 自动推导（驼峰转下划线），如 PurchaseOrderCreate → purchase_order</div>
         </el-form-item>
         <el-form-item label="拦截方法">
           <el-checkbox-group v-model="formData.methods">
@@ -99,6 +101,7 @@ import { getRuleList, createRule, updateRule, deleteRule, toggleRuleStatus, getF
 const loading = ref(false)
 const tableData = ref([])
 const flowOptions = ref([])
+const MODEL_OPTIONS = ['purchase_order', 'purchase_receipt', 'sales_order', 'inventory_adjust']
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const dialogMode = ref('create')
@@ -107,7 +110,7 @@ const pagination = reactive({ page: 1, page_size: 10, total: 0 })
 const formData = reactive({
   id: null,
   business_type: '',
-  path_pattern: '',
+  model: '',
   methods: ['POST'],
   flow_id: null,
   priority: 0,
@@ -143,7 +146,7 @@ const fetchFlows = async () => {
 
 const resetForm = () => {
   Object.assign(formData, {
-    id: null, business_type: '', path_pattern: '', methods: ['POST'],
+    id: null, business_type: '', model: '', methods: ['POST'],
     flow_id: null, priority: 0, description: '', is_active: true
   })
 }
@@ -158,7 +161,7 @@ const handleCreate = () => {
 const handleEdit = (row) => {
   resetForm()
   Object.assign(formData, {
-    id: row.id, business_type: row.business_type, path_pattern: row.path_pattern,
+    id: row.id, business_type: row.business_type, model: row.model || '',
     methods: row.methods || ['POST'], flow_id: row.flow_id, priority: row.priority,
     description: row.description || '', is_active: row.is_active
   })

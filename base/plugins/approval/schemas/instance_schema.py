@@ -13,6 +13,7 @@ class InstanceCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="审批标题")
     form_data: Dict[str, Any] = Field(default={}, description="表单数据")
     business_data: Optional[Dict[str, Any]] = Field(None, description="业务数据快照")
+    action: Optional[str] = Field(None, description="业务动作：create/update/delete（供执行器回调）")
 
 
 class InstanceResponse(BaseModel):

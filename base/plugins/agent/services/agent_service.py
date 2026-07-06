@@ -9,11 +9,13 @@ import json
 import asyncio
 from datetime import datetime
 import logging
+from base.common.base_service import BaseBusinessService
 
 logger = logging.getLogger(__name__)
 
 
-class AgentService:
+class AgentService(BaseBusinessService):
+    model = "agent"
     """Agent service class"""
 
     @staticmethod

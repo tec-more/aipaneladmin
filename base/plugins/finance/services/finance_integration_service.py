@@ -5,6 +5,7 @@ from datetime import datetime, date
 from typing import Optional, Dict, Any, List
 from decimal import Decimal
 from tortoise.transactions import atomic
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.finance.models.integration_account_mapping import IntegrationAccountMapping
@@ -30,7 +31,8 @@ def _generate_no(prefix: str) -> str:
     return f"{prefix}{ts}{rand}"
 
 
-class FinanceIntegrationService:
+class FinanceIntegrationService(BaseBusinessService):
+    model = "finance_integration"
     @staticmethod
     async def _get_account_id_by_code(code: str) -> Optional[int]:
         account = await Account.get_or_none(code=code)

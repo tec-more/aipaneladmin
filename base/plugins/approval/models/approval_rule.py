@@ -7,10 +7,12 @@ from base.common.model import BaseModel, TimestampMixin
 
 class ApprovalRule(BaseModel, TimestampMixin):
     """审批规则配置（中间件拦截依据）"""
-    # 业务类型标识
+    # 业务类型标识（保留，向后兼容）
     business_type = fields.CharField(max_length=50, description="业务类型", index=True)
-    # 路径匹配模式（支持通配符 *，如 /v1/purchase/orders*）
-    path_pattern = fields.CharField(max_length=255, description="路径匹配模式", index=True)
+    # 业务模型标识（按模型匹配审批的核心字段，如 purchase_order）
+    model = fields.CharField(max_length=50, description="业务模型标识（按模型匹配审批）", index=True, null=True)
+    # 路径匹配模式（已废弃，仅保留字段兼容，不再用于匹配）
+    path_pattern = fields.CharField(max_length=255, description="路径匹配模式（已废弃）", index=True, null=True)
     # 需要拦截的HTTP方法列表
     methods = fields.JSONField(default=["POST", "PUT", "DELETE"], description="拦截方法列表")
     # 关联的审批流程ID
@@ -32,6 +34,7 @@ class ApprovalRule(BaseModel, TimestampMixin):
         return {
             "id": self.id,
             "business_type": self.business_type,
+            "model": self.model,
             "path_pattern": self.path_pattern,
             "methods": self.methods,
             "flow_id": self.flow_id,

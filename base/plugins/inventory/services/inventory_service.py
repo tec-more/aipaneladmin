@@ -6,6 +6,7 @@ from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 import uuid
+from base.common.base_service import BaseBusinessService
 
 try:
     from tortoise import connections
@@ -265,7 +266,8 @@ class SequenceGenerator:
 
 # ==================== 基础数据服务 ====================
 
-class LocationService:
+class LocationService(BaseBusinessService):
+    model = "location"
     """库位管理服务"""
 
     @staticmethod
@@ -433,7 +435,8 @@ class LocationService:
         return await query.exists()
 
 
-class WarehouseService:
+class WarehouseService(BaseBusinessService):
+    model = "warehouse"
     """仓库管理服务"""
 
     @staticmethod
@@ -530,7 +533,8 @@ class WarehouseService:
         return await query.exists()
 
 
-class PickingTypeService:
+class PickingTypeService(BaseBusinessService):
+    model = "picking_type"
     """调拨类型管理服务"""
 
     @staticmethod
@@ -648,7 +652,8 @@ class PickingTypeService:
         return await query.exists()
 
 
-class LotService:
+class LotService(BaseBusinessService):
+    model = "lot"
     """批次管理服务"""
 
     @staticmethod
@@ -732,7 +737,8 @@ class LotService:
         return await query.exists()
 
 
-class PackageService:
+class PackageService(BaseBusinessService):
+    model = "package"
     """包裹管理服务"""
 
     @staticmethod
@@ -831,7 +837,8 @@ class PackageService:
 
 # ==================== 调拨单服务 ====================
 
-class PickingService:
+class PickingService(BaseBusinessService):
+    model = "picking"
     """调拨单全流程管理服务"""
 
     @staticmethod
@@ -1120,7 +1127,8 @@ class PickingService:
         return await query.exists()
 
 
-class MoveService:
+class MoveService(BaseBusinessService):
+    model = "move"
     """移动明细管理服务"""
 
     @staticmethod
@@ -1460,7 +1468,8 @@ class MoveService:
         return await query.exists()
 
 
-class MoveLineService:
+class MoveLineService(BaseBusinessService):
+    model = "move_line"
     """移动明细行管理服务"""
 
     @staticmethod
@@ -1596,7 +1605,8 @@ class MoveLineService:
 
 # ==================== 库存服务 ====================
 
-class QuantService:
+class QuantService(BaseBusinessService):
+    model = "quant"
     """库存数量管理服务"""
 
     @staticmethod
@@ -1883,7 +1893,8 @@ class QuantService:
         return await query.exists()
 
 
-class ReservationService:
+class ReservationService(BaseBusinessService):
+    model = "reservation"
     """库存预留管理服务"""
 
     @staticmethod

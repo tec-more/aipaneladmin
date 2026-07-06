@@ -2,9 +2,11 @@ from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
 from base.plugins.audit.models.audit_log import DataChangeLog
 from base.plugins.audit.schemas.audit_log import DataChangeLogCreate
+from base.common.base_service import BaseBusinessService
 
 
-class DataChangeService:
+class DataChangeService(BaseBusinessService):
+    model = "data_change"
     """数据变更服务"""
 
     @staticmethod

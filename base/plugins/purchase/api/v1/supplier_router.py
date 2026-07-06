@@ -9,7 +9,7 @@ supplier_router = APIRouter(prefix="/supplier", tags=["采购-供应商管理"])
 
 @supplier_router.post("/", response_model=SupplierResponse, summary="创建供应商")
 async def create_supplier(data: SupplierCreate):
-    supplier = await SupplierService.create_supplier(data.dict())
+    supplier = await SupplierService.create(data.dict())
     return await supplier.to_dict()
 
 
@@ -40,7 +40,7 @@ async def get_supplier_list(
 
 @supplier_router.put("/{supplier_id}", response_model=SupplierResponse, summary="更新供应商")
 async def update_supplier(supplier_id: int, data: SupplierUpdate):
-    supplier = await SupplierService.update_supplier(supplier_id, data.dict())
+    supplier = await SupplierService.update(supplier_id, data.dict())
     if not supplier:
         return {"error": "供应商不存在"}, 404
     return await supplier.to_dict()
@@ -48,7 +48,7 @@ async def update_supplier(supplier_id: int, data: SupplierUpdate):
 
 @supplier_router.delete("/{supplier_id}", summary="删除供应商")
 async def delete_supplier(supplier_id: int):
-    success = await SupplierService.delete_supplier(supplier_id)
+    success = await SupplierService.delete(supplier_id)
     if not success:
         return {"error": "供应商不存在"}, 404
     return {"message": "删除成功"}

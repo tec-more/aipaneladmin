@@ -1,6 +1,7 @@
 from typing import Optional, List, Tuple, Dict, Any
 from decimal import Decimal
 from tortoise.expressions import Q
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.mes.models.base_data import Material, Bom, BomVersion, WorkCenter, Process, Route, RouteProcess
@@ -89,7 +90,8 @@ except ImportError:
     class RouteUpdate(MaterialUpdate): pass
 
 
-class MaterialService:
+class MaterialService(BaseBusinessService):
+    model = "material"
     @staticmethod
     async def get_by_id(material_id: int) -> Optional[Material]:
         return await Material.filter(id=material_id).first()
@@ -160,7 +162,8 @@ class MaterialService:
         return await query.exists()
 
 
-class BomService:
+class BomService(BaseBusinessService):
+    model = "bom"
     @staticmethod
     async def get_by_id(bom_id: int) -> Optional[Bom]:
         return await Bom.filter(id=bom_id).first()
@@ -403,7 +406,8 @@ class BomService:
         }
 
 
-class BomVersionService:
+class BomVersionService(BaseBusinessService):
+    model = "bom_version"
     @staticmethod
     async def get_by_id(version_id: int) -> Optional[BomVersion]:
         return await BomVersion.filter(id=version_id).first()
@@ -526,7 +530,8 @@ class BomVersionService:
         return items, total
 
 
-class WorkCenterService:
+class WorkCenterService(BaseBusinessService):
+    model = "work_center"
     @staticmethod
     async def get_by_id(wc_id: int) -> Optional[WorkCenter]:
         return await WorkCenter.filter(id=wc_id).first()
@@ -585,7 +590,8 @@ class WorkCenterService:
         return await query.exists()
 
 
-class ProcessService:
+class ProcessService(BaseBusinessService):
+    model = "process"
     @staticmethod
     async def get_by_id(process_id: int) -> Optional[Process]:
         return await Process.filter(id=process_id).first()
@@ -644,7 +650,8 @@ class ProcessService:
         return await query.exists()
 
 
-class RouteService:
+class RouteService(BaseBusinessService):
+    model = "route"
     @staticmethod
     async def get_by_id(route_id: int) -> Optional[Route]:
         return await Route.filter(id=route_id).first()

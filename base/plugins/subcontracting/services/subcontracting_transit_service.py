@@ -4,9 +4,11 @@ from loguru import logger
 
 from base.plugins.subcontracting.models.subcontracting_issue import SubcontractingIssue, SubcontractingIssueLine
 from base.plugins.subcontracting.models.subcontracting_receipt import SubcontractingReceipt, SubcontractingReceiptLine
+from base.common.base_service import BaseBusinessService
 
 
-class SubcontractingTransitService:
+class SubcontractingTransitService(BaseBusinessService):
+    model = "subcontracting_transit"
 
     @staticmethod
     async def get_transit_list(page: int = 1, page_size: int = 10,

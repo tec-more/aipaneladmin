@@ -9,9 +9,11 @@ from typing import Dict, Optional, Tuple
 from base.plugins.customer.models.customer_membership import CustomerMembership
 from base.plugins.customer.models.membership import MembershipLevel
 from base.plugins.customer.models.customer import Customer
+from base.common.base_service import BaseBusinessService
 
 
-class PurchaseService:
+class PurchaseService(BaseBusinessService):
+    model = "purchase"
     """购买服务 - 处理充值包购买和折扣计算"""
 
     @staticmethod

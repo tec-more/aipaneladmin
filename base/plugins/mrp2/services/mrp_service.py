@@ -1,6 +1,7 @@
 from typing import Optional, List, Tuple, Dict, Any
 from decimal import Decimal
 from datetime import datetime, date, timedelta
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.mrp2.models.mrp_models import (
@@ -109,7 +110,8 @@ except ImportError:
     MES_AVAILABLE = False
 
 
-class SalesForecastService:
+class SalesForecastService(BaseBusinessService):
+    model = "sales_forecast"
     @staticmethod
     async def get_by_id(forecast_id: int) -> Optional[SalesForecast]:
         return await SalesForecast.filter(id=forecast_id).first()
@@ -260,7 +262,8 @@ class SalesForecastService:
         return {"product_code": product_code, "historical_data": result}
 
 
-class MPSService:
+class MPSService(BaseBusinessService):
+    model = "mps"
     @staticmethod
     async def get_by_id(mps_id: int) -> Optional[MasterProductionSchedule]:
         return await MasterProductionSchedule.filter(id=mps_id).first()
@@ -629,7 +632,8 @@ class MPSService:
         }
 
 
-class MRPService:
+class MRPService(BaseBusinessService):
+    model = "mrp"
     @staticmethod
     async def get_by_id(mrp_id: int) -> Optional[MRPCalculation]:
         return await MRPCalculation.filter(id=mrp_id).first()
@@ -1054,7 +1058,8 @@ class MRPService:
         return results
 
 
-class CRPService:
+class CRPService(BaseBusinessService):
+    model = "crp"
     @staticmethod
     async def get_by_id(crp_id: int) -> Optional[CapacityRequirementPlan]:
         return await CapacityRequirementPlan.filter(id=crp_id).first()
@@ -1222,7 +1227,8 @@ class CRPService:
         return crp
 
 
-class MonitorService:
+class MonitorService(BaseBusinessService):
+    model = "monitor"
     @staticmethod
     async def get_by_id(monitor_id: int) -> Optional[PlanExecutionMonitor]:
         return await PlanExecutionMonitor.filter(id=monitor_id).first()
@@ -1362,7 +1368,8 @@ class MonitorService:
         }
 
 
-class AlertService:
+class AlertService(BaseBusinessService):
+    model = "alert"
     @staticmethod
     async def get_by_id(alert_id: int) -> Optional[MRPExceptionAlert]:
         return await MRPExceptionAlert.filter(id=alert_id).first()

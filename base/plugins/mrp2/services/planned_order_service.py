@@ -1,5 +1,6 @@
 from typing import Optional, List, Tuple
 from datetime import datetime
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.mrp2.models.mrp_models import PlannedOrder
@@ -22,7 +23,8 @@ except ImportError:
     SC_AVAILABLE = False
 
 
-class PlannedOrderService:
+class PlannedOrderService(BaseBusinessService):
+    model = "planned_order"
     @staticmethod
     async def get_by_id(order_id: int) -> Optional[PlannedOrder]:
         return await PlannedOrder.filter(id=order_id).first()

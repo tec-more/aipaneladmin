@@ -16,7 +16,7 @@ purchase_router = APIRouter(prefix="/order", tags=["采购-订单管理"])
 
 @purchase_router.post("/", response_model=PurchaseOrderResponse, summary="创建采购订单")
 async def create_purchase_order(data: PurchaseOrderCreate):
-    order = await PurchaseOrderService.create_purchase_order(data.dict())
+    order = await PurchaseOrderService.create(data.dict())
     return await order.to_dict()
 
 
@@ -51,7 +51,7 @@ async def get_purchase_order_list(
 
 @purchase_router.put("/{order_id}", response_model=PurchaseOrderResponse, summary="更新采购订单")
 async def update_purchase_order(order_id: int, data: PurchaseOrderUpdate):
-    order = await PurchaseOrderService.update_purchase_order(order_id, data.dict())
+    order = await PurchaseOrderService.update(order_id, data.dict())
     if not order:
         return {"error": "采购订单不存在"}, 404
     return await order.to_dict()
@@ -75,7 +75,7 @@ async def cancel_purchase_order(order_id: int):
 
 @purchase_router.delete("/{order_id}", summary="删除采购订单")
 async def delete_purchase_order(order_id: int):
-    success = await PurchaseOrderService.delete_purchase_order(order_id)
+    success = await PurchaseOrderService.delete(order_id)
     if not success:
         return {"error": "采购订单不存在"}, 404
     return {"message": "删除成功"}
@@ -84,7 +84,7 @@ async def delete_purchase_order(order_id: int):
 @purchase_router.post("/receipt/", response_model=PurchaseReceiptResponse, summary="创建采购收货单")
 async def create_purchase_receipt(data: PurchaseReceiptCreate):
     try:
-        receipt = await PurchaseReceiptService.create_purchase_receipt(data.dict())
+        receipt = await PurchaseReceiptService.create(data.dict())
         return await receipt.to_dict()
     except ValueError as e:
         return {"error": str(e)}, 400
@@ -121,7 +121,7 @@ async def get_purchase_receipt_list(
 
 @purchase_router.put("/receipt/{receipt_id}", response_model=PurchaseReceiptResponse, summary="更新采购收货单")
 async def update_purchase_receipt(receipt_id: int, data: PurchaseReceiptUpdate):
-    receipt = await PurchaseReceiptService.update_purchase_receipt(receipt_id, data.dict())
+    receipt = await PurchaseReceiptService.update(receipt_id, data.dict())
     if not receipt:
         return {"error": "采购收货单不存在"}, 404
     return await receipt.to_dict()
@@ -129,7 +129,7 @@ async def update_purchase_receipt(receipt_id: int, data: PurchaseReceiptUpdate):
 
 @purchase_router.delete("/receipt/{receipt_id}", summary="删除采购收货单")
 async def delete_purchase_receipt(receipt_id: int):
-    success = await PurchaseReceiptService.delete_purchase_receipt(receipt_id)
+    success = await PurchaseReceiptService.delete(receipt_id)
     if not success:
         return {"error": "采购收货单不存在"}, 404
     return {"message": "删除成功"}

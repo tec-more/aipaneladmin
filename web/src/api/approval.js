@@ -96,6 +96,6 @@ export const toggleRuleStatus = (id, isActive) => {
   return request.post(`/v1/approval/rules/${id}/toggle`, null, { params: { is_active: isActive } })
 }
 
-export const checkApprovalRequired = (path, method) => {
-  return request.post('/v1/approval/rules/check', null, { params: { path, method } })
+export const checkApprovalRequired = (params) => {
+  return request.post('/v1/approval/rules/check', null, { params })
 }

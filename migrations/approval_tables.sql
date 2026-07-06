@@ -72,7 +72,8 @@ CREATE INDEX IF NOT EXISTS idx_approval_record_operator ON approval_record(opera
 CREATE TABLE IF NOT EXISTS approval_rule (
     id BIGSERIAL PRIMARY KEY,
     business_type VARCHAR(50) NOT NULL,
-    path_pattern VARCHAR(255) NOT NULL,
+    model VARCHAR(50),
+    path_pattern VARCHAR(255),
     methods JSONB DEFAULT '["POST", "PUT", "DELETE"]'::jsonb,
     flow_id BIGINT NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
@@ -82,7 +83,7 @@ CREATE TABLE IF NOT EXISTS approval_rule (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_approval_rule_business_type ON approval_rule(business_type);
-CREATE INDEX IF NOT EXISTS idx_approval_rule_path_pattern ON approval_rule(path_pattern);
+CREATE INDEX IF NOT EXISTS idx_approval_rule_model ON approval_rule(model);
 CREATE INDEX IF NOT EXISTS idx_approval_rule_is_active ON approval_rule(is_active);
 CREATE INDEX IF NOT EXISTS idx_approval_rule_priority ON approval_rule(priority);
 
@@ -94,9 +95,34 @@ SELECT '采购审批流程', 'default_purchase_approval', '采购订单审批默
     'purchase_order', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM approval_flow WHERE code = 'default_purchase_approval');
 
--- 初始化默认审批规则（拦截采购订单创建和编辑）
-INSERT INTO approval_rule (business_type, path_pattern, methods, flow_id, is_active, priority, description)
-SELECT 'purchase_order', '/v1/purchase/order*', '["POST", "PUT"]'::jsonb, af.id, TRUE, 100, '采购订单需要审批'
+-- 初始化默认审批规则（按模型 purchase_order 拦截采购订单创建和编辑）
+INSERT INTO approval_rule (business_type, model, path_pattern, methods, flow_id, is_active, priority, description)
+SELECT 'purchase_order', 'purchase_order', '/v1/purchase/order*', '["POST", "PUT"]'::jsonb, af.id, TRUE, 100, '采购订单需要审批'
 FROM approval_flow af
 WHERE af.code = 'default_purchase_approval'
-  AND NOT EXISTS (SELECT 1 FROM approval_rule ar WHERE ar.business_type = 'purchase_order' AND ar.path_pattern = '/v1/purchase/order*');
+  AND NOT EXISTS (SELECT 1 FROM approval_rule ar WHERE ar.business_type = 'purchase_order' AND ar.model = 'purchase_order');
+
+-- 向后兼容：已存在 approval_rule 表但缺少 model 列时补充并填充旧数据
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'approval_rule' AND column_name = 'model'
+    ) THEN
+        ALTER TABLE approval_rule ADD COLUMN model VARCHAR(50);
+        CREATE INDEX IF NOT EXISTS idx_approval_rule_model ON approval_rule(model);
+        UPDATE approval_rule SET model = business_type WHERE model IS NULL;
+    END IF;
+END $$;
+
+-- 审批实例增加 action 字段（供审批通过后执行器回调：create/update/delete）
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'approval_instance' AND column_name = 'action'
+    ) THEN
+        ALTER TABLE approval_instance ADD COLUMN action VARCHAR(20);
+        CREATE INDEX IF NOT EXISTS idx_approval_instance_action ON approval_instance(action);
+    END IF;
+END $$;

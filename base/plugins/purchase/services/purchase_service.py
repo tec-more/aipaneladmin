@@ -10,6 +10,11 @@ except ImportError:
     event_bus = None
 
 try:
+    from base.common.base_service import BaseBusinessService
+except ImportError:
+    BaseBusinessService = object
+
+try:
     from base.plugins.purchase.models.supplier import Supplier, SupplierType, SupplierStatus
     from base.plugins.purchase.models.purchase import (
         PurchaseOrderStatus,
@@ -40,9 +45,11 @@ except ImportError:
     Product = None
 
 
-class SupplierService:
-    @staticmethod
-    async def create_supplier(data: Dict[str, Any]) -> Supplier:
+class SupplierService(BaseBusinessService):
+    model = "supplier"
+
+    @classmethod
+    async def _do_create(cls, data: Dict[str, Any]) -> Supplier:
         if not data.get('supplier_code'):
             max_code = await Supplier.all().order_by('-supplier_code').first()
             if max_code:
@@ -93,8 +100,8 @@ class SupplierService:
             "items": [await s.to_dict() for s in suppliers]
         }
 
-    @staticmethod
-    async def update_supplier(supplier_id: int, data: Dict[str, Any]) -> Optional[Supplier]:
+    @classmethod
+    async def _do_update(cls, supplier_id: int, data: Dict[str, Any]) -> Optional[Supplier]:
         supplier = await SupplierService.get_supplier(supplier_id)
         if not supplier:
             return None
@@ -106,8 +113,8 @@ class SupplierService:
         await supplier.save()
         return supplier
 
-    @staticmethod
-    async def delete_supplier(supplier_id: int) -> bool:
+    @classmethod
+    async def _do_delete(cls, supplier_id: int) -> bool:
         supplier = await SupplierService.get_supplier(supplier_id)
         if not supplier:
             return False
@@ -120,9 +127,11 @@ class SupplierService:
         return await Supplier.filter(status=SupplierStatus.ACTIVE).order_by("supplier_name")
 
 
-class PurchaseOrderService:
-    @staticmethod
-    async def create_purchase_order(data: Dict[str, Any]) -> PurchaseOrder:
+class PurchaseOrderService(BaseBusinessService):
+    model = "purchase_order"
+
+    @classmethod
+    async def _do_create(cls, data: Dict[str, Any]) -> PurchaseOrder:
         items_data = data.pop('items', [])
         order_no = generate_purchase_no()
 
@@ -190,8 +199,8 @@ class PurchaseOrderService:
             "items": [await o.to_dict() for o in orders]
         }
 
-    @staticmethod
-    async def update_purchase_order(order_id: int, data: Dict[str, Any]) -> Optional[PurchaseOrder]:
+    @classmethod
+    async def _do_update(cls, order_id: int, data: Dict[str, Any]) -> Optional[PurchaseOrder]:
         order = await PurchaseOrderService.get_purchase_order(order_id)
         if not order:
             return None
@@ -254,8 +263,8 @@ class PurchaseOrderService:
         await order.save()
         return order
 
-    @staticmethod
-    async def delete_purchase_order(order_id: int) -> bool:
+    @classmethod
+    async def _do_delete(cls, order_id: int) -> bool:
         order = await PurchaseOrderService.get_purchase_order(order_id)
         if not order:
             return False
@@ -286,9 +295,11 @@ class PurchaseOrderService:
         return order
 
 
-class PurchaseReceiptService:
-    @staticmethod
-    async def create_purchase_receipt(data: Dict[str, Any]) -> PurchaseReceipt:
+class PurchaseReceiptService(BaseBusinessService):
+    model = "purchase_receipt"
+
+    @classmethod
+    async def _do_create(cls, data: Dict[str, Any]) -> PurchaseReceipt:
         items_data = data.pop('items', [])
         receipt_no = generate_receipt_no()
 
@@ -447,8 +458,8 @@ class PurchaseReceiptService:
             "items": [await r.to_dict() for r in receipts]
         }
 
-    @staticmethod
-    async def update_purchase_receipt(receipt_id: int, data: Dict[str, Any]) -> Optional[PurchaseReceipt]:
+    @classmethod
+    async def _do_update(cls, receipt_id: int, data: Dict[str, Any]) -> Optional[PurchaseReceipt]:
         receipt = await PurchaseReceiptService.get_purchase_receipt(receipt_id)
         if not receipt:
             return None
@@ -473,8 +484,8 @@ class PurchaseReceiptService:
         await receipt.save()
         return receipt
 
-    @staticmethod
-    async def delete_purchase_receipt(receipt_id: int) -> bool:
+    @classmethod
+    async def _do_delete(cls, receipt_id: int) -> bool:
         receipt = await PurchaseReceiptService.get_purchase_receipt(receipt_id)
         if not receipt:
             return False

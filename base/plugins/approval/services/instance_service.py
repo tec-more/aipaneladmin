@@ -42,7 +42,8 @@ class InstanceService:
             title=data.title,
             applicant_id=applicant_id,
             status=ApprovalEngine.STATUS_PENDING,
-            form_data=data.form_data
+            form_data=data.form_data,
+            action=data.action
         )
 
         # 创建审批记录
@@ -104,17 +105,28 @@ class InstanceService:
         await instance.save()
 
     @staticmethod
+    async def _complete_instance_with_execute(instance: ApprovalInstance, action: str = "approve"):
+        """完成审批实例，并在审批通过时自动回调执行器执行业务落库。"""
+        status = ApprovalEngine.STATUS_APPROVED if action == "approve" else ApprovalEngine.STATUS_REJECTED
+        result = "审批通过" if action == "approve" else "审批拒绝"
+        await ApprovalEngine.complete_instance(instance, status, result)
+        # 审批通过：自动执行业务（失败不影响已置为 approved 的状态）
+        if status == ApprovalEngine.STATUS_APPROVED:
+            try:
+                from base.plugins.approval.services.approval_gate import ApprovalExecutor
+                await ApprovalExecutor.execute(instance)
+            except Exception as e:
+                logger.error(f"审批通过后自动执行业务失败 instance={instance.id}: {e}")
+        return instance
+
+    @staticmethod
     async def _process_node_complete(instance: ApprovalInstance, flow: ApprovalFlow,
                                      node_config: Dict[str, Any], form_data: Dict[str, Any],
                                      action: str = "approve"):
         """处理节点完成，进入下一节点"""
         # 如果是结束节点，完成实例
         if node_config.get("type") == ApprovalEngine.NODE_END:
-            await ApprovalEngine.complete_instance(
-                instance,
-                ApprovalEngine.STATUS_APPROVED if action == "approve" else ApprovalEngine.STATUS_REJECTED,
-                "审批通过" if action == "approve" else "审批拒绝"
-            )
+            await InstanceService._complete_instance_with_execute(instance, action)
             return
 
         # 计算下一节点
@@ -122,11 +134,7 @@ class InstanceService:
 
         if not next_node:
             # 没有下一节点，结束审批
-            await ApprovalEngine.complete_instance(
-                instance,
-                ApprovalEngine.STATUS_APPROVED if action == "approve" else ApprovalEngine.STATUS_REJECTED,
-                "审批通过" if action == "approve" else "审批拒绝"
-            )
+            await InstanceService._complete_instance_with_execute(instance, action)
             return
 
         # 如果下一节点是审批节点，进入审批

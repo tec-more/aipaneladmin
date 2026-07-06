@@ -3,6 +3,7 @@
 """
 from typing import List, Optional
 import os
+from base.common.base_service import BaseBusinessService
 
 # 添加向量检索相关依赖
 try:
@@ -19,7 +20,8 @@ except ImportError:
         pass
 
 
-class DocumentProcessingService:
+class DocumentProcessingService(BaseBusinessService):
+    model = "document_processing"
     """文档处理服务"""
     
     @staticmethod

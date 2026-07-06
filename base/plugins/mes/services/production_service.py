@@ -3,6 +3,7 @@ from decimal import Decimal
 from datetime import datetime
 from tortoise.expressions import Q
 from loguru import logger
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.common.events.event_bus import event_bus
@@ -91,7 +92,8 @@ except ImportError:
     class WorkOrderUpdate(ManufacturingOrderUpdate): pass
 
 
-class ManufacturingOrderService:
+class ManufacturingOrderService(BaseBusinessService):
+    model = "manufacturing_order"
     @staticmethod
     async def get_by_id(mo_id: int) -> Optional[ManufacturingOrder]:
         return await ManufacturingOrder.filter(id=mo_id).first()
@@ -265,7 +267,8 @@ class ManufacturingOrderService:
         return work_orders
 
 
-class WorkOrderService:
+class WorkOrderService(BaseBusinessService):
+    model = "work_order"
     @staticmethod
     async def get_by_id(wo_id: int) -> Optional[WorkOrder]:
         return await WorkOrder.filter(id=wo_id).first()

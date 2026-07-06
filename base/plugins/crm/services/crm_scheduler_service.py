@@ -5,9 +5,11 @@ from base.plugins.crm.models.lead import Lead, LeadStatus
 from base.plugins.crm.models.opportunity import Opportunity, OpportunityStatus
 from base.plugins.crm.models.follow_up_task import FollowUpTask, TaskStatus
 from base.plugins.crm.models.crm_config import CrmConfig
+from base.common.base_service import BaseBusinessService
 
 
-class CrmSchedulerService:
+class CrmSchedulerService(BaseBusinessService):
+    model = "crm_scheduler"
 
     @staticmethod
     async def auto_recycle_leads():

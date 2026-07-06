@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Any
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.finance.models.integration_config import IntegrationConfig
@@ -6,7 +7,8 @@ except ImportError:
     IntegrationConfig = None
 
 
-class IntegrationConfigService:
+class IntegrationConfigService(BaseBusinessService):
+    model = "integration_config"
     @staticmethod
     async def get_all_configs(page: int = 1, page_size: int = 20) -> List[IntegrationConfig]:
         offset = (page - 1) * page_size

@@ -6,9 +6,11 @@ from tortoise.exceptions import DoesNotExist, IntegrityError
 from base.plugins.agent.models.tool_tag import ToolTag
 from base.plugins.agent.models.tool import Tool
 from base.plugins.agent.schemas.tool_tag import ToolTagCreate, ToolTagUpdate
+from base.common.base_service import BaseBusinessService
 
 
-class ToolTagService:
+class ToolTagService(BaseBusinessService):
+    model = "tool_tag"
     """Tool tag service class"""
 
     @staticmethod

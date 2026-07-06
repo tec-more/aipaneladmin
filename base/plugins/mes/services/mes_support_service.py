@@ -1,6 +1,7 @@
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime, date, timedelta
 from decimal import Decimal
+from base.common.base_service import BaseBusinessService
 
 try:
     from base.plugins.mes.models.trace import TraceRecord
@@ -31,7 +32,8 @@ except ImportError:
     WorkOrder = None
 
 
-class TraceService:
+class TraceService(BaseBusinessService):
+    model = "trace"
     @staticmethod
     async def forward_trace(material_batch_no: str) -> List[TraceRecord]:
         return await TraceRecord.filter(material_batch_no=material_batch_no).order_by('created_at')
@@ -41,7 +43,8 @@ class TraceService:
         return await TraceRecord.filter(product_batch_no=product_batch_no).order_by('created_at')
 
 
-class DashboardService:
+class DashboardService(BaseBusinessService):
+    model = "dashboard"
     @staticmethod
     async def get_oee(work_center_code: str = None, period: str = "day") -> Dict[str, Any]:
         return {
@@ -83,7 +86,8 @@ class DashboardService:
         return result
 
 
-class BarcodeService:
+class BarcodeService(BaseBusinessService):
+    model = "barcode"
     @staticmethod
     async def generate_barcode(data: BarcodeGenerateRequest) -> BarcodeRecord:
         if data.barcode_type == "work_order":
@@ -115,7 +119,8 @@ class BarcodeService:
         return record
 
 
-class ShiftService:
+class ShiftService(BaseBusinessService):
+    model = "shift"
     @staticmethod
     async def create_shift(data: ShiftDefinitionCreate) -> ShiftDefinition:
         existing = await ShiftDefinition.filter(
@@ -168,7 +173,8 @@ class ShiftService:
         return await query.order_by('start_time')
 
 
-class ExceptionService:
+class ExceptionService(BaseBusinessService):
+    model = "exception"
     @staticmethod
     async def report_exception(data: ProductionExceptionCreate) -> ProductionException:
         import random
@@ -243,7 +249,8 @@ class ExceptionService:
         return items, total
 
 
-class ToolingService:
+class ToolingService(BaseBusinessService):
+    model = "tooling"
     @staticmethod
     async def create_tooling(data: ToolingCreate) -> Tooling:
         existing = await Tooling.filter(tooling_code=data.tooling_code).first()
@@ -287,7 +294,8 @@ class ToolingService:
         return items, total
 
 
-class EnergyService:
+class EnergyService(BaseBusinessService):
+    model = "energy"
     @staticmethod
     async def record_energy(data: EnergyRecordCreate) -> EnergyRecord:
         return await EnergyRecord.create(**data.model_dump())

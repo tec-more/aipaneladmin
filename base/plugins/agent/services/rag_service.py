@@ -48,13 +48,15 @@ class TextSplitter:
         return [s.strip() for s in result if s.strip()]
 
 
-class VectorService:
+class VectorService(BaseBusinessService):
+    model = "vector"
     """向量服务（已简化，只保留 pgvector 支持）"""
 
     VECTOR_DIMENSION = 1024
 
 
-class RAGService:
+class RAGService(BaseBusinessService):
+    model = "rag"
     """RAG服务"""
 
     @staticmethod
@@ -789,7 +791,8 @@ class DocumentProcessor:
             raise
 
 
-class HybridRAGService:
+class HybridRAGService(BaseBusinessService):
+    model = "hybrid_r_a_g"
     """混合 RAG 服务"""
     
     # 切换方式：可以通过配置或环境变量切换
@@ -865,7 +868,8 @@ class HybridRAGService:
         )
 
 
-class RAGPermissionService:
+class RAGPermissionService(BaseBusinessService):
+    model = "rag_permission"
     """RAG 权限服务"""
 
     @staticmethod
@@ -1183,5 +1187,6 @@ async def add_permission_methods_to_rag_service():
 
 
 import asyncio
+from base.common.base_service import BaseBusinessService
 asyncio.create_task(add_permission_methods_to_rag_service())
 

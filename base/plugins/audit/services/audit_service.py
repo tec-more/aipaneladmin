@@ -26,6 +26,7 @@ from base.plugins.audit.schemas.audit_log import (
     RiskAuditRecordUpdate,
     FullTraceResponse
 )
+from base.common.base_service import BaseBusinessService
 from base.common.context import (
     current_trace_id,
     current_user_id,
@@ -55,7 +56,8 @@ def clear_trace_id() -> None:
     clear_context_trace_id()
 
 
-class AuditTraceService:
+class AuditTraceService(BaseBusinessService):
+    model = "audit_trace"
     """全链路追踪服务"""
 
     @staticmethod
@@ -133,7 +135,8 @@ class AuditTraceService:
         )
 
 
-class InputLayerService:
+class InputLayerService(BaseBusinessService):
+    model = "input_layer"
     """输入层服务"""
 
     @staticmethod
@@ -156,7 +159,8 @@ class InputLayerService:
         return await InputLayerLog.filter(trace_id=trace_id).order_by('-created_at')
 
 
-class DecisionLayerService:
+class DecisionLayerService(BaseBusinessService):
+    model = "decision_layer"
     """决策层服务"""
 
     @staticmethod
@@ -179,7 +183,8 @@ class DecisionLayerService:
         return await DecisionLayerLog.filter(trace_id=trace_id).order_by('created_at')
 
 
-class ExecutionLayerService:
+class ExecutionLayerService(BaseBusinessService):
+    model = "execution_layer"
     """执行层服务"""
 
     @staticmethod
@@ -202,7 +207,8 @@ class ExecutionLayerService:
         return await ExecutionLayerLog.filter(trace_id=trace_id).order_by('created_at')
 
 
-class OutputLayerService:
+class OutputLayerService(BaseBusinessService):
+    model = "output_layer"
     """输出层服务"""
 
     @staticmethod
@@ -225,7 +231,8 @@ class OutputLayerService:
         return await OutputLayerLog.filter(trace_id=trace_id).order_by('-created_at')
 
 
-class SystemLayerService:
+class SystemLayerService(BaseBusinessService):
+    model = "system_layer"
     """系统层服务"""
 
     @staticmethod
@@ -288,7 +295,8 @@ class SystemLayerService:
         return await SystemLayerService.create_log(log_data)
 
 
-class AuditLogService:
+class AuditLogService(BaseBusinessService):
+    model = "audit_log"
     """审计日志服务"""
 
     @staticmethod
@@ -402,7 +410,8 @@ class AuditLogService:
         }
 
 
-class AuditReportService:
+class AuditReportService(BaseBusinessService):
+    model = "audit_report"
     """审计报告服务"""
 
     @staticmethod
@@ -605,7 +614,8 @@ class AuditReportService:
         return await AuditReportService.create_report(report)
 
 
-class RiskAuditService:
+class RiskAuditService(BaseBusinessService):
+    model = "risk_audit"
     """风险审计服务"""
 
     @staticmethod

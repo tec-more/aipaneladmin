@@ -6,9 +6,11 @@ from tortoise.transactions import atomic
 from base.plugins.crm.models.contact import Contact
 from base.plugins.crm.models.opportunity import Opportunity, OpportunityStatus
 from base.plugins.crm.schemas.contact_schema import ContactCreate, ContactUpdate, ContactListQuery
+from base.common.base_service import BaseBusinessService
 
 
-class ContactService:
+class ContactService(BaseBusinessService):
+    model = "contact"
 
     @staticmethod
     async def create_contact(contact_data: ContactCreate) -> Contact:
