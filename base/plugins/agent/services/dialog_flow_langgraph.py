@@ -23,16 +23,16 @@ from base.plugins.agent.models.agent import Agent
 from base.plugins.agent.utils.safe_eval import safe_eval
 from base.plugins.agent.services.memory_service import MemoryService
 from base.plugins.agent.services.checkpoint_service import CheckpointService
-from base.plugins.agent.services.langgraph_executor import LangGraphExecutor, AgentState
+from base.plugins.agent.services.langgraph_executor import LangGraphExecutor, AgentState, last_value_reducer
 
 logger = logging.getLogger(__name__)
 
 
 class DialogFlowState(AgentState):
     """对话流执行状态，继承智能体状态"""
-    dialog_flow_id: Annotated[Optional[int], LangGraphExecutor._last_value_reducer]
-    user_id: Annotated[Optional[int], LangGraphExecutor._last_value_reducer]
-    session_id: Annotated[Optional[str], LangGraphExecutor._last_value_reducer]
+    dialog_flow_id: Annotated[Optional[int], last_value_reducer]
+    user_id: Annotated[Optional[int], last_value_reducer]
+    session_id: Annotated[Optional[str], last_value_reducer]
 
 
 class DialogFlowLangGraphExecutor:
