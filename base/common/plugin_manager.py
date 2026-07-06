@@ -290,6 +290,33 @@ class PluginManager:
             log.error(f"加载插件 {name} 失败: {e}")
             return None
 
+    def _load_services(self, name: str) -> None:
+        """自动导入插件 services/ 目录下的所有模块，触发 BaseBusinessService 子类注册。
+
+        审批执行器（APPROVAL_EXECUTORS）依赖 service 类在模块加载时通过
+        BaseBusinessService.__init_subclass__ 自动登记。插件路由文件通常也会导入
+        service，但为保险起见，此处显式遍历 services/ 目录做一次性导入，
+        确保所有业务模型都能被审批规则配置页面发现。
+        """
+        plugin_dir = self._plugins_dir / name
+        services_dir = plugin_dir / "services"
+        if not services_dir.exists() or not services_dir.is_dir():
+            return
+
+        for service_file in services_dir.rglob("*.py"):
+            if service_file.name == "__init__.py":
+                continue
+            try:
+                relative_path = service_file.relative_to(plugin_dir)
+                module_path = f"base.plugins.{name}.{relative_path.as_posix().replace('/', '.')[:-3]}"
+                spec = importlib.util.spec_from_file_location(module_path, service_file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+            except Exception as e:
+                log.warning(f"插件 {name} 导入 service 文件 {service_file.relative_to(plugin_dir)} 失败: {e}")
+
+
     def _load_routes_from_manifest(self, name: str, manifest: dict) -> Optional[APIRouter]:
         """从 manifest.json 的 routes 字段加载路由
 
@@ -512,6 +539,9 @@ class PluginManager:
             if plugin.router:
                 self._app.include_router(plugin.router)
                 log.info(f"已注册插件路由: {name}")
+
+            # 导入 services，确保 BaseBusinessService 子类注册到审批执行器
+            self._load_services(name)
 
             # 更新 manifest 状态
             self.update_plugin_status(name, is_installed=True, is_enabled=True)

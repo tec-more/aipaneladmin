@@ -43,6 +43,15 @@ async def get_rule_list(
     return success_response(data=result)
 
 
+@rule_router.get("/models")
+async def get_available_models(
+    user_id: int = require_permission("approval:rule:view"),
+):
+    """获取所有可用的业务模型列表（来自 BaseBusinessService 子类的 model 属性）"""
+    models = RuleService.get_available_models()
+    return success_response(data={"models": models, "total": len(models)})
+
+
 @rule_router.get("/{rule_id}")
 async def get_rule_detail(
     rule_id: int,

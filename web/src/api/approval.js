@@ -99,3 +99,7 @@ export const toggleRuleStatus = (id, isActive) => {
 export const checkApprovalRequired = (params) => {
   return request.post('/v1/approval/rules/check', null, { params })
 }
+
+export const getAvailableModels = () => {
+  return request.get('/v1/approval/rules/models')
+}

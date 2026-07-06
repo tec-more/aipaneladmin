@@ -1,7 +1,9 @@
 """
 审批规则 Service
 """
-from typing import Optional, List, Dict, Any
+import ast
+from pathlib import Path
+from typing import Optional, List, Dict, Any, Set
 from tortoise.expressions import Q
 import fnmatch
 from loguru import logger
@@ -13,6 +15,58 @@ from base.plugins.approval.schemas.rule_schema import RuleCreate, RuleUpdate, Ru
 
 class RuleService:
     """审批规则服务"""
+
+    @staticmethod
+    def get_available_models() -> List[str]:
+        """获取所有可用的业务模型。
+
+        优先读取运行时注册表 APPROVAL_EXECUTORS；同时扫描所有插件 services/ 目录，
+        通过 AST 解析继承自 BaseBusinessService 且声明了 model 类属性的 service 文件，
+        把未在运行时注册的 model 也纳入列表，确保前端下拉框能看到全部模型。
+        """
+        from base.plugins.approval.services.approval_gate import APPROVAL_EXECUTORS
+
+        models: Set[str] = {model for (model, _action) in APPROVAL_EXECUTORS.keys()}
+
+        try:
+            plugins_dir = Path(__file__).resolve().parent.parent.parent
+            for services_dir in plugins_dir.glob("*/services"):
+                if not services_dir.is_dir():
+                    continue
+                for service_file in services_dir.rglob("*.py"):
+                    if service_file.name == "__init__.py":
+                        continue
+                    try:
+                        source = service_file.read_text(encoding="utf-8")
+                        tree = ast.parse(source)
+                    except Exception:
+                        continue
+                    for node in ast.walk(tree):
+                        if not isinstance(node, ast.ClassDef):
+                            continue
+                        # 判断是否继承 BaseBusinessService
+                        has_base = any(
+                            (isinstance(base, ast.Name) and base.id == "BaseBusinessService")
+                            or (isinstance(base, ast.Attribute) and base.attr == "BaseBusinessService")
+                            for base in node.bases
+                        )
+                        if not has_base:
+                            continue
+                        # 查找 model = "xxx" 的类属性
+                        for stmt in node.body:
+                            if isinstance(stmt, ast.Assign):
+                                for target in stmt.targets:
+                                    if isinstance(target, ast.Name) and target.id == "model":
+                                        value = stmt.value
+                                        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                                            models.add(value.value)
+                                        elif isinstance(value, ast.Str):
+                                            models.add(value.s)
+                                        break
+        except Exception as e:
+            logger.warning(f"扫描业务模型失败: {e}")
+
+        return sorted(models)
 
     @staticmethod
     async def create_rule(data: RuleCreate) -> ApprovalRule:

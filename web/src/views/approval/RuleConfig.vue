@@ -58,7 +58,7 @@
         </el-form-item>
         <el-form-item label="业务模型">
           <el-select v-model="formData.model" placeholder="选择或输入业务模型" filterable allow-create default-first-option style="width: 100%">
-            <el-option v-for="m in MODEL_OPTIONS" :key="m" :label="m" :value="m" />
+            <el-option v-for="m in modelOptions" :key="m" :label="m" :value="m" />
           </el-select>
           <div class="form-tip">由框架从 Pydantic Model 自动推导（驼峰转下划线），如 PurchaseOrderCreate → purchase_order</div>
         </el-form-item>
@@ -96,12 +96,12 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getRuleList, createRule, updateRule, deleteRule, toggleRuleStatus, getFlowList } from '@/api/approval'
+import { getRuleList, createRule, updateRule, deleteRule, toggleRuleStatus, getFlowList, getAvailableModels } from '@/api/approval'
 
 const loading = ref(false)
 const tableData = ref([])
 const flowOptions = ref([])
-const MODEL_OPTIONS = ['purchase_order', 'purchase_receipt', 'sales_order', 'inventory_adjust']
+const modelOptions = ref([])
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const dialogMode = ref('create')
@@ -138,6 +138,17 @@ const fetchFlows = async () => {
     const res = await getFlowList({ page: 1, page_size: 100 })
     if (res.code === 0 || res.code === 200 || res.success) {
       flowOptions.value = res.data.items || []
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const fetchModels = async () => {
+  try {
+    const res = await getAvailableModels()
+    if (res.code === 0 || res.code === 200 || res.success) {
+      modelOptions.value = res.data.models || []
     }
   } catch (e) {
     console.error(e)
@@ -218,6 +229,7 @@ const handleDelete = async (row) => {
 onMounted(() => {
   fetchData()
   fetchFlows()
+  fetchModels()
 })
 </script>
 
