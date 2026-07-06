@@ -32,6 +32,69 @@ def _patch_asyncpg_for_gaussdb():
 _patch_asyncpg_for_gaussdb()
 
 
+def _split_sql_statements(sql: str) -> "list[str]":
+    """按顶层分号切分 SQL，忽略 $$...$$ 美元引号块内的分号（asyncpg.execute 仅支持单条语句）。"""
+    statements: "list[str]" = []
+    buf: "list[str]" = []
+    in_dollar = False
+    i, n = 0, len(sql)
+    while i < n:
+        ch = sql[i]
+        if ch == "$" and sql[i:i + 2] == "$$":
+            in_dollar = not in_dollar
+            buf.append("$$")
+            i += 2
+            continue
+        if not in_dollar and ch == ";":
+            stmt = "".join(buf).strip()
+            if stmt:
+                statements.append(stmt)
+            buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    tail = "".join(buf).strip()
+    if tail:
+        statements.append(tail)
+    return statements
+
+
+async def _run_sql_migrations() -> None:
+    """执行 migrations/*.sql 幂等迁移（补齐 action 等列及默认数据）。
+
+    这些 SQL 为 CREATE TABLE IF NOT EXISTS / ALTER ... IF NOT EXISTS / INSERT ... WHERE NOT EXISTS，
+    可重复执行且对全新库与存量库均安全。需在 Tortoise.generate_schemas 之前执行，
+    以确保 approval_instance.action 等列已存在。
+    """
+    from base.common.setting import settings
+
+    migrations_dir = Path(__file__).resolve().parent.parent.parent / "migrations"
+    sql_files = sorted(migrations_dir.glob("*.sql"))
+    if not sql_files:
+        print("未找到 migrations/*.sql，跳过自定义 SQL 迁移")
+        return
+
+    import asyncpg
+
+    conn = await asyncpg.connect(
+        host=settings.db_host,
+        port=settings.db_port,
+        user=settings.db_user,
+        password=settings.db_password,
+        database=settings.db_name,
+    )
+    try:
+        for sql_file in sql_files:
+            sql = sql_file.read_text(encoding="utf-8")
+            print(f"执行 SQL 迁移: {sql_file.name}")
+            for stmt in _split_sql_statements(sql):
+                await conn.execute(stmt)
+        print("自定义 SQL 迁移执行完成")
+    finally:
+        await conn.close()
+
+
 async def init_db():
     print("开始初始化数据库...")
     print(f"模型列表: {TORTOISE_ORM['apps']['models']['models']}")
@@ -58,7 +121,15 @@ async def init_db():
             print("继续执行，可能是因为迁移已应用...")
             import traceback
             traceback.print_exc()
-            
+
+        # 执行自定义 SQL 迁移（补齐 action 等列及默认数据），需在 generate_schemas 之前
+        try:
+            await _run_sql_migrations()
+        except Exception as e:
+            print(f"执行自定义 SQL 迁移时出错（已忽略）: {e}")
+            import traceback
+            traceback.print_exc()
+
     except ImportError:
         print("aerich 未安装，跳过迁移")
     except Exception as e:

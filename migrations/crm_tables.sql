@@ -128,26 +128,38 @@ CREATE TABLE IF NOT EXISTS crm_config (
 );
 
 -- 初始化默认商机阶段
-INSERT INTO crm_opportunity_stage (name, code, sort_order, probability, is_won_stage, is_lost_stage) VALUES
-('初步接触', 'initial_contact', 1, 10, FALSE, FALSE),
-('需求确认', 'requirement_confirmation', 2, 25, FALSE, FALSE),
-('方案报价', 'proposal_quotation', 3, 50, FALSE, FALSE),
-('商务谈判', 'negotiation', 4, 75, FALSE, FALSE),
-('赢单', 'won', 5, 100, TRUE, FALSE),
-('输单', 'lost', 6, 0, FALSE, TRUE)
-ON CONFLICT (code) DO NOTHING;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM crm_opportunity_stage WHERE code IN ('initial_contact','requirement_confirmation','proposal_quotation','negotiation','won','lost')) THEN
+        INSERT INTO crm_opportunity_stage (name, code, sort_order, probability, is_won_stage, is_lost_stage) VALUES
+        ('初步接触', 'initial_contact', 1, 10, FALSE, FALSE),
+        ('需求确认', 'requirement_confirmation', 2, 25, FALSE, FALSE),
+        ('方案报价', 'proposal_quotation', 3, 50, FALSE, FALSE),
+        ('商务谈判', 'negotiation', 4, 75, FALSE, FALSE),
+        ('赢单', 'won', 5, 100, TRUE, FALSE),
+        ('输单', 'lost', 6, 0, FALSE, TRUE);
+    END IF;
+END $$;
 
 -- 初始化默认线索来源
-INSERT INTO crm_lead_source (name, code, sort_order) VALUES
-('官网注册', 'website', 1),
-('广告投放', 'advertisement', 2),
-('转介绍', 'referral', 3),
-('展会', 'exhibition', 4),
-('其他', 'other', 5)
-ON CONFLICT (code) DO NOTHING;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM crm_lead_source WHERE code IN ('website','advertisement','referral','exhibition','other')) THEN
+        INSERT INTO crm_lead_source (name, code, sort_order) VALUES
+        ('官网注册', 'website', 1),
+        ('广告投放', 'advertisement', 2),
+        ('转介绍', 'referral', 3),
+        ('展会', 'exhibition', 4),
+        ('其他', 'other', 5);
+    END IF;
+END $$;
 
 -- 初始化默认系统配置
-INSERT INTO crm_config (config_key, config_value, description) VALUES
-('auto_recycle_days', '30', '线索自动回收天数'),
-('stale_warning_days', '14', '商机超期预警天数')
-ON CONFLICT (config_key) DO NOTHING;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM crm_config WHERE config_key IN ('auto_recycle_days','stale_warning_days')) THEN
+        INSERT INTO crm_config (config_key, config_value, description) VALUES
+        ('auto_recycle_days', '30', '线索自动回收天数'),
+        ('stale_warning_days', '14', '商机超期预警天数');
+    END IF;
+END $$;

@@ -21,6 +21,7 @@ from base.plugins.agent.schemas.rag import (
 )
 from base.common.permissions import get_user_data_scope_cached, get_user_permissions_cached
 from base.common.security import get_current_user
+from base.common.base_service import BaseBusinessService
 
 logger = logging.getLogger(__name__)
 
@@ -1187,6 +1188,5 @@ async def add_permission_methods_to_rag_service():
 
 
 import asyncio
-from base.common.base_service import BaseBusinessService
 asyncio.create_task(add_permission_methods_to_rag_service())
 
