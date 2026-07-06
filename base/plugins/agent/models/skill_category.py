@@ -6,6 +6,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class SkillCategory(BaseModel, TimestampMixin):
+    verbose_name = "技能分类"
     """Skill Category model"""
     
     name = fields.CharField(max_length=100, description="Category name")

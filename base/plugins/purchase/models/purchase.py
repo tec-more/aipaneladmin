@@ -50,6 +50,7 @@ def generate_receipt_no() -> str:
 
 
 class PurchaseOrder(BaseModel, TimestampMixin):
+    verbose_name = "采购订单"
     order_no = fields.CharField(max_length=64, unique=True, description="采购单号")
     supplier = fields.ForeignKeyField(
         "models.Supplier",
@@ -174,6 +175,7 @@ class PurchaseOrderItem(BaseModel, TimestampMixin):
 
 
 class PurchaseReceipt(BaseModel, TimestampMixin):
+    verbose_name = "采购入库单"
     receipt_no = fields.CharField(max_length=64, unique=True, description="入库单号")
     purchase_order = fields.ForeignKeyField(
         "models.PurchaseOrder",

@@ -3,6 +3,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class IntegrationAccountMapping(BaseModel, TimestampMixin):
+    verbose_name = "集成科目映射"
     event_type = fields.CharField(max_length=64, unique=True, description="事件类型")
     debit_account_code = fields.CharField(max_length=64, description="借方科目编码")
     credit_account_code = fields.CharField(max_length=64, description="贷方科目编码")

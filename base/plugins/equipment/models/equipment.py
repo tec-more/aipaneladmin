@@ -60,6 +60,7 @@ except ImportError:
 
 
 class Equipment(BaseModel, TimestampMixin):
+    verbose_name = "设备"
     """设备模型"""
     equipment_code = fields.CharField(max_length=100, unique=True, description="设备编码", index=True)
     equipment_name = fields.CharField(max_length=255, description="设备名称", index=True)
@@ -102,6 +103,7 @@ class Equipment(BaseModel, TimestampMixin):
 
 
 class EquipmentMaintenance(BaseModel, TimestampMixin):
+    verbose_name = "设备保养"
     """设备维护保养模型"""
     maintenance_code = fields.CharField(max_length=100, unique=True, description="保养单号", index=True)
     equipment_code = fields.CharField(max_length=100, description="设备编码", index=True)
@@ -136,6 +138,7 @@ class EquipmentMaintenance(BaseModel, TimestampMixin):
 
 
 class EquipmentFault(BaseModel, TimestampMixin):
+    verbose_name = "设备故障"
     """设备故障模型"""
     fault_code = fields.CharField(max_length=100, unique=True, description="故障单号", index=True)
     equipment_code = fields.CharField(max_length=100, description="设备编码", index=True)

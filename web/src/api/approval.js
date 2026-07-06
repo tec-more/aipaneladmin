@@ -104,6 +104,11 @@ export const getAvailableModels = () => {
   return request.get('/v1/approval/rules/models')
 }
 
+// 获取指定业务模型对应的 service 执行动作列表（create/update/delete）
+export const getModelActions = (model) => {
+  return request.get('/v1/approval/rules/actions', { params: { model } })
+}
+
 // 校验流程配置结构（不落库）
 export const validateFlow = (data) => {
   return request.post('/v1/approval/flows/validate', data)

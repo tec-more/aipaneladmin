@@ -52,6 +52,7 @@ except ImportError:
 
 
 class Product(BaseModel, TimestampMixin):
+    verbose_name = "产品"
     """产品模型"""
     name = fields.CharField(max_length=255, unique=True, description="产品名称", index=True)
     description = fields.TextField(null=True, description="产品描述")

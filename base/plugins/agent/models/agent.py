@@ -6,6 +6,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class Agent(BaseModel, TimestampMixin):
+    verbose_name = "智能体"
     """Agent model"""
     
     name = fields.CharField(max_length=100, description="Agent name")

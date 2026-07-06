@@ -60,6 +60,7 @@ except ImportError:
 
 
 class Material(BaseModel, TimestampMixin):
+    verbose_name = "物料"
     """物料主数据模型"""
     product_id = fields.IntField(null=True, description="产品ID", index=True)
     material_code = fields.CharField(max_length=100, unique=True, description="物料编码", index=True)
@@ -94,6 +95,7 @@ class Material(BaseModel, TimestampMixin):
 
 
 class BomVersion(BaseModel, TimestampMixin):
+    verbose_name = "BOM版本"
     """BOM版本管理模型"""
     product_id = fields.IntField(null=True, description="成品产品ID", index=True)
     product_code = fields.CharField(max_length=100, description="成品编码", index=True)
@@ -125,6 +127,7 @@ class BomVersion(BaseModel, TimestampMixin):
 
 
 class Bom(BaseModel, TimestampMixin):
+    verbose_name = "物料清单"
     """物料清单模型"""
     product_id = fields.IntField(null=True, description="成品产品ID", index=True)
     product_code = fields.CharField(max_length=100, description="成品编码", index=True)
@@ -171,6 +174,7 @@ class Bom(BaseModel, TimestampMixin):
 
 
 class WorkCenter(BaseModel, TimestampMixin):
+    verbose_name = "工作中心"
     """工作中心模型"""
     work_center_code = fields.CharField(max_length=100, unique=True, description="工作中心编码", index=True)
     work_center_name = fields.CharField(max_length=255, description="工作中心名称", index=True)
@@ -199,6 +203,7 @@ class WorkCenter(BaseModel, TimestampMixin):
 
 
 class Process(BaseModel, TimestampMixin):
+    verbose_name = "工序"
     """工艺/工序模型"""
     process_code = fields.CharField(max_length=100, unique=True, description="工序编码", index=True)
     process_name = fields.CharField(max_length=255, description="工序名称", index=True)
@@ -235,6 +240,7 @@ class Process(BaseModel, TimestampMixin):
 
 
 class Route(BaseModel, TimestampMixin):
+    verbose_name = "生产路线"
     """生产路线模型"""
     route_code = fields.CharField(max_length=100, unique=True, description="路线编码", index=True)
     route_name = fields.CharField(max_length=255, description="路线名称", index=True)

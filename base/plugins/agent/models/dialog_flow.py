@@ -3,6 +3,7 @@ from tortoise.models import Model
 
 
 class DialogFlow(Model):
+    verbose_name = "对话流"
     """对话流模型"""
     id = fields.IntField(pk=True, description="对话流ID")
     name = fields.CharField(max_length=100, description="对话流名称")

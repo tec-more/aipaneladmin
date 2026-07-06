@@ -60,6 +60,7 @@ except ImportError:
 
 
 class SalesForecast(BaseModel, TimestampMixin):
+    verbose_name = "销售预测"
     """销售预测模型"""
     forecast_code = fields.CharField(max_length=100, unique=True, description="预测编号", index=True)
     forecast_name = fields.CharField(max_length=255, description="预测名称")
@@ -548,6 +549,7 @@ class MRPExceptionAlert(BaseModel, TimestampMixin):
 
 
 class PlannedOrder(BaseModel, TimestampMixin):
+    verbose_name = "计划订单"
     """计划订单模型"""
     order_code = fields.CharField(max_length=100, unique=True, description="计划订单编号", index=True)
     mrp_id = fields.IntField(null=True, description="关联MRP计算ID", index=True)

@@ -6,6 +6,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class Workflow(BaseModel, TimestampMixin):
+    verbose_name = "工作流"
     """Workflow model"""
     
     name = fields.CharField(max_length=100, description="Workflow name")

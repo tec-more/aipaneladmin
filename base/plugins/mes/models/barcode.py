@@ -60,6 +60,7 @@ except ImportError:
 
 
 class BarcodeRecord(BaseModel, TimestampMixin):
+    verbose_name = "条码记录"
     """条码记录模型"""
     barcode = fields.CharField(max_length=100, unique=True, description="条码值", index=True)
     barcode_type = fields.CharField(max_length=20, description="条码类型：work_order/material/process", index=True)

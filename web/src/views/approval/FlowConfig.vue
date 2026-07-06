@@ -86,25 +86,6 @@
           <el-input v-model="formData.description" type="textarea" :rows="2" />
         </el-form-item>
 
-        <el-divider>表单配置（申请人填写项）</el-divider>
-        <div v-for="(field, index) in formData.form_config" :key="index" class="field-item">
-          <el-input v-model="field.label" placeholder="字段标签" style="width: 140px" />
-          <el-input v-model="field.field" placeholder="字段名" style="width: 140px; margin: 0 8px" />
-          <el-select v-model="field.type" placeholder="类型" style="width: 120px">
-            <el-option label="文本" value="text" />
-            <el-option label="数字" value="number" />
-            <el-option label="文本域" value="textarea" />
-            <el-option label="日期" value="date" />
-            <el-option label="下拉" value="select" />
-          </el-select>
-          <el-button type="danger" link @click="removeField(index)" style="margin-left: 8px">
-            <el-icon><Delete /></el-icon>
-          </el-button>
-        </div>
-        <el-button @click="addField" type="primary" link>
-          <el-icon><Plus /></el-icon> 添加字段
-        </el-button>
-
         <el-divider>流程节点设计（拖拽连线，右侧配置审批方式）</el-divider>
         <ApprovalFlowCanvas ref="canvasRef" />
       </el-form>
@@ -181,13 +162,6 @@ const openDialog = (mode, row) => {
   nextTick(() => {
     canvasRef.value?.load(mode === 'edit' ? (row?.flow_config || {}) : null)
   })
-}
-
-const addField = () => {
-  formData.form_config.push({ label: '', field: '', type: 'text' })
-}
-const removeField = (index) => {
-  formData.form_config.splice(index, 1)
 }
 
 const handleToggleStatus = async (row, val) => {

@@ -60,6 +60,7 @@ except ImportError:
 
 
 class QualityInspection(BaseModel, TimestampMixin):
+    verbose_name = "质量检验"
     """质检模型"""
     inspection_code = fields.CharField(max_length=100, unique=True, description="检验单号", index=True)
     inspection_type = fields.CharField(max_length=20, description="检验类型：IQC/IPQC/FQC/OQC", index=True)
@@ -102,6 +103,7 @@ class QualityInspection(BaseModel, TimestampMixin):
 
 
 class InspectionStandard(BaseModel, TimestampMixin):
+    verbose_name = "检验标准"
     """检验标准模型"""
     standard_code = fields.CharField(max_length=100, unique=True, description="标准编码", index=True)
     standard_name = fields.CharField(max_length=255, description="标准名称")

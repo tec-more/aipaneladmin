@@ -4,6 +4,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class SubcontractingSettlement(BaseModel, TimestampMixin):
+    verbose_name = "委外结算"
     settlement_code = fields.CharField(max_length=100, unique=True, description="结算单编码", index=True)
     sc_code = fields.CharField(max_length=100, description="委外工单编码", index=True)
     supplier_code = fields.CharField(max_length=100, description="供应商编码", index=True)

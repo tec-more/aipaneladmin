@@ -3,6 +3,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class IntegrationLog(BaseModel, TimestampMixin):
+    verbose_name = "集成日志"
     event_name = fields.CharField(max_length=128, description="事件名称")
     source_type = fields.CharField(max_length=64, description="来源类型")
     source_id = fields.IntField(null=True, description="来源ID")

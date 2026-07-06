@@ -9,6 +9,7 @@ class RuleCreate(BaseModel):
     """创建审批规则"""
     business_type: str = Field(..., min_length=1, max_length=50, description="业务类型")
     model: Optional[str] = Field(None, max_length=50, description="业务模型标识（按模型匹配审批，缺省用 business_type）")
+    action: Optional[str] = Field(None, max_length=50, description="执行动作(create/update/delete)，不填表示匹配全部动作")
     path_pattern: Optional[str] = Field(None, max_length=255, description="路径匹配模式（已废弃）")
     methods: List[str] = Field(default=["POST", "PUT", "DELETE"], description="拦截方法列表")
     flow_id: int = Field(..., description="关联审批流程ID")
@@ -21,6 +22,7 @@ class RuleUpdate(BaseModel):
     """更新审批规则"""
     business_type: Optional[str] = Field(None, max_length=50, description="业务类型")
     model: Optional[str] = Field(None, max_length=50, description="业务模型标识（按模型匹配审批）")
+    action: Optional[str] = Field(None, max_length=50, description="执行动作(create/update/delete)")
     path_pattern: Optional[str] = Field(None, max_length=255, description="路径匹配模式（已废弃）")
     methods: Optional[List[str]] = Field(None, description="拦截方法列表")
     flow_id: Optional[int] = Field(None, description="关联审批流程ID")
@@ -34,6 +36,7 @@ class RuleResponse(BaseModel):
     id: int
     business_type: str
     model: Optional[str] = None
+    action: Optional[str] = None
     path_pattern: Optional[str] = None
     methods: List[str]
     flow_id: int

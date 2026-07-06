@@ -126,3 +126,15 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_approval_instance_action ON approval_instance(action);
     END IF;
 END $$;
+
+-- 审批规则增加 action 字段（业务模型的执行动作：create/update/delete，NULL 表示匹配全部动作）
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'approval_rule' AND column_name = 'action'
+    ) THEN
+        ALTER TABLE approval_rule ADD COLUMN action VARCHAR(50);
+        CREATE INDEX IF NOT EXISTS idx_approval_rule_action ON approval_rule(action);
+    END IF;
+END $$;

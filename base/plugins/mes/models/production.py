@@ -114,6 +114,7 @@ class ManufacturingOrder(BaseModel, TimestampMixin):
 
 
 class WorkOrder(BaseModel, TimestampMixin):
+    verbose_name = "工单"
     """工单模型"""
     wo_code = fields.CharField(max_length=100, unique=True, description="工单编码", index=True)
     mo_code = fields.CharField(max_length=100, description="制造单编码", index=True)

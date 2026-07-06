@@ -11,6 +11,8 @@ class ApprovalRule(BaseModel, TimestampMixin):
     business_type = fields.CharField(max_length=50, description="业务类型", index=True)
     # 业务模型标识（按模型匹配审批的核心字段，如 purchase_order）
     model = fields.CharField(max_length=50, description="业务模型标识（按模型匹配审批）", index=True, null=True)
+    # 执行动作（按模型匹配后的具体业务动作：create/update/delete；NULL 表示匹配全部动作）
+    action = fields.CharField(max_length=50, description="执行动作(create/update/delete)", index=True, null=True)
     # 路径匹配模式（已废弃，仅保留字段兼容，不再用于匹配）
     path_pattern = fields.CharField(max_length=255, description="路径匹配模式（已废弃）", index=True, null=True)
     # 需要拦截的HTTP方法列表
@@ -35,6 +37,7 @@ class ApprovalRule(BaseModel, TimestampMixin):
             "id": self.id,
             "business_type": self.business_type,
             "model": self.model,
+            "action": self.action,
             "path_pattern": self.path_pattern,
             "methods": self.methods,
             "flow_id": self.flow_id,

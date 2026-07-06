@@ -4,6 +4,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class SubcontractingReceipt(BaseModel, TimestampMixin):
+    verbose_name = "委外收货"
     receipt_code = fields.CharField(max_length=100, unique=True, description="收货单编码", index=True)
     sc_code = fields.CharField(max_length=100, description="委外工单编码", index=True)
     supplier_code = fields.CharField(max_length=100, description="供应商编码")

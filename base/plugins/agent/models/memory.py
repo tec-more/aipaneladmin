@@ -6,6 +6,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class Memory(BaseModel, TimestampMixin):
+    verbose_name = "记忆"
     """Memory model"""
     
     agent = fields.ForeignKeyField("models.Agent", related_name="memories", description="Associated agent")

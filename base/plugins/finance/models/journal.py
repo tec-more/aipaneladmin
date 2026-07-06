@@ -62,6 +62,7 @@ def generate_journal_no() -> str:
 
 
 class JournalEntry(BaseModel, TimestampMixin):
+    verbose_name = "会计凭证"
     journal_no = fields.CharField(max_length=64, unique=True, description="凭证编号")
     journal_date = fields.DateField(default=datetime.now, description="凭证日期")
     journal_type = fields.CharEnumField(

@@ -60,6 +60,7 @@ except ImportError:
 
 
 class TraceRecord(BaseModel, TimestampMixin):
+    verbose_name = "生产追溯"
     """生产追溯记录模型"""
     trace_code = fields.CharField(max_length=100, unique=True, description="追溯编码", index=True)
     product_batch_no = fields.CharField(max_length=100, description="成品批次号", index=True)

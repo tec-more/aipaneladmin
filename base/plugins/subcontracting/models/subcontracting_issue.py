@@ -4,6 +4,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class SubcontractingIssue(BaseModel, TimestampMixin):
+    verbose_name = "委外发料"
     issue_code = fields.CharField(max_length=100, unique=True, description="发料单编码", index=True)
     sc_code = fields.CharField(max_length=100, description="委外工单编码", index=True)
     issue_type = fields.CharField(max_length=20, default="auto", description="发料类型：auto/manual")

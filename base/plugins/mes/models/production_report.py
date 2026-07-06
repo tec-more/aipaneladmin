@@ -60,6 +60,7 @@ except ImportError:
 
 
 class ProductionReport(BaseModel, TimestampMixin):
+    verbose_name = "生产报工"
     """生产报工模型"""
     report_code = fields.CharField(max_length=100, unique=True, description="报工单号", index=True)
     wo_code = fields.CharField(max_length=100, description="工单编码", index=True)

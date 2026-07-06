@@ -7,6 +7,7 @@ from base.plugins.thirdparty.models.platform import ThirdPartyPlatform
 
 
 class ThirdPartyAgent(BaseModel, TimestampMixin):
+    verbose_name = "第三方智能体"
     """第三方平台智能体表"""
 
     name = fields.CharField(max_length=100, description="智能体名称")

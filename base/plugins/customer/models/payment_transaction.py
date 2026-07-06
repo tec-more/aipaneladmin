@@ -16,6 +16,7 @@ class TransactionStatus(str, Enum):
 
 
 class PaymentTransaction(BaseModel, TimestampMixin):
+    verbose_name = "支付交易"
     """支付交易记录表"""
 
     order = fields.ForeignKeyField(

@@ -60,6 +60,7 @@ except ImportError:
 
 
 class Tooling(BaseModel, TimestampMixin):
+    verbose_name = "工装夹具"
     """工装夹具模型"""
     tooling_code = fields.CharField(max_length=100, unique=True, description="工装编码", index=True)
     tooling_name = fields.CharField(max_length=255, description="工装名称")

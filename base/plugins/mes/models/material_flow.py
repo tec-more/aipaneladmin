@@ -60,6 +60,7 @@ except ImportError:
 
 
 class MaterialRequisition(BaseModel, TimestampMixin):
+    verbose_name = "领料单"
     """领料单模型"""
     requisition_code = fields.CharField(max_length=100, unique=True, description="领料单号", index=True)
     mo_code = fields.CharField(max_length=100, description="制造单编码", index=True)
@@ -122,6 +123,7 @@ class MaterialRequisitionDetail(BaseModel, TimestampMixin):
 
 
 class MaterialReturn(BaseModel, TimestampMixin):
+    verbose_name = "退料单"
     """退料单模型"""
     return_code = fields.CharField(max_length=100, unique=True, description="退料单号", index=True)
     mo_code = fields.CharField(max_length=100, description="制造单编码", index=True)
@@ -152,6 +154,7 @@ class MaterialReturn(BaseModel, TimestampMixin):
 
 
 class ProductionReceipt(BaseModel, TimestampMixin):
+    verbose_name = "完工入库单"
     """完工入库单模型"""
     receipt_code = fields.CharField(max_length=100, unique=True, description="入库单号", index=True)
     mo_code = fields.CharField(max_length=100, description="制造单编码", index=True)

@@ -4,6 +4,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class SubcontractingOrder(BaseModel, TimestampMixin):
+    verbose_name = "委外订单"
     sc_code = fields.CharField(max_length=100, unique=True, description="委外工单编码", index=True)
     product_code = fields.CharField(max_length=100, description="产品编码", index=True)
     product_name = fields.CharField(max_length=255, description="产品名称")

@@ -6,6 +6,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class ToolTag(BaseModel, TimestampMixin):
+    verbose_name = "工具标签"
     """工具标签模型"""
     name = fields.CharField(max_length=100, unique=True, description="标签名称")
     description = fields.TextField(null=True, description="标签描述")

@@ -18,6 +18,9 @@
       <el-table v-loading="loading" :data="tableData" border stripe class="table-margin">
         <el-table-column prop="business_type" label="业务类型" width="140" />
         <el-table-column prop="model" label="业务模型" width="160" show-overflow-tooltip />
+        <el-table-column prop="action" label="执行动作" width="100">
+          <template #default="{ row }">{{ row.action || '全部' }}</template>
+        </el-table-column>
         <el-table-column prop="methods" label="拦截方法" width="160">
           <template #default="{ row }">
             <el-tag v-for="m in row.methods" :key="m" size="small" class="method-tag">{{ m }}</el-tag>
@@ -57,10 +60,16 @@
           <el-input v-model="formData.business_type" placeholder="如：purchase_order" />
         </el-form-item>
         <el-form-item label="业务模型">
-          <el-select v-model="formData.model" placeholder="选择或输入业务模型" filterable allow-create default-first-option style="width: 100%">
-            <el-option v-for="m in modelOptions" :key="m" :label="m" :value="m" />
+          <el-select v-model="formData.model" placeholder="选择业务模型" filterable style="width: 100%" @change="onModelChange">
+            <el-option v-for="m in modelOptions" :key="m.model" :label="m.label" :value="m.model" />
           </el-select>
-          <div class="form-tip">由框架从 Pydantic Model 自动推导（驼峰转下划线），如 PurchaseOrderCreate → purchase_order</div>
+          <div class="form-tip">业务模型来自插件 models 目录，格式：中文(英文标识)</div>
+        </el-form-item>
+        <el-form-item label="执行动作">
+          <el-select v-model="formData.action" placeholder="选择执行动作" clearable filterable style="width: 100%" :disabled="!formData.model">
+            <el-option v-for="a in actionOptions" :key="a.value" :label="a.label" :value="a.value" />
+          </el-select>
+          <div class="form-tip">该模型对应 service 的公开方法；不填表示匹配全部动作（创建/更新/删除）</div>
         </el-form-item>
         <el-form-item label="拦截方法">
           <el-checkbox-group v-model="formData.methods">
@@ -96,7 +105,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getRuleList, createRule, updateRule, deleteRule, toggleRuleStatus, getFlowList, getAvailableModels } from '@/api/approval'
+import { getRuleList, createRule, updateRule, deleteRule, toggleRuleStatus, getFlowList, getAvailableModels, getModelActions } from '@/api/approval'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -111,6 +120,7 @@ const formData = reactive({
   id: null,
   business_type: '',
   model: '',
+  action: '',
   methods: ['POST'],
   flow_id: null,
   priority: 0,
@@ -195,12 +205,14 @@ const submitForm = async () => {
   try {
     if (dialogMode.value === 'create') {
       const { id, ...data } = formData
+      data.action = data.action || null
       const res = await createRule(data)
       if (res.code === 0 || res.code === 200 || res.success) {
         ElMessage.success('创建成功')
       }
     } else {
       const { id, ...data } = formData
+      data.action = data.action || null
       const res = await updateRule(id, data)
       if (res.code === 0 || res.code === 200 || res.success) {
         ElMessage.success('更新成功')

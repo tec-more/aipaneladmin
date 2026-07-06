@@ -25,6 +25,7 @@ class LevelType(str, Enum):
 
 
 class MembershipLevel(BaseModel, TimestampMixin):
+    verbose_name = "会员等级"
     """会员等级配置表"""
 
     level_type = fields.CharEnumField(

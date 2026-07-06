@@ -3,6 +3,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class Customer(BaseModel, TimestampMixin):
+    verbose_name = "客户"
     """Customer model"""
 
     # 系统关联

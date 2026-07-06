@@ -60,6 +60,7 @@ except ImportError:
 
 
 class ProductionException(BaseModel, TimestampMixin):
+    verbose_name = "生产异常"
     """生产异常记录模型"""
     exception_code = fields.CharField(max_length=100, unique=True, description="异常编号", index=True)
     exception_type = fields.CharField(max_length=20, description="异常类型：equipment/material/quality/process/personnel", index=True)

@@ -86,6 +86,7 @@ def generate_order_no() -> str:
 
 
 class CustomerOrder(BaseModel, TimestampMixin):
+    verbose_name = "客户订单"
     order_no = fields.CharField(max_length=64, unique=True, description="订单号")
     customer = fields.ForeignKeyField(
         "models.Customer",

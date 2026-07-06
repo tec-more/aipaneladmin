@@ -60,6 +60,7 @@ except ImportError:
 
 
 class EnergyRecord(BaseModel, TimestampMixin):
+    verbose_name = "能耗记录"
     """能耗记录模型"""
     equipment_code = fields.CharField(max_length=100, description="设备编码", index=True)
     energy_type = fields.CharField(max_length=20, description="能耗类型：electric/water/gas", index=True)

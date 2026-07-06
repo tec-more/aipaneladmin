@@ -6,6 +6,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class ThirdPartyPlatform(BaseModel, TimestampMixin):
+    verbose_name = "第三方平台"
     """第三方平台表"""
 
     name = fields.CharField(max_length=50, unique=True, description="平台名称")

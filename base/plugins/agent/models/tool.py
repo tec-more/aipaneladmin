@@ -6,6 +6,7 @@ from base.common.model import BaseModel, TimestampMixin
 
 
 class Tool(BaseModel, TimestampMixin):
+    verbose_name = "工具"
     """Tool model"""
     name = fields.CharField(max_length=100, unique=True, description="Tool identifier")
     display_name = fields.CharField(max_length=100, description="Display name")

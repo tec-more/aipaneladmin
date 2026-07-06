@@ -62,6 +62,7 @@ except ImportError:
 # ==================== 基础数据模型 ====================
 
 class StockLocation(BaseModel, TimestampMixin):
+    verbose_name = "库位"
     """库位模型 - Odoo stock.location
     
     支持层级树形结构，通过parent_id实现父子关系
@@ -115,6 +116,7 @@ class StockLocation(BaseModel, TimestampMixin):
 
 
 class StockWarehouse(BaseModel, TimestampMixin):
+    verbose_name = "仓库"
     """仓库模型 - Odoo stock.warehouse
     
     关联关键库位：存货库位、入库库位、出库库位、质检库位、打包库位
@@ -178,6 +180,7 @@ class StockWarehouse(BaseModel, TimestampMixin):
 
 
 class StockPickingType(BaseModel, TimestampMixin):
+    verbose_name = "调拨类型"
     """调拨类型模型 - Odoo stock.picking.type
     
     定义调拨操作类型和序列码生成规则
@@ -299,6 +302,7 @@ class StockPicking(BaseModel, TimestampMixin):
 
 
 class StockMove(BaseModel, TimestampMixin):
+    verbose_name = "库存移动"
     """移动明细模型 - Odoo stock.move
     
     关联产品和库位，随Picking状态流转
@@ -545,6 +549,7 @@ class StockQuant(BaseModel, TimestampMixin):
 
 
 class StockQuantReservation(BaseModel, TimestampMixin):
+    verbose_name = "库存预留"
     """库存预留模型
     
     记录库存预留关系
@@ -644,6 +649,7 @@ class StockLot(BaseModel, TimestampMixin):
 
 
 class StockPackage(BaseModel, TimestampMixin):
+    verbose_name = "包裹"
     """包裹模型 - Odoo stock.quant.package
     
     管理包裹信息

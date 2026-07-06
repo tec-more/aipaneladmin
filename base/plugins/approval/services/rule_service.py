@@ -2,8 +2,9 @@
 审批规则 Service
 """
 import ast
+import re
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional, List, Dict, Any
 from tortoise.expressions import Q
 import fnmatch
 from loguru import logger
@@ -13,60 +14,175 @@ from base.plugins.approval.models.approval_flow import ApprovalFlow
 from base.plugins.approval.schemas.rule_schema import RuleCreate, RuleUpdate, RuleListQuery
 
 
+# ---------------------------------------------------------------------------
+# 插件扫描：业务模型（service）与 ORM 模型（中文名）元数据
+# ---------------------------------------------------------------------------
+_PLUGIN_SCAN_CACHE = None
+
+
+def _snake(name: str) -> str:
+    """CamelCase -> snake_case。"""
+    s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+
+def _is_tortoise_model(node) -> bool:
+    """粗略判断 AST 节点是否为 Tortoise 模型类。"""
+    if not isinstance(node, ast.ClassDef):
+        return False
+    for stmt in node.body:
+        if isinstance(stmt, ast.ClassDef) and stmt.name == "Meta":
+            return True
+    for base in node.bases:
+        bname = base.id if isinstance(base, ast.Name) else (base.attr if isinstance(base, ast.Attribute) else "")
+        if bname in ("Model", "BaseModel", "TimestampMixin"):
+            return True
+    return False
+
+
+def _scan_plugins():
+    """扫描所有插件，返回 (services, model_meta)。
+    services: [{"model", "plugin", "methods"}]
+    model_meta: {plugin: [{"table","classname","verbose_name","table_description"}]}
+    """
+    global _PLUGIN_SCAN_CACHE
+    if _PLUGIN_SCAN_CACHE is not None:
+        return _PLUGIN_SCAN_CACHE
+
+    plugins_dir = Path(__file__).resolve().parent.parent.parent
+    services: List[Dict[str, Any]] = []
+    model_meta: Dict[str, List[Dict[str, Any]]] = {}
+
+    for plugin_dir in plugins_dir.iterdir():
+        if not plugin_dir.is_dir():
+            continue
+        plugin = plugin_dir.name
+        services_dir = plugin_dir / "services"
+        models_dir = plugin_dir / "models"
+
+        if services_dir.is_dir():
+            for service_file in services_dir.rglob("*.py"):
+                if service_file.name == "__init__.py":
+                    continue
+                try:
+                    tree = ast.parse(service_file.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.ClassDef):
+                        continue
+                    has_base = any(
+                        (isinstance(b, ast.Name) and b.id == "BaseBusinessService")
+                        or (isinstance(b, ast.Attribute) and b.attr == "BaseBusinessService")
+                        for b in node.bases
+                    )
+                    if not has_base:
+                        continue
+                    model_val = None
+                    for stmt in node.body:
+                        if isinstance(stmt, ast.Assign):
+                            for t in stmt.targets:
+                                if isinstance(t, ast.Name) and t.id == "model":
+                                    if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                                        model_val = stmt.value.value
+                                    break
+                    if not model_val:
+                        continue
+                    methods = {n.name for n in node.body if isinstance(n, ast.FunctionDef)}
+                    services.append({"model": model_val, "plugin": plugin, "methods": methods})
+
+        if models_dir.is_dir():
+            for model_file in models_dir.rglob("*.py"):
+                if model_file.name in ("__init__.py", "base.py"):
+                    continue
+                try:
+                    tree = ast.parse(model_file.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                for node in ast.walk(tree):
+                    if not _is_tortoise_model(node):
+                        continue
+                    table = None
+                    verbose_name = None
+                    table_description = None
+                    for stmt in node.body:
+                        if isinstance(stmt, ast.Assign):
+                            for t in stmt.targets:
+                                if isinstance(t, ast.Name) and t.id == "verbose_name":
+                                    if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                                        verbose_name = stmt.value.value
+                        elif isinstance(stmt, ast.ClassDef) and stmt.name == "Meta":
+                            for mstmt in stmt.body:
+                                if isinstance(mstmt, ast.Assign):
+                                    for mt in mstmt.targets:
+                                        if isinstance(mt, ast.Name) and mt.id == "table":
+                                            if isinstance(mstmt.value, ast.Constant) and isinstance(mstmt.value.value, str):
+                                                table = mstmt.value.value
+                                        if isinstance(mt, ast.Name) and mt.id == "table_description":
+                                            if isinstance(mstmt.value, ast.Constant) and isinstance(mstmt.value.value, str):
+                                                table_description = mstmt.value.value
+                    model_meta.setdefault(plugin, []).append({
+                        "table": table,
+                        "classname": node.name,
+                        "verbose_name": verbose_name,
+                        "table_description": table_description,
+                    })
+
+    _PLUGIN_SCAN_CACHE = (services, model_meta)
+    return _PLUGIN_SCAN_CACHE
+
+
 class RuleService:
     """审批规则服务"""
 
     @staticmethod
-    def get_available_models() -> List[str]:
-        """获取所有可用的业务模型。
+    def get_available_models() -> List[Dict[str, str]]:
+        """获取所有可用的业务模型（用于审批规则配置）。
 
-        优先读取运行时注册表 APPROVAL_EXECUTORS；同时扫描所有插件 services/ 目录，
-        通过 AST 解析继承自 BaseBusinessService 且声明了 model 类属性的 service 文件，
-        把未在运行时注册的 model 也纳入列表，确保前端下拉框能看到全部模型。
+        标识（model）取自各插件的 ``BaseBusinessService`` 子类（审批门禁实际使用的标识），
+        中文名优先读取 ORM 模型类的 ``verbose_name``，其次 ``Meta.table_description``，
+        再回退到 model 本身。展示格式：``中文(model)``。
         """
-        from base.plugins.approval.services.approval_gate import APPROVAL_EXECUTORS
+        services, model_meta = _scan_plugins()
+        result: List[Dict[str, str]] = []
+        for s in services:
+            model = s["model"]
+            plugin = s["plugin"]
+            cn = None
+            for m in model_meta.get(plugin, []):
+                tbl = m["table"] or ""
+                stripped = tbl[len(plugin) + 1:] if tbl.startswith(plugin + "_") else tbl
+                match = (
+                    tbl == model
+                    or tbl == f"{plugin}_{model}"
+                    or _snake(m["classname"]) == model
+                    or stripped == model
+                )
+                if match:
+                    cn = m["verbose_name"] or m["table_description"]
+                    break
+            label = f"{cn}({model})" if cn else model
+            result.append({"model": model, "label": label})
+        result.sort(key=lambda x: x["model"])
+        return result
 
-        models: Set[str] = {model for (model, _action) in APPROVAL_EXECUTORS.keys()}
+    @staticmethod
+    def get_model_actions(model: str) -> List[Dict[str, str]]:
+        """按 model 找到对应的 BaseBusinessService 子类，返回其可配置的执行动作。
 
-        try:
-            plugins_dir = Path(__file__).resolve().parent.parent.parent
-            for services_dir in plugins_dir.glob("*/services"):
-                if not services_dir.is_dir():
-                    continue
-                for service_file in services_dir.rglob("*.py"):
-                    if service_file.name == "__init__.py":
-                        continue
-                    try:
-                        source = service_file.read_text(encoding="utf-8")
-                        tree = ast.parse(source)
-                    except Exception:
-                        continue
-                    for node in ast.walk(tree):
-                        if not isinstance(node, ast.ClassDef):
-                            continue
-                        # 判断是否继承 BaseBusinessService
-                        has_base = any(
-                            (isinstance(base, ast.Name) and base.id == "BaseBusinessService")
-                            or (isinstance(base, ast.Attribute) and base.attr == "BaseBusinessService")
-                            for base in node.bases
-                        )
-                        if not has_base:
-                            continue
-                        # 查找 model = "xxx" 的类属性
-                        for stmt in node.body:
-                            if isinstance(stmt, ast.Assign):
-                                for target in stmt.targets:
-                                    if isinstance(target, ast.Name) and target.id == "model":
-                                        value = stmt.value
-                                        if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                                            models.add(value.value)
-                                        elif isinstance(value, ast.Str):
-                                            models.add(value.s)
-                                        break
-        except Exception as e:
-            logger.warning(f"扫描业务模型失败: {e}")
-
-        return sorted(models)
+        动作即 service 的公开写操作方法 create/update/delete（BaseBusinessService 均具备），
+        与 ``gate_write`` 使用的 action 一致，可用于审批通过后的回调执行与规则匹配。
+        """
+        services, _ = _scan_plugins()
+        for s in services:
+            if s["model"] != model:
+                continue
+            return [
+                {"value": "create", "label": "创建(create)"},
+                {"value": "update", "label": "更新(update)"},
+                {"value": "delete", "label": "删除(delete)"},
+            ]
+        return []
 
     @staticmethod
     async def create_rule(data: RuleCreate) -> ApprovalRule:
@@ -79,6 +195,7 @@ class RuleService:
         rule = await ApprovalRule.create(
             business_type=data.business_type,
             model=data.model or data.business_type,
+            action=data.action,
             path_pattern=data.path_pattern,
             methods=data.methods,
             flow_id=data.flow_id,
@@ -236,12 +353,17 @@ class RuleService:
     @staticmethod
     async def get_matched_rule_by_model(model: str, method: str) -> Optional[ApprovalRule]:
         """
-        根据业务模型和方法获取匹配的规则（按 model + methods 匹配，废弃 path_pattern）。
+        根据业务模型和方法获取匹配的规则（按 model + methods + action 匹配，废弃 path_pattern）。
         """
+        action = {"POST": "create", "PUT": "update", "DELETE": "delete"}.get(method)
         rules = await ApprovalRule.filter(is_active=True, model=model).order_by("-priority").all()
         for rule in rules:
-            if method in rule.methods:
-                return rule
+            if method not in rule.methods:
+                continue
+            # 规则指定了 action 时，仅匹配该动作；未指定则匹配全部动作（向后兼容）
+            if rule.action and action and rule.action != action:
+                continue
+            return rule
         return None
 
     @staticmethod

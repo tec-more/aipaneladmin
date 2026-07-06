@@ -38,6 +38,7 @@ class AccountType(str, Enum):
 
 
 class Account(BaseModel, TimestampMixin):
+    verbose_name = "会计科目"
     code = fields.CharField(max_length=50, unique=True, description="科目编码")
     name = fields.CharField(max_length=255, description="科目名称")
     account_type = fields.CharEnumField(

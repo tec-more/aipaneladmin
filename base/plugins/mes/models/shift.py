@@ -60,6 +60,7 @@ except ImportError:
 
 
 class ShiftDefinition(BaseModel, TimestampMixin):
+    verbose_name = "班次"
     """班次定义模型"""
     shift_code = fields.CharField(max_length=20, unique=True, description="班次编码", index=True)
     shift_name = fields.CharField(max_length=50, description="班次名称")
