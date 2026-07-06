@@ -103,3 +103,8 @@ export const checkApprovalRequired = (params) => {
 export const getAvailableModels = () => {
   return request.get('/v1/approval/rules/models')
 }
+
+// 校验流程配置结构（不落库）
+export const validateFlow = (data) => {
+  return request.post('/v1/approval/flows/validate', data)
+}

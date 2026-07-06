@@ -1,1 +1,0 @@
-import{_ as o,an as c,c as t,o as n,b as s}from"./index-CUzeTFxT.js";const r={},_={class:"equipment-index"};function a(d,i){const e=c("router-view");return n(),t("div",_,[s(e)])}const m=o(r,[["render",a],["__scopeId","data-v-68767c1c"]]);export{m as default};

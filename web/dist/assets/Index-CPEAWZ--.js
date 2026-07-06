@@ -1,1 +1,0 @@
-import{_ as o,an as t,c as s,o as c,b as n}from"./index-CUzeTFxT.js";const a={},r={class:"asset-index"};function _(d,f){const e=t("router-view");return c(),s("div",r,[n(e)])}const p=o(a,[["render",_],["__scopeId","data-v-ff68a9e2"]]);export{p as default};

@@ -1,1 +1,0 @@
-import{_ as o,an as n,c as t,o as c,b as r}from"./index-Biu6WnbT.js";const s={},a={class:"general-ledger-index"};function _(d,i){const e=n("router-view");return c(),t("div",a,[r(e)])}const f=o(s,[["render",_],["__scopeId","data-v-5bfe41a1"]]);export{f as default};

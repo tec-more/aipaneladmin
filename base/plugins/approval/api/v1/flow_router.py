@@ -24,6 +24,18 @@ async def create_flow(
         return fail_response(msg=str(e))
 
 
+@flow_router.post("/validate")
+async def validate_flow(
+    flow_data: FlowCreate,
+    user_id: int = require_permission("approval:flow:view"),
+):
+    """校验流程配置结构（不落库），供前端实时校验使用"""
+    errors = FlowService.validate_flow_config(flow_data.flow_config)
+    if errors:
+        return success_response(data={"valid": False, "errors": errors})
+    return success_response(data={"valid": True, "errors": []})
+
+
 @flow_router.get("")
 async def get_flow_list(
     page: int = 1,

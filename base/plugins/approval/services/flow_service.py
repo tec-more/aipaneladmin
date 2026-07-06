@@ -12,9 +12,96 @@ from base.plugins.approval.schemas.flow_schema import FlowCreate, FlowUpdate, Fl
 class FlowService:
     """审批流程定义服务"""
 
+    # 合法的审批方式（对应 ApprovalEngine.APPROVE_*）
+    VALID_APPROVE_TYPES = {"single", "or", "joint"}
+    # 合法的审批人来源（对应 ApprovalEngine.get_approver_ids）
+    VALID_APPROVER_TYPES = {"user", "role", "dept_head", "dynamic"}
+    # 合法的节点类型
+    VALID_NODE_TYPES = {"start", "approve", "condition", "fork", "join", "end"}
+
+    @staticmethod
+    def validate_flow_config(config: Dict[str, Any]) -> List[str]:
+        """校验 flow_config 结构合法性，返回错误信息列表（空列表表示校验通过）。
+
+        仅做结构校验，不触碰引擎与实例流转逻辑；plugin 启用后 engine 已能解析该结构。
+        """
+        if not config or not isinstance(config, dict):
+            return ["流程配置不能为空"]
+
+        nodes = config.get("nodes")
+        edges = config.get("edges")
+        if not isinstance(nodes, list) or not nodes:
+            return ["流程配置必须包含至少一个节点"]
+        if not isinstance(edges, list):
+            return ["流程配置 edges 必须为数组"]
+
+        node_ids: set = set()
+        start_count = 0
+        end_count = 0
+
+        for idx, node in enumerate(nodes):
+            if not isinstance(node, dict):
+                return [f"第 {idx + 1} 个节点格式非法"]
+            node_id = node.get("id")
+            if not node_id:
+                return [f"第 {idx + 1} 个节点缺少 id"]
+            if node_id in node_ids:
+                return [f"节点 id 重复: {node_id}"]
+            node_ids.add(node_id)
+
+            node_type = node.get("type")
+            if node_type == "start":
+                start_count += 1
+            elif node_type == "end":
+                end_count += 1
+            elif node_type == "approve":
+                approve_type = node.get("approve_type")
+                if approve_type not in FlowService.VALID_APPROVE_TYPES:
+                    return [f"审批节点 {node_id} 的审批方式(approve_type)非法: {approve_type}（应为 single/or/joint）"]
+                approver_config = node.get("approver_config") or {}
+                approver_type = approver_config.get("type")
+                if approver_type not in FlowService.VALID_APPROVER_TYPES:
+                    return [f"审批节点 {node_id} 的审批人来源(approver_config.type)非法: {approver_type}（应为 user/role/dept_head/dynamic）"]
+                if approver_type == "user" and not approver_config.get("user_ids"):
+                    return [f"审批节点 {node_id} 选择了「指定用户」但未选择任何用户"]
+                if approver_type == "role" and not approver_config.get("role_ids"):
+                    return [f"审批节点 {node_id} 选择了「按角色」但未选择任何角色"]
+                # dept_head / dynamic 允许不指定部门（取申请人部门）
+            elif node_type == "condition":
+                if not node.get("field"):
+                    return [f"条件节点 {node_id} 缺少字段(field)"]
+                if not node.get("operator"):
+                    return [f"条件节点 {node_id} 缺少运算符(operator)"]
+                if "value" not in node:
+                    return [f"条件节点 {node_id} 缺少值(value)"]
+            elif node_type not in FlowService.VALID_NODE_TYPES:
+                return [f"未知节点类型: {node_type}（节点 {node_id}）"]
+
+        if start_count != 1:
+            return [f"必须且只能有 1 个开始节点（当前 {start_count} 个）"]
+        if end_count < 1:
+            return ["至少需要 1 个结束节点"]
+
+        for idx, edge in enumerate(edges):
+            if not isinstance(edge, dict):
+                return [f"第 {idx + 1} 条边格式非法"]
+            source = edge.get("source")
+            target = edge.get("target")
+            if source not in node_ids:
+                return [f"第 {idx + 1} 条边的起点(source)不存在: {source}"]
+            if target not in node_ids:
+                return [f"第 {idx + 1} 条边的终点(target)不存在: {target}"]
+
+        return []
+
     @staticmethod
     async def create_flow(data: FlowCreate) -> ApprovalFlow:
         """创建流程"""
+        # 校验流程配置结构
+        errors = FlowService.validate_flow_config(data.flow_config)
+        if errors:
+            raise ValueError("；".join(errors))
+
         # 检查编码是否已存在
         existing = await ApprovalFlow.get_or_none(code=data.code)
         if existing:
@@ -37,6 +124,12 @@ class FlowService:
         flow = await ApprovalFlow.get_or_none(id=flow_id)
         if not flow:
             return None
+
+        # 若本次更新包含 flow_config，先校验结构
+        if data.flow_config is not None:
+            errors = FlowService.validate_flow_config(data.flow_config)
+            if errors:
+                raise ValueError("；".join(errors))
 
         update_data = data.dict(exclude_unset=True)
         for key, value in update_data.items():
