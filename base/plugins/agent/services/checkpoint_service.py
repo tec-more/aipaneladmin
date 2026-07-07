@@ -5,12 +5,10 @@ from typing import Optional, List, Dict, Any, Union
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from base.common.base_service import BaseBusinessService
-
 logger = logging.getLogger(__name__)
 
 
-class CheckpointService(BaseBusinessService):
+class CheckpointService:
     model = "checkpoint"
     """检查点服务 - 管理 LangGraph 检查点的存储、恢复和查询"""
     

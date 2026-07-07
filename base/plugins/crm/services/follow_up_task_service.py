@@ -5,10 +5,7 @@ from loguru import logger
 from base.plugins.crm.models.follow_up_task import FollowUpTask, TaskStatus
 from base.plugins.crm.schemas.task_schema import FollowUpTaskCreate, FollowUpTaskUpdate, TaskListQuery, TaskCompleteRequest
 from base.plugins.crm.services.crm_data_filter import get_crm_data_filter
-from base.common.base_service import BaseBusinessService
-
-
-class FollowUpTaskService(BaseBusinessService):
+class FollowUpTaskService:
     model = "follow_up_task"
 
     @staticmethod

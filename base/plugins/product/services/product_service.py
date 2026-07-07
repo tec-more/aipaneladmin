@@ -7,11 +7,6 @@ from decimal import Decimal
 from tortoise.expressions import Q
 from tortoise.queryset import QuerySet
 
-try:
-    from base.common.base_service import BaseBusinessService
-except ImportError:
-    BaseBusinessService = object
-
 # 尝试导入依赖项
 try:
     from base.plugins.product.models.product import Product
@@ -108,7 +103,7 @@ except ImportError:
             return {k: v for k, v in self.__dict__.items() if v is not None}
 
 
-class ProductService(BaseBusinessService):
+class ProductService:
     model = "product"
     """产品服务类"""
 

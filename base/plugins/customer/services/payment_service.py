@@ -15,10 +15,7 @@ from base.plugins.customer.models import (
 )
 from base.plugins.sales.models.order import CustomerOrder, PaymentStatus, OrderStatus
 from base.plugins.customer.models.membership import MembershipLevel
-from base.common.base_service import BaseBusinessService
-
-
-class PaymentService(BaseBusinessService):
+class PaymentService:
     model = "payment"
     """支付服务基类"""
 

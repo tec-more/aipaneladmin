@@ -2,8 +2,6 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from tortoise.transactions import atomic
 from decimal import Decimal
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.finance.models.account import Account, AccountType
 except ImportError:
@@ -11,7 +9,7 @@ except ImportError:
     AccountType = None
 
 
-class AccountService(BaseBusinessService):
+class AccountService:
     model = "account"
     @staticmethod
     async def get_all_accounts(page: int = 1, page_size: int = 20, account_type: Optional[str] = None, keyword: Optional[str] = None) -> List[Account]:

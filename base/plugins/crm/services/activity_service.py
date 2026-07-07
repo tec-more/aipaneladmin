@@ -7,10 +7,7 @@ from base.plugins.crm.models.lead import Lead, LeadStatus
 from base.plugins.crm.models.opportunity import Opportunity
 from base.plugins.crm.schemas.activity_schema import ActivityCreate, ActivityListQuery, TimelineQuery
 from base.plugins.crm.services.crm_data_filter import get_crm_data_filter
-from base.common.base_service import BaseBusinessService
-
-
-class ActivityService(BaseBusinessService):
+class ActivityService:
     model = "activity"
 
     @staticmethod

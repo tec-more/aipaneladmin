@@ -2,8 +2,6 @@ from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from tortoise.transactions import atomic
 from decimal import Decimal
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.finance.models.account import Account, AccountType
     from base.plugins.finance.models.journal import JournalEntry, JournalLine, JournalStatus
@@ -22,7 +20,7 @@ except ImportError:
     ReportType = None
 
 
-class ReportService(BaseBusinessService):
+class ReportService:
     model = "report"
     @staticmethod
     async def get_daily_journal(page: int = 1, page_size: int = 20, journal_date_start: Optional[str] = None, 

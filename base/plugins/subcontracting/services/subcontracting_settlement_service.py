@@ -7,8 +7,6 @@ from base.plugins.subcontracting.models.subcontracting_settlement import Subcont
 from base.plugins.subcontracting.models.subcontracting_receipt import SubcontractingReceipt, SubcontractingReceiptLine
 from base.plugins.subcontracting.services.subcontracting_order_service import SubcontractingOrderService
 from base.common.events.event_bus import event_bus
-from base.common.base_service import BaseBusinessService
-
 SETTLEMENT_STATUS_LABELS = {
     "draft": "草稿",
     "submitted": "已提交",
@@ -17,7 +15,7 @@ SETTLEMENT_STATUS_LABELS = {
 }
 
 
-class SubcontractingSettlementService(BaseBusinessService):
+class SubcontractingSettlementService:
     model = "subcontracting_settlement"
 
     @staticmethod

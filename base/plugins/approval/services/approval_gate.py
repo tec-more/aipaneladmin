@@ -1,25 +1,23 @@
 """
-审批门禁 + 执行器（判定下沉到 Service 层，由 BaseBusinessService 主动调用）
+审批门禁 + 执行器（审批模块独立，不依赖 BaseBusinessService）
 
 职责：
-1. 提供 ``NeedApprovalError`` —— service 命中审批规则时抛出，由全局异常处理器
-   转成与原中间件一致的 ``code=40001`` JSON，前端拦截器零改动。
+1. 提供 ``NeedApprovalError`` —— 命中审批规则时抛出，由全局异常处理器
+   转成 ``code=40001`` JSON，前端拦截器捕获。
 2. 提供 ``gate_write(model, action, payload, business_id, applicant_id, title)`` ——
-   service 在写操作前调用（由 BaseBusinessService 的 create/update/delete 自动触发）：
    按模型+动作查 approval_flow 表（流程本身即审批规则），命中则自动创建审批实例并抛
    NeedApprovalError；否则静默放行（判定异常默认放行）。
 3. ``register_executor`` / ``APPROVAL_EXECUTORS`` —— 执行器注册表，存
-   ``(model, action) → (service_cls, method_name)``。BaseBusinessService 的
-   ``__init_subclass__`` 自动登记 ``_do_create/_do_update/_do_delete``。
+   ``(model, action) -> (service_cls, method_name)``。可通过手动调用 register_executor
+   登记，供审批通过后回调落库。
 4. ``ApprovalExecutor.execute(instance)`` —— 审批实例通过完成时，按
    ``(business_type, action)`` 从注册表取 ``(cls, method)`` 回调落库。
 
 设计要点：
-- 门禁与执行分离：BaseBusinessService 的 ``create`` 是「门禁→_do_create」，
-  注册表存的是 ``_do_*``（不带门禁），executor 只调 ``_do_*``，杜绝递归。
+- 门禁与执行分离：前端通过 /v1/approval/flow-rules/check-for-model 检测审批规则，
+  确认后调用 /v1/approval/flow-rules/submit-for-approval 提交审批。
 - 审批决策来源：``FlowService.check_approval_required_by_model`` 查询
-  流程（approval_flow）表的 model/action/methods/priority 字段（后台配置），
-  不依赖任何代码注解/装饰器。
+  流程（approval_flow）表的 model/action/methods/priority 字段（后台配置）。
 - 参数约定：
   create  -> method(payload)
   update  -> method(business_id, payload)
@@ -61,7 +59,7 @@ class NeedApprovalError(Exception):
 
 
 # (model, action) -> (service_cls, method_name)
-# 由 BaseBusinessService.__init_subclass__ 自动登记，或手动调用 register_executor
+# 可通过手动调用 register_executor 登记，供审批通过后回调落库
 APPROVAL_EXECUTORS: Dict[tuple, Tuple[Type, str]] = {}
 
 

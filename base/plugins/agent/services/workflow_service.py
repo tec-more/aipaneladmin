@@ -7,7 +7,6 @@ from base.plugins.agent.models.workflow import Workflow, WorkflowNode, WorkflowE
 from base.plugins.agent.models.agent import Agent
 from base.plugins.agent.models.skill import Skill
 from base.plugins.llm.models.model import LLMModel
-from base.common.base_service import BaseBusinessService
 from base.plugins.agent.schemas.workflow import (
     WorkflowCreate, WorkflowUpdate, WorkflowExecutionCreate
 )
@@ -36,7 +35,7 @@ except ImportError:
     JSON_AVAILABLE = False
 
 
-class WorkflowService(BaseBusinessService):
+class WorkflowService:
     model = "workflow"
     """Workflow service class"""
 

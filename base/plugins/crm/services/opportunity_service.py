@@ -13,10 +13,7 @@ from base.plugins.crm.schemas.opportunity_schema import (
 )
 from base.plugins.crm.services.crm_data_filter import get_crm_data_filter
 from base.common.events.event_bus import event_bus
-from base.common.base_service import BaseBusinessService
-
-
-class OpportunityService(BaseBusinessService):
+class OpportunityService:
     model = "opportunity"
 
     @staticmethod

@@ -2,10 +2,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
 from base.plugins.audit.models.audit_log import LoginLog
 from base.plugins.audit.schemas.audit_log import LoginLogCreate
-from base.common.base_service import BaseBusinessService
-
-
-class LoginLogService(BaseBusinessService):
+class LoginLogService:
     model = "login_log"
     """登录日志服务"""
 

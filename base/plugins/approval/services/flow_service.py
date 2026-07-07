@@ -40,6 +40,8 @@ def _is_tortoise_model(node) -> bool:
 
 def _scan_plugins():
     """扫描所有插件，返回 (services, model_meta)。
+
+    扫描所有 service 类中定义了 ``model`` 类变量的类（不再依赖 BaseBusinessService 继承）。
     services: [{"model", "plugin", "methods"}]
     model_meta: {plugin: [{"table","classname","verbose_name","table_description"}]}
     """
@@ -69,13 +71,7 @@ def _scan_plugins():
                 for node in ast.walk(tree):
                     if not isinstance(node, ast.ClassDef):
                         continue
-                    has_base = any(
-                        (isinstance(b, ast.Name) and b.id == "BaseBusinessService")
-                        or (isinstance(b, ast.Attribute) and b.attr == "BaseBusinessService")
-                        for b in node.bases
-                    )
-                    if not has_base:
-                        continue
+                    # 扫描所有定义了 model 类变量的 Service 类（不再依赖 BaseBusinessService 继承）
                     model_val = None
                     for stmt in node.body:
                         if isinstance(stmt, ast.Assign):
@@ -365,10 +361,9 @@ class FlowService:
 
     @staticmethod
     def get_model_actions(model: str) -> List[Dict[str, str]]:
-        """按 model 找到对应的 BaseBusinessService 子类，返回其可配置的执行动作。
+        """返回指定模型可配置的审批动作（create/update/delete）。
 
-        动作即 service 的公开写操作方法 create/update/delete（BaseBusinessService 均具备），
-        与 ``gate_write`` 使用的 action 一致，可用于审批通过后的回调执行与流程匹配。
+        仅检查 _scan_plugins 中是否存在该 model，存在即返回标准三动作。
         """
         services, _ = _scan_plugins()
         for s in services:

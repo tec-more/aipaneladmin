@@ -5,10 +5,7 @@ from typing import List, Optional
 from tortoise.exceptions import DoesNotExist
 from base.plugins.thirdparty.models.agent import ThirdPartyAgent
 from base.plugins.thirdparty.schemas.agent import AgentCreate, AgentUpdate
-from base.common.base_service import BaseBusinessService
-
-
-class AgentService(BaseBusinessService):
+class AgentService:
     model = "agent"
     """智能体服务类"""
 

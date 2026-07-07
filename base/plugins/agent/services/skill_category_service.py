@@ -6,10 +6,7 @@ from tortoise.exceptions import DoesNotExist, IntegrityError
 from base.plugins.agent.models.skill_category import SkillCategory
 from base.plugins.agent.models.skill import Skill
 from base.plugins.agent.schemas.skill_category import SkillCategoryCreate, SkillCategoryUpdate
-from base.common.base_service import BaseBusinessService
-
-
-class SkillCategoryService(BaseBusinessService):
+class SkillCategoryService:
     model = "skill_category"
     """Skill Category service class"""
 

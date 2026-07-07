@@ -21,8 +21,6 @@ from base.plugins.agent.schemas.rag import (
 )
 from base.common.permissions import get_user_data_scope_cached, get_user_permissions_cached
 from base.common.security import get_current_user
-from base.common.base_service import BaseBusinessService
-
 logger = logging.getLogger(__name__)
 
 
@@ -49,14 +47,14 @@ class TextSplitter:
         return [s.strip() for s in result if s.strip()]
 
 
-class VectorService(BaseBusinessService):
+class VectorService:
     model = "vector"
     """向量服务（已简化，只保留 pgvector 支持）"""
 
     VECTOR_DIMENSION = 1024
 
 
-class RAGService(BaseBusinessService):
+class RAGService:
     model = "rag"
     """RAG服务"""
 
@@ -792,7 +790,7 @@ class DocumentProcessor:
             raise
 
 
-class HybridRAGService(BaseBusinessService):
+class HybridRAGService:
     model = "hybrid_r_a_g"
     """混合 RAG 服务"""
     
@@ -869,7 +867,7 @@ class HybridRAGService(BaseBusinessService):
         )
 
 
-class RAGPermissionService(BaseBusinessService):
+class RAGPermissionService:
     model = "rag_permission"
     """RAG 权限服务"""
 

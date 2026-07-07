@@ -86,3 +86,25 @@ export const getModelActions = (model) => {
 export const validateFlow = (data) => {
   return request.post('/v1/approval/flow-rules/validate', data)
 }
+
+// ==================== 前端审批检测与提交（无需权限） ====================
+
+/**
+ * 检测指定模型+动作是否需要审批（前端页面级调用）
+ * @param {string} model - 业务模型标识，如 "purchase_order"
+ * @param {string} action - 动作 create/update/delete，不传返回该模型所有匹配流程
+ * @returns {require_approval, flows: [{flow_id, flow_name, flow_code, actions, methods, ...}]}
+ */
+export const checkApprovalForModel = (model, action = null) => {
+  return request.get('/v1/approval/flow-rules/check-for-model', {
+    params: { model, action }
+  })
+}
+
+/**
+ * 提交审批（前端用户确认后调用）
+ * @param {object} data - { model, action, data: payload, business_id, title }
+ */
+export const submitForApproval = (data) => {
+  return request.post('/v1/approval/flow-rules/submit-for-approval', data)
+}

@@ -1,13 +1,11 @@
 from typing import Optional, List, Dict, Any
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.finance.models.integration_log import IntegrationLog
 except ImportError:
     IntegrationLog = None
 
 
-class IntegrationLogService(BaseBusinessService):
+class IntegrationLogService:
     model = "integration_log"
     @staticmethod
     async def get_all_logs(page: int = 1, page_size: int = 20, event_name: Optional[str] = None, source_type: Optional[str] = None, result: Optional[str] = None) -> List[IntegrationLog]:

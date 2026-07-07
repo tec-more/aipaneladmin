@@ -7,10 +7,7 @@ from base.plugins.crm.models.lead import Lead, LeadStatus
 from base.plugins.crm.schemas.lead_schema import LeadCreate, LeadUpdate, LeadListQuery
 from base.plugins.crm.services.crm_data_filter import get_crm_data_filter
 from base.common.events.event_bus import event_bus
-from base.common.base_service import BaseBusinessService
-
-
-class LeadService(BaseBusinessService):
+class LeadService:
     model = "lead"
 
     @staticmethod

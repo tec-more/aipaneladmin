@@ -4,10 +4,7 @@ from loguru import logger
 
 from base.plugins.subcontracting.models.subcontracting_issue import SubcontractingIssue, SubcontractingIssueLine
 from base.plugins.subcontracting.models.subcontracting_receipt import SubcontractingReceipt, SubcontractingReceiptLine
-from base.common.base_service import BaseBusinessService
-
-
-class SubcontractingTransitService(BaseBusinessService):
+class SubcontractingTransitService:
     model = "subcontracting_transit"
 
     @staticmethod

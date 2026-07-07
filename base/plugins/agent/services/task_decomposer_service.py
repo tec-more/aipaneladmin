@@ -7,8 +7,6 @@ import json
 import logging
 from typing import Dict, Any, List
 from datetime import datetime
-from base.common.base_service import BaseBusinessService
-
 logger = logging.getLogger(__name__)
 
 try:
@@ -36,7 +34,7 @@ class TaskPlan(BaseModel):
     reasoning: str = Field(description="拆解理由")
 
 
-class TaskDecomposerService(BaseBusinessService):
+class TaskDecomposerService:
     model = "task_decomposer"
     """
     任务拆解智能体服务

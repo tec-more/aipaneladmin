@@ -1,10 +1,7 @@
 from typing import List, Optional, Dict, Any
 from base.plugins.audit.models.audit_log import AuditConfig
 from base.plugins.audit.schemas.audit_log import AuditConfigCreate, AuditConfigUpdate
-from base.common.base_service import BaseBusinessService
-
-
-class AuditConfigService(BaseBusinessService):
+class AuditConfigService:
     model = "audit_config"
     """审计配置服务"""
 

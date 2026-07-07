@@ -5,10 +5,7 @@ from typing import List, Optional
 from tortoise.exceptions import DoesNotExist, IntegrityError
 from base.plugins.agent.models.tool import Tool
 from base.plugins.agent.schemas.tool import ToolCreate, ToolUpdate
-from base.common.base_service import BaseBusinessService
-
-
-class ToolService(BaseBusinessService):
+class ToolService:
     model = "tool"
     """Tool service class"""
 

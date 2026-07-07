@@ -1,7 +1,5 @@
 from typing import Optional, List, Tuple
 from datetime import datetime
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.mrp2.models.mrp_models import PlannedOrder
     from base.plugins.mrp2.schemas.planned_order_schema import PlannedOrderConfirmRequest
@@ -23,7 +21,7 @@ except ImportError:
     SC_AVAILABLE = False
 
 
-class PlannedOrderService(BaseBusinessService):
+class PlannedOrderService:
     model = "planned_order"
     @staticmethod
     async def get_by_id(order_id: int) -> Optional[PlannedOrder]:

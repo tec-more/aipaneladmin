@@ -11,9 +11,6 @@ from base.plugins.customer.models import (
     CustomerMembership,
     LevelType
 )
-from base.common.base_service import BaseBusinessService
-
-
 class FibonacciMembershipSystem:
     """
     Fibonacci会员系统
@@ -345,7 +342,7 @@ class FibonacciMembershipSystem:
 fibonacci_service = FibonacciMembershipSystem()
 
 
-class MembershipService(BaseBusinessService):
+class MembershipService:
     model = "membership"
     """会员服务"""
 

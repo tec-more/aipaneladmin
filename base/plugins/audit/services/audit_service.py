@@ -26,7 +26,6 @@ from base.plugins.audit.schemas.audit_log import (
     RiskAuditRecordUpdate,
     FullTraceResponse
 )
-from base.common.base_service import BaseBusinessService
 from base.common.context import (
     current_trace_id,
     current_user_id,
@@ -56,7 +55,7 @@ def clear_trace_id() -> None:
     clear_context_trace_id()
 
 
-class AuditTraceService(BaseBusinessService):
+class AuditTraceService:
     model = "audit_trace"
     """全链路追踪服务"""
 
@@ -135,7 +134,7 @@ class AuditTraceService(BaseBusinessService):
         )
 
 
-class InputLayerService(BaseBusinessService):
+class InputLayerService:
     model = "input_layer"
     """输入层服务"""
 
@@ -159,7 +158,7 @@ class InputLayerService(BaseBusinessService):
         return await InputLayerLog.filter(trace_id=trace_id).order_by('-created_at')
 
 
-class DecisionLayerService(BaseBusinessService):
+class DecisionLayerService:
     model = "decision_layer"
     """决策层服务"""
 
@@ -183,7 +182,7 @@ class DecisionLayerService(BaseBusinessService):
         return await DecisionLayerLog.filter(trace_id=trace_id).order_by('created_at')
 
 
-class ExecutionLayerService(BaseBusinessService):
+class ExecutionLayerService:
     model = "execution_layer"
     """执行层服务"""
 
@@ -207,7 +206,7 @@ class ExecutionLayerService(BaseBusinessService):
         return await ExecutionLayerLog.filter(trace_id=trace_id).order_by('created_at')
 
 
-class OutputLayerService(BaseBusinessService):
+class OutputLayerService:
     model = "output_layer"
     """输出层服务"""
 
@@ -231,7 +230,7 @@ class OutputLayerService(BaseBusinessService):
         return await OutputLayerLog.filter(trace_id=trace_id).order_by('-created_at')
 
 
-class SystemLayerService(BaseBusinessService):
+class SystemLayerService:
     model = "system_layer"
     """系统层服务"""
 
@@ -295,7 +294,7 @@ class SystemLayerService(BaseBusinessService):
         return await SystemLayerService.create_log(log_data)
 
 
-class AuditLogService(BaseBusinessService):
+class AuditLogService:
     model = "audit_log"
     """审计日志服务"""
 
@@ -410,7 +409,7 @@ class AuditLogService(BaseBusinessService):
         }
 
 
-class AuditReportService(BaseBusinessService):
+class AuditReportService:
     model = "audit_report"
     """审计报告服务"""
 
@@ -614,7 +613,7 @@ class AuditReportService(BaseBusinessService):
         return await AuditReportService.create_report(report)
 
 
-class RiskAuditService(BaseBusinessService):
+class RiskAuditService:
     model = "risk_audit"
     """风险审计服务"""
 

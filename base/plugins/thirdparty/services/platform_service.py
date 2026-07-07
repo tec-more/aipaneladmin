@@ -5,10 +5,7 @@ from typing import List, Optional
 from tortoise.exceptions import DoesNotExist
 from base.plugins.thirdparty.models.platform import ThirdPartyPlatform
 from base.plugins.thirdparty.schemas.platform import PlatformCreate, PlatformUpdate
-from base.common.base_service import BaseBusinessService
-
-
-class PlatformService(BaseBusinessService):
+class PlatformService:
     model = "platform"
     """平台服务类"""
 

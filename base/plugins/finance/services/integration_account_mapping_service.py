@@ -1,13 +1,11 @@
 from typing import Optional, List, Dict, Any
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.finance.models.integration_account_mapping import IntegrationAccountMapping
 except ImportError:
     IntegrationAccountMapping = None
 
 
-class IntegrationAccountMappingService(BaseBusinessService):
+class IntegrationAccountMappingService:
     model = "integration_account_mapping"
     @staticmethod
     async def get_all_mappings(page: int = 1, page_size: int = 20, event_type: Optional[str] = None, is_active: Optional[bool] = None) -> List[IntegrationAccountMapping]:

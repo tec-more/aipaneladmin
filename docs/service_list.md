@@ -38,14 +38,15 @@
 
 ## 二、approval 插件
 
+
 | 文件 | 类名 | model | 说明 |
 |------|------|-------|------|
-| `approval/services/approval_gate.py` | - | - | 审批门禁 + 执行器（核心，不继承 BaseBusinessService） |
+| `approval/services/approval_gate.py` | - | - | 审批门禁 + 执行器（审批模块核心，独立运行） |
 | `approval/services/flow_service.py` | `FlowService` | - | 审批流程规则 CRUD + 模型匹配（流程本身即审批规则） |
 | `approval/services/instance_service.py` | `InstanceService` | - | 审批实例管理 |
 | `approval/services/task_service.py` | `TaskService` | - | 审批任务管理 |
 
-> 审批模块自身不注册业务 model，只提供框架能力。
+> BaseBusinessService 已移除，审批检测由前端通过 `/v1/approval/flow-rules/check-for-model` API 调用，提交审批通过 `/v1/approval/flow-rules/submit-for-approval`。
 
 ---
 

@@ -3,8 +3,6 @@
 """
 from typing import List, Optional
 import os
-from base.common.base_service import BaseBusinessService
-
 # 添加向量检索相关依赖
 try:
     from langchain.document_loaders import PyPDFLoader, TextLoader, DocxLoader
@@ -20,7 +18,7 @@ except ImportError:
         pass
 
 
-class DocumentProcessingService(BaseBusinessService):
+class DocumentProcessingService:
     model = "document_processing"
     """文档处理服务"""
     

@@ -22,10 +22,9 @@ except ImportError:
 VECTOR_STORE_DIR = "./vector_stores"
 
 import logging
-from base.common.base_service import BaseBusinessService
 logger = logging.getLogger(__name__)
 
-class MemoryService(BaseBusinessService):
+class MemoryService:
     model = "memory"
     """Memory service class"""
 

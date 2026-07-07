@@ -10,10 +10,7 @@ from base.plugins.crm.schemas.config_schema import (
     LeadSourceCreate, LeadSourceUpdate,
     CrmSettingsUpdate, CrmSettingsResponse,
 )
-from base.common.base_service import BaseBusinessService
-
-
-class CrmConfigService(BaseBusinessService):
+class CrmConfigService:
     model = "crm_config"
 
     @staticmethod

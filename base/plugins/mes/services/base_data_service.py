@@ -1,8 +1,6 @@
 from typing import Optional, List, Tuple, Dict, Any
 from decimal import Decimal
 from tortoise.expressions import Q
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.mes.models.base_data import Material, Bom, BomVersion, WorkCenter, Process, Route, RouteProcess
     from base.plugins.mes.schemas.mes_schema import (
@@ -90,7 +88,7 @@ except ImportError:
     class RouteUpdate(MaterialUpdate): pass
 
 
-class MaterialService(BaseBusinessService):
+class MaterialService:
     model = "material"
     @staticmethod
     async def get_by_id(material_id: int) -> Optional[Material]:
@@ -162,7 +160,7 @@ class MaterialService(BaseBusinessService):
         return await query.exists()
 
 
-class BomService(BaseBusinessService):
+class BomService:
     model = "bom"
     @staticmethod
     async def get_by_id(bom_id: int) -> Optional[Bom]:
@@ -406,7 +404,7 @@ class BomService(BaseBusinessService):
         }
 
 
-class BomVersionService(BaseBusinessService):
+class BomVersionService:
     model = "bom_version"
     @staticmethod
     async def get_by_id(version_id: int) -> Optional[BomVersion]:
@@ -530,7 +528,7 @@ class BomVersionService(BaseBusinessService):
         return items, total
 
 
-class WorkCenterService(BaseBusinessService):
+class WorkCenterService:
     model = "work_center"
     @staticmethod
     async def get_by_id(wc_id: int) -> Optional[WorkCenter]:
@@ -590,7 +588,7 @@ class WorkCenterService(BaseBusinessService):
         return await query.exists()
 
 
-class ProcessService(BaseBusinessService):
+class ProcessService:
     model = "process"
     @staticmethod
     async def get_by_id(process_id: int) -> Optional[Process]:
@@ -650,7 +648,7 @@ class ProcessService(BaseBusinessService):
         return await query.exists()
 
 
-class RouteService(BaseBusinessService):
+class RouteService:
     model = "route"
     @staticmethod
     async def get_by_id(route_id: int) -> Optional[Route]:

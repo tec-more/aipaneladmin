@@ -3,7 +3,6 @@ from datetime import datetime
 import json
 import logging
 from base.plugins.agent.models.dialog_flow import DialogFlow, DialogFlowNode, DialogFlowEdge, DialogFlowExecution
-from base.common.base_service import BaseBusinessService
 from base.plugins.agent.schemas.dialog_flow import (
     DialogFlowCreate, DialogFlowUpdate, DialogFlowResponse,
     DialogFlowNodeCreate, DialogFlowNodeUpdate, DialogFlowNodeResponse,
@@ -14,7 +13,7 @@ from base.plugins.agent.schemas.dialog_flow import (
 logger = logging.getLogger(__name__)
 
 
-class DialogFlowService(BaseBusinessService):
+class DialogFlowService:
     model = "dialog_flow"
     """对话流服务"""
     

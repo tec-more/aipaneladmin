@@ -2,8 +2,6 @@ from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from tortoise.transactions import atomic
 from decimal import Decimal
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.finance.models.journal import JournalEntry, JournalLine, JournalType, JournalStatus, generate_journal_no
     from base.plugins.finance.models.account import Account
@@ -18,7 +16,7 @@ except ImportError:
     GeneralLedger = None
 
 
-class JournalService(BaseBusinessService):
+class JournalService:
     model = "journal"
     @staticmethod
     async def get_all_journals(page: int = 1, page_size: int = 20, journal_type: Optional[str] = None, 

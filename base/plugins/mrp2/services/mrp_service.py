@@ -1,8 +1,6 @@
 from typing import Optional, List, Tuple, Dict, Any
 from decimal import Decimal
 from datetime import datetime, date, timedelta
-from base.common.base_service import BaseBusinessService
-
 try:
     from base.plugins.mrp2.models.mrp_models import (
         SalesForecast, SalesForecastDetail,
@@ -110,7 +108,7 @@ except ImportError:
     MES_AVAILABLE = False
 
 
-class SalesForecastService(BaseBusinessService):
+class SalesForecastService:
     model = "sales_forecast"
     @staticmethod
     async def get_by_id(forecast_id: int) -> Optional[SalesForecast]:
@@ -262,7 +260,7 @@ class SalesForecastService(BaseBusinessService):
         return {"product_code": product_code, "historical_data": result}
 
 
-class MPSService(BaseBusinessService):
+class MPSService:
     model = "mps"
     @staticmethod
     async def get_by_id(mps_id: int) -> Optional[MasterProductionSchedule]:
@@ -632,7 +630,7 @@ class MPSService(BaseBusinessService):
         }
 
 
-class MRPService(BaseBusinessService):
+class MRPService:
     model = "mrp"
     @staticmethod
     async def get_by_id(mrp_id: int) -> Optional[MRPCalculation]:
@@ -1058,7 +1056,7 @@ class MRPService(BaseBusinessService):
         return results
 
 
-class CRPService(BaseBusinessService):
+class CRPService:
     model = "crp"
     @staticmethod
     async def get_by_id(crp_id: int) -> Optional[CapacityRequirementPlan]:
@@ -1227,7 +1225,7 @@ class CRPService(BaseBusinessService):
         return crp
 
 
-class MonitorService(BaseBusinessService):
+class MonitorService:
     model = "monitor"
     @staticmethod
     async def get_by_id(monitor_id: int) -> Optional[PlanExecutionMonitor]:
@@ -1368,7 +1366,7 @@ class MonitorService(BaseBusinessService):
         }
 
 
-class AlertService(BaseBusinessService):
+class AlertService:
     model = "alert"
     @staticmethod
     async def get_by_id(alert_id: int) -> Optional[MRPExceptionAlert]:

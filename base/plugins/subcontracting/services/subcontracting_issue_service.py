@@ -6,8 +6,6 @@ from loguru import logger
 from base.plugins.subcontracting.models.subcontracting_issue import SubcontractingIssue, SubcontractingIssueLine
 from base.plugins.subcontracting.services.subcontracting_order_service import SubcontractingOrderService
 from base.common.events.event_bus import event_bus
-from base.common.base_service import BaseBusinessService
-
 ISSUE_STATUS_LABELS = {
     "draft": "待确认",
     "confirmed": "已确认",
@@ -15,7 +13,7 @@ ISSUE_STATUS_LABELS = {
 }
 
 
-class SubcontractingIssueService(BaseBusinessService):
+class SubcontractingIssueService:
     model = "subcontracting_issue"
 
     @staticmethod

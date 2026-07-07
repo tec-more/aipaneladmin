@@ -3,11 +3,6 @@ from typing import Optional, List, Dict, Any
 from decimal import Decimal
 
 try:
-    from base.common.base_service import BaseBusinessService
-except ImportError:
-    BaseBusinessService = object
-
-try:
     from base.plugins.sales.models.order import CustomerOrder, OrderItem, OrderStatus, PaymentStatus
     from base.plugins.customer.models.customer import Customer
 except ImportError:
@@ -18,7 +13,7 @@ except ImportError:
     Customer = None
 
 
-class SalesService(BaseBusinessService):
+class SalesService:
     model = "sales"
     @staticmethod
     async def get_sales_overview(start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
