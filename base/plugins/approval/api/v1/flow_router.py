@@ -107,6 +107,102 @@ async def submit_for_approval(
         return fail_response(msg=str(e))
 
 
+# ==================== 审批上下文 API（无需权限，页面级调用） ====================
+
+
+@flow_router.get("/context")
+async def get_approval_context(
+    model: str = Query(..., description="业务模型标识"),
+    business_id: int = Query(None, description="业务对象 ID（详情页传入）"),
+    user_id: int = Depends(get_current_user_id),
+):
+    """获取审批上下文：合并流程规则、实例状态、当前用户的审批任务。
+
+    返回数据前端可直接用于判断显示哪些审批按钮：
+    - has_flow: 模型是否有启用的审批流程
+    - flows: 匹配的流程列表（含各动作支持情况）
+    - instance: 现有审批实例（详情页传入 business_id 时返回）
+    - pending_tasks: 当前用户在实例上的待处理任务
+    - can_submit: 可提交审批（有流程 且 无进行中实例 或 有创建动作的流程）
+    - can_approve: 当前用户是某个待处理任务的审批人
+    - can_cancel: 当前用户是实例申请人且实例未完结
+    - can_create / can_update / can_delete: 各动作是否有匹配流程
+    """
+    from base.plugins.approval.models.approval_flow import ApprovalFlow
+    from base.plugins.approval.models.approval_instance import ApprovalInstance
+    from base.plugins.approval.models.approval_task import ApprovalTask
+
+    flows = await ApprovalFlow.filter(is_active=True, model=model).order_by("-priority").all()
+    flow_list = []
+    all_actions = set()
+
+    for flow in flows:
+        actions = []
+        if flow.action:
+            actions.append(flow.action)
+        else:
+            m_to_a = {"POST": "create", "PUT": "update", "DELETE": "delete"}
+            actions = [m_to_a[m] for m in (flow.methods or []) if m in m_to_a]
+        all_actions.update(actions)
+        flow_list.append({
+            "flow_id": flow.id,
+            "flow_name": flow.name,
+            "flow_code": flow.code,
+            "actions": actions,
+            "methods": flow.methods,
+            "priority": flow.priority,
+            "business_type": flow.business_type,
+        })
+
+    has_flow = len(flow_list) > 0
+
+    # 查现有实例（仅详情页有 business_id 时）
+    instance_data = None
+    pending_tasks_data = []
+    can_approve = False
+    can_cancel = False
+
+    if business_id is not None:
+        instance = await ApprovalInstance.get_or_none(
+            business_type=model, business_id=business_id
+        )
+        if instance:
+            instance_data = await instance.to_dict(include_flow=True) if hasattr(instance, "to_dict") else None
+            if instance_data is None and hasattr(instance, "to_dict"):
+                instance_data = await instance.to_dict()
+
+            # 获取实例上的待处理任务（当前用户是审批人）
+            if instance.status == "pending":
+                tasks = await ApprovalTask.filter(
+                    instance_id=instance.id, status="pending", approver_id=user_id
+                ).all()
+                pending_tasks_data = [await t.to_dict() for t in tasks]
+                can_approve = len(pending_tasks_data) > 0
+
+            # 申请人可撤销（状态为 pending 时）
+            if instance.applicant_id == user_id and instance.status == "pending":
+                can_cancel = True
+
+    # 能否提交：有流程 且（详情页无进行中实例 或 列表页有创建动作流程）
+    has_pending_instance = instance_data and instance_data.get("status") == "pending" if instance_data else False
+    can_submit = has_flow and not has_pending_instance
+
+    return success_response(data={
+        "model": model,
+        "business_id": business_id,
+        "has_flow": has_flow,
+        "flows": flow_list,
+        "instance": instance_data,
+        "pending_tasks": pending_tasks_data,
+        "can_submit": can_submit,
+        "can_approve": can_approve,
+        "can_cancel": can_cancel,
+        "can_create": "create" in all_actions,
+        "can_update": "update" in all_actions,
+        "can_delete": "delete" in all_actions,
+    })
+
+
 # ==================== 流程规则管理 API（需权限） ====================
 
 

@@ -39,11 +39,9 @@
       <template #header>
         <div class="card-header">
           <span>采购订单列表</span>
-          <div>
+          <div class="header-actions">
             <el-button type="primary" :icon="Plus" @click="handleAdd">新建采购订单</el-button>
-            <el-button v-if="hasApproval" type="warning" :icon="Plus" @click="handleSubmitApproval">
-              提交审批
-            </el-button>
+            <ApprovalAction model="purchase_order" mode="list" />
           </div>
         </div>
       </template>
@@ -72,14 +70,21 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="350" fixed="right" align="center">
+        <el-table-column label="操作" width="500" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
-            <el-button v-if="row.status === 'draft'" type="success" link @click="handleConfirm(row)">确认</el-button>
-            <el-button v-if="row.status === 'confirmed'" type="success" link @click="handleReceive(row)">收货</el-button>
-            <el-button v-if="['draft', 'confirmed', 'partial_received'].includes(row.status)" type="danger" link @click="handleCancel(row)">取消</el-button>
-            <el-button v-if="canApproveUpdate" type="warning" link @click="handleApproveUpdate(row)">审批更新</el-button>
-            <el-button v-if="canApproveDelete" type="danger" link @click="handleApproveDelete(row)">审批删除</el-button>
+            <div class="row-actions">
+              <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
+              <el-button v-if="row.status === 'draft'" type="success" link @click="handleConfirm(row)">确认</el-button>
+              <el-button v-if="row.status === 'confirmed'" type="success" link @click="handleReceive(row)">收货</el-button>
+              <el-button v-if="['draft', 'confirmed', 'partial_received'].includes(row.status)" type="danger" link @click="handleCancel(row)">取消</el-button>
+              <ApprovalAction
+                model="purchase_order"
+                :business-id="row.id"
+                mode="detail"
+                @submit="(action) => onRowApprovalSubmit(row, action)"
+                @viewDetail="(id) => ElMessage.info(`审批实例 #${id}，请到审批中心查看`)"
+              />
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -104,11 +109,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, View } from '@element-plus/icons-vue'
 import { getPurchaseOrderList, confirmPurchaseOrder, cancelPurchaseOrder } from '@/api/purchase'
-import { submitForApproval } from '@/api/approval'
-import { useApproval } from '@/composables/useApproval'
-
-// 审批检测
-const { hasApproval, canApproveCreate, canApproveUpdate, canApproveDelete, checkModel, getFlowForAction } = useApproval()
+import ApprovalAction from '@/components/ApprovalAction.vue'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -182,61 +183,12 @@ const handleCancel = async (row) => {
   } catch (e) {}
 }
 
-// ==== 审批相关 ====
-
-const handleSubmitApproval = () => {
-  const flow = getFlowForAction('create')
-  ElMessage.info(`是否通过「${flow?.flow_name || '审批流程'}」提交审批？(请在弹窗中填写审批表单)`)
-  // 实际使用时打开审批表单弹窗
+/** 审批操作：每行动态获取对应审批上下文并显示按钮 */
+const onRowApprovalSubmit = (row, action) => {
+  ElMessage.success(`订单 ${row.order_no} 已通过「${action}」审批流程提交`)
 }
 
-const handleApproveUpdate = async (row) => {
-  try {
-    const flow = getFlowForAction('update')
-    await ElMessageBox.confirm(
-      `确定将订单 "${row.order_no}" 的修改提交至「${flow?.flow_name || '审批流程'}」吗？`,
-      '提交审批',
-      { type: 'warning' }
-    )
-    const res = await submitForApproval({
-      model: 'purchase_order',
-      action: 'update',
-      data: row,
-      business_id: row.id,
-      title: `采购订单 ${row.order_no} 更新审批`
-    })
-    if (res.code === 0) {
-      ElMessage.success('已提交审批')
-    }
-  } catch (e) {
-    // 用户取消或审批已提交(40001)
-  }
-}
-
-const handleApproveDelete = async (row) => {
-  try {
-    const flow = getFlowForAction('delete')
-    await ElMessageBox.confirm(
-      `确定将订单 "${row.order_no}" 的删除提交至「${flow?.flow_name || '审批流程'}」吗？`,
-      '提交审批',
-      { type: 'warning' }
-    )
-    const res = await submitForApproval({
-      model: 'purchase_order',
-      action: 'delete',
-      business_id: row.id,
-      title: `采购订单 ${row.order_no} 删除审批`
-    })
-    if (res.code === 0) {
-      ElMessage.success('已提交审批')
-    }
-  } catch (e) {}
-}
-
-onMounted(() => {
-  fetchData()
-  checkModel('purchase_order')
-})
+onMounted(() => { fetchData() })
 </script>
 
 <style lang="scss" scoped>
@@ -248,8 +200,13 @@ onMounted(() => {
   }
   .table-card {
     .card-header { display: flex; justify-content: space-between; align-items: center; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
   }
   .pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
+  .row-actions {
+    display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    > :deep(.approval-action) { margin-left: 4px; }
+  }
 }
 </style>
 

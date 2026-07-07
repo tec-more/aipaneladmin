@@ -7,6 +7,7 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    ApprovalAction: typeof import('./components/ApprovalAction.vue')['default']
     ApprovalFlowCanvas: typeof import('./components/approval/ApprovalFlowCanvas.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']

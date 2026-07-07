@@ -1,78 +1,81 @@
 /**
- * 审批检测 Composable —— 业务页面引入，自动检测当前模型是否有审批规则
+ * 审批检测 Composable —— 业务页面引入，自动检测当前模型是否有审批规则。
  *
- * 用法:
- *   import { useApproval } from '@/composables/useApproval'
- *   const { hasApproval, approvalFlows, checkModel, canApproveCreate, canApproveUpdate, canApproveDelete } = useApproval()
- *   onMounted(() => checkModel('purchase_order'))
+ * 两种用法：
  *
- * 返回:
- *   hasApproval       - Boolean，当前模型是否有审批规则
- *   approvalFlows     - 匹配的流程列表
- *   loading           - 检测中
- *   checkModel(model) - 触发检测（页面 onMounted 时调用）
- *   canApproveCreate / canApproveUpdate / canApproveDelete - 各动作是否需要审批
- *   getFlowForAction(action) - 获取指定动作的流程信息
+ * 1. 列表页（只需检测模型是否有审批规则）：
+ *    const { hasApproval, canCreate, canUpdate, canDelete, checkModel } = useApproval()
+ *    onMounted(() => checkModel('purchase_order'))
+ *
+ * 2. 详情页（需检测实例状态 + 当前用户审批任务）：
+ *    const { context, hasFlow, instance, canSubmit, canApprove, canCancel, checkContext } = useApproval()
+ *    onMounted(() => checkContext('purchase_order', 123))
  */
 import { ref, computed } from 'vue'
-import { checkApprovalForModel } from '@/api/approval'
+import { checkApprovalForModel, getApprovalContext } from '@/api/approval'
 
 export function useApproval() {
   const loading = ref(false)
-  const approvalData = ref(null) // { require_approval, flows: [...] }
+  const approvalData = ref(null)   // check-for-model 结果
+  const contextData = ref(null)     // /context 结果（含实例+任务）
 
-  const hasApproval = computed(() => {
-    return approvalData.value?.require_approval === true
-  })
-
-  const approvalFlows = computed(() => {
-    return approvalData.value?.flows || []
-  })
+  // ============ 列表页用 ============
+  const hasApproval = computed(() => approvalData.value?.require_approval === true)
+  const approvalFlows = computed(() => approvalData.value?.flows || [])
 
   const allActions = computed(() => {
     const actions = new Set()
     for (const flow of approvalFlows.value) {
-      for (const a of flow.actions || []) {
-        actions.add(a)
-      }
+      for (const a of flow.actions || []) actions.add(a)
     }
     return [...actions]
   })
 
-  const canApproveCreate = computed(() => allActions.value.includes('create'))
-  const canApproveUpdate = computed(() => allActions.value.includes('update'))
-  const canApproveDelete = computed(() => allActions.value.includes('delete'))
-
-  function getFlowForAction(action) {
-    return approvalFlows.value.find(f => (f.actions || []).includes(action)) || null
-  }
+  const canCreate = computed(() => allActions.value.includes('create'))
+  const canUpdate = computed(() => allActions.value.includes('update'))
+  const canDelete = computed(() => allActions.value.includes('delete'))
+  const getFlowForAction = (action) => approvalFlows.value.find(f => (f.actions || []).includes(action)) || null
 
   async function checkModel(model) {
     if (!model) return
     loading.value = true
     try {
       const res = await checkApprovalForModel(model)
-      if (res.code === 0 && res.data) {
-        approvalData.value = res.data
-      } else {
-        approvalData.value = null
-      }
-    } catch {
-      approvalData.value = null
-    } finally {
-      loading.value = false
-    }
+      if (res.code === 0 && res.data) approvalData.value = res.data
+      else approvalData.value = null
+    } catch { approvalData.value = null }
+    finally { loading.value = false }
+  }
+
+  // ============ 详情页用（context = flows + instance + tasks） ============
+  const context = computed(() => contextData.value)
+  const hasFlow = computed(() => contextData.value?.has_flow ?? false)
+  const instance = computed(() => contextData.value?.instance ?? null)
+  const pendingTasks = computed(() => contextData.value?.pending_tasks ?? [])
+  const canSubmit = computed(() => contextData.value?.can_submit ?? false)
+  const canApprove = computed(() => contextData.value?.can_approve ?? false)
+  const canCancel = computed(() => contextData.value?.can_cancel ?? false)
+
+  async function checkContext(model, businessId) {
+    if (!model) return
+    loading.value = true
+    try {
+      const res = await getApprovalContext({ model, business_id: businessId })
+      if (res.code === 0 && res.data) contextData.value = res.data
+      else contextData.value = null
+    } catch { contextData.value = null }
+    finally { loading.value = false }
   }
 
   return {
     loading,
-    hasApproval,
-    approvalFlows,
-    allActions,
-    canApproveCreate,
-    canApproveUpdate,
-    canApproveDelete,
-    checkModel,
-    getFlowForAction,
+    // 列表页
+    hasApproval, approvalFlows, allActions,
+    canCreate, canUpdate, canDelete,
+    checkModel, getFlowForAction,
+    // 详情页
+    context, hasFlow, instance, pendingTasks,
+    canSubmit, canApprove, canCancel,
+    checkContext,
   }
 }

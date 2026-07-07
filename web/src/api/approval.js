@@ -102,6 +102,15 @@ export const checkApprovalForModel = (model, action = null) => {
 }
 
 /**
+ * 获取审批上下文：合并流程规则 + 实例状态 + 当前用户审批任务
+ * @param {object} params - { model, business_id }
+ * @returns { has_flow, flows, instance, pending_tasks, can_submit, can_approve, can_cancel, can_create, can_update, can_delete }
+ */
+export const getApprovalContext = (params) => {
+  return request.get('/v1/approval/flow-rules/context', { params })
+}
+
+/**
  * 提交审批（前端用户确认后调用）
  * @param {object} data - { model, action, data: payload, business_id, title }
  */
