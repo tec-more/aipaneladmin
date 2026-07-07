@@ -1,0 +1,1 @@
+import{_ as o,an as c,c as n,o as t,b as s}from"./index-DvQLNIr9.js";const r={},_={class:"expense-index"};function a(d,f){const e=c("router-view");return t(),n("div",_,[s(e)])}const p=o(r,[["render",a],["__scopeId","data-v-f42595cf"]]);export{p as default};

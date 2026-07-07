@@ -91,6 +91,12 @@
 
         <!-- 操作按钮 -->
         <div class="action-section">
+          <ApprovalAction
+            model="order"
+            :business-id="Number(route.params.id)"
+            mode="detail"
+          />
+          <el-divider direction="vertical" />
           <el-button type="danger" :icon="Delete" @click="handleDelete">删除订单</el-button>
         </div>
       </div>
@@ -106,6 +112,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Delete } from '@element-plus/icons-vue'
 import { getOrderDetail, deleteOrder } from '@/api/order'
+import ApprovalAction from '@/components/ApprovalAction.vue'
 
 const router = useRouter()
 const route = useRoute()

@@ -43,6 +43,9 @@
       <template #header>
         <div class="card-header">
           <span>订单列表</span>
+          <div class="header-actions">
+            <ApprovalAction model="order" mode="list" />
+          </div>
         </div>
       </template>
 
@@ -116,12 +119,17 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="250" fixed="right" align="center">
+        <el-table-column label="操作" width="320" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
-            <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">
-              删除
-            </el-button>
+            <div class="row-actions">
+              <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
+              <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
+              <ApprovalAction
+                model="order"
+                :business-id="row.id"
+                mode="detail"
+              />
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -148,6 +156,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, View, Delete } from '@element-plus/icons-vue'
 import { getOrderList, deleteOrder } from '@/api/sales'
+import ApprovalAction from '@/components/ApprovalAction.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -241,12 +250,19 @@ onMounted(() => {
       justify-content: space-between;
       align-items: center;
     }
+    .header-actions {
+      display: flex; align-items: center; gap: 8px;
+    }
   }
 
   .pagination-wrapper {
     margin-top: 16px;
     display: flex;
     justify-content: flex-end;
+  }
+
+  .row-actions {
+    display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;
   }
 }
 </style>
