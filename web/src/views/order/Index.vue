@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="order-management">
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-card">
@@ -43,9 +43,6 @@
       <template #header>
         <div class="card-header">
           <span>订单列表</span>
-          <div class="header-actions">
-            <ApprovalAction model="order" mode="list" />
-          </div>
         </div>
       </template>
 
@@ -124,11 +121,6 @@
             <div class="row-actions">
               <el-button type="primary" link :icon="View" @click="handleDetail(row)">详情</el-button>
               <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
-              <ApprovalAction
-                model="order"
-                :business-id="row.id"
-                mode="detail"
-              />
             </div>
           </template>
         </el-table-column>
@@ -156,7 +148,6 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, View, Delete } from '@element-plus/icons-vue'
 import { getOrderList, deleteOrder } from '@/api/sales'
-import ApprovalAction from '@/components/ApprovalAction.vue'
 
 const router = useRouter()
 const loading = ref(false)

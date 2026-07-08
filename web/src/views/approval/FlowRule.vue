@@ -28,6 +28,14 @@
           </template>
         </el-table-column>
         <el-table-column prop="priority" label="优先级" width="80" align="center" />
+        <el-table-column prop="route_patterns" label="路由模式" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row.route_patterns && row.route_patterns.length">
+              {{ row.route_patterns.join('，') }}
+            </span>
+            <span v-else class="empty-text">—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="business_type" label="业务类型" width="120">
           <template #default="{ row }">{{ row.business_type || '通用' }}</template>
         </el-table-column>
@@ -128,6 +136,34 @@
             <el-input-number v-model="formData.priority" :min="0" :max="999" />
             <div class="form-tip">数字越大优先级越高；同一模型+动作命中多条流程时取最高</div>
           </el-form-item>
+          <el-form-item label="前端路由">
+            <div class="route-patterns-input">
+              <el-tag
+                v-for="(pat, idx) in formData.route_patterns"
+                :key="idx"
+                closable
+                size="small"
+                class="route-tag"
+                @close="removeRoutePattern(idx)"
+              >
+                {{ pat }}
+              </el-tag>
+              <el-input
+                v-if="routeInputVisible"
+                ref="routeInputRef"
+                v-model="routeInputValue"
+                size="small"
+                class="route-input"
+                placeholder="如 /panel/purchase/order/:id"
+                @keyup.enter="confirmRoutePattern"
+                @blur="confirmRoutePattern"
+              />
+              <el-button v-else size="small" class="route-add-btn" @click="showRouteInput">
+                + 添加路由
+              </el-button>
+            </div>
+            <div class="form-tip">匹配的页面路由，含 :id 表示详情页；全局审批组件据此自动显示。如 /panel/purchase/order 和 /panel/purchase/order/:id</div>
+          </el-form-item>
           <el-form-item label="业务类型">
             <el-input v-model="formData.business_type" placeholder="如：purchase_order, expense" />
           </el-form-item>
@@ -180,11 +216,37 @@ const formData = reactive({
   action: '',
   methods: ['POST', 'PUT', 'DELETE'],
   priority: 0,
+  route_patterns: [],
   description: '',
   is_active: true,
   form_config: [],
   flow_config: {}
 })
+
+// 前端路由 tag 输入
+const routeInputVisible = ref(false)
+const routeInputValue = ref('')
+const routeInputRef = ref(null)
+
+const showRouteInput = () => {
+  routeInputVisible.value = true
+  nextTick(() => {
+    routeInputRef.value?.focus?.()
+  })
+}
+
+const confirmRoutePattern = () => {
+  const val = routeInputValue.value.trim()
+  if (val && !formData.route_patterns.includes(val)) {
+    formData.route_patterns.push(val)
+  }
+  routeInputVisible.value = false
+  routeInputValue.value = ''
+}
+
+const removeRoutePattern = (idx) => {
+  formData.route_patterns.splice(idx, 1)
+}
 
 const fetchData = async () => {
   loading.value = true
@@ -226,10 +288,13 @@ const fetchActions = async (model) => {
 const resetForm = () => {
   Object.assign(formData, {
     id: null, name: '', code: '', business_type: '', model: '', action: '',
-    methods: ['POST', 'PUT', 'DELETE'], priority: 0, description: '', is_active: true,
+    methods: ['POST', 'PUT', 'DELETE'], priority: 0, route_patterns: [],
+    description: '', is_active: true,
     form_config: [], flow_config: {}
   })
   actionOptions.value = []
+  routeInputVisible.value = false
+  routeInputValue.value = ''
 }
 
 const onModelChange = async (val) => {
@@ -249,7 +314,8 @@ const openDialog = (mode, row) => {
     Object.assign(formData, {
       id: row.id, name: row.name, code: row.code, business_type: row.business_type || '',
       model: row.model || '', action: row.action || '', methods: row.methods || ['POST', 'PUT', 'DELETE'],
-      priority: row.priority || 0, description: row.description || '', is_active: row.is_active,
+      priority: row.priority || 0, route_patterns: row.route_patterns || [],
+      description: row.description || '', is_active: row.is_active,
       form_config: row.form_config || [], flow_config: row.flow_config || {}
     })
     if (row.model) {
@@ -370,6 +436,30 @@ onMounted(() => {
   color: #909399;
   line-height: 1.4;
   margin-top: 4px;
+}
+
+.route-patterns-input {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+
+  .route-tag {
+    margin: 0;
+  }
+
+  .route-input {
+    width: 220px;
+  }
+
+  .route-add-btn {
+    border-style: dashed;
+  }
+}
+
+.empty-text {
+  color: #c0c4cc;
 }
 
 .pagination-wrapper {

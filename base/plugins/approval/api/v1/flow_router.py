@@ -128,79 +128,24 @@ async def get_approval_context(
     - can_cancel: 当前用户是实例申请人且实例未完结
     - can_create / can_update / can_delete: 各动作是否有匹配流程
     """
-    from base.plugins.approval.models.approval_flow import ApprovalFlow
-    from base.plugins.approval.models.approval_instance import ApprovalInstance
-    from base.plugins.approval.models.approval_task import ApprovalTask
+    data = await FlowService.build_approval_context(model, business_id, user_id)
+    return success_response(data=data)
 
-    flows = await ApprovalFlow.filter(is_active=True, model=model).order_by("-priority").all()
-    flow_list = []
-    all_actions = set()
 
-    for flow in flows:
-        actions = []
-        if flow.action:
-            actions.append(flow.action)
-        else:
-            m_to_a = {"POST": "create", "PUT": "update", "DELETE": "delete"}
-            actions = [m_to_a[m] for m in (flow.methods or []) if m in m_to_a]
-        all_actions.update(actions)
-        flow_list.append({
-            "flow_id": flow.id,
-            "flow_name": flow.name,
-            "flow_code": flow.code,
-            "actions": actions,
-            "methods": flow.methods,
-            "priority": flow.priority,
-            "business_type": flow.business_type,
-        })
+@flow_router.get("/context-by-route")
+async def get_context_by_route(
+    route: str = Query(..., description="当前前端路由路径，如 /panel/purchase/order/123"),
+    business_id: int = Query(None, description="业务对象 ID（详情页传入）"),
+    user_id: int = Depends(get_current_user_id),
+):
+    """全局审批组件按当前前端路由反查命中的审批流程，返回审批上下文。
 
-    has_flow = len(flow_list) > 0
-
-    # 查现有实例（仅详情页有 business_id 时）
-    instance_data = None
-    pending_tasks_data = []
-    can_approve = False
-    can_cancel = False
-
-    if business_id is not None:
-        instance = await ApprovalInstance.get_or_none(
-            business_type=model, business_id=business_id
-        )
-        if instance:
-            instance_data = await instance.to_dict(include_flow=True) if hasattr(instance, "to_dict") else None
-            if instance_data is None and hasattr(instance, "to_dict"):
-                instance_data = await instance.to_dict()
-
-            # 获取实例上的待处理任务（当前用户是审批人）
-            if instance.status == "pending":
-                tasks = await ApprovalTask.filter(
-                    instance_id=instance.id, status="pending", approver_id=user_id
-                ).all()
-                pending_tasks_data = [await t.to_dict() for t in tasks]
-                can_approve = len(pending_tasks_data) > 0
-
-            # 申请人可撤销（状态为 pending 时）
-            if instance.applicant_id == user_id and instance.status == "pending":
-                can_cancel = True
-
-    # 能否提交：有流程 且（详情页无进行中实例 或 列表页有创建动作流程）
-    has_pending_instance = instance_data and instance_data.get("status") == "pending" if instance_data else False
-    can_submit = has_flow and not has_pending_instance
-
-    return success_response(data={
-        "model": model,
-        "business_id": business_id,
-        "has_flow": has_flow,
-        "flows": flow_list,
-        "instance": instance_data,
-        "pending_tasks": pending_tasks_data,
-        "can_submit": can_submit,
-        "can_approve": can_approve,
-        "can_cancel": can_cancel,
-        "can_create": "create" in all_actions,
-        "can_update": "update" in all_actions,
-        "can_delete": "delete" in all_actions,
-    })
+    无需权限（页面级调用，与 /context 一致）。
+    后台在流程规则的 route_patterns 中配置适用的路由模式（支持 :id 参数段），
+    本接口据此匹配，命中则返回 has_flow=True 及完整上下文，未命中返回 has_flow=False。
+    """
+    data = await FlowService.get_context_by_route(route, business_id, user_id)
+    return success_response(data=data)
 
 
 # ==================== 流程规则管理 API（需权限） ====================

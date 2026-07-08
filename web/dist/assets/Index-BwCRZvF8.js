@@ -1,0 +1,1 @@
+import{_ as o,c,b as t,aC as n,o as s}from"./index-Y-HAgN76.js";const r={},_={class:"picking-index"};function a(d,i){const e=n("router-view");return s(),c("div",_,[t(e)])}const f=o(r,[["render",a],["__scopeId","data-v-c75c2135"]]);export{f as default};

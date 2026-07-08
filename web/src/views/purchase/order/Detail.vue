@@ -6,16 +6,6 @@
           <span>采购订单详情</span>
           <div class="header-actions">
             <el-button :icon="Edit" @click="handleEdit">编辑</el-button>
-            <!-- ★ 审批组件：自动检测 + 动态显示按钮 ★ -->
-            <ApprovalAction
-              model="purchase_order"
-              :business-id="orderId"
-              mode="detail"
-              @submit="onApprovalSubmit"
-              @approve="onApprovalApprove"
-              @cancel="onApprovalCancel"
-              @viewDetail="onViewApproval"
-            />
           </div>
         </div>
       </template>
@@ -48,7 +38,6 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Edit } from '@element-plus/icons-vue'
 import { getPurchaseOrderDetail } from '@/api/purchase'
-import ApprovalAction from '@/components/ApprovalAction.vue'
 
 const route = useRoute()
 const orderId = ref(Number(route.params.id) || null)
@@ -70,20 +59,6 @@ onMounted(async () => {
 })
 
 const handleEdit = () => { ElMessage.info('编辑功能开发中') }
-
-// ★ 审批事件回调（可选，用于自定义后续操作）
-const onApprovalSubmit = (action) => {
-  console.log(`[Detail] 已提交「${action}」审批`)
-}
-const onApprovalApprove = (taskId, approved) => {
-  console.log(`[Detail] 审批任务 #${taskId} ${approved ? '通过' : '拒绝'}`)
-}
-const onApprovalCancel = (instanceId) => {
-  console.log(`[Detail] 审批实例 #${instanceId} 已撤销`)
-}
-const onViewApproval = (instanceId) => {
-  ElMessage.info(`查看审批实例 #${instanceId} 详情，请到审批中心`)
-}
 </script>
 
 <style lang="scss" scoped>

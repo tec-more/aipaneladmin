@@ -111,6 +111,15 @@ export const getApprovalContext = (params) => {
 }
 
 /**
+ * 按当前前端路由反查审批上下文（全局审批组件用）
+ * @param {object} params - { route, business_id }
+ * @returns { has_flow, model, mode, flows, instance, pending_tasks, can_* }
+ */
+export const getApprovalContextByRoute = (params) => {
+  return request.get('/v1/approval/flow-rules/context-by-route', { params })
+}
+
+/**
  * 提交审批（前端用户确认后调用）
  * @param {object} data - { model, action, data: payload, business_id, title }
  */

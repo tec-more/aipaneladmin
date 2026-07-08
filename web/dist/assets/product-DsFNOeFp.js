@@ -1,0 +1,1 @@
+import{aR as r}from"./index-Y-HAgN76.js";const c=t=>r.get("/v1/product/list",{params:t}),e=t=>r.get(`/v1/product/${t}`),s=t=>r.post("/v1/product",t),d=(t,o)=>r.put(`/v1/product/${t}`,o),a=t=>r.delete(`/v1/product/${t}`),p=(t,o)=>r.patch(`/v1/product/${t}/stock`,o),n=t=>r.patch(`/v1/product/${t}/toggle-status`);export{p as a,e as b,s as c,a as d,c as g,n as t,d as u};

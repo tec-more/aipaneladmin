@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <el-container class="main-layout">
     <!-- 侧边栏 -->
     <el-aside :width="isCollapse ? '64px' : '220px'" class="aside">
@@ -109,6 +109,7 @@
 
       <!-- 内容区 -->
       <el-main class="main">
+        <GlobalApproval />
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
             <component :is="Component" />
@@ -157,6 +158,7 @@ import { useUserStore } from '@/stores/user'
 import { useMenuStore } from '@/stores/menu'
 import { changePassword } from '@/api/auth'
 import ApprovalPrompt from '@/views/approval/ApprovalPrompt.vue'
+import GlobalApproval from '@/components/GlobalApproval.vue'
 
 // 图标组件映射
 const iconComponents = {

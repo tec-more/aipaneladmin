@@ -20,6 +20,7 @@ class FlowCreate(BaseModel):
     methods: List[str] = Field(default=["POST", "PUT", "DELETE"], description="拦截方法列表")
     priority: int = Field(default=0, description="优先级(数字越大优先级越高)")
     is_active: bool = Field(default=True, description="是否启用")
+    route_patterns: List[str] = Field(default=[], description="前端路由模式列表，全局审批组件按路由匹配")
 
 
 class FlowUpdate(BaseModel):
@@ -34,6 +35,7 @@ class FlowUpdate(BaseModel):
     methods: Optional[List[str]] = Field(None, description="拦截方法列表")
     priority: Optional[int] = Field(None, description="优先级(数字越大优先级越高)")
     is_active: Optional[bool] = Field(None, description="是否启用")
+    route_patterns: Optional[List[str]] = Field(None, description="前端路由模式列表")
 
 
 class FlowResponse(BaseModel):
@@ -50,6 +52,7 @@ class FlowResponse(BaseModel):
     action: Optional[str] = None
     methods: List[str] = ["POST", "PUT", "DELETE"]
     priority: int = 0
+    route_patterns: List[str] = []
     is_system: bool
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

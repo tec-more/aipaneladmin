@@ -25,6 +25,8 @@ class ApprovalFlow(BaseModel, TimestampMixin):
     methods = fields.JSONField(default=["POST", "PUT", "DELETE"], description="拦截方法列表")
     # 优先级（数字越大优先级越高；同一 model+action 命中多条流程时取最高）
     priority = fields.IntField(default=0, description="优先级(数字越大优先级越高)", index=True)
+    # 前端路由模式列表，全局审批组件按当前路由反查命中的流程
+    route_patterns = fields.JSONField(default=list, description="前端路由模式列表，如 ['/panel/purchase/order', '/panel/purchase/order/:id']")
     # 是否为系统预设流程（预设流程不可删除）
     is_system = fields.BooleanField(default=False, description="是否系统预设")
 
@@ -47,6 +49,7 @@ class ApprovalFlow(BaseModel, TimestampMixin):
             "action": self.action,
             "methods": self.methods,
             "priority": self.priority,
+            "route_patterns": self.route_patterns,
             "is_system": self.is_system,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,

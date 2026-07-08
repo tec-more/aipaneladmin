@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="purchase-order-list">
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -41,7 +41,6 @@
           <span>采购订单列表</span>
           <div class="header-actions">
             <el-button type="primary" :icon="Plus" @click="handleAdd">新建采购订单</el-button>
-            <ApprovalAction model="purchase_order" mode="list" />
           </div>
         </div>
       </template>
@@ -77,13 +76,6 @@
               <el-button v-if="row.status === 'draft'" type="success" link @click="handleConfirm(row)">确认</el-button>
               <el-button v-if="row.status === 'confirmed'" type="success" link @click="handleReceive(row)">收货</el-button>
               <el-button v-if="['draft', 'confirmed', 'partial_received'].includes(row.status)" type="danger" link @click="handleCancel(row)">取消</el-button>
-              <ApprovalAction
-                model="purchase_order"
-                :business-id="row.id"
-                mode="detail"
-                @submit="(action) => onRowApprovalSubmit(row, action)"
-                @viewDetail="(id) => ElMessage.info(`审批实例 #${id}，请到审批中心查看`)"
-              />
             </div>
           </template>
         </el-table-column>
@@ -109,7 +101,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, View } from '@element-plus/icons-vue'
 import { getPurchaseOrderList, confirmPurchaseOrder, cancelPurchaseOrder } from '@/api/purchase'
-import ApprovalAction from '@/components/ApprovalAction.vue'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -181,11 +172,6 @@ const handleCancel = async (row) => {
     ElMessage.success('取消成功')
     fetchData()
   } catch (e) {}
-}
-
-/** 审批操作：每行动态获取对应审批上下文并显示按钮 */
-const onRowApprovalSubmit = (row, action) => {
-  ElMessage.success(`订单 ${row.order_no} 已通过「${action}」审批流程提交`)
 }
 
 onMounted(() => { fetchData() })

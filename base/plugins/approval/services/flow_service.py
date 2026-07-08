@@ -235,7 +235,8 @@ class FlowService:
             action=data.action,
             methods=data.methods,
             priority=data.priority,
-            is_active=data.is_active
+            is_active=data.is_active,
+            route_patterns=data.route_patterns or [],
         )
         return flow
 
@@ -424,6 +425,163 @@ class FlowService:
             "model": model
         }
 
+    # ------------------------------------------------------------------
+    # 路由匹配：全局审批组件按当前前端路由反查命中的流程
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _route_pattern_to_regex(pattern: str) -> "re.Pattern":
+        """把 vue-router 风格路由模式转正则。
+
+        ``/panel/purchase/order/:id`` -> ``^/panel/purchase/order/([^/]+)$``
+        其余字符按字面转义。
+        """
+        # 先按 / 分段，逐段处理：:param 段替换为 [^/]+，其余段转义
+        segments = pattern.split("/")
+        regex_parts = []
+        for seg in segments:
+            if seg.startswith(":"):
+                regex_parts.append(r"([^/]+)")
+            else:
+                regex_parts.append(re.escape(seg))
+        return re.compile("^" + "/".join(regex_parts) + "$")
+
+    @staticmethod
+    async def match_route_to_flows(route: str) -> List[ApprovalFlow]:
+        """加载所有启用且 route_patterns 非空的流程，返回命中的流程列表（按 priority 降序）。"""
+        if not route:
+            return []
+        flows = await ApprovalFlow.filter(is_active=True).order_by("-priority").all()
+        matched = []
+        for flow in flows:
+            patterns = flow.route_patterns or []
+            if not patterns:
+                continue
+            for pat in patterns:
+                if not isinstance(pat, str) or not pat:
+                    continue
+                if FlowService._route_pattern_to_regex(pat).match(route):
+                    matched.append(flow)
+                    break
+        return matched
+
+    @staticmethod
+    async def build_approval_context(
+        model: str,
+        business_id: Optional[int],
+        user_id: int,
+    ) -> Dict[str, Any]:
+        """构建审批上下文：合并流程规则、实例状态、当前用户的审批任务。
+
+        供 /context 与 /context-by-route 复用，返回前端可直接用于渲染审批按钮的数据。
+        """
+        from base.plugins.approval.models.approval_instance import ApprovalInstance
+        from base.plugins.approval.models.approval_task import ApprovalTask
+
+        flows = await ApprovalFlow.filter(is_active=True, model=model).order_by("-priority").all()
+        flow_list = []
+        all_actions = set()
+
+        for flow in flows:
+            actions = []
+            if flow.action:
+                actions.append(flow.action)
+            else:
+                m_to_a = {"POST": "create", "PUT": "update", "DELETE": "delete"}
+                actions = [m_to_a[m] for m in (flow.methods or []) if m in m_to_a]
+            all_actions.update(actions)
+            flow_list.append({
+                "flow_id": flow.id,
+                "flow_name": flow.name,
+                "flow_code": flow.code,
+                "actions": actions,
+                "methods": flow.methods,
+                "priority": flow.priority,
+                "business_type": flow.business_type,
+            })
+
+        has_flow = len(flow_list) > 0
+
+        instance_data = None
+        pending_tasks_data: List[Dict[str, Any]] = []
+        can_approve = False
+        can_cancel = False
+
+        if business_id is not None:
+            instance = await ApprovalInstance.get_or_none(
+                business_type=model, business_id=business_id
+            )
+            if instance:
+                instance_data = await instance.to_dict(include_flow=True) if hasattr(instance, "to_dict") else None
+                if instance_data is None and hasattr(instance, "to_dict"):
+                    instance_data = await instance.to_dict()
+
+                if instance.status == "pending":
+                    tasks = await ApprovalTask.filter(
+                        instance_id=instance.id, status="pending", approver_id=user_id
+                    ).all()
+                    pending_tasks_data = [await t.to_dict() for t in tasks]
+                    can_approve = len(pending_tasks_data) > 0
+
+                if instance.applicant_id == user_id and instance.status == "pending":
+                    can_cancel = True
+
+        has_pending_instance = bool(instance_data and instance_data.get("status") == "pending")
+        can_submit = has_flow and not has_pending_instance
+
+        return {
+            "model": model,
+            "business_id": business_id,
+            "has_flow": has_flow,
+            "flows": flow_list,
+            "instance": instance_data,
+            "pending_tasks": pending_tasks_data,
+            "can_submit": can_submit,
+            "can_approve": can_approve,
+            "can_cancel": can_cancel,
+            "can_create": "create" in all_actions,
+            "can_update": "update" in all_actions,
+            "can_delete": "delete" in all_actions,
+        }
+
+    @staticmethod
+    async def get_context_by_route(
+        route: str,
+        business_id: Optional[int],
+        user_id: int,
+    ) -> Dict[str, Any]:
+        """按当前前端路由反查命中的流程，返回审批上下文。
+
+        - 命中流程取首个的 model 作为业务模型标识
+        - mode: business_id 存在 -> detail，否则 list
+        - 未命中任何流程 -> has_flow=False，全局组件据此隐藏
+        """
+        matched = await FlowService.match_route_to_flows(route)
+        if not matched:
+            return {
+                "route": route,
+                "model": None,
+                "mode": "list" if business_id is None else "detail",
+                "business_id": business_id,
+                "has_flow": False,
+                "flows": [],
+                "instance": None,
+                "pending_tasks": [],
+                "can_submit": False,
+                "can_approve": False,
+                "can_cancel": False,
+                "can_create": False,
+                "can_update": False,
+                "can_delete": False,
+            }
+
+        model = matched[0].model or matched[0].business_type
+        mode = "detail" if business_id is not None else "list"
+        ctx = await FlowService.build_approval_context(model, business_id, user_id)
+        ctx["route"] = route
+        ctx["mode"] = mode
+        return ctx
+
     @staticmethod
     async def initialize_default_data():
         """初始化默认数据"""
@@ -495,6 +653,7 @@ class FlowService:
             methods=["POST", "PUT", "DELETE"],
             priority=100,
             is_active=True,
-            is_system=True
+            is_system=True,
+            route_patterns=["/panel/purchase/order", "/panel/purchase/order/:id"],
         )
         logger.info("创建默认采购审批流程")
