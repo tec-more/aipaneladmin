@@ -11,10 +11,10 @@ from base.common.security import get_current_user_id_ws
 from base.plugins.mail.services.ws_manager import mail_ws_manager
 from base.plugins.mail.services.notification_service import NotificationService
 
-mail_ws_router = APIRouter(tags=["消息-WebSocket"])
+ws_router = APIRouter(tags=["消息-WebSocket"])
 
 
-@mail_ws_router.websocket("/ws")
+@ws_router.websocket("/ws")
 async def mail_ws(websocket: WebSocket, token: Optional[str] = Query(None)):
     """消息实时推送 WebSocket
 
