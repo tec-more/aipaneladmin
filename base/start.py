@@ -456,6 +456,14 @@ def init_app() -> FastAPI:
     except ImportError as e:
         print(f"[警告] 无法导入voice_websocket: {e}")
 
+    # 手动注册 mail WebSocket 路由（消息实时推送）
+    try:
+        from base.plugins.mail.api.v1.ws_router import mail_ws_router
+        app.include_router(mail_ws_router, prefix="/v1/mail")
+        print("[手动注册] WebSocket路由已注册: /v1/mail/ws")
+    except ImportError as e:
+        print(f"[警告] 无法导入 mail ws_router: {e}")
+
     # 注册事件系统API路由
     try:
         from base.common.events.api import events_api_router

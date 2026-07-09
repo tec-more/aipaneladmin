@@ -12,6 +12,7 @@ declare module 'vue' {
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
+    ElBadge: typeof import('element-plus/es')['ElBadge']
     ElBreadcrumb: typeof import('element-plus/es')['ElBreadcrumb']
     ElBreadcrumbItem: typeof import('element-plus/es')['ElBreadcrumbItem']
     ElButton: typeof import('element-plus/es')['ElButton']
@@ -67,6 +68,7 @@ declare module 'vue' {
     FlowNodePanel: typeof import('./components/approval/FlowNodePanel.vue')['default']
     GlobalApproval: typeof import('./components/GlobalApproval.vue')['default']
     LangGraphEditor: typeof import('./components/LangGraphEditor.vue')['default']
+    MailBell: typeof import('./components/MailBell.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }

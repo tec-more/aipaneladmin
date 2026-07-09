@@ -90,6 +90,7 @@
         </div>
 
         <div class="header-right">
+          <MailBell />
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <el-avatar :size="32" :icon="UserFilled" />
@@ -159,6 +160,7 @@ import { useMenuStore } from '@/stores/menu'
 import { changePassword } from '@/api/auth'
 import ApprovalPrompt from '@/views/approval/ApprovalPrompt.vue'
 import GlobalApproval from '@/components/GlobalApproval.vue'
+import MailBell from '@/components/MailBell.vue'
 
 // 图标组件映射
 const iconComponents = {
@@ -449,6 +451,10 @@ onMounted(async () => {
   }
 
   .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
     .user-info {
       display: flex;
       align-items: center;
