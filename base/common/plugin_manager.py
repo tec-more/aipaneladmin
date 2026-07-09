@@ -470,6 +470,60 @@ class PluginManager:
             log.error(f"处理插件 {name} 的菜单配置失败: {e}")
             return False
 
+    async def _process_plugin_permissions(self, name: str, manifest: dict) -> bool:
+        """处理插件的权限配置"""
+        try:
+            from base.core.users.services.rbac_service import PermissionService
+            from base.core.users.schemas.rbac import PermissionCreate, PermissionUpdate
+
+            permissions_config = manifest.get("permissions", [])
+            if not permissions_config:
+                return True
+
+            for perm_config in permissions_config:
+                code = perm_config.get("code")
+                if not code:
+                    continue
+
+                existing_perm = await PermissionService.get_by_code(code)
+
+                if existing_perm:
+                    has_changes = False
+                    if existing_perm.name != perm_config.get("name"):
+                        has_changes = True
+                    if existing_perm.description != perm_config.get("description"):
+                        has_changes = True
+                    if existing_perm.module != perm_config.get("module"):
+                        has_changes = True
+                    if not existing_perm.is_active:
+                        has_changes = True
+
+                    if has_changes:
+                        update_data = PermissionUpdate(
+                            name=perm_config.get("name"),
+                            description=perm_config.get("description"),
+                            module=perm_config.get("module"),
+                            is_active=True
+                        )
+                        await PermissionService.update_permission(existing_perm.id, update_data)
+                        log.debug(f"更新权限: {code}")
+                else:
+                    create_data = PermissionCreate(
+                        name=perm_config.get("name"),
+                        code=code,
+                        description=perm_config.get("description"),
+                        module=perm_config.get("module")
+                    )
+                    await PermissionService.create_permission(create_data)
+                    log.debug(f"创建权限: {code}")
+
+            log.info(f"插件 {name} 的权限配置已处理完成")
+            return True
+
+        except Exception as e:
+            log.error(f"处理插件 {name} 的权限配置失败: {e}")
+            return False
+
     async def enable_plugin(self, name: str) -> bool:
         """启用插件"""
         manifest = self.get_manifest(name)
@@ -507,6 +561,9 @@ class PluginManager:
 
             # 处理菜单配置
             await self._process_plugin_menus(name, manifest)
+
+            # 处理权限配置
+            await self._process_plugin_permissions(name, manifest)
 
             # 注册路由
             if plugin.router:
