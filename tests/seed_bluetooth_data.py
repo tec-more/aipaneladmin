@@ -1,36 +1,94 @@
 import asyncio
+import sys
+import os
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 
-try:
-    from base.common.database import init_db
-    from base.plugins.mes.models.base_data import Material, BomVersion, Bom, WorkCenter, Process, Route, RouteProcess
-    from base.plugins.mrp2.models.mrp_models import SalesForecast, SalesForecastDetail, MasterProductionSchedule, MPSPlanLine
-    from base.plugins.quality.models.quality import InspectionStandard
-    from base.plugins.inventory.models.inventory_models import StockWarehouse, StockLocation
-    from base.plugins.purchase.models.supplier import Supplier
-    HAS_TORTOISE = True
-except ImportError:
-    HAS_TORTOISE = False
-    print("Tortoise ORM not available, skipping database operations")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from base.common.setting import TORTOISE_ORM, settings
+
+
+BLUETOOTH_MODELS = [
+    "base.plugins.mes.models.base_data",
+    "base.plugins.mrp2.models.mrp_models",
+    "base.plugins.quality.models.quality",
+    "base.plugins.inventory.models.inventory_models",
+    "base.plugins.purchase.models.supplier",
+    "base.plugins.purchase.models.purchase",
+    "base.plugins.product.models.product",
+]
+
+
+def get_custom_orm_config():
+    config = TORTOISE_ORM.copy()
+    existing_models = config["apps"]["models"]["models"]
+    for model_path in BLUETOOTH_MODELS:
+        if model_path not in existing_models:
+            existing_models.append(model_path)
+    return config
+
+
+PRODUCTS_DATA = [
+    {
+        "name": "听音T100蓝牙耳机",
+        "description": "高品质蓝牙5.3耳机，支持主动降噪(ANC)，IPX5防水等级，超长续航30小时",
+        "price": Decimal("299.00"),
+        "original_price": Decimal("399.00"),
+        "stock": 0,
+        "category": "蓝牙耳机",
+        "tags": ["蓝牙5.3", "ANC降噪", "IPX5", "长续航"],
+        "images": [],
+        "is_active": True,
+        "is_hot": True,
+        "is_new": True,
+        "is_stock_item": True,
+        "uom_code": "副",
+        "uom_name": "副",
+        "product_type": "item",
+        "price_mode": "fixed",
+    },
+    {
+        "name": "听音T100充电盒",
+        "description": "T100蓝牙耳机专用充电盒，Type-C接口，420mAh容量",
+        "price": Decimal("99.00"),
+        "original_price": Decimal("129.00"),
+        "stock": 0,
+        "category": "配件",
+        "tags": ["充电盒", "Type-C"],
+        "images": [],
+        "is_active": True,
+        "is_hot": False,
+        "is_new": False,
+        "is_stock_item": True,
+        "uom_code": "个",
+        "uom_name": "个",
+        "product_type": "item",
+        "price_mode": "fixed",
+    },
+]
+
+PRODUCT_MATERIAL_MAP = {
+    "听音T100蓝牙耳机": "FG-T100",
+    "听音T100充电盒": "FG-T100-CASE",
+}
 
 MATERIALS_DATA = [
-    {"material_code": "FG-T100", "material_name": "听音T100蓝牙耳机", "material_type": "finished", "unit": "副", "specification": "BT5.3/ANC/IPX5"},
-    {"material_code": "FG-T100-CASE", "material_name": "T100充电盒", "material_type": "finished", "unit": "个", "specification": "Type-C/420mAh"},
-    {"material_code": "SEMI-PCB", "material_name": "T100主板组件", "material_type": "semi_finished", "unit": "件", "specification": "BT5.3芯片"},
-    {"material_code": "SEMI-SPEAKER", "material_name": "T100扬声器组件", "material_type": "semi_finished", "unit": "个", "specification": "10mm动圈"},
-    {"material_code": "RM-PCB-BOARD", "material_name": "PCB电路板", "material_type": "raw", "unit": "片", "specification": "FR-4/2层"},
-    {"material_code": "RM-BT-CHIP", "material_name": "蓝牙5.3芯片", "material_type": "raw", "unit": "颗", "specification": "QCC3084"},
-    {"material_code": "RM-MIC", "material_name": "麦克风", "material_type": "raw", "unit": "个", "specification": "硅麦"},
-    {"material_code": "RM-BATTERY", "material_name": "锂电池", "material_type": "raw", "unit": "个", "specification": "40mAh"},
-    {"material_code": "RM-SPEAKER", "material_name": "扬声器单元", "material_type": "raw", "unit": "个", "specification": "10mm"},
-    {"material_code": "RM-HOUSING", "material_name": "耳机壳体", "material_type": "raw", "unit": "个", "specification": "ABS+PC"},
-    {"material_code": "RM-EAR-TIP", "material_name": "耳套", "material_type": "raw", "unit": "套", "specification": "S/M/L"},
-    {"material_code": "RM-CHARGE-BOARD", "material_name": "充电盒主板", "material_type": "raw", "unit": "片", "specification": "-"},
-    {"material_code": "RM-CHARGE-BATTERY", "material_name": "充电盒电池", "material_type": "raw", "unit": "个", "specification": "420mAh"},
-    {"material_code": "RM-BOX", "material_name": "包装盒", "material_type": "raw", "unit": "个", "specification": "彩盒"},
-    {"material_code": "RM-MANUAL", "material_name": "说明书", "material_type": "raw", "unit": "本", "specification": "-"},
+    {"material_code": "FG-T100", "material_name": "听音T100蓝牙耳机", "material_type": "finished", "unit": "副", "specification": "BT5.3/ANC/IPX5", "product_id": None},
+    {"material_code": "FG-T100-CASE", "material_name": "T100充电盒", "material_type": "finished", "unit": "个", "specification": "Type-C/420mAh", "product_id": None},
+    {"material_code": "SEMI-PCB", "material_name": "T100主板组件", "material_type": "semi_finished", "unit": "件", "specification": "BT5.3芯片", "product_id": None},
+    {"material_code": "SEMI-SPEAKER", "material_name": "T100扬声器组件", "material_type": "semi_finished", "unit": "个", "specification": "10mm动圈", "product_id": None},
+    {"material_code": "RM-PCB-BOARD", "material_name": "PCB电路板", "material_type": "raw", "unit": "片", "specification": "FR-4/2层", "product_id": None},
+    {"material_code": "RM-BT-CHIP", "material_name": "蓝牙5.3芯片", "material_type": "raw", "unit": "颗", "specification": "QCC3084", "product_id": None},
+    {"material_code": "RM-MIC", "material_name": "麦克风", "material_type": "raw", "unit": "个", "specification": "硅麦", "product_id": None},
+    {"material_code": "RM-BATTERY", "material_name": "锂电池", "material_type": "raw", "unit": "个", "specification": "40mAh", "product_id": None},
+    {"material_code": "RM-SPEAKER", "material_name": "扬声器单元", "material_type": "raw", "unit": "个", "specification": "10mm", "product_id": None},
+    {"material_code": "RM-HOUSING", "material_name": "耳机壳体", "material_type": "raw", "unit": "个", "specification": "ABS+PC", "product_id": None},
+    {"material_code": "RM-EAR-TIP", "material_name": "耳套", "material_type": "raw", "unit": "套", "specification": "S/M/L", "product_id": None},
+    {"material_code": "RM-CHARGE-BOARD", "material_name": "充电盒主板", "material_type": "raw", "unit": "片", "specification": "-", "product_id": None},
+    {"material_code": "RM-CHARGE-BATTERY", "material_name": "充电盒电池", "material_type": "raw", "unit": "个", "specification": "420mAh", "product_id": None},
+    {"material_code": "RM-BOX", "material_name": "包装盒", "material_type": "raw", "unit": "个", "specification": "彩盒", "product_id": None},
+    {"material_code": "RM-MANUAL", "material_name": "说明书", "material_type": "raw", "unit": "本", "specification": "-", "product_id": None},
 ]
 
 
@@ -158,18 +216,49 @@ INSPECTION_STANDARDS_DATA = [
 ]
 
 
-async def seed_materials():
-    print("Seeding materials...")
+async def seed_products():
+    from base.plugins.product.models.product import Product
+    print("Seeding products...")
     count = 0
-    for data in MATERIALS_DATA:
-        existing = await Material.get_or_none(material_code=data["material_code"])
+    for data in PRODUCTS_DATA:
+        existing = await Product.get_or_none(name=data["name"])
         if not existing:
-            await Material.create(**data)
+            await Product.create(**data)
             count += 1
+    print(f"Created {count} products")
+
+
+async def seed_materials():
+    from base.plugins.mes.models.base_data import Material
+    from base.plugins.product.models.product import Product
+    print("Seeding materials...")
+    
+    product_material_code_map = {v: k for k, v in PRODUCT_MATERIAL_MAP.items()}
+    
+    count = 0
+    for data in MATERIALS_DATA.copy():
+        data_copy = data.copy()
+        material_code = data_copy["material_code"]
+        
+        if material_code in product_material_code_map:
+            product_name = product_material_code_map[material_code]
+            product = await Product.get_or_none(name=product_name)
+            if product:
+                data_copy["product_id"] = product.id
+        
+        existing = await Material.get_or_none(material_code=material_code)
+        if not existing:
+            await Material.create(**data_copy)
+            count += 1
+        else:
+            if data_copy.get("product_id"):
+                existing.product_id = data_copy["product_id"]
+                await existing.save()
     print(f"Created {count} materials")
 
 
 async def seed_bom():
+    from base.plugins.mes.models.base_data import BomVersion, Bom
     print("Seeding BOM...")
     await BomVersion.get_or_create(product_code="FG-T100", version="V1.0", defaults={
         "product_name": "听音T100蓝牙耳机", "status": "active"
@@ -194,6 +283,7 @@ async def seed_bom():
 
 
 async def seed_work_centers():
+    from base.plugins.mes.models.base_data import WorkCenter
     print("Seeding work centers...")
     count = 0
     for data in WORK_CENTERS_DATA:
@@ -205,6 +295,7 @@ async def seed_work_centers():
 
 
 async def seed_processes():
+    from base.plugins.mes.models.base_data import Process
     print("Seeding processes...")
     count = 0
     for data in PROCESSES_DATA:
@@ -216,6 +307,7 @@ async def seed_processes():
 
 
 async def seed_route():
+    from base.plugins.mes.models.base_data import Route, RouteProcess
     print("Seeding route...")
     await Route.get_or_create(route_code="ROUTE-T100", defaults={
         "route_name": "听音T100工艺路线",
@@ -236,6 +328,7 @@ async def seed_route():
 
 
 async def seed_suppliers():
+    from base.plugins.purchase.models.supplier import Supplier
     print("Seeding suppliers...")
     count = 0
     for data in SUPPLIERS_DATA:
@@ -247,6 +340,7 @@ async def seed_suppliers():
 
 
 async def seed_warehouses():
+    from base.plugins.inventory.models.inventory_models import StockWarehouse
     print("Seeding warehouses...")
     count = 0
     for data in WAREHOUSES_DATA:
@@ -258,6 +352,7 @@ async def seed_warehouses():
 
 
 async def seed_inspection_standards():
+    from base.plugins.quality.models.quality import InspectionStandard
     print("Seeding inspection standards...")
     count = 0
     for data in INSPECTION_STANDARDS_DATA:
@@ -269,6 +364,7 @@ async def seed_inspection_standards():
 
 
 async def seed_sales_forecast():
+    from base.plugins.mrp2.models.mrp_models import SalesForecast, SalesForecastDetail
     print("Seeding sales forecast...")
     today = date.today()
     q3_start = date(today.year, 7, 1)
@@ -304,6 +400,7 @@ async def seed_sales_forecast():
 
 
 async def seed_mps():
+    from base.plugins.mrp2.models.mrp_models import MasterProductionSchedule, MPSPlanLine
     print("Seeding MPS...")
     today = date.today()
     q3_start = date(today.year, 7, 1)
@@ -345,25 +442,25 @@ async def seed_mps():
 
 
 async def main():
-    if not HAS_TORTOISE:
-        print("Tortoise ORM not available, please run this script within the application context")
-        return
-    
     print("=" * 60)
     print("Seed Bluetooth Headset Test Data")
     print("=" * 60)
     
+    print(f"DB Config: {settings.db_host}:{settings.db_port}/{settings.db_name}")
+    
     from tortoise import Tortoise
-    from base.common.setting import TORTOISE_ORM
+    
+    custom_orm_config = get_custom_orm_config()
     
     print("Initializing Tortoise ORM...")
-    await Tortoise.init(config=TORTOISE_ORM)
+    await Tortoise.init(config=custom_orm_config)
     print("Tortoise ORM initialized")
     
     print("Generating schemas...")
     await Tortoise.generate_schemas(safe=True)
     print("Schemas generated")
     
+    await seed_products()
     await seed_materials()
     await seed_work_centers()
     await seed_processes()

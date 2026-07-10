@@ -196,7 +196,8 @@ async def get_product_list(
         category: Optional[str] = Query(None, description="产品分类"),
         is_active: Optional[bool] = Query(None, description="是否上架"),
         is_hot: Optional[bool] = Query(None, description="是否热门"),
-        is_new: Optional[bool] = Query(None, description="是否新品")
+        is_new: Optional[bool] = Query(None, description="是否新品"),
+        is_stock_item: Optional[bool] = Query(None, description="是否库存商品")
 ):
     """
     获取产品列表(分页)
@@ -209,7 +210,7 @@ async def get_product_list(
         is_active: 是否上架
         is_hot: 是否热门
         is_new: 是否新品
-        current_user_id: 当前用户ID
+        is_stock_item: 是否库存商品
 
     Returns:
         产品列表
@@ -222,7 +223,8 @@ async def get_product_list(
             category=category,
             is_active=is_active,
             is_hot=is_hot,
-            is_new=is_new
+            is_new=is_new,
+            is_stock_item=is_stock_item
         )
 
         # 转换为字典列表
@@ -504,6 +506,31 @@ async def get_product_categories():
     try:
         categories = await ProductService.get_product_categories()
         return SuccessResponse(data={"categories": categories}, msg="获取分类成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/materials/available", summary="获取可关联的成品物料列表")
+async def get_available_materials(
+    keyword: Optional[str] = Query(None, description="物料编码/名称关键词"),
+    include_linked: bool = Query(False, description="是否包含已关联产品的物料")
+):
+    """
+    获取可关联的成品物料列表（用于库存商品创建时选取物料）
+
+    Args:
+        keyword: 物料编码/名称关键词(模糊搜索)
+        include_linked: 是否包含已关联产品的物料(编辑场景)
+
+    Returns:
+        成品物料列表
+    """
+    try:
+        materials = await ProductService.get_available_materials(
+            keyword=keyword,
+            include_linked=include_linked
+        )
+        return SuccessResponse(data={"items": materials, "total": len(materials)}, msg="获取物料列表成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 

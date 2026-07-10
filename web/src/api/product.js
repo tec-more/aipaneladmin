@@ -39,3 +39,8 @@ export const updateProductStock = (id, data) => {
 export const toggleProductStatus = (id) => {
   return request.patch(`/v1/product/${id}/toggle-status`)
 }
+
+// 获取可关联的成品物料列表
+export const getAvailableMaterials = (params) => {
+  return request.get('/v1/product/materials/available', { params })
+}

@@ -9,6 +9,7 @@ from decimal import Decimal
 
 class ProductBase(BaseModel):
     """产品基础模型"""
+    product_code: Optional[str] = Field(None, max_length=100, description="产品编码（从物料表自动填充）")
     name: str = Field(..., min_length=1, max_length=255, description="产品名称")
     description: Optional[str] = Field(None, description="产品描述")
     price: Decimal = Field(..., ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="销售价格")
@@ -21,6 +22,8 @@ class ProductBase(BaseModel):
     is_active: bool = Field(default=True, description="是否上架")
     is_hot: bool = Field(default=False, description="是否热门")
     is_new: bool = Field(default=False, description="是否新品")
+    is_stock_item: bool = Field(default=True, description="是否为库存商品：True-实物商品(需库存管理)，False-虚拟商品(如会员/充值)")
+    material_id: Optional[int] = Field(None, description="关联的成品物料ID（库存商品模式下从物料表选取）")
     recharge_hours: Optional[int] = Field(None, ge=0, description="充值时长（小时）")
     bonus_hours: int = Field(default=0, ge=0, description="赠送时长（小时）")
     discount_description: Optional[str] = Field(None, max_length=255, description="优惠描述")
@@ -43,6 +46,7 @@ class ProductCreate(ProductBase):
 
 class ProductUpdate(BaseModel):
     """更新产品模型"""
+    product_code: Optional[str] = Field(None, max_length=100, description="产品编码")
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="产品名称")
     description: Optional[str] = Field(None, description="产品描述")
     price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="销售价格")
@@ -55,6 +59,7 @@ class ProductUpdate(BaseModel):
     is_active: Optional[bool] = Field(None, description="是否上架")
     is_hot: Optional[bool] = Field(None, description="是否热门")
     is_new: Optional[bool] = Field(None, description="是否新品")
+    is_stock_item: Optional[bool] = Field(None, description="是否为库存商品")
     recharge_hours: Optional[int] = Field(None, ge=0, description="充值时长（小时）")
     bonus_hours: Optional[int] = Field(None, ge=0, description="赠送时长（小时）")
     discount_description: Optional[str] = Field(None, max_length=255, description="优惠描述")
@@ -66,6 +71,7 @@ class ProductUpdate(BaseModel):
 class ProductResponse(BaseModel):
     """产品响应模型"""
     id: int
+    product_code: Optional[str] = None
     name: str
     description: Optional[str] = None
     price: Decimal
@@ -78,6 +84,7 @@ class ProductResponse(BaseModel):
     is_active: bool
     is_hot: bool
     is_new: bool
+    is_stock_item: bool
     view_count: int
     sales_count: int
     recharge_hours: Optional[int] = None

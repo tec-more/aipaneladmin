@@ -54,6 +54,7 @@ except ImportError:
 class Product(BaseModel, TimestampMixin):
     verbose_name = "产品"
     """产品模型"""
+    product_code = fields.CharField(max_length=100, unique=True, null=True, description="产品编码", index=True)
     name = fields.CharField(max_length=255, unique=True, description="产品名称", index=True)
     description = fields.TextField(null=True, description="产品描述")
     price = fields.DecimalField(max_digits=10, decimal_places=2, description="价格")
@@ -94,6 +95,7 @@ class Product(BaseModel, TimestampMixin):
         default="dynamic",
         description="价格模式：dynamic(跟随会员等级) 或 fixed(独立定价)"
     )
+    is_stock_item = fields.BooleanField(default=True, description="是否为库存商品：True-实物商品(需库存管理)，False-虚拟商品(如会员/充值)")
 
     class Meta:
         table = "product"
@@ -170,6 +172,7 @@ class Product(BaseModel, TimestampMixin):
 
         data = {
             "id": self.id,
+            "product_code": self.product_code,
             "name": self.name,
             "description": self.description,
             "price": float(self.price) if hasattr(self.price, "__float__") else self.price,
@@ -211,6 +214,7 @@ class Product(BaseModel, TimestampMixin):
             "is_active": self.is_active,
             "is_hot": self.is_hot,
             "is_new": self.is_new,
+            "is_stock_item": self.is_stock_item,
             "view_count": self.view_count,
             "sales_count": self.sales_count,
             "recharge_hours": self.recharge_hours,

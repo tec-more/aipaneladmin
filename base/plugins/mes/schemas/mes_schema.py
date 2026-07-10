@@ -12,6 +12,7 @@ class MaterialBase(BaseModel):
     unit: str = Field(..., max_length=20, description="计量单位")
     specification: Optional[str] = Field(None, max_length=255, description="规格型号")
     description: Optional[str] = Field(None, description="物料描述")
+    initial_stock: int = Field(default=0, ge=0, description="初始库存数量")
     is_active: bool = Field(default=True, description="是否启用")
 
 
@@ -26,6 +27,7 @@ class MaterialUpdate(BaseModel):
     unit: Optional[str] = Field(None, max_length=20, description="计量单位")
     specification: Optional[str] = Field(None, max_length=255, description="规格型号")
     description: Optional[str] = Field(None, description="物料描述")
+    initial_stock: Optional[int] = Field(None, ge=0, description="初始库存数量")
     is_active: Optional[bool] = Field(None, description="是否启用")
 
 

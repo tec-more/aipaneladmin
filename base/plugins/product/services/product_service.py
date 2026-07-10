@@ -5,7 +5,6 @@ from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 from tortoise.expressions import Q
-from tortoise.queryset import QuerySet
 
 # 尝试导入依赖项
 try:
@@ -140,21 +139,52 @@ class ProductService:
 
         Args:
             product_data: 产品创建数据
+                - is_stock_item=True 且 material_id 有值：从物料表选取成品物料，自动填充信息
+                - is_stock_item=True 且 material_id 为空：直接创建（需手动填写信息）
+                - is_stock_item=False：虚拟商品，直接创建
 
         Returns:
             Product: 创建的产品对象
 
         Raises:
-            ValueError: 产品名称已存在
+            ValueError: 产品名称已存在 / 物料不存在 / 物料非成品类型 / 物料已关联产品
         """
+        material = None
+        if product_data.is_stock_item and product_data.material_id:
+            from base.plugins.mes.models.base_data import Material
+            material = await Material.get_or_none(id=product_data.material_id)
+            if not material:
+                raise ValueError("关联的物料不存在")
+            if material.material_type != "finished":
+                raise ValueError("只能关联成品类型的物料")
+            if material.product_id is not None:
+                raise ValueError("该物料已关联其他产品")
+
+        # 如果关联了物料，从物料表获取产品编码和名称（以物料表为准）
+        product_code = product_data.product_code
+        product_name = product_data.name
+        product_desc = product_data.description
+        if material:
+            product_code = material.material_code
+            product_name = material.material_name
+            if not product_data.description:
+                product_desc = f"规格: {material.specification or '-'}，单位: {material.unit or '-'}"
+
         # 检查产品名称是否已存在
-        if await ProductService.check_name_exists(product_data.name):
+        if await ProductService.check_name_exists(product_name):
             raise ValueError("产品名称已存在")
+
+        # 如果关联了物料，检查产品编码是否重复
+        if material and product_code:
+            existing_by_code = await Product.filter(product_code=product_code).first()
+            if existing_by_code:
+                raise ValueError("产品编码已存在")
 
         # 创建产品
         product = await Product.create(
-            name=product_data.name,
-            description=product_data.description,
+            product_code=product_code,
+            name=product_name,
+            description=product_desc,
             price=product_data.price,
             original_price=product_data.original_price,
             stock=product_data.stock or 0,
@@ -164,11 +194,17 @@ class ProductService:
             is_active=product_data.is_active,
             is_hot=product_data.is_hot,
             is_new=product_data.is_new,
+            is_stock_item=product_data.is_stock_item,
             recharge_hours=product_data.recharge_hours,
             bonus_hours=product_data.bonus_hours,
             discount_description=product_data.discount_description,
             sort=product_data.sort,
         )
+
+        # 建立物料与产品的关联
+        if material:
+            material.product_id = product.id
+            await material.save()
 
         return product
 
@@ -320,6 +356,7 @@ class ProductService:
             is_active: Optional[bool] = None,
             is_hot: Optional[bool] = None,
             is_new: Optional[bool] = None,
+            is_stock_item: Optional[bool] = None,
     ) -> Tuple[List[Product], int]:
         """
         获取产品列表(分页)
@@ -332,6 +369,7 @@ class ProductService:
             is_active: 是否上架
             is_hot: 是否热门
             is_new: 是否新品
+            is_stock_item: 是否库存商品
 
         Returns:
             Tuple[List[Product], int]: (产品列表, 总数)
@@ -349,6 +387,8 @@ class ProductService:
             query = query.filter(is_hot=is_hot)
         if is_new is not None:
             query = query.filter(is_new=is_new)
+        if is_stock_item is not None:
+            query = query.filter(is_stock_item=is_stock_item)
 
         # 获取总数
         total = await query.count()
@@ -387,3 +427,42 @@ class ProductService:
         if exclude_id:
             query = query.exclude(id=exclude_id)
         return await query.exists()
+
+    @staticmethod
+    async def get_available_materials(
+        keyword: Optional[str] = None,
+        include_linked: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取可关联的成品物料列表
+
+        Args:
+            keyword: 物料编码/名称关键词(模糊搜索)
+            include_linked: 是否包含已关联产品的物料(编辑场景)
+
+        Returns:
+            List[Dict]: 成品物料列表
+        """
+        from base.plugins.mes.models.base_data import Material
+
+        query = Material.filter(material_type="finished", is_active=True)
+        if not include_linked:
+            query = query.filter(product_id__isnull=True)
+        if keyword:
+            query = query.filter(
+                Q(material_code__icontains=keyword) | Q(material_name__icontains=keyword)
+            )
+
+        materials = await query.order_by("material_code").limit(50)
+        result = []
+        for m in materials:
+            result.append({
+                "id": m.id,
+                "material_code": m.material_code,
+                "material_name": m.material_name,
+                "specification": m.specification,
+                "unit": m.unit,
+                "product_id": m.product_id,
+                "initial_stock": m.initial_stock or 0,
+            })
+        return result

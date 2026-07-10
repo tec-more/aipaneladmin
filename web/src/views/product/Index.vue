@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="product-management">
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-card">
@@ -7,9 +7,17 @@
           <el-input v-model="searchForm.name" placeholder="请输入产品名称" clearable />
         </el-form-item>
         <el-form-item label="产品分类">
-          <el-select v-model="searchForm.category" placeholder="请选择" clearable style="width: 120px">
+          <el-select v-model="searchForm.category" placeholder="请选择" clearable filterable style="width: 140px">
             <el-option label="充值套餐" value="充值套餐" />
             <el-option label="会员套餐" value="会员套餐" />
+            <el-option label="蓝牙耳机" value="蓝牙耳机" />
+            <el-option label="配件" value="配件" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="产品类型">
+          <el-select v-model="searchForm.is_stock_item" placeholder="请选择" clearable style="width: 130px">
+            <el-option label="库存商品" :value="true" />
+            <el-option label="虚拟商品" :value="false" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -36,6 +44,7 @@
 
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="80" align="center" />
+        <el-table-column prop="product_code" label="产品编码" width="140" />
         <el-table-column prop="sort" label="排序" width="80" align="center" />
         <el-table-column prop="name" label="产品名称" min-width="120" />
         <el-table-column prop="description" label="产品描述" min-width="150" show-overflow-tooltip />
@@ -71,6 +80,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="stock" label="库存" width="100" align="center" />
+        <el-table-column label="产品类型" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.is_stock_item" type="primary" size="small">库存商品</el-tag>
+            <el-tag v-else type="info" size="small">虚拟商品</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="sales_count" label="销量" width="100" align="center" />
         <el-table-column prop="view_count" label="浏览" width="80" align="center" />
         <el-table-column label="标签" width="200" align="center">
@@ -129,12 +144,71 @@
       @close="resetForm"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <!-- 产品类型切换 -->
+        <el-form-item label="产品类型" prop="is_stock_item" v-if="!isEdit">
+          <el-radio-group v-model="form.is_stock_item" @change="handleProductTypeChange">
+            <el-radio-button :value="true">库存商品（实物）</el-radio-button>
+            <el-radio-button :value="false">虚拟商品（会员/充值）</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+
+        <!-- 库存商品：从物料表选取 -->
+        <el-form-item
+          label="关联物料"
+          prop="material_id"
+          v-if="form.is_stock_item && !isEdit"
+        >
+          <el-select
+            v-model="form.material_id"
+            placeholder="请选择成品物料"
+            filterable
+            remote
+            :remote-method="searchMaterials"
+            :loading="materialLoading"
+            style="width: 100%"
+            @change="handleMaterialSelect"
+            :disabled="materialOptions.length === 0"
+          >
+            <el-option
+              v-for="item in materialOptions"
+              :key="item.id"
+              :label="`${item.material_code} - ${item.material_name}`"
+              :value="item.id"
+            >
+              <span style="float: left">{{ item.material_code }} - {{ item.material_name }}</span>
+              <span style="float: right; color: #999; font-size: 12px">{{ item.specification }}</span>
+            </el-option>
+          </el-select>
+          <div v-if="materialOptions.length === 0" style="font-size: 12px; color: #f56c6c; margin-top: 4px">
+            ⚠ 没有可关联的成品物料，请先在【MES-基础数据-物料管理】中创建成品物料（类型选择finished）
+          </div>
+          <div v-else style="font-size: 12px; color: #999; margin-top: 4px">
+            选择成品物料后，产品编码/名称/描述将自动从物料信息填充
+          </div>
+        </el-form-item>
+
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="产品名称" prop="name">
-              <el-input v-model="form.name" placeholder="请输入产品名称" />
+            <el-form-item label="产品编码" prop="product_code">
+              <el-input
+                v-model="form.product_code"
+                placeholder="请选择物料后自动填充"
+                :disabled="form.is_stock_item && form.material_id"
+              />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="产品名称" prop="name">
+              <el-input
+                v-model="form.name"
+                placeholder="请输入产品名称"
+                :disabled="form.is_stock_item && form.material_id"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="排序" prop="sort">
               <el-input-number v-model="form.sort" :min="0" :step="1" style="width: 100%" />
@@ -143,20 +217,25 @@
         </el-row>
 
         <el-form-item label="产品描述" prop="description">
-          <el-input v-model="form.description" type="textarea" placeholder="请输入产品描述" rows="2" />
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            placeholder="请输入产品描述"
+            rows="2"
+            :disabled="form.is_stock_item && form.material_id"
+          />
         </el-form-item>
 
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="产品分类" prop="category">
-              <el-select v-model="form.category" placeholder="请选择分类" style="width: 100%">
-                <el-option label="充值套餐" value="充值套餐" />
-                <el-option label="会员套餐" value="会员套餐" />
+              <el-select v-model="form.category" placeholder="请选择分类" style="width: 100%" allow-create filterable>
+                <el-option v-for="cat in availableCategories" :key="cat" :label="cat" :value="cat" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="库存" prop="stock">
+            <el-form-item label="库存" prop="stock" v-if="form.is_stock_item">
               <el-input-number v-model="form.stock" :min="0" :step="10" style="width: 100%" />
             </el-form-item>
           </el-col>
@@ -180,34 +259,49 @@
           </el-col>
         </el-row>
 
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="充值时长" prop="recharge_hours">
-              <el-input-number v-model="form.recharge_hours" :min="0" :step="1" style="width: 100%" />
-              <span style="margin-left: 8px; color: #999; font-size: 12px">小时</span>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="赠送时长" prop="bonus_hours">
-              <el-input-number v-model="form.bonus_hours" :min="0" :step="1" style="width: 100%" />
-              <span style="margin-left: 8px; color: #999; font-size: 12px">小时</span>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="产品标签" prop="tags">
-              <el-select v-model="form.tags" multiple placeholder="选择标签" style="width: 100%">
-                <el-option label="升级 LV.1" value="升级 LV.1" />
-                <el-option label="升级 LV.4" value="升级 LV.4" />
-                <el-option label="升级 LV.7" value="升级 LV.7" />
-                <el-option label="升级 LV.9" value="升级 LV.9" />
-                <el-option label="升级 LV.11" value="升级 LV.11" />
-                <el-option label="限时9折" value="限时9折" />
-                <el-option label="限时8折" value="限时8折" />
-                <el-option label="限时75折" value="限时75折" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <!-- 虚拟商品专属字段 -->
+        <template v-if="!form.is_stock_item">
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="充值时长" prop="recharge_hours">
+                <el-input-number v-model="form.recharge_hours" :min="0" :step="1" style="width: 100%" />
+                <span style="margin-left: 8px; color: #999; font-size: 12px">小时</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="赠送时长" prop="bonus_hours">
+                <el-input-number v-model="form.bonus_hours" :min="0" :step="1" style="width: 100%" />
+                <span style="margin-left: 8px; color: #999; font-size: 12px">小时</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="产品标签" prop="tags">
+                <el-select v-model="form.tags" multiple placeholder="选择标签" style="width: 100%">
+                  <el-option label="升级 LV.1" value="升级 LV.1" />
+                  <el-option label="升级 LV.4" value="升级 LV.4" />
+                  <el-option label="升级 LV.7" value="升级 LV.7" />
+                  <el-option label="升级 LV.9" value="升级 LV.9" />
+                  <el-option label="升级 LV.11" value="升级 LV.11" />
+                  <el-option label="限时9折" value="限时9折" />
+                  <el-option label="限时8折" value="限时8折" />
+                  <el-option label="限时75折" value="限时75折" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+
+        <!-- 库存商品标签 -->
+        <template v-if="form.is_stock_item">
+          <el-form-item label="产品标签" prop="tags">
+            <el-select v-model="form.tags" multiple placeholder="选择标签" style="width: 100%" allow-create filterable>
+              <el-option label="热门" value="热门" />
+              <el-option label="新品" value="新品" />
+              <el-option label="限量" value="限量" />
+              <el-option label="促销" value="促销" />
+            </el-select>
+          </el-form-item>
+        </template>
 
         <el-form-item label="产品特性">
           <el-checkbox v-model="form.is_active">上架</el-checkbox>
@@ -241,7 +335,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete, Box, View } from '@element-plus/icons-vue'
@@ -251,12 +345,14 @@ import {
   updateProduct,
   deleteProduct,
   toggleProductStatus,
-  updateProductStock
+  updateProductStock,
+  getAvailableMaterials
 } from '@/api/product'
 
 const loading = ref(false)
 const submitLoading = ref(false)
 const stockLoading = ref(false)
+const materialLoading = ref(false)
 const dialogVisible = ref(false)
 const stockDialogVisible = ref(false)
 const isEdit = ref(false)
@@ -266,10 +362,19 @@ const router = useRouter()
 
 const tableData = ref([])
 const currentProduct = ref(null)
+const materialOptions = ref([])
+
+const stockCategories = ['蓝牙耳机', '配件', '电子设备', '数码产品']
+const virtualCategories = ['充值套餐', '会员套餐']
+
+const availableCategories = computed(() => {
+  return form.value.is_stock_item ? stockCategories : virtualCategories
+})
 
 const searchForm = reactive({
   name: '',
   category: null,
+  is_stock_item: null,
   is_active: null
 })
 
@@ -280,13 +385,16 @@ const pagination = reactive({
 })
 
 const form = ref({
+  product_code: '',
   name: '',
   description: '',
   price: 0,
   original_price: null,
-  stock: 9999,
+  stock: 0,
   sort: 0,
-  category: '充值套餐',
+  category: '',
+  is_stock_item: true,
+  material_id: null,
   recharge_hours: 0,
   bonus_hours: 0,
   tags: [],
@@ -346,6 +454,7 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.name = ''
   searchForm.category = null
+  searchForm.is_stock_item = null
   searchForm.is_active = null
   handleSearch()
 }
@@ -357,13 +466,16 @@ const handleDetail = (row) => {
 const handleAdd = () => {
   isEdit.value = false
   form.value = {
+    product_code: '',
     name: '',
     description: '',
     price: 0,
     original_price: null,
-    stock: 9999,
+    stock: 0,
     sort: 0,
-    category: '充值套餐',
+    category: '',
+    is_stock_item: true,
+    material_id: null,
     recharge_hours: 0,
     bonus_hours: 0,
     tags: [],
@@ -372,6 +484,8 @@ const handleAdd = () => {
     is_new: false,
     discount_description: null
   }
+  materialOptions.value = []
+  loadMaterials()
   dialogVisible.value = true
 }
 
@@ -379,6 +493,7 @@ const handleEdit = (row) => {
   isEdit.value = true
   form.value = {
     id: row.id,
+    product_code: row.product_code || '',
     name: row.name,
     description: row.description || '',
     price: row.price,
@@ -386,6 +501,8 @@ const handleEdit = (row) => {
     stock: row.stock,
     sort: row.sort || 0,
     category: row.category,
+    is_stock_item: row.is_stock_item !== undefined ? row.is_stock_item : true,
+    material_id: null,
     recharge_hours: row.recharge_hours,
     bonus_hours: row.bonus_hours,
     tags: row.tags || [],
@@ -395,6 +512,48 @@ const handleEdit = (row) => {
     discount_description: row.discount_description
   }
   dialogVisible.value = true
+}
+
+const loadMaterials = async (keyword) => {
+  materialLoading.value = true
+  try {
+    const res = await getAvailableMaterials({ keyword, include_linked: false })
+    materialOptions.value = res.data.items
+  } catch (e) {
+    // 错误已处理
+  } finally {
+    materialLoading.value = false
+  }
+}
+
+const searchMaterials = (query) => {
+  if (query) {
+    loadMaterials(query)
+  } else {
+    loadMaterials()
+  }
+}
+
+const handleMaterialSelect = (materialId) => {
+  const material = materialOptions.value.find(m => m.id === materialId)
+  if (material) {
+    form.value.product_code = material.material_code
+    form.value.name = material.material_name
+    form.value.description = `物料编码: ${material.material_code}，规格: ${material.specification || '-'}，单位: ${material.unit || '-'}`
+    form.value.stock = material.initial_stock || 0
+    nextTick(() => {
+      formRef.value && formRef.value.clearValidate(['name', 'product_code'])
+    })
+  }
+}
+
+const handleProductTypeChange = (val) => {
+  form.value.material_id = null
+  if (!val) {
+    form.value.recharge_hours = 0
+    form.value.bonus_hours = 0
+    form.value.stock = 0
+  }
 }
 
 const handleSubmit = async () => {
@@ -411,6 +570,7 @@ const handleSubmit = async () => {
         stock: form.value.stock,
         sort: form.value.sort,
         category: form.value.category,
+        is_stock_item: form.value.is_stock_item,
         recharge_hours: form.value.recharge_hours,
         bonus_hours: form.value.bonus_hours,
         tags: form.value.tags,
@@ -421,7 +581,24 @@ const handleSubmit = async () => {
       })
       ElMessage.success('更新成功')
     } else {
-      await createProduct(form.value)
+      await createProduct({
+        name: form.value.name,
+        description: form.value.description,
+        price: form.value.price,
+        original_price: form.value.original_price,
+        stock: form.value.stock,
+        sort: form.value.sort,
+        category: form.value.category,
+        is_stock_item: form.value.is_stock_item,
+        material_id: form.value.material_id,
+        recharge_hours: form.value.recharge_hours,
+        bonus_hours: form.value.bonus_hours,
+        tags: form.value.tags,
+        is_active: form.value.is_active,
+        is_hot: form.value.is_hot,
+        is_new: form.value.is_new,
+        discount_description: form.value.discount_description
+      })
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false

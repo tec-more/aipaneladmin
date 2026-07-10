@@ -71,6 +71,7 @@ class Material(BaseModel, TimestampMixin):
     drawing_code = fields.CharField(max_length=100, null=True, description="图纸编号", index=True)
     drawing_url = fields.CharField(max_length=500, null=True, description="图纸文件地址")
     description = fields.TextField(null=True, description="物料描述")
+    initial_stock = fields.IntField(default=0, description="初始库存数量")
     is_active = fields.BooleanField(default=True, description="是否启用", index=True)
 
     class Meta:
@@ -88,6 +89,7 @@ class Material(BaseModel, TimestampMixin):
             "drawing_code": self.drawing_code,
             "drawing_url": self.drawing_url,
             "description": self.description,
+            "initial_stock": self.initial_stock,
             "is_active": self.is_active,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
