@@ -5,6 +5,7 @@ from base.common.setting import settings
 from base.common.context import get_current_trace_id
 from loguru import logger
 from datetime import datetime, date
+from decimal import Decimal
 import functools
 
 
@@ -37,6 +38,8 @@ def get_instance_dict(instance) -> dict:
             # Convert datetime/date objects to ISO strings
             if isinstance(value, (datetime, date)):
                 data[field_name] = value.isoformat()
+            elif isinstance(value, Decimal):
+                data[field_name] = float(value)
             else:
                 data[field_name] = value
     return data

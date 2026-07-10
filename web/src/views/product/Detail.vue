@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="product-detail">
     <el-card shadow="never" class="detail-card">
       <template #header>
@@ -147,7 +147,7 @@
               </div>
             </div>
 
-            <div class="detail-section">
+            <div class="detail-section" v-if="!product?.is_stock_item">
               <h3 class="section-title">时长信息</h3>
               <el-row :gutter="20">
                 <el-col :span="8">
@@ -252,7 +252,7 @@
           </el-col>
         </el-row>
 
-        <el-row :gutter="20">
+        <el-row :gutter="20" v-if="!editForm.is_stock_item">
           <el-col :span="8">
             <el-form-item label="充值时长" prop="recharge_hours">
               <el-input-number v-model="editForm.recharge_hours" :min="0" :step="1" style="width: 100%" />
@@ -266,6 +266,23 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
+            <el-form-item label="产品标签" prop="tags">
+              <el-select v-model="editForm.tags" multiple placeholder="选择标签" style="width: 100%">
+                <el-option label="升级 LV.1" value="升级 LV.1" />
+                <el-option label="升级 LV.4" value="升级 LV.4" />
+                <el-option label="升级 LV.7" value="升级 LV.7" />
+                <el-option label="升级 LV.9" value="升级 LV.9" />
+                <el-option label="升级 LV.11" value="升级 LV.11" />
+                <el-option label="限时9折" value="限时9折" />
+                <el-option label="限时8折" value="限时8折" />
+                <el-option label="限时75折" value="限时75折" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" v-if="editForm.is_stock_item">
+          <el-col :span="24">
             <el-form-item label="产品标签" prop="tags">
               <el-select v-model="editForm.tags" multiple placeholder="选择标签" style="width: 100%">
                 <el-option label="升级 LV.1" value="升级 LV.1" />
