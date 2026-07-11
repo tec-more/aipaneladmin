@@ -134,6 +134,7 @@ TORTOISE_ORM: dict = {
 				"maxsize": maxsize,      # 最大连接数（默认10）
 				"timeout": timeout,      # 连接获取超时（秒）
 				"command_timeout": command_timeout,  # 查询执行超时（秒）
+				"statement_cache_size": 0,
 			},
 		},
 		# MSSQL/Oracle configuration

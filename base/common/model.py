@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from pytz import utc
 
 from tortoise import fields, models
 

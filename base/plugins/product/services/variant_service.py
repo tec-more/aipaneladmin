@@ -5,10 +5,12 @@ from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime
 
 try:
+    from tortoise.expressions import Q
     from base.plugins.product.models.attribute import Attribute, AttributeValue
     from base.plugins.product.models.product import ProductVariant
     from base.plugins.mes.models.base_data import MaterialVariant
 except ImportError:
+    Q = None
     pass
 
 
