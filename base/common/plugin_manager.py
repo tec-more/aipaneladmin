@@ -321,9 +321,17 @@ class PluginManager:
                 continue
 
             # 递归遍历该目录下的所有 .py 文件（排除 __init__.py）
+            # 先收集所有文件，然后按文件名排序：以 _router 结尾的文件优先加载
+            route_files = []
             for route_file in route_dir.rglob("*.py"):
                 if route_file.name == "__init__.py":
                     continue
+                route_files.append(route_file)
+            
+            # 排序：以 _router 结尾的文件优先加载
+            route_files.sort(key=lambda f: 0 if f.stem.endswith("_router") else 1)
+            
+            for route_file in route_files:
 
                 try:
                     # 计算相对路径和模块路径

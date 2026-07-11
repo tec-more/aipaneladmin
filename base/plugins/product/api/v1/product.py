@@ -157,6 +157,344 @@ product_router = APIRouter(
     tags=["产品管理"]
 )
 
+try:
+    from base.plugins.product.services.product_service import CategoryService
+    from base.plugins.product.services.variant_service import AttributeService, AttributeValueService, MaterialVariantService, ProductVariantService
+    from base.plugins.product.schemas.product_schema import CategoryCreate, CategoryUpdate
+    CATEGORY_AVAILABLE = True
+    ATTRIBUTE_AVAILABLE = True
+except ImportError:
+    CategoryService = None
+    AttributeService = None
+    AttributeValueService = None
+    MaterialVariantService = None
+    ProductVariantService = None
+    CATEGORY_AVAILABLE = False
+    ATTRIBUTE_AVAILABLE = False
+
+
+@product_router.get("/categories", summary="获取产品分类列表")
+async def get_category_list(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
+    name: Optional[str] = Query(None, description="分类名称关键词"),
+    parent_id: Optional[int] = Query(None, description="父分类ID"),
+    is_active: Optional[bool] = Query(None, description="是否启用")
+):
+    try:
+        items, total = await CategoryService.get_category_list(
+            page=page, page_size=page_size,
+            name=name, parent_id=parent_id, is_active=is_active
+        )
+        return SuccessResponse(data={"items": items, "total": total, "page": page, "page_size": page_size}, msg="获取分类列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/categories/options", summary="获取产品分类选项（下拉选择用）")
+async def get_category_options():
+    try:
+        options = await CategoryService.get_category_options()
+        return SuccessResponse(data=options, msg="获取分类选项成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/categories/{category_id}", summary="获取产品分类详情")
+async def get_category(category_id: int):
+    try:
+        category = await CategoryService.get_category_by_id(category_id)
+        if not category:
+            return ErrorResponse(msg="分类不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=category, msg="获取分类详情成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.post("/categories", summary="创建产品分类")
+async def create_category(data: CategoryCreate):
+    try:
+        category = await CategoryService.create_category(data.dict())
+        return SuccessResponse(data=category, msg="分类创建成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.put("/categories/{category_id}", summary="更新产品分类")
+async def update_category(category_id: int, data: CategoryUpdate):
+    try:
+        category = await CategoryService.update_category(category_id, data.dict(exclude_unset=True))
+        if not category:
+            return ErrorResponse(msg="分类不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=category, msg="分类更新成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.delete("/categories/{category_id}", summary="删除产品分类")
+async def delete_category(category_id: int):
+    try:
+        success = await CategoryService.delete_category(category_id)
+        if not success:
+            return ErrorResponse(msg="分类不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data={"message": "分类删除成功"}, msg="分类删除成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/attributes", summary="获取产品属性列表")
+async def get_attribute_list(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
+    name: Optional[str] = Query(None, description="属性名称关键词"),
+    category: Optional[str] = Query(None, description="属性类别"),
+    is_active: Optional[bool] = Query(None, description="是否启用")
+):
+    try:
+        items, total = await AttributeService.get_attribute_list(
+            page=page, page_size=page_size,
+            name=name, category=category, is_active=is_active
+        )
+        return SuccessResponse(data={"items": items, "total": total, "page": page, "page_size": page_size}, msg="获取属性列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/attributes/options", summary="获取产品属性选项（下拉选择用）")
+async def get_attribute_options(
+    category: Optional[str] = Query(None, description="属性类别")
+):
+    try:
+        options = await AttributeService.get_attribute_options(category=category)
+        return SuccessResponse(data=options, msg="获取属性选项成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/attributes/{attribute_id}", summary="获取产品属性详情")
+async def get_attribute(attribute_id: int):
+    try:
+        attribute = await AttributeService.get_attribute_by_id(attribute_id)
+        if not attribute:
+            return ErrorResponse(msg="属性不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=attribute, msg="获取属性详情成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.post("/attributes", summary="创建产品属性")
+async def create_attribute(data: dict):
+    try:
+        attribute = await AttributeService.create_attribute(data)
+        return SuccessResponse(data=attribute, msg="属性创建成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.put("/attributes/{attribute_id}", summary="更新产品属性")
+async def update_attribute(attribute_id: int, data: dict):
+    try:
+        attribute = await AttributeService.update_attribute(attribute_id, data)
+        if not attribute:
+            return ErrorResponse(msg="属性不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=attribute, msg="属性更新成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.delete("/attributes/{attribute_id}", summary="删除产品属性")
+async def delete_attribute(attribute_id: int):
+    try:
+        success = await AttributeService.delete_attribute(attribute_id)
+        if not success:
+            return ErrorResponse(msg="属性不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data={"message": "属性删除成功"}, msg="属性删除成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/attributes/{attribute_id}/values", summary="获取属性值列表")
+async def get_attribute_values(attribute_id: int):
+    try:
+        values = await AttributeValueService.get_attribute_values(attribute_id)
+        return SuccessResponse(data=values, msg="获取属性值列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.post("/attributes/values", summary="创建属性值")
+async def create_attribute_value(data: dict):
+    try:
+        value = await AttributeValueService.create_attribute_value(data)
+        return SuccessResponse(data=value, msg="属性值创建成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.put("/attributes/values/{value_id}", summary="更新属性值")
+async def update_attribute_value(value_id: int, data: dict):
+    try:
+        value = await AttributeValueService.update_attribute_value(value_id, data)
+        if not value:
+            return ErrorResponse(msg="属性值不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=value, msg="属性值更新成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.delete("/attributes/values/{value_id}", summary="删除属性值")
+async def delete_attribute_value(value_id: int):
+    try:
+        success = await AttributeValueService.delete_attribute_value(value_id)
+        if not success:
+            return ErrorResponse(msg="属性值不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data={"message": "属性值删除成功"}, msg="属性值删除成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/material-variants", summary="获取物料变体列表")
+async def get_material_variant_list(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
+    material_id: Optional[int] = Query(None, description="物料ID"),
+    variant_code: Optional[str] = Query(None, description="变体编码"),
+    is_active: Optional[bool] = Query(None, description="是否启用")
+):
+    try:
+        items, total = await MaterialVariantService.get_material_variant_list(
+            page=page, page_size=page_size,
+            material_id=material_id, variant_code=variant_code, is_active=is_active
+        )
+        return SuccessResponse(data={"items": items, "total": total, "page": page, "page_size": page_size}, msg="获取物料变体列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/material-variants/{variant_id}", summary="获取物料变体详情")
+async def get_material_variant(variant_id: int):
+    try:
+        variant = await MaterialVariantService.get_material_variant_by_id(variant_id)
+        if not variant:
+            return ErrorResponse(msg="物料变体不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=variant, msg="获取物料变体详情成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.post("/material-variants", summary="创建物料变体")
+async def create_material_variant(data: dict):
+    try:
+        variant = await MaterialVariantService.create_material_variant(data)
+        return SuccessResponse(data=variant, msg="物料变体创建成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.put("/material-variants/{variant_id}", summary="更新物料变体")
+async def update_material_variant(variant_id: int, data: dict):
+    try:
+        variant = await MaterialVariantService.update_material_variant(variant_id, data)
+        if not variant:
+            return ErrorResponse(msg="物料变体不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=variant, msg="物料变体更新成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.delete("/material-variants/{variant_id}", summary="删除物料变体")
+async def delete_material_variant(variant_id: int):
+    try:
+        success = await MaterialVariantService.delete_material_variant(variant_id)
+        if not success:
+            return ErrorResponse(msg="物料变体不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data={"message": "物料变体删除成功"}, msg="物料变体删除成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/variants", summary="获取产品变体列表")
+async def get_product_variant_list(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
+    product_id: Optional[int] = Query(None, description="产品ID"),
+    sku: Optional[str] = Query(None, description="SKU"),
+    is_active: Optional[bool] = Query(None, description="是否启用")
+):
+    try:
+        items, total = await ProductVariantService.get_product_variant_list(
+            page=page, page_size=page_size,
+            product_id=product_id, sku=sku, is_active=is_active
+        )
+        return SuccessResponse(data={"items": items, "total": total, "page": page, "page_size": page_size}, msg="获取产品变体列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/variants/{variant_id}", summary="获取产品变体详情")
+async def get_product_variant(variant_id: int):
+    try:
+        variant = await ProductVariantService.get_product_variant_by_id(variant_id)
+        if not variant:
+            return ErrorResponse(msg="产品变体不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=variant, msg="获取产品变体详情成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.post("/variants", summary="创建产品变体")
+async def create_product_variant(data: dict):
+    try:
+        variant = await ProductVariantService.create_product_variant(data)
+        return SuccessResponse(data=variant, msg="产品变体创建成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.put("/variants/{variant_id}", summary="更新产品变体")
+async def update_product_variant(variant_id: int, data: dict):
+    try:
+        variant = await ProductVariantService.update_product_variant(variant_id, data)
+        if not variant:
+            return ErrorResponse(msg="产品变体不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=variant, msg="产品变体更新成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.delete("/variants/{variant_id}", summary="删除产品变体")
+async def delete_product_variant(variant_id: int):
+    try:
+        success = await ProductVariantService.delete_product_variant(variant_id)
+        if not success:
+            return ErrorResponse(msg="产品变体不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data={"message": "产品变体删除成功"}, msg="产品变体删除成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
 # 为每个路由添加单数和复数两种路径
 @product_router.post("/", summary="创建产品", status_code=status.HTTP_201_CREATED)
 async def create_product(
@@ -249,7 +587,7 @@ async def get_product_list(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.get("/{product_id}", summary="获取产品详情")
+@product_router.get("/item/{product_id:int}", summary="获取产品详情")
 async def get_product_detail(
         product_id: int
 ):
@@ -280,7 +618,7 @@ async def get_product_detail(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.put("/{product_id}", summary="更新产品信息")
+@product_router.put("/item/{product_id:int}", summary="更新产品信息")
 async def update_product(
         product_id: int,
         product_data: ProductUpdate
@@ -312,7 +650,7 @@ async def update_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.delete("/{product_id}", summary="删除产品")
+@product_router.delete("/item/{product_id:int}", summary="删除产品")
 async def delete_product(
         product_id: int
         # current_user_id: int = Depends(get_current_user_id)  # 临时注释认证，用于测试
@@ -367,7 +705,7 @@ async def batch_delete_product(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/{product_id}/toggle-status", summary="切换产品上架状态")
+@product_router.patch("/item/{product_id:int}/toggle-status", summary="切换产品上架状态")
 async def toggle_product_status(
         product_id: int
         # current_user_id: int = Depends(get_current_user_id)  # 临时注释认证，用于测试
@@ -398,7 +736,7 @@ async def toggle_product_status(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/{product_id}/stock", summary="更新产品库存")
+@product_router.patch("/item/{product_id:int}/stock", summary="更新产品库存")
 async def update_product_stock(
         product_id: int,
         stock_data: ProductStockUpdate
@@ -432,7 +770,7 @@ async def update_product_stock(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/{product_id}/sales", summary="更新产品销售数量")
+@product_router.patch("/item/{product_id:int}/sales", summary="更新产品销售数量")
 async def update_product_sales(
         product_id: int,
         sales_data: ProductSalesUpdate
@@ -464,7 +802,7 @@ async def update_product_sales(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.patch("/{product_id}/view", summary="增加产品浏览次数")
+@product_router.patch("/item/{product_id:int}/view", summary="增加产品浏览次数")
 async def increment_product_view(
         product_id: int
         # current_user_id: int = Depends(get_current_user_id)  # 临时注释认证，用于测试
@@ -544,7 +882,7 @@ except ImportError:
     INVENTORY_AVAILABLE = False
 
 
-@product_router.get("/{product_id}/inventory", summary="获取产品库存详情")
+@product_router.get("/item/{product_id:int}/inventory", summary="获取产品库存详情")
 async def get_product_inventory(
         product_id: int
 ):
@@ -673,7 +1011,7 @@ except ImportError:
     MES_AVAILABLE = False
 
 
-@product_router.get("/{product_id}/bom", summary="获取产品BOM结构")
+@product_router.get("/item/{product_id:int}/bom", summary="获取产品BOM结构")
 async def get_product_bom(
         product_id: int,
         version: Optional[str] = Query(None, description="BOM版本号"),
@@ -819,7 +1157,7 @@ async def get_product_bom_list(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
-@product_router.get("/{product_id}/mrp", summary="计算物料需求计划(MRP)")
+@product_router.get("/item/{product_id:int}/mrp", summary="计算物料需求计划(MRP)")
 async def calculate_mrp(
         product_id: int,
         quantity: Decimal = Query(..., ge=Decimal("0.000001"), description="需求数量"),
