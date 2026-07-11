@@ -78,6 +78,43 @@ class ProductCategory(BaseModel, TimestampMixin):
         }
 
 
+class ProductVariant(BaseModel, TimestampMixin):
+    verbose_name = "产品变体"
+    """产品变体模型"""
+    product = fields.ForeignKeyField("models.Product", on_delete=fields.CASCADE, description="关联产品")
+    sku = fields.CharField(max_length=100, unique=True, description="SKU编码", index=True)
+    attributes = fields.JSONField(null=True, description="属性组合")
+    price = fields.DecimalField(max_digits=10, decimal_places=2, description="价格")
+    original_price = fields.DecimalField(max_digits=10, decimal_places=2, null=True, description="原价")
+    stock = fields.IntField(default=0, description="库存数量")
+    material_variant_id = fields.IntField(null=True, description="关联物料变体ID")
+    is_active = fields.BooleanField(default=True, description="是否启用", index=True)
+
+    class Meta:
+        table = "product_variant"
+
+    @property
+    def total_hours(self):
+        if self.recharge_hours and self.bonus_hours:
+            return self.recharge_hours + self.bonus_hours
+        return self.recharge_hours or 0
+
+    async def to_dict(self):
+        return {
+            "id": self.id,
+            "product_id": self.product_id,
+            "sku": self.sku,
+            "attributes": self.attributes,
+            "price": float(self.price) if self.price and hasattr(self.price, "__float__") else self.price,
+            "original_price": float(self.original_price) if self.original_price and hasattr(self.original_price, "__float__") else self.original_price,
+            "stock": self.stock,
+            "material_variant_id": self.material_variant_id,
+            "is_active": self.is_active,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+
+
 class Product(BaseModel, TimestampMixin):
     verbose_name = "产品"
     """产品模型"""

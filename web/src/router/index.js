@@ -135,6 +135,18 @@ const routes = [
         meta: { title: '产品分类', icon: 'Folder' }
       },
       {
+        path: 'product/attribute',
+        name: 'ProductAttribute',
+        component: () => import('@/views/product/Attribute.vue'),
+        meta: { title: '产品属性', icon: 'Settings' }
+      },
+      {
+        path: 'product/variant',
+        name: 'ProductVariant',
+        component: () => import('@/views/product/Variant.vue'),
+        meta: { title: '产品变体', icon: 'Boxes' }
+      },
+      {
         path: 'product/:id',
         name: 'ProductDetail',
         component: () => import('@/views/product/Detail.vue'),

@@ -202,3 +202,163 @@ class CategoryListResponse(BaseModel):
     page: int = Field(..., description="当前页")
     page_size: int = Field(..., description="每页数量")
     items: List[CategoryResponse] = Field(..., description="分类列表")
+
+
+class AttributeBase(BaseModel):
+    """属性基础模型"""
+    name: str = Field(..., min_length=1, max_length=50, description="属性名称")
+    code: str = Field(..., min_length=1, max_length=50, description="属性编码")
+    category: str = Field(default="both", description="属性类别：product/material/both")
+    sort: int = Field(default=0, ge=0, description="排序")
+    is_active: bool = Field(default=True, description="是否启用")
+
+
+class AttributeCreate(AttributeBase):
+    """创建属性模型"""
+    pass
+
+
+class AttributeUpdate(BaseModel):
+    """更新属性模型"""
+    name: Optional[str] = Field(None, min_length=1, max_length=50, description="属性名称")
+    code: Optional[str] = Field(None, min_length=1, max_length=50, description="属性编码")
+    category: Optional[str] = Field(None, description="属性类别")
+    sort: Optional[int] = Field(None, ge=0, description="排序")
+    is_active: Optional[bool] = Field(None, description="是否启用")
+
+
+class AttributeResponse(AttributeBase):
+    """属性响应模型"""
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AttributeListResponse(BaseModel):
+    """属性列表响应模型"""
+    total: int = Field(..., description="总数")
+    page: int = Field(..., description="当前页")
+    page_size: int = Field(..., description="每页数量")
+    items: List[AttributeResponse] = Field(..., description="属性列表")
+
+
+class AttributeValueBase(BaseModel):
+    """属性值基础模型"""
+    attribute_id: int = Field(..., description="属性ID")
+    value: str = Field(..., min_length=1, max_length=100, description="属性值")
+    sort: int = Field(default=0, ge=0, description="排序")
+
+
+class AttributeValueCreate(AttributeValueBase):
+    """创建属性值模型"""
+    pass
+
+
+class AttributeValueUpdate(BaseModel):
+    """更新属性值模型"""
+    value: Optional[str] = Field(None, min_length=1, max_length=100, description="属性值")
+    sort: Optional[int] = Field(None, ge=0, description="排序")
+
+
+class AttributeValueResponse(AttributeValueBase):
+    """属性值响应模型"""
+    id: int
+    attribute_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialVariantBase(BaseModel):
+    """物料变体基础模型"""
+    material_id: int = Field(..., description="物料ID")
+    variant_code: str = Field(..., min_length=1, max_length=100, description="变体编码")
+    attributes: Optional[Dict[str, str]] = Field(None, description="属性组合")
+    specification: Optional[str] = Field(None, max_length=255, description="规格型号")
+    unit: Optional[str] = Field(None, max_length=20, description="计量单位")
+    initial_stock: int = Field(default=0, ge=0, description="初始库存")
+    is_active: bool = Field(default=True, description="是否启用")
+
+
+class MaterialVariantCreate(MaterialVariantBase):
+    """创建物料变体模型"""
+    pass
+
+
+class MaterialVariantUpdate(BaseModel):
+    """更新物料变体模型"""
+    variant_code: Optional[str] = Field(None, min_length=1, max_length=100, description="变体编码")
+    attributes: Optional[Dict[str, str]] = Field(None, description="属性组合")
+    specification: Optional[str] = Field(None, max_length=255, description="规格型号")
+    unit: Optional[str] = Field(None, max_length=20, description="计量单位")
+    initial_stock: Optional[int] = Field(None, ge=0, description="初始库存")
+    is_active: Optional[bool] = Field(None, description="是否启用")
+
+
+class MaterialVariantResponse(MaterialVariantBase):
+    """物料变体响应模型"""
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialVariantListResponse(BaseModel):
+    """物料变体列表响应模型"""
+    total: int = Field(..., description="总数")
+    page: int = Field(..., description="当前页")
+    page_size: int = Field(..., description="每页数量")
+    items: List[MaterialVariantResponse] = Field(..., description="物料变体列表")
+
+
+class ProductVariantBase(BaseModel):
+    """产品变体基础模型"""
+    product_id: int = Field(..., description="产品ID")
+    sku: str = Field(..., min_length=1, max_length=100, description="SKU编码")
+    attributes: Optional[Dict[str, str]] = Field(None, description="属性组合")
+    price: Decimal = Field(..., ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="价格")
+    original_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
+    stock: int = Field(default=0, ge=0, description="库存数量")
+    material_variant_id: Optional[int] = Field(None, description="关联物料变体ID")
+    is_active: bool = Field(default=True, description="是否启用")
+
+
+class ProductVariantCreate(ProductVariantBase):
+    """创建产品变体模型"""
+    pass
+
+
+class ProductVariantUpdate(BaseModel):
+    """更新产品变体模型"""
+    sku: Optional[str] = Field(None, min_length=1, max_length=100, description="SKU编码")
+    attributes: Optional[Dict[str, str]] = Field(None, description="属性组合")
+    price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="价格")
+    original_price: Optional[Decimal] = Field(None, ge=Decimal("0.01"), max_digits=10, decimal_places=2, description="原价")
+    stock: Optional[int] = Field(None, ge=0, description="库存数量")
+    material_variant_id: Optional[int] = Field(None, description="关联物料变体ID")
+    is_active: Optional[bool] = Field(None, description="是否启用")
+
+
+class ProductVariantResponse(ProductVariantBase):
+    """产品变体响应模型"""
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProductVariantListResponse(BaseModel):
+    """产品变体列表响应模型"""
+    total: int = Field(..., description="总数")
+    page: int = Field(..., description="当前页")
+    page_size: int = Field(..., description="每页数量")
+    items: List[ProductVariantResponse] = Field(..., description="产品变体列表")

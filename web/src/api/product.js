@@ -74,3 +74,83 @@ export const updateCategory = (id, data) => {
 export const deleteCategory = (id) => {
   return request.delete(`/v1/product/categories/${id}`)
 }
+
+export const getAttributeList = (params) => {
+  return request.get('/v1/product/attributes', { params })
+}
+
+export const getAttributeOptions = (params) => {
+  return request.get('/v1/product/attributes/options', { params })
+}
+
+export const getAttributeDetail = (id) => {
+  return request.get(`/v1/product/attributes/${id}`)
+}
+
+export const createAttribute = (data) => {
+  return request.post('/v1/product/attributes', data)
+}
+
+export const updateAttribute = (id, data) => {
+  return request.put(`/v1/product/attributes/${id}`, data)
+}
+
+export const deleteAttribute = (id) => {
+  return request.delete(`/v1/product/attributes/${id}`)
+}
+
+export const getAttributeValues = (id) => {
+  return request.get(`/v1/product/attributes/${id}/values`)
+}
+
+export const createAttributeValue = (data) => {
+  return request.post('/v1/product/attributes/values', data)
+}
+
+export const updateAttributeValue = (id, data) => {
+  return request.put(`/v1/product/attributes/values/${id}`, data)
+}
+
+export const deleteAttributeValue = (id) => {
+  return request.delete(`/v1/product/attributes/values/${id}`)
+}
+
+export const getMaterialVariantList = (params) => {
+  return request.get('/v1/product/material-variants', { params })
+}
+
+export const getMaterialVariantDetail = (id) => {
+  return request.get(`/v1/product/material-variants/${id}`)
+}
+
+export const createMaterialVariant = (data) => {
+  return request.post('/v1/product/material-variants', data)
+}
+
+export const updateMaterialVariant = (id, data) => {
+  return request.put(`/v1/product/material-variants/${id}`, data)
+}
+
+export const deleteMaterialVariant = (id) => {
+  return request.delete(`/v1/product/material-variants/${id}`)
+}
+
+export const getProductVariantList = (params) => {
+  return request.get('/v1/product/variants', { params })
+}
+
+export const getProductVariantDetail = (id) => {
+  return request.get(`/v1/product/variants/${id}`)
+}
+
+export const createProductVariant = (data) => {
+  return request.post('/v1/product/variants', data)
+}
+
+export const updateProductVariant = (id, data) => {
+  return request.put(`/v1/product/variants/${id}`, data)
+}
+
+export const deleteProductVariant = (id) => {
+  return request.delete(`/v1/product/variants/${id}`)
+}

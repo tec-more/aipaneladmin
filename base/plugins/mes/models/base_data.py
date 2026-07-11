@@ -96,6 +96,35 @@ class Material(BaseModel, TimestampMixin):
         }
 
 
+class MaterialVariant(BaseModel, TimestampMixin):
+    verbose_name = "物料变体"
+    """物料变体模型"""
+    material = fields.ForeignKeyField("models.Material", on_delete=fields.CASCADE, description="关联物料")
+    variant_code = fields.CharField(max_length=100, unique=True, description="变体编码", index=True)
+    attributes = fields.JSONField(null=True, description="属性组合")
+    specification = fields.CharField(max_length=255, null=True, description="规格型号")
+    unit = fields.CharField(max_length=20, null=True, description="计量单位")
+    initial_stock = fields.IntField(default=0, description="初始库存数量")
+    is_active = fields.BooleanField(default=True, description="是否启用", index=True)
+
+    class Meta:
+        table = "mes_material_variant"
+
+    async def to_dict(self):
+        return {
+            "id": self.id,
+            "material_id": self.material_id,
+            "variant_code": self.variant_code,
+            "attributes": self.attributes,
+            "specification": self.specification,
+            "unit": self.unit,
+            "initial_stock": self.initial_stock,
+            "is_active": self.is_active,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+
+
 class BomVersion(BaseModel, TimestampMixin):
     verbose_name = "BOM版本"
     """BOM版本管理模型"""
