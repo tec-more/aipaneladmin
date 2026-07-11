@@ -466,3 +466,155 @@ class ProductService:
                 "initial_stock": m.initial_stock or 0,
             })
         return result
+
+
+class CategoryService:
+    """产品分类服务"""
+
+    @staticmethod
+    async def create_category(data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        创建产品分类
+
+        Args:
+            data: 分类数据
+
+        Returns:
+            创建的分类
+        """
+        from base.plugins.product.models.product import ProductCategory
+
+        if await ProductCategory.filter(name=data['name']).exists():
+            raise ValueError("分类名称已存在")
+
+        if data.get('code') and await ProductCategory.filter(code=data['code']).exists():
+            raise ValueError("分类编码已存在")
+
+        category = await ProductCategory.create(**data)
+        return await category.to_dict()
+
+    @staticmethod
+    async def get_category_by_id(category_id: int) -> Optional[Dict[str, Any]]:
+        """
+        根据ID获取分类
+
+        Args:
+            category_id: 分类ID
+
+        Returns:
+            分类信息
+        """
+        from base.plugins.product.models.product import ProductCategory
+
+        category = await ProductCategory.get_or_none(id=category_id)
+        if category:
+            return await category.to_dict()
+        return None
+
+    @staticmethod
+    async def update_category(category_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        更新分类
+
+        Args:
+            category_id: 分类ID
+            data: 更新数据
+
+        Returns:
+            更新后的分类
+        """
+        from base.plugins.product.models.product import ProductCategory
+
+        category = await ProductCategory.get_or_none(id=category_id)
+        if not category:
+            return None
+
+        if 'name' in data and data['name'] != category.name:
+            if await ProductCategory.filter(name=data['name']).exists():
+                raise ValueError("分类名称已存在")
+
+        if 'code' in data and data['code'] != category.code:
+            if data['code'] and await ProductCategory.filter(code=data['code']).exists():
+                raise ValueError("分类编码已存在")
+
+        for key, value in data.items():
+            setattr(category, key, value)
+
+        await category.save()
+        return await category.to_dict()
+
+    @staticmethod
+    async def delete_category(category_id: int) -> bool:
+        """
+        删除分类
+
+        Args:
+            category_id: 分类ID
+
+        Returns:
+            是否删除成功
+        """
+        from base.plugins.product.models.product import ProductCategory
+        from base.plugins.product.models.product import Product
+
+        if await Product.filter(category=category_id).exists():
+            raise ValueError("该分类下存在产品，无法删除")
+
+        deleted_count = await ProductCategory.filter(id=category_id).delete()
+        return deleted_count > 0
+
+    @staticmethod
+    async def get_category_list(
+        page: int = 1,
+        page_size: int = 10,
+        name: Optional[str] = None,
+        parent_id: Optional[int] = None,
+        is_active: Optional[bool] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        获取分类列表
+
+        Args:
+            page: 页码
+            page_size: 每页数量
+            name: 分类名称关键词
+            parent_id: 父分类ID
+            is_active: 是否启用
+
+        Returns:
+            分类列表和总数
+        """
+        from base.plugins.product.models.product import ProductCategory
+
+        query = ProductCategory.all()
+
+        if name:
+            query = query.filter(name__icontains=name)
+        if parent_id is not None:
+            query = query.filter(parent_id=parent_id)
+        if is_active is not None:
+            query = query.filter(is_active=is_active)
+
+        query = query.order_by("sort", "id")
+
+        total = await query.count()
+        items = await query.offset((page - 1) * page_size).limit(page_size)
+
+        result = []
+        for item in items:
+            result.append(await item.to_dict())
+
+        return result, total
+
+    @staticmethod
+    async def get_category_options() -> List[Dict[str, Any]]:
+        """
+        获取分类选项列表（用于下拉选择）
+
+        Returns:
+            分类选项列表
+        """
+        from base.plugins.product.models.product import ProductCategory
+
+        categories = await ProductCategory.filter(is_active=True).order_by("sort", "id")
+        return [{"value": cat.name, "label": cat.name} for cat in categories]

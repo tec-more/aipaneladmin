@@ -161,6 +161,44 @@ class ProductSalesUpdate(BaseModel):
     quantity: int = Field(..., ge=1, description="销售数量增加量")
 
 
+class CategoryBase(BaseModel):
+    """分类基础模型"""
+    name: str = Field(..., min_length=1, max_length=50, description="分类名称")
+    code: Optional[str] = Field(None, max_length=50, description="分类编码")
+    parent_id: Optional[int] = Field(None, description="父分类ID")
+    sort: int = Field(default=0, ge=0, description="排序")
+    description: Optional[str] = Field(None, description="分类描述")
+    is_active: bool = Field(default=True, description="是否启用")
+
+
+class CategoryCreate(CategoryBase):
+    """创建分类模型"""
+    pass
+
+
+class CategoryUpdate(BaseModel):
+    """更新分类模型"""
+    name: Optional[str] = Field(None, min_length=1, max_length=50, description="分类名称")
+    code: Optional[str] = Field(None, max_length=50, description="分类编码")
+    parent_id: Optional[int] = Field(None, description="父分类ID")
+    sort: Optional[int] = Field(None, ge=0, description="排序")
+    description: Optional[str] = Field(None, description="分类描述")
+    is_active: Optional[bool] = Field(None, description="是否启用")
+
+
+class CategoryResponse(CategoryBase):
+    """分类响应模型"""
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class CategoryListResponse(BaseModel):
     """分类列表响应模型"""
-    categories: List[str] = Field(..., description="分类列表")
+    total: int = Field(..., description="总数")
+    page: int = Field(..., description="当前页")
+    page_size: int = Field(..., description="每页数量")
+    items: List[CategoryResponse] = Field(..., description="分类列表")

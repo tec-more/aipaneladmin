@@ -44,3 +44,33 @@ export const toggleProductStatus = (id) => {
 export const getAvailableMaterials = (params) => {
   return request.get('/v1/product/materials/available', { params })
 }
+
+// 获取产品分类列表
+export const getCategoryList = (params) => {
+  return request.get('/v1/product/categories', { params })
+}
+
+// 获取产品分类选项
+export const getCategoryOptions = () => {
+  return request.get('/v1/product/categories/options')
+}
+
+// 获取分类详情
+export const getCategoryDetail = (id) => {
+  return request.get(`/v1/product/categories/${id}`)
+}
+
+// 创建分类
+export const createCategory = (data) => {
+  return request.post('/v1/product/categories', data)
+}
+
+// 更新分类
+export const updateCategory = (id, data) => {
+  return request.put(`/v1/product/categories/${id}`, data)
+}
+
+// 删除分类
+export const deleteCategory = (id) => {
+  return request.delete(`/v1/product/categories/${id}`)
+}

@@ -8,10 +8,7 @@
         </el-form-item>
         <el-form-item label="产品分类">
           <el-select v-model="searchForm.category" placeholder="请选择" clearable filterable style="width: 140px">
-            <el-option label="充值套餐" value="充值套餐" />
-            <el-option label="会员套餐" value="会员套餐" />
-            <el-option label="蓝牙耳机" value="蓝牙耳机" />
-            <el-option label="配件" value="配件" />
+            <el-option v-for="cat in categoryOptions" :key="cat.value" :label="cat.label" :value="cat.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="产品类型">
@@ -230,7 +227,7 @@
           <el-col :span="12">
             <el-form-item label="产品分类" prop="category">
               <el-select v-model="form.category" placeholder="请选择分类" style="width: 100%" allow-create filterable>
-                <el-option v-for="cat in availableCategories" :key="cat" :label="cat" :value="cat" />
+                <el-option v-for="cat in categoryOptions" :key="cat.value" :label="cat.label" :value="cat.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -346,7 +343,8 @@ import {
   deleteProduct,
   toggleProductStatus,
   updateProductStock,
-  getAvailableMaterials
+  getAvailableMaterials,
+  getCategoryOptions
 } from '@/api/product'
 
 const loading = ref(false)
@@ -363,13 +361,7 @@ const router = useRouter()
 const tableData = ref([])
 const currentProduct = ref(null)
 const materialOptions = ref([])
-
-const stockCategories = ['蓝牙耳机', '配件', '电子设备', '数码产品']
-const virtualCategories = ['充值套餐', '会员套餐']
-
-const availableCategories = computed(() => {
-  return form.value.is_stock_item ? stockCategories : virtualCategories
-})
+const categoryOptions = ref([])
 
 const searchForm = reactive({
   name: '',
@@ -526,6 +518,15 @@ const loadMaterials = async (keyword) => {
   }
 }
 
+const loadCategories = async () => {
+  try {
+    const res = await getCategoryOptions()
+    categoryOptions.value = res.data
+  } catch (e) {
+    // 错误已处理
+  }
+}
+
 const searchMaterials = (query) => {
   if (query) {
     loadMaterials(query)
@@ -663,6 +664,7 @@ const resetForm = () => {
 
 onMounted(() => {
   fetchData()
+  loadCategories()
 })
 </script>
 

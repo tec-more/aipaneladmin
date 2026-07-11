@@ -129,6 +129,12 @@ const routes = [
         meta: { title: '产品管理', icon: 'Box' }
       },
       {
+        path: 'product/category',
+        name: 'ProductCategory',
+        component: () => import('@/views/product/Category.vue'),
+        meta: { title: '产品分类', icon: 'Folder' }
+      },
+      {
         path: 'product/:id',
         name: 'ProductDetail',
         component: () => import('@/views/product/Detail.vue'),

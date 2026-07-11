@@ -51,6 +51,33 @@ except ImportError:
             return kwargs
 
 
+class ProductCategory(BaseModel, TimestampMixin):
+    verbose_name = "产品分类"
+    """产品分类模型"""
+    name = fields.CharField(max_length=50, unique=True, description="分类名称", index=True)
+    code = fields.CharField(max_length=50, unique=True, null=True, description="分类编码", index=True)
+    parent_id = fields.IntField(null=True, description="父分类ID")
+    sort = fields.IntField(default=0, description="排序", index=True)
+    description = fields.TextField(null=True, description="分类描述")
+    is_active = fields.BooleanField(default=True, description="是否启用", index=True)
+
+    class Meta:
+        table = "product_category"
+
+    async def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "code": self.code,
+            "parent_id": self.parent_id,
+            "sort": self.sort,
+            "description": self.description,
+            "is_active": self.is_active,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
+        }
+
+
 class Product(BaseModel, TimestampMixin):
     verbose_name = "产品"
     """产品模型"""

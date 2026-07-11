@@ -864,4 +864,143 @@ async def calculate_mrp(
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
 
+# ==================== 产品分类接口 ====================
 
+try:
+    from base.plugins.product.services.product_service import CategoryService
+    from base.plugins.product.schemas.product_schema import CategoryCreate, CategoryUpdate
+    CATEGORY_AVAILABLE = True
+except ImportError:
+    CategoryService = None
+    CATEGORY_AVAILABLE = False
+
+
+@product_router.get("/categories", summary="获取产品分类列表")
+async def get_category_list(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=200, description="每页数量"),
+    name: Optional[str] = Query(None, description="分类名称关键词"),
+    parent_id: Optional[int] = Query(None, description="父分类ID"),
+    is_active: Optional[bool] = Query(None, description="是否启用")
+):
+    """
+    获取产品分类列表
+
+    Args:
+        page: 页码
+        page_size: 每页数量
+        name: 分类名称关键词(模糊搜索)
+        parent_id: 父分类ID
+        is_active: 是否启用
+
+    Returns:
+        分类列表
+    """
+    try:
+        items, total = await CategoryService.get_category_list(
+            page=page, page_size=page_size,
+            name=name, parent_id=parent_id, is_active=is_active
+        )
+        return SuccessResponse(data={"items": items, "total": total, "page": page, "page_size": page_size}, msg="获取分类列表成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/categories/options", summary="获取产品分类选项（下拉选择用）")
+async def get_category_options():
+    """
+    获取产品分类选项（用于下拉选择）
+
+    Returns:
+        分类选项列表
+    """
+    try:
+        options = await CategoryService.get_category_options()
+        return SuccessResponse(data=options, msg="获取分类选项成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.get("/categories/{category_id}", summary="获取产品分类详情")
+async def get_category(category_id: int):
+    """
+    获取产品分类详情
+
+    Args:
+        category_id: 分类ID
+
+    Returns:
+        分类详情
+    """
+    try:
+        category = await CategoryService.get_category_by_id(category_id)
+        if not category:
+            return ErrorResponse(msg="分类不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=category, msg="获取分类详情成功")
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.post("/categories", summary="创建产品分类")
+async def create_category(data: CategoryCreate):
+    """
+    创建产品分类
+
+    Args:
+        data: 分类数据
+
+    Returns:
+        创建的分类
+    """
+    try:
+        category = await CategoryService.create_category(data.dict())
+        return SuccessResponse(data=category, msg="分类创建成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.put("/categories/{category_id}", summary="更新产品分类")
+async def update_category(category_id: int, data: CategoryUpdate):
+    """
+    更新产品分类
+
+    Args:
+        category_id: 分类ID
+        data: 更新数据
+
+    Returns:
+        更新后的分类
+    """
+    try:
+        category = await CategoryService.update_category(category_id, data.dict(exclude_unset=True))
+        if not category:
+            return ErrorResponse(msg="分类不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data=category, msg="分类更新成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@product_router.delete("/categories/{category_id}", summary="删除产品分类")
+async def delete_category(category_id: int):
+    """
+    删除产品分类
+
+    Args:
+        category_id: 分类ID
+
+    Returns:
+        删除结果
+    """
+    try:
+        success = await CategoryService.delete_category(category_id)
+        if not success:
+            return ErrorResponse(msg="分类不存在", status_code=status.HTTP_404_NOT_FOUND)
+        return SuccessResponse(data={"message": "分类删除成功"}, msg="分类删除成功")
+    except ValueError as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)

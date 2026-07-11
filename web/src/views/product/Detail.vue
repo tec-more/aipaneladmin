@@ -222,8 +222,7 @@
           <el-col :span="12">
             <el-form-item label="产品分类" prop="category">
               <el-select v-model="editForm.category" placeholder="请选择分类" style="width: 100%">
-                <el-option label="充值套餐" value="充值套餐" />
-                <el-option label="会员套餐" value="会员套餐" />
+                <el-option v-for="cat in categoryOptions" :key="cat.value" :label="cat.label" :value="cat.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -317,7 +316,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Edit, Delete, SwitchButton } from '@element-plus/icons-vue'
-import { getProductDetail, toggleProductStatus, deleteProduct, updateProduct } from '@/api/product'
+import { getProductDetail, toggleProductStatus, deleteProduct, updateProduct, getCategoryOptions } from '@/api/product'
 
 const route = useRoute()
 const router = useRouter()
@@ -327,6 +326,7 @@ const editSubmitLoading = ref(false)
 const editDialogVisible = ref(false)
 const product = ref(null)
 const editFormRef = ref(null)
+const categoryOptions = ref([])
 
 const productId = computed(() => route.params.id)
 
@@ -444,7 +444,17 @@ const handleDelete = async () => {
 
 onMounted(() => {
   fetchProductDetail()
+  loadCategories()
 })
+
+const loadCategories = async () => {
+  try {
+    const res = await getCategoryOptions()
+    categoryOptions.value = res.data
+  } catch (e) {
+    // 错误已处理
+  }
+}
 </script>
 
 <style lang="scss" scoped>
