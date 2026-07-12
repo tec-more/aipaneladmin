@@ -69,10 +69,11 @@ class AttributeValue(BaseModel, TimestampMixin):
     attribute = fields.ForeignKeyField("models.Attribute", on_delete=fields.CASCADE, description="关联属性")
     value = fields.CharField(max_length=100, description="属性值")
     sort = fields.IntField(default=0, description="排序")
+    product_category_id = fields.IntField(null=True, description="关联产品分类ID，null表示全品类通用")
 
     class Meta:
         table = "product_attribute_value"
-        unique_together = ("attribute", "value")
+        unique_together = ("attribute", "value", "product_category_id")
 
     async def to_dict(self):
         return {
@@ -81,6 +82,7 @@ class AttributeValue(BaseModel, TimestampMixin):
             "attribute_name": (await self.attribute.first()).name if hasattr(self, 'attribute') else None,
             "value": self.value,
             "sort": self.sort,
+            "product_category_id": self.product_category_id,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
         }

@@ -88,7 +88,13 @@ class AttributeValueService:
 
     @staticmethod
     async def create_attribute_value(data: Dict[str, Any]) -> Dict[str, Any]:
-        if await AttributeValue.filter(attribute_id=data['attribute_id'], value=data['value']).exists():
+        category_id = data.get('product_category_id')
+        filters = {'attribute_id': data['attribute_id'], 'value': data['value']}
+        if category_id is not None:
+            filters['product_category_id'] = category_id
+        else:
+            filters['product_category_id__isnull'] = True
+        if await AttributeValue.filter(**filters).exists():
             raise ValueError("该属性值已存在")
         value = await AttributeValue.create(**data)
         return await value.to_dict()
@@ -117,8 +123,11 @@ class AttributeValueService:
         return deleted_count > 0
 
     @staticmethod
-    async def get_attribute_values(attribute_id: int) -> List[Dict[str, Any]]:
-        values = await AttributeValue.filter(attribute_id=attribute_id).order_by("sort")
+    async def get_attribute_values(attribute_id: int, product_category_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        query = AttributeValue.filter(attribute_id=attribute_id)
+        if product_category_id is not None:
+            query = query.filter(Q(product_category_id=product_category_id) | Q(product_category_id__isnull=True))
+        values = await query.order_by("sort")
         return [await v.to_dict() for v in values]
 
 

@@ -324,9 +324,12 @@ async def delete_attribute(attribute_id: int):
 
 
 @product_router.get("/attributes/{attribute_id}/values", summary="获取属性值列表")
-async def get_attribute_values(attribute_id: int):
+async def get_attribute_values(
+    attribute_id: int,
+    product_category_id: Optional[int] = Query(None, description="产品分类ID，过滤该分类可用的属性值")
+):
     try:
-        values = await AttributeValueService.get_attribute_values(attribute_id)
+        values = await AttributeValueService.get_attribute_values(attribute_id, product_category_id)
         return SuccessResponse(data=values, msg="获取属性值列表成功")
     except Exception as e:
         return ErrorResponse(msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)

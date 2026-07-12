@@ -1,0 +1,114 @@
+[
+  {
+    "test_id": "TC-PROD-BT-001",
+    "test_name": "产品分类CRUD完整流程",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:50.271767"
+  },
+  {
+    "test_id": "TC-PROD-BT-002",
+    "test_name": "产品属性管理",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:50.399313"
+  },
+  {
+    "test_id": "TC-PROD-BT-003",
+    "test_name": "产品变体管理",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:50.468556"
+  },
+  {
+    "test_id": "TC-PROD-BT-004",
+    "test_name": "产品规格关联",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:50.600032"
+  },
+  {
+    "test_id": "TC-BASE-BT-001",
+    "test_name": "蓝牙耳机物料CRUD完整流程",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:50.704005"
+  },
+  {
+    "test_id": "TC-BASE-BT-002",
+    "test_name": "蓝牙耳机BOM版本管理",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:50.827419"
+  },
+  {
+    "test_id": "TC-BASE-BT-003",
+    "test_name": "蓝牙耳机工艺路线配置",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:50.927501"
+  },
+  {
+    "test_id": "TC-MRP2-BT-001",
+    "test_name": "蓝牙耳机销售预测",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.061932"
+  },
+  {
+    "test_id": "TC-MRP2-BT-002",
+    "test_name": "蓝牙耳机MPS主生产计划",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.152354"
+  },
+  {
+    "test_id": "TC-MRP2-BT-003",
+    "test_name": "蓝牙耳机MRP物料需求计算",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.229072"
+  },
+  {
+    "test_id": "TC-MRP2-BT-004",
+    "test_name": "蓝牙耳机CRP能力需求计算",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.339485"
+  },
+  {
+    "test_id": "TC-INV-BT-001",
+    "test_name": "蓝牙耳机库存查询",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.477401"
+  },
+  {
+    "test_id": "TC-INV-BT-002",
+    "test_name": "蓝牙耳机库存调拨",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.611761"
+  },
+  {
+    "test_id": "TC-PLAN-BT-001",
+    "test_name": "蓝牙耳机制造单完整生命周期",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.703344"
+  },
+  {
+    "test_id": "TC-EXEC-BT-001",
+    "test_name": "蓝牙耳机工单完整状态流转",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.785701"
+  },
+  {
+    "test_id": "TC-PUR-BT-001",
+    "test_name": "蓝牙耳机原材料采购订单",
+    "status": "PASS",
+    "message": "",
+    "timestamp": "2026-07-12T18:26:51.924994"
+  }
+]

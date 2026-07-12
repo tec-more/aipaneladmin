@@ -1,0 +1,114 @@
+[
+  {
+    "test_id": "TC-PROD-CO-001",
+    "test_name": "美妆产品分类CRUD完整流程",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:15.969954"
+  },
+  {
+    "test_id": "TC-PROD-CO-002",
+    "test_name": "美妆产品属性管理",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:16.946402"
+  },
+  {
+    "test_id": "TC-PROD-CO-003",
+    "test_name": "美妆产品变体管理",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:17.276873"
+  },
+  {
+    "test_id": "TC-PROD-CO-004",
+    "test_name": "美妆产品规格关联",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:17.504639"
+  },
+  {
+    "test_id": "TC-BASE-CO-001",
+    "test_name": "美妆物料CRUD",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:17.616579"
+  },
+  {
+    "test_id": "TC-MRP2-CO-001",
+    "test_name": "美妆产品销售预测",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:17.691186"
+  },
+  {
+    "test_id": "TC-MRP2-CO-002",
+    "test_name": "美妆产品MPS主生产计划",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:17.750540"
+  },
+  {
+    "test_id": "TC-MRP2-CO-003",
+    "test_name": "美妆产品MRP物料需求计算",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:17.804188"
+  },
+  {
+    "test_id": "TC-MRP2-CO-004",
+    "test_name": "美妆产品CRP能力需求计算",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:17.925419"
+  },
+  {
+    "test_id": "TC-PUR-CO-003",
+    "test_name": "供应商管理",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:18.022814"
+  },
+  {
+    "test_id": "TC-PUR-CO-001",
+    "test_name": "美妆原材料采购订单",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:18.095922"
+  },
+  {
+    "test_id": "TC-INV-CO-001",
+    "test_name": "美妆产品库存查询",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:18.199422"
+  },
+  {
+    "test_id": "TC-SALES-CO-001",
+    "test_name": "销售订单创建",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:18.301922"
+  },
+  {
+    "test_id": "TC-QUALITY-CO-001",
+    "test_name": "美妆产品检验标准管理",
+    "status": "PASS",
+    "msg": "",
+    "error": "",
+    "timestamp": "2026-07-12T22:44:18.366109"
+  }
+]
