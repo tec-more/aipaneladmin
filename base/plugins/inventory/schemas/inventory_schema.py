@@ -365,6 +365,8 @@ class StockMoveBase(BaseModel):
 
 class StockMoveCreate(StockMoveBase):
     """创建移动明细"""
+    picking_id: Optional[int] = Field(None, description="调拨单ID（创建调拨单时自动填充）")
+    picking_code: Optional[str] = Field(None, max_length=100, description="调拨单编码（创建调拨单时自动填充）")
     move_code: Optional[str] = Field(None, max_length=100, description="移动编码（不提供则自动生成）")
     move_lines: Optional[List['StockMoveLineCreate']] = Field(None, description="移动明细行列表")
 

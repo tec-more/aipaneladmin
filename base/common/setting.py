@@ -168,7 +168,7 @@ TORTOISE_ORM: dict = {
             "default_connection": "postgres",
         },
     },
-	"use_tz": False,  # Whether to use timezone-aware datetimes
+	"use_tz": True,  # Whether to use timezone-aware datetimes
 	"timezone": "Asia/Shanghai",  # Timezone setting
 	"db_logs": False,  # 禁用 Tortoise ORM 的 SQL 日志输出
 }

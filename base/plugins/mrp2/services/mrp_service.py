@@ -818,7 +818,9 @@ class MRPService:
                                 is_manufactured = bom_exists
 
                             order_type = "manufacture" if is_manufactured else "purchase"
-                            order_code = f"PO{datetime.now().strftime('%Y%m%d%H%M%S')}{mat_code[:5]}"
+                            import time
+                            timestamp = int(time.time() * 1000)
+                            order_code = f"PO{timestamp}{mat_code[:5]}"
 
                             planned_order = await PlannedOrder.create(
                                 order_code=order_code,
