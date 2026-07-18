@@ -493,6 +493,67 @@ def test_quality_inspection(token):
         add_test_result("TC-QUALITY-CO-001", "美妆产品检验标准管理", "FAIL", error=str(e))
         print(f"\n❌ TC-QUALITY-CO-001 测试失败: {e}")
 
+def test_kit_check(token):
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    print("\n" + "=" * 60)
+    print("TC-KIT-CO-001: 齐套检查功能测试")
+    print("=" * 60)
+    
+    try:
+        print("\n1. 查询制造订单列表")
+        response = requests.get(f"{BASE_URL}/mes/manufacturing-orders", headers=headers)
+        result = response.json()
+        mo_list = result.get('data', {}).get('items', [])
+        print(f"   制造订单数量: {len(mo_list)}")
+        
+        if mo_list:
+            mo_id = mo_list[0]['id']
+            mo_code = mo_list[0]['mo_code']
+            
+            print(f"\n2. 检查制造订单 {mo_code} 齐套情况")
+            response = requests.get(f"{BASE_URL}/mes/kit-check/{mo_id}", headers=headers)
+            result = response.json()
+            print(f"   响应: code={result.get('code')}")
+            if result.get('code') == 0:
+                data = result['data']
+                print(f"   齐套状态: {data.get('kit_status')}")
+                print(f"   齐套率: {data.get('kit_rate')}%")
+                print(f"   物料总数: {data.get('total_items')}")
+                print(f"   缺料数量: {data.get('shortage_items')}")
+                
+                shortage_list = data.get('shortage_list', [])
+                if shortage_list:
+                    print("\n   缺料清单:")
+                    for item in shortage_list:
+                        print(f"     - {item['item_name']}({item['item_code']}): 缺{item['shortage']}{item['unit']}")
+        
+        print("\n3. 检查BOM齐套情况（口红）")
+        response = requests.get(f"{BASE_URL}/mes/kit-check/bom/LIPSTICK-001?quantity=10", headers=headers)
+        result = response.json()
+        print(f"   响应: code={result.get('code')}")
+        if result.get('code') == 0:
+            data = result['data']
+            print(f"   产品名称: {data.get('product_name')}")
+            print(f"   齐套状态: {data.get('kit_status')}")
+            print(f"   齐套率: {data.get('kit_rate')}%")
+        
+        print("\n4. 获取齐套状态")
+        if mo_list:
+            response = requests.get(f"{BASE_URL}/mes/kit-check/status/{mo_code}", headers=headers)
+            result = response.json()
+            print(f"   响应: code={result.get('code')}")
+            if result.get('code') == 0:
+                data = result['data']
+                print(f"   齐套状态: {data.get('kit_status')} - {data.get('kit_status_desc')}")
+        
+        add_test_result("TC-KIT-CO-001", "齐套检查功能测试", "PASS")
+        print("\n✅ TC-KIT-CO-001 测试完成")
+    
+    except Exception as e:
+        add_test_result("TC-KIT-CO-001", "齐套检查功能测试", "FAIL", error=str(e))
+        print(f"\n❌ TC-KIT-CO-001 测试失败: {e}")
+
 def generate_test_report():
     print("\n" + "=" * 60)
     print("生成测试报告")
@@ -571,6 +632,7 @@ def main():
         test_inventory_query(token)
         test_sales_order(token)
         test_quality_inspection(token)
+        test_kit_check(token)
         
         print("\n" + "=" * 60)
         print("所有测试用例执行完成!")

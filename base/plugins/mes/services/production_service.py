@@ -29,6 +29,12 @@ try:
     except ImportError:
         Equipment = None
         EQUIPMENT_AVAILABLE = False
+    try:
+        from base.plugins.mes.services.kit_check_service import KitCheckService
+        KIT_CHECK_AVAILABLE = True
+    except ImportError:
+        KitCheckService = None
+        KIT_CHECK_AVAILABLE = False
 except ImportError:
     from typing import Any
     from datetime import datetime
@@ -124,7 +130,7 @@ class ManufacturingOrderService:
         return deleted_count > 0
 
     @staticmethod
-    async def release_mo(mo_id: int) -> Optional[ManufacturingOrder]:
+    async def release_mo(mo_id: int, skip_kit_check: bool = False) -> Optional[ManufacturingOrder]:
         mo = await ManufacturingOrder.filter(id=mo_id).first()
         if not mo:
             return None
@@ -135,6 +141,13 @@ class ManufacturingOrderService:
             bom_exists = await Bom.filter(product_code=mo.product_code, is_active=True).exists()
             if not bom_exists:
                 raise ValueError("产品BOM未维护或已失效，无法下达")
+
+        if KIT_CHECK_AVAILABLE and KitCheckService is not None and not skip_kit_check:
+            kit_result = await KitCheckService.check_kit_by_mo(mo_id)
+            if "error" not in kit_result and kit_result.get("kit_status") != "full_kit":
+                shortage_list = kit_result.get("shortage_list", [])
+                shortage_info = "; ".join([f"{item['item_name']}({item['item_code']})缺{item['shortage']}{item['unit']}" for item in shortage_list])
+                raise ValueError(f"物料不齐套，无法下达制造单。缺料清单: {shortage_info}")
 
         mo.status = "released"
         mo.actual_start_date = datetime.now()

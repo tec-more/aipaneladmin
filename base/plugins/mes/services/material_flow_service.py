@@ -22,13 +22,22 @@ try:
     except ImportError:
         Bom = None
         BOM_AVAILABLE = False
+    try:
+        from base.plugins.inventory.models.inventory_models import StockQuant
+        QUANT_AVAILABLE = True
+    except ImportError:
+        StockQuant = None
+        QUANT_AVAILABLE = False
 except ImportError:
     MaterialRequisition = None
     MaterialRequisitionDetail = None
     MaterialReturn = None
     ProductionReceipt = None
     ManufacturingOrder = None
+    Bom = None
+    StockQuant = None
     BOM_AVAILABLE = False
+    QUANT_AVAILABLE = False
 
 
 class MaterialRequisitionService:
@@ -103,12 +112,38 @@ class MaterialRequisitionService:
         return requisition
 
     @staticmethod
-    async def confirm_requisition(requisition_id: int) -> Optional[MaterialRequisition]:
+    async def confirm_requisition(requisition_id: int, skip_stock_check: bool = False) -> Optional[MaterialRequisition]:
         req = await MaterialRequisition.filter(id=requisition_id).first()
         if not req:
             return None
         if req.status != "draft":
             raise ValueError("只能确认草稿状态的领料单")
+
+        if QUANT_AVAILABLE and StockQuant is not None and not skip_stock_check:
+            details = await MaterialRequisitionDetail.filter(requisition_id=requisition_id)
+            shortage_items = []
+            for detail in details:
+                quants = await StockQuant.filter(product_code=detail.material_code)
+                total_available = 0.0
+                for quant in quants:
+                    available = float(quant.available_quantity) if hasattr(quant.available_quantity, '__float__') else 0.0
+                    total_available += available
+
+                required = float(detail.required_quantity) if hasattr(detail.required_quantity, '__float__') else 0.0
+                if total_available < required:
+                    shortage_items.append({
+                        "material_code": detail.material_code,
+                        "material_name": detail.material_name,
+                        "required": required,
+                        "available": total_available,
+                        "shortage": required - total_available,
+                        "unit": detail.unit,
+                    })
+
+            if shortage_items:
+                shortage_info = "; ".join([f"{item['material_name']}({item['material_code']})可用{item['available']}{item['unit']}，需{item['required']}{item['unit']}" for item in shortage_items])
+                raise ValueError(f"库存不足，无法确认领料单。{shortage_info}")
+
         req.status = "confirmed"
         await req.save()
 
