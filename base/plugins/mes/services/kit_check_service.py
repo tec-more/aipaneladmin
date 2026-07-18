@@ -34,7 +34,7 @@ class KitCheckService:
         if current_level > max_level:
             return []
 
-        boms = await Bom.filter(product_code=product_code, is_active=True).order_by('level')
+        boms = await Bom.filter(product_code=product_code, is_active=True).order_by('level').all()
         if not boms:
             return []
 
@@ -42,8 +42,8 @@ class KitCheckService:
         for bom in boms:
             item_qty = Decimal(str(bom.quantity)) * quantity * (Decimal('1') + Decimal(str(bom.scrap_rate)))
 
-            is_raw_material = bom.level == 1 or bom.parent_item_code is None
-            if not is_raw_material:
+            child_boms = await Bom.filter(product_code=bom.item_code, is_active=True).exists()
+            if child_boms:
                 child_items = await KitCheckService._get_flattened_bom(
                     bom.item_code, item_qty, current_level + 1, max_level
                 )
@@ -75,7 +75,7 @@ class KitCheckService:
         if not QUANT_AVAILABLE or StockQuant is None:
             return 0.0, 0.0, 0.0
 
-        quants = await StockQuant.filter(product_code=item_code)
+        quants = await StockQuant.filter(product_code=item_code).all()
         total_qty = 0.0
         total_reserved = 0.0
         total_available = 0.0
@@ -97,7 +97,7 @@ class KitCheckService:
         if not PO_AVAILABLE or PurchaseOrder is None:
             return 0.0
 
-        pos = await PurchaseOrder.filter(item_code=item_code, status='confirmed')
+        pos = await PurchaseOrder.filter(item_code=item_code, status='confirmed').all()
         total_on_order = 0.0
         for po in pos:
             qty = float(po.quantity) if hasattr(po.quantity, '__float__') else 0.0
