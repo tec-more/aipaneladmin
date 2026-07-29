@@ -66,6 +66,16 @@
                     "is_hidden": false,
                     "menu_type": "menu",
                     "permission_code": "document:settings:list"
+                },
+                {
+                    "name": "版本管理",
+                    "path": "/document/version/:id",
+                    "icon": "Version",
+                    "component": "document/version/Index",
+                    "sort": 5,
+                    "is_hidden": true,
+                    "menu_type": "menu",
+                    "permission_code": "document:version"
                 }
             ]
         }

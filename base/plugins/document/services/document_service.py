@@ -485,6 +485,50 @@ class VersionService:
         deleted = await DocumentVersion.filter(id=version_id).delete()
         return deleted > 0
 
+    @staticmethod
+    async def upload_new_version(
+        document_id: int,
+        file_bytes: bytes,
+        file_name: str,
+        change_log: Optional[str] = None,
+        user_id: Optional[int] = None
+    ) -> Tuple[DocumentVersion, Document]:
+        """上传文件创建新版本"""
+        doc = await Document.filter(id=document_id).first()
+        if not doc:
+            raise ValueError("文档不存在")
+
+        # 生成存储路径
+        file_ext = _extract_file_extension(file_name)
+        storage_path = _generate_storage_path(file_name)
+        os.makedirs(os.path.dirname(storage_path), exist_ok=True)
+        with open(storage_path, "wb") as f:
+            f.write(file_bytes)
+
+        # 创建版本记录
+        max_version = await DocumentVersion.filter(document_id=document_id).order_by("-version").first()
+        next_version = (max_version.version if max_version else 0) + 1
+
+        version = await DocumentVersion.create(
+            document_id=document_id,
+            version=next_version,
+            file_path=storage_path,
+            file_size=len(file_bytes),
+            change_log=change_log or f"上传新版本 v{next_version}",
+            created_by_id=user_id,
+        )
+
+        # 更新文档当前版本
+        doc.version = next_version
+        doc.file_name = file_name
+        doc.file_type = file_ext
+        doc.file_path = storage_path
+        doc.file_size = len(file_bytes)
+        await doc.save()
+
+        log.info(f"文档新版本上传: {doc.title} v{next_version}")
+        return version, doc
+
 
 # ==================== 预览服务 ====================
 

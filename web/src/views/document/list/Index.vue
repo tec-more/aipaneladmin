@@ -63,13 +63,16 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="handleView(row)">
               查看
             </el-button>
             <el-button link type="warning" size="small" @click="handleEdit(row)">
               编辑
+            </el-button>
+            <el-button link type="info" size="small" @click="handleVersions(row)">
+              版本
             </el-button>
             <el-button link type="success" size="small" @click="handleDownload(row)">
               下载
@@ -215,6 +218,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Upload } from '@element-plus/icons-vue'
 import {
@@ -227,6 +231,8 @@ import {
   getDownloadUrl
 } from '@/api/document'
 import request from '@/utils/request'
+
+const router = useRouter()
 
 const loading = ref(false)
 const uploading = ref(false)
@@ -438,6 +444,10 @@ const handleDelete = async (row) => {
       ElMessage.error('删除失败')
     }
   }
+}
+
+const handleVersions = (row) => {
+  router.push(`/panel/document/version/${row.id}`)
 }
 
 const handleDownload = async (row) => {

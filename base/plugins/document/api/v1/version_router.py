@@ -1,9 +1,10 @@
 """
 文档版本管理 API 路由
 """
+import os
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
 try:
@@ -65,6 +66,9 @@ except ImportError:
         @staticmethod
         async def delete_version(id):
             return False
+        @staticmethod
+        async def upload_new_version(doc_id, file_bytes, file_name, change_log=None, user_id=None):
+            return None, None
 
     class DocumentVersionCreate(BaseModel): pass
     class DocumentVersionUpdate(BaseModel): pass
@@ -147,3 +151,32 @@ async def delete_version(version_id: int, user_id: int = require_permission("doc
         return success_response(msg="版本删除成功")
     except ValueError as e:
         return fail_response(msg=str(e))
+
+
+@version_router.post("/document/{document_id}/upload", summary="上传新版本文件")
+async def upload_new_version(
+    document_id: int,
+    file: UploadFile = File(...),
+    change_log: Optional[str] = Form(None),
+    user_id: int = require_permission("document:version")
+):
+    """上传文件为文档创建新版本"""
+    try:
+        file_bytes = await file.read()
+        file_name = file.filename or "unnamed"
+
+        version, doc = await VersionService.upload_new_version(
+            document_id=document_id,
+            file_bytes=file_bytes,
+            file_name=file_name,
+            change_log=change_log,
+            user_id=user_id,
+        )
+        return success_response(
+            data={"version": version, "document": doc},
+            msg=f"新版本 v{version.version} 上传成功"
+        )
+    except ValueError as e:
+        return fail_response(msg=str(e))
+    except Exception as e:
+        return fail_response(msg=f"上传失败: {str(e)}")

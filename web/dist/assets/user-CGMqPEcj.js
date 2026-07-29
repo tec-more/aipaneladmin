@@ -1,0 +1,1 @@
+import{aY as t}from"./index-CYCVhDcb.js";function u(e){return t.get("/v1/users/list",{params:e})}function n(e){return t.post("/v1/users",e)}function a(e,s){return t.put(`/v1/users/${e}`,s)}function o(e){return t.delete(`/v1/users/${e}`)}function c(e){return t.patch(`/v1/users/${e}/toggle-status`)}export{n as c,o as d,u as g,c as t,a as u};

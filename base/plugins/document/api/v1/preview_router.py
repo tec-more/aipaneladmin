@@ -11,6 +11,7 @@ from pydantic import BaseModel
 try:
     from base.plugins.document.services.document_service import (
         DocumentService,
+        VersionService,
         PreviewService,
     )
     from base.common.response import success_response, fail_response
@@ -30,6 +31,11 @@ except ImportError:
             return decorator
 
     class DocumentService:
+        @staticmethod
+        async def get_by_id(id):
+            return None
+
+    class VersionService:
         @staticmethod
         async def get_by_id(id):
             return None
@@ -124,3 +130,66 @@ async def check_preview(
         "file_type": file_type,
         "content_type": PreviewService.get_preview_content_type(file_type),
     })
+
+
+@preview_router.get("/version/{version_id}", summary="预览指定版本")
+async def preview_version(
+    version_id: int,
+    inline: bool = True,
+    user_id: int = require_permission("document:view")
+):
+    version = await VersionService.get_by_id(version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="版本不存在")
+
+    file_path = version.file_path
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    doc = await DocumentService.get_by_id(version.document_id)
+    file_type = doc.file_type if doc else ""
+
+    if not PreviewService.is_previewable(file_type):
+        raise HTTPException(status_code=400, detail="该文件类型不支持在线预览")
+
+    content_type = PreviewService.get_preview_content_type(file_type)
+
+    headers = {}
+    if not inline:
+        headers["Content-Disposition"] = f'attachment; filename="v{version.version}_{doc.file_name if doc else ""}"'
+
+    return FileResponse(
+        path=file_path,
+        media_type=content_type,
+        filename=f"v{version.version}_{doc.file_name}" if not inline and doc else None,
+        headers=headers if not inline else None,
+    )
+
+
+@preview_router.get("/version/{version_id}/download", summary="下载指定版本")
+async def download_version(
+    version_id: int,
+    user_id: int = require_permission("document:download")
+):
+    version = await VersionService.get_by_id(version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="版本不存在")
+
+    file_path = version.file_path
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    doc = await DocumentService.get_by_id(version.document_id)
+    file_type = doc.file_type if doc else ""
+    content_type = PreviewService.get_preview_content_type(file_type)
+
+    filename = f"v{version.version}_{doc.file_name}" if doc else f"v{version.version}_file"
+
+    return FileResponse(
+        path=file_path,
+        media_type=content_type,
+        filename=filename,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )

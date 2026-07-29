@@ -87,8 +87,30 @@ export const getVersionList = (documentId, params) => {
   return request.get(`${BASE}/versions/document/${documentId}`, { params })
 }
 
+export const getVersionDetail = (versionId) => {
+  return request.get(`${BASE}/versions/${versionId}`)
+}
+
 export const createVersion = (documentId, data) => {
   return request.post(`${BASE}/versions/document/${documentId}`, data)
+}
+
+export const uploadDocumentNewVersion = (documentId, formData) => {
+  return request.post(`${BASE}/versions/document/${documentId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export const updateVersion = (versionId, data) => {
+  return request.put(`${BASE}/versions/${versionId}`, data)
+}
+
+export const deleteVersion = (versionId) => {
+  return request.delete(`${BASE}/versions/${versionId}`)
+}
+
+export const rollbackVersion = (documentId, data) => {
+  return request.post(`${BASE}/versions/document/${documentId}/rollback`, data)
 }
 
 // 预览
