@@ -43,13 +43,17 @@
         border
       >
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="title" label="文档标题" min-width="200" />
-        <el-table-column prop="file_name" label="文件名" min-width="150" />
-        <el-table-column prop="file_type" label="类型" width="80" />
+        <el-table-column prop="title" label="文档标题" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="file_name" label="文件名" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="file_type" label="类型" width="80">
+          <template #default="{ row }">
+            <el-tag size="small" type="info">{{ (row.file_type || '').toUpperCase() }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="version" label="版本" width="70" />
         <el-table-column prop="visibility" label="可见性" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.visibility === 'public' ? 'success' : 'info'">
+            <el-tag :type="row.visibility === 'public' ? 'success' : 'info'" size="small">
               {{ row.visibility === 'public' ? '公开' : row.visibility === 'dept' ? '部门' : '私有' }}
             </el-tag>
           </template>
@@ -59,13 +63,16 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="handleView(row)">
               查看
             </el-button>
-            <el-button link type="primary" size="small" @click="handleEdit(row)">
+            <el-button link type="warning" size="small" @click="handleEdit(row)">
               编辑
+            </el-button>
+            <el-button link type="success" size="small" @click="handleDownload(row)">
+              下载
             </el-button>
             <el-button link type="danger" size="small" @click="handleDelete(row)">
               删除
@@ -87,6 +94,76 @@
         />
       </div>
     </el-card>
+
+    <!-- 查看文档对话框 -->
+    <el-dialog
+      v-model="showViewDialog"
+      title="文档详情"
+      width="600px"
+      destroy-on-close
+    >
+      <div v-if="viewingDoc" class="doc-detail">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="文档标题">{{ viewingDoc.title }}</el-descriptions-item>
+          <el-descriptions-item label="文件名">{{ viewingDoc.file_name }}</el-descriptions-item>
+          <el-descriptions-item label="类型">{{ (viewingDoc.file_type || '').toUpperCase() }}</el-descriptions-item>
+          <el-descriptions-item label="版本">v{{ viewingDoc.version }}</el-descriptions-item>
+          <el-descriptions-item label="大小">{{ formatFileSize(viewingDoc.file_size) }}</el-descriptions-item>
+          <el-descriptions-item label="可见性">
+            <el-tag :type="viewingDoc.visibility === 'public' ? 'success' : 'info'">
+              {{ viewingDoc.visibility === 'public' ? '公开' : viewingDoc.visibility === 'dept' ? '部门' : '私有' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="描述" v-if="viewingDoc.description">
+            {{ viewingDoc.description }}
+          </el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ formatDate(viewingDoc.created_at) }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="doc-actions" style="margin-top: 16px; text-align: right;">
+          <el-button @click="downloadFile(viewingDoc)">下载文件</el-button>
+          <el-button type="primary" @click="previewInNewTab(viewingDoc)">在新窗口预览</el-button>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 编辑文档对话框 -->
+    <el-dialog
+      v-model="showEditDialog"
+      title="编辑文档"
+      width="500px"
+      destroy-on-close
+    >
+      <el-form v-if="editingDoc" :model="editForm" label-width="80px">
+        <el-form-item label="文档标题" required>
+          <el-input v-model="editForm.title" />
+        </el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="editForm.category_id" placeholder="选择分类" clearable style="width: 100%">
+            <el-option
+              v-for="cat in categoryOptions"
+              :key="cat.id"
+              :label="cat.name"
+              :value="cat.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="可见性">
+          <el-select v-model="editForm.visibility" style="width: 100%">
+            <el-option label="私有" value="private" />
+            <el-option label="部门" value="dept" />
+            <el-option label="公开" value="public" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="editForm.description" type="textarea" :rows="3" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveEdit" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 上传对话框 -->
     <el-dialog v-model="showUploadDialog" title="上传文档" width="500px">
@@ -137,23 +214,32 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Upload } from '@element-plus/icons-vue'
 import {
   getDocumentList,
   getCategoryTree,
   uploadDocument,
-  deleteDocument
+  getDocumentDetail,
+  updateDocument,
+  deleteDocument,
+  getDownloadUrl
 } from '@/api/document'
+import request from '@/utils/request'
 
 const loading = ref(false)
 const uploading = ref(false)
+const saving = ref(false)
 const tableData = ref([])
 const searchTitle = ref('')
 const filterCategory = ref(null)
 const categoryOptions = ref([])
 const showUploadDialog = ref(false)
+const showViewDialog = ref(false)
+const showEditDialog = ref(false)
+const viewingDoc = ref(null)
+const editingDoc = ref(null)
 
 const pagination = reactive({
   page: 1,
@@ -170,10 +256,23 @@ const uploadForm = reactive({
   file: null
 })
 
+const editForm = reactive({
+  title: '',
+  category_id: null,
+  visibility: 'private',
+  description: ''
+})
+
 const formatDate = (dateStr) => {
   if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN')
+  return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+const formatFileSize = (size) => {
+  if (!size) return '-'
+  if (size < 1024) return size + ' B'
+  if (size < 1024 * 1024) return (size / 1024).toFixed(2) + ' KB'
+  return (size / 1024 / 1024).toFixed(2) + ' MB'
 }
 
 const handleFileChange = (file) => {
@@ -266,28 +365,147 @@ const resetUploadForm = () => {
   uploadForm.file = null
 }
 
-const handleView = (row) => {
-  window.open(`/v1/document/preview/${row.id}`, '_blank')
+const handleView = async (row) => {
+  try {
+    const res = await getDocumentDetail(row.id)
+    if (res.code === 0) {
+      viewingDoc.value = res.data
+      showViewDialog.value = true
+    } else {
+      ElMessage.error(res.msg || '获取文档详情失败')
+    }
+  } catch (e) {
+    ElMessage.error('获取文档详情失败: ' + e.message)
+  }
 }
 
 const handleEdit = (row) => {
-  ElMessage.info('编辑功能开发中')
+  editingDoc.value = row
+  editForm.title = row.title || ''
+  editForm.category_id = row.category_id || null
+  editForm.visibility = row.visibility || 'private'
+  editForm.description = row.description || ''
+  showEditDialog.value = true
+}
+
+const handleSaveEdit = async () => {
+  if (!editForm.title) {
+    ElMessage.warning('请输入文档标题')
+    return
+  }
+  
+  saving.value = true
+  try {
+    const res = await updateDocument(editingDoc.value.id, {
+      title: editForm.title,
+      category_id: editForm.category_id,
+      visibility: editForm.visibility,
+      description: editForm.description
+    })
+    if (res.code === 0) {
+      ElMessage.success('保存成功')
+      showEditDialog.value = false
+      fetchList()
+    } else {
+      ElMessage.error(res.msg || '保存失败')
+    }
+  } catch (e) {
+    ElMessage.error('保存失败: ' + e.message)
+  } finally {
+    saving.value = false
+  }
 }
 
 const handleDelete = async (row) => {
   try {
-    await ElMessageBox.confirm(`确定要删除文档「${row.title}」吗？`, '确认删除', {
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      `确定要删除文档「${row.title}」吗？删除后可在回收站恢复。`,
+      '确认删除',
+      { type: 'warning' }
+    )
     const res = await deleteDocument(row.id)
     if (res.code === 0) {
-      ElMessage.success('删除成功')
-      fetchList()
+      ElMessage.success('删除成功，文档已移入回收站')
+      // 从本地数组移除，不立即刷新（避免后端未重启导致重新加载）
+      tableData.value = tableData.value.filter(item => item.id !== row.id)
+      pagination.total = Math.max(0, pagination.total - 1)
+    } else {
+      ElMessage.error(res.msg || '删除失败')
     }
   } catch (e) {
     if (e !== 'cancel') {
+      console.error('删除文档失败:', e)
       ElMessage.error('删除失败')
     }
+  }
+}
+
+const handleDownload = async (row) => {
+  try {
+    const res = await request.get(`/v1/document/preview/${row.id}/download`, {
+      responseType: 'blob'
+    })
+    if (res && res.data) {
+      const blob = new Blob([res.data])
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = row.file_name || 'download'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      ElMessage.success('下载成功')
+    } else {
+      ElMessage.error('下载失败：无数据')
+    }
+  } catch (e) {
+    console.error('下载失败:', e)
+    const msg = e.response?.data?.msg || e.message || '下载失败'
+    ElMessage.error(msg)
+  }
+}
+
+const downloadFile = async (doc) => {
+  try {
+    const res = await request.get(`/v1/document/preview/${doc.id}/download`, {
+      responseType: 'blob'
+    })
+    if (res && res.data) {
+      const blob = new Blob([res.data])
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = doc.file_name || 'download'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      ElMessage.success('下载成功')
+    }
+  } catch (e) {
+    console.error('下载失败:', e)
+    const msg = e.response?.data?.msg || e.message || '下载失败'
+    ElMessage.error(msg)
+  }
+}
+
+const previewInNewTab = async (doc) => {
+  try {
+    const res = await request.get(`/v1/document/preview/${doc.id}`, {
+      responseType: 'blob'
+    })
+    if (res && res.data) {
+      const blob = new Blob([res.data])
+      const previewUrl = window.URL.createObjectURL(blob)
+      window.open(previewUrl, '_blank')
+    } else {
+      ElMessage.error('预览失败：无数据')
+    }
+  } catch (e) {
+    console.error('预览失败:', e)
+    const msg = e.response?.data?.msg || e.message || '预览失败'
+    ElMessage.error(msg)
   }
 }
 
@@ -322,6 +540,13 @@ onMounted(() => {
     color: var(--el-text-color-secondary);
     font-size: 12px;
     margin-top: 4px;
+  }
+  
+  .doc-detail {
+    .doc-actions {
+      padding-top: 16px;
+      border-top: 1px solid var(--el-border-color);
+    }
   }
 }
 </style>

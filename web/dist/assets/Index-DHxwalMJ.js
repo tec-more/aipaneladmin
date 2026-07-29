@@ -1,0 +1,1 @@
+import{_ as o,aK as c,c as t,o as n,b as r}from"./index-DNsOmL1q.js";const s={},a={class:"general-ledger-index"};function _(d,i){const e=c("router-view");return n(),t("div",a,[r(e)])}const f=o(s,[["render",_],["__scopeId","data-v-c52f8895"]]);export{f as default};

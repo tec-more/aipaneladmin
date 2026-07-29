@@ -1,0 +1,1 @@
+import{aY as e}from"./index-Bu1iRavU.js";const n="/v1/equipment",s=t=>e.get(`${n}/equipment`,{params:t}),r=t=>e.post(`${n}/equipment`,t),u=t=>e.get(`${n}/maintenance`,{params:t}),c=t=>e.post(`${n}/maintenance`,t),i=t=>e.get(`${n}/fault`,{params:t}),o=t=>e.post(`${n}/fault`,t);export{s as a,r as b,o as c,u as d,c as e,i as g};

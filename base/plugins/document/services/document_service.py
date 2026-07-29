@@ -171,6 +171,12 @@ class DocumentService:
     ) -> Tuple[List[Document], int]:
         query = Document.all()
 
+        # 默认过滤掉已删除的文档
+        if not status:
+            query = query.filter(status="normal")
+        else:
+            query = query.filter(status=status)
+
         if title:
             query = query.filter(title__icontains=title)
         if file_name:
@@ -179,8 +185,6 @@ class DocumentService:
             query = query.filter(file_type=file_type)
         if category_id:
             query = query.filter(category_id=category_id)
-        if status:
-            query = query.filter(status=status)
         if business_type:
             query = query.filter(business_type=business_type)
         if business_id:

@@ -1,0 +1,1 @@
+import{_ as o,aK as c,c as t,o as n,b as s}from"./index-Cxwq8DWT.js";const r={},_={class:"document-index"};function a(d,i){const e=c("router-view");return n(),t("div",_,[s(e)])}const p=o(r,[["render",a],["__scopeId","data-v-5c0b7213"]]);export{p as default};
