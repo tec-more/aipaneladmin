@@ -7,10 +7,16 @@ from base.plugins.document.services.document_service import (
     VersionService,
     PreviewService,
 )
+from base.plugins.document.services.rag_integration_service import (
+    RAGIntegrationService,
+    RAG_BUSINESS_TYPE,
+)
 
 __all__ = [
     "CategoryService",
     "DocumentService",
     "VersionService",
     "PreviewService",
+    "RAGIntegrationService",
+    "RAG_BUSINESS_TYPE",
 ]

@@ -22,6 +22,7 @@ try:
         DocumentRestoreRequest,
         DocumentDeleteRequest,
     )
+    from base.plugins.document.services.rag_integration_service import RAGIntegrationService
     from base.common.response import success_response, fail_response
     from base.common.permissions import require_permission
 except ImportError:
@@ -107,6 +108,14 @@ except ImportError:
     class DocumentRestoreRequest(BaseModel): pass
     class DocumentDeleteRequest(BaseModel): pass
 
+    class RAGIntegrationService:
+        @staticmethod
+        async def auto_link_on_upload(*args, **kwargs):
+            return {"status": "skipped", "message": "RAG 集成服务未加载"}
+        @staticmethod
+        async def link_to_knowledge_base(*args, **kwargs):
+            return None
+
 
 document_router = APIRouter(prefix="/documents", tags=["文档管理"])
 
@@ -120,7 +129,7 @@ async def create_document(data: DocumentCreate, user_id: int = require_permissio
         return fail_response(msg=str(e))
 
 
-@document_router.post("/upload", summary="上传文档文件")
+@document_router.post("/upload", summary="上传文档文件(可选择关联RAG知识库)")
 async def upload_document(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
@@ -129,8 +138,13 @@ async def upload_document(
     business_type: Optional[str] = Form(None),
     business_id: Optional[int] = Form(None),
     visibility: str = Form("private"),
+    knowledge_base_id: Optional[int] = Form(None),
     user_id: int = require_permission("document:upload")
 ):
+    """上传企业文档，可选一步关联 RAG 知识库
+
+    集成顺序：企业文档先创建 → 可选关联 RAG
+    """
     try:
         file_bytes = await file.read()
         file_name = file.filename or "unnamed"
@@ -156,6 +170,28 @@ async def upload_document(
         )
 
         result = await DocumentService.create_document(doc, user_id=user_id, file_bytes=None)
+
+        if knowledge_base_id:
+            try:
+                rag_result = await RAGIntegrationService.auto_link_on_upload(
+                    doc_id=result.id,
+                    file_path=storage_path,
+                    file_name=file_name,
+                    knowledge_base_id=knowledge_base_id,
+                    user_id=user_id,
+                )
+                result_data = {
+                    "document": result,
+                    "rag_link": rag_result,
+                }
+                return success_response(data=result_data, msg="文档上传成功并已关联 RAG 知识库")
+            except Exception as rag_e:
+                result_data = {
+                    "document": result,
+                    "rag_link": {"status": "failed", "error": str(rag_e)},
+                }
+                return success_response(data=result_data, msg="文档上传成功，但 RAG 关联失败")
+
         return success_response(data=result, msg="文档上传成功")
     except Exception as e:
         return fail_response(msg=f"文档上传失败: {str(e)}")

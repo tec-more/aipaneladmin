@@ -364,12 +364,15 @@ class DocumentService:
         archived_count = await Document.filter(status="archived").count()
         categories_count = await DocumentCategory.filter(is_active=True).count()
 
-        type_stats = await Document.filter(status="normal").annotate(
-        ).group_by("file_type").count("id")
         type_dist = {}
-        for item in type_stats:
-            ft = item.get("file_type") or "other"
-            type_dist[ft] = item.get("count", 0)
+        try:
+            from tortoise.expressions import RawSQL
+            docs = await Document.filter(status="normal").all()
+            for doc in docs:
+                ft = doc.file_type or "other"
+                type_dist[ft] = type_dist.get(ft, 0) + 1
+        except Exception:
+            pass
 
         return {
             "total_count": total_count,
