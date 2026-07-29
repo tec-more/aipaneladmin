@@ -10,6 +10,8 @@ import tempfile
 from datetime import datetime
 
 BASE_URL = "http://127.0.0.1:9998"
+API_PREFIX = "/api"  # 如果有网关代理，使用 /api；否则留空
+DOCUMENT_BASE = f"{API_PREFIX}/v1/document" if API_PREFIX else "/v1/document"
 TEST_RESULTS = []
 
 def log_result(test_id, test_name, status, message=""):
@@ -32,7 +34,7 @@ def login():
     print("=" * 60)
     data = {"username": "admin", "password": "admin123"}
     try:
-        response = requests.post(f"{BASE_URL}/api/v1/auth/login", json=data)
+        response = requests.post(f"{BASE_URL}/v1/auth/login", json=data)
         if response.status_code == 200:
             result = response.json()
             print(f"登录成功")
@@ -54,7 +56,7 @@ def test_category_crud(token):
 
     # TC-CAT-001: 创建根分类
     try:
-        resp = requests.post(f"{BASE_URL}/api/v1/document/categories", headers=headers, json={
+        resp = requests.post(f"{BASE_URL}/v1/document/categories", headers=headers, json={
             "name": "测试分类",
             "sort": 1,
             "is_active": True
@@ -72,7 +74,7 @@ def test_category_crud(token):
     # TC-CAT-002: 创建子分类
     if created_ids:
         try:
-            resp = requests.post(f"{BASE_URL}/api/v1/document/categories", headers=headers, json={
+            resp = requests.post(f"{BASE_URL}/v1/document/categories", headers=headers, json={
                 "name": "测试子分类",
                 "parent_id": created_ids[0],
                 "sort": 1,
@@ -90,7 +92,7 @@ def test_category_crud(token):
 
     # TC-CAT-003: 获取分类树
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/categories/tree", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/categories/tree", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             log_result("TC-CAT-003", "获取分类树", "PASS", f"分类数量: {len(result['data'])}")
@@ -102,7 +104,7 @@ def test_category_crud(token):
     # TC-CAT-004: 更新分类
     if created_ids:
         try:
-            resp = requests.put(f"{BASE_URL}/api/v1/document/categories/{created_ids[0]}", headers=headers, json={
+            resp = requests.put(f"{BASE_URL}/v1/document/categories/{created_ids[0]}", headers=headers, json={
                 "name": "测试分类-已更新"
             })
             result = resp.json()
@@ -116,7 +118,7 @@ def test_category_crud(token):
     # TC-CAT-005: 获取分类详情
     if created_ids:
         try:
-            resp = requests.get(f"{BASE_URL}/api/v1/document/categories/{created_ids[0]}", headers=headers)
+            resp = requests.get(f"{BASE_URL}/v1/document/categories/{created_ids[0]}", headers=headers)
             result = resp.json()
             if result.get("code") == 0:
                 log_result("TC-CAT-005", "获取分类详情", "PASS")
@@ -152,7 +154,7 @@ def test_document_upload_and_crud(token, category_ids):
             if category_ids:
                 data['category_id'] = str(category_ids[0])
 
-            resp = requests.post(f"{BASE_URL}/api/v1/document/documents/upload", headers=headers, files=files, data=data)
+            resp = requests.post(f"{BASE_URL}/v1/document/documents/upload", headers=headers, files=files, data=data)
             result = resp.json()
             if result.get("code") == 0:
                 doc_id = result['data']['id']
@@ -166,7 +168,7 @@ def test_document_upload_and_crud(token, category_ids):
 
     # TC-DOC-002: 获取文档列表
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/documents", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/documents", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             log_result("TC-DOC-002", "获取文档列表", "PASS", f"总数: {result['data']['total']}")
@@ -178,7 +180,7 @@ def test_document_upload_and_crud(token, category_ids):
     # TC-DOC-003: 获取文档详情
     if created_doc_ids:
         try:
-            resp = requests.get(f"{BASE_URL}/api/v1/document/documents/{created_doc_ids[0]}", headers=headers)
+            resp = requests.get(f"{BASE_URL}/v1/document/documents/{created_doc_ids[0]}", headers=headers)
             result = resp.json()
             if result.get("code") == 0:
                 log_result("TC-DOC-003", "获取文档详情", "PASS")
@@ -190,7 +192,7 @@ def test_document_upload_and_crud(token, category_ids):
     # TC-DOC-004: 更新文档
     if created_doc_ids:
         try:
-            resp = requests.put(f"{BASE_URL}/api/v1/document/documents/{created_doc_ids[0]}", headers=headers, json={
+            resp = requests.put(f"{BASE_URL}/v1/document/documents/{created_doc_ids[0]}", headers=headers, json={
                 "title": "测试文档-已更新",
                 "description": "文档描述已更新"
             })
@@ -205,7 +207,7 @@ def test_document_upload_and_crud(token, category_ids):
     # TC-DOC-005: 移动文档到其他分类
     if len(created_doc_ids) >= 1 and len(category_ids) >= 2:
         try:
-            resp = requests.post(f"{BASE_URL}/api/v1/document/documents/{created_doc_ids[0]}/move", headers=headers, json={
+            resp = requests.post(f"{BASE_URL}/v1/document/documents/{created_doc_ids[0]}/move", headers=headers, json={
                 "target_category_id": category_ids[1]
             })
             result = resp.json()
@@ -218,7 +220,7 @@ def test_document_upload_and_crud(token, category_ids):
 
     # TC-DOC-006: 获取文档统计
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/documents/statistics", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/documents/statistics", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             stats = result['data']
@@ -230,7 +232,7 @@ def test_document_upload_and_crud(token, category_ids):
 
     # TC-DOC-007: 按标题搜索文档
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/documents", headers=headers, params={"title": "测试"})
+        resp = requests.get(f"{BASE_URL}/v1/document/documents", headers=headers, params={"title": "测试"})
         result = resp.json()
         if result.get("code") == 0:
             log_result("TC-DOC-007", "按标题搜索文档", "PASS", f"搜索结果: {result['data']['total']}")
@@ -256,7 +258,7 @@ def test_version_management(token, doc_ids):
 
     # TC-VER-001: 获取版本列表
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/versions/document/{doc_id}", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/versions/document/{doc_id}", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             log_result("TC-VER-001", "获取版本列表", "PASS", f"版本数: {result['data']['total']}")
@@ -269,13 +271,13 @@ def test_version_management(token, doc_ids):
     try:
         file_path = None
         for d in doc_ids[:1]:
-            resp_detail = requests.get(f"{BASE_URL}/api/v1/document/documents/{d}", headers=headers)
+            resp_detail = requests.get(f"{BASE_URL}/v1/document/documents/{d}", headers=headers)
             if resp_detail.json().get("code") == 0:
                 file_path = resp_detail.json()['data'].get('file_path')
                 break
 
         if file_path and os.path.exists(file_path):
-            resp = requests.post(f"{BASE_URL}/api/v1/document/versions/document/{doc_id}", headers=headers, json={
+            resp = requests.post(f"{BASE_URL}/v1/document/versions/document/{doc_id}", headers=headers, json={
                 "file_path": file_path,
                 "file_size": os.path.getsize(file_path),
                 "change_log": "添加新版本"
@@ -305,7 +307,7 @@ def test_preview_and_download(token, doc_ids):
 
     # TC-PRE-001: 检查可预览性
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/preview/{doc_id}/check", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/preview/{doc_id}/check", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             data = result['data']
@@ -318,7 +320,7 @@ def test_preview_and_download(token, doc_ids):
 
     # TC-PRE-002: 预览文档
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/preview/{doc_id}", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/preview/{doc_id}", headers=headers)
         if resp.status_code == 200 and 'application/octet-stream' not in resp.headers.get('content-type', ''):
             log_result("TC-PRE-002", "在线预览文档", "PASS", f"Content-Type: {resp.headers.get('content-type')}")
         elif resp.status_code == 200:
@@ -330,7 +332,7 @@ def test_preview_and_download(token, doc_ids):
 
     # TC-PRE-003: 下载文档
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/preview/{doc_id}/download", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/preview/{doc_id}/download", headers=headers)
         if resp.status_code == 200 and len(resp.content) > 0:
             log_result("TC-PRE-003", "下载文档", "PASS", f"文件大小: {len(resp.content)} bytes")
         else:
@@ -353,7 +355,7 @@ def test_business_query(token, doc_ids):
 
     # TC-BIZ-001: 先给文档设置业务关联
     try:
-        resp = requests.put(f"{BASE_URL}/api/v1/document/documents/{doc_id}", headers=headers, json={
+        resp = requests.put(f"{BASE_URL}/v1/document/documents/{doc_id}", headers=headers, json={
             "business_type": "product",
             "business_id": 1
         })
@@ -367,7 +369,7 @@ def test_business_query(token, doc_ids):
 
     # TC-BIZ-002: 按业务查询
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/documents/business/product/1", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/documents/business/product/1", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             log_result("TC-BIZ-002", "按业务查询文档", "PASS", f"关联文档数: {len(result['data'])}")
@@ -391,7 +393,7 @@ def test_trash_and_restore(token, doc_ids):
 
     # TC-TRASH-001: 软删除文档
     try:
-        resp = requests.delete(f"{BASE_URL}/api/v1/document/documents/{doc_id}", headers=headers)
+        resp = requests.delete(f"{BASE_URL}/v1/document/documents/{doc_id}", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             log_result("TC-TRASH-001", "软删除文档", "PASS")
@@ -402,7 +404,7 @@ def test_trash_and_restore(token, doc_ids):
 
     # TC-TRASH-002: 查看回收站
     try:
-        resp = requests.get(f"{BASE_URL}/api/v1/document/documents/trash", headers=headers)
+        resp = requests.get(f"{BASE_URL}/v1/document/documents/trash", headers=headers)
         result = resp.json()
         if result.get("code") == 0:
             log_result("TC-TRASH-002", "查看回收站", "PASS", f"回收站文档数: {result['data']['total']}")
@@ -413,7 +415,7 @@ def test_trash_and_restore(token, doc_ids):
 
     # TC-TRASH-003: 恢复文档
     try:
-        resp = requests.post(f"{BASE_URL}/api/v1/document/documents/batch-restore", headers=headers, json={
+        resp = requests.post(f"{BASE_URL}/v1/document/documents/batch-restore", headers=headers, json={
             "document_ids": [doc_id]
         })
         result = resp.json()
@@ -428,7 +430,7 @@ def test_trash_and_restore(token, doc_ids):
     doc_id_2 = doc_ids[1] if len(doc_ids) > 1 else None
     if doc_id_2:
         try:
-            resp = requests.post(f"{BASE_URL}/api/v1/document/documents/batch-delete", headers=headers, json={
+            resp = requests.post(f"{BASE_URL}/v1/document/documents/batch-delete", headers=headers, json={
                 "document_ids": [doc_id_2]
             })
             result = resp.json()
@@ -500,7 +502,7 @@ def main():
         headers = {"Authorization": f"Bearer {token}"}
         for cat_id in reversed(category_ids):
             try:
-                requests.delete(f"{BASE_URL}/api/v1/document/categories/{cat_id}", headers=headers)
+                requests.delete(f"{BASE_URL}/v1/document/categories/{cat_id}", headers=headers)
             except Exception:
                 pass
 

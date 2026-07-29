@@ -8,10 +8,16 @@ from base.plugins.document.api.v1.version_router import version_router
 from base.plugins.document.api.v1.preview_router import preview_router
 from base.plugins.document.api.v1.rag_router import rag_router
 
-document_v1_router = APIRouter()
+# 主路由器（符合插件管理器命名约定：__init___router）
+__init___router = APIRouter()
 
-document_v1_router.include_router(category_router, prefix="/categories", tags=["文档分类"])
-document_v1_router.include_router(document_router, prefix="/documents", tags=["文档管理"])
-document_v1_router.include_router(version_router, prefix="/versions", tags=["文档版本"])
-document_v1_router.include_router(preview_router, prefix="/preview", tags=["文档预览"])
-document_v1_router.include_router(rag_router, prefix="/rag", tags=["RAG 集成"])
+__init___router.include_router(category_router, prefix="/categories", tags=["文档分类"])
+__init___router.include_router(document_router, prefix="/documents", tags=["文档管理"])
+__init___router.include_router(version_router, prefix="/versions", tags=["文档版本"])
+__init___router.include_router(preview_router, prefix="/preview", tags=["文档预览"])
+__init___router.include_router(rag_router, prefix="/rag", tags=["RAG 集成"])
+
+# 兼容别名
+router = __init___router
+
+__all__ = ["__init___router", "router"]
