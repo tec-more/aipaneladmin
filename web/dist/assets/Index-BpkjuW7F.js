@@ -1,0 +1,1 @@
+import{_ as o,ba as c,c as t,o as s,d as n}from"./index-AuTg3dMG.js";const r={},a={class:"cash-bill-index"};function _(d,i){const e=c("router-view");return s(),t("div",a,[n(e)])}const l=o(r,[["render",_],["__scopeId","data-v-1e102f5f"]]);export{l as default};

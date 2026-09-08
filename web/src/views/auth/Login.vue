@@ -1,9 +1,9 @@
-﻿<template>
+<template>
   <div class="login-container">
     <div class="login-card">
       <div class="login-header">
         <img src="@/assets/logo.svg" alt="logo" class="logo" />
-        <h1>笑话面对面</h1>
+        <h1>{{ system.productName }}</h1>
         <p>管理后台</p>
       </div>
 
@@ -56,10 +56,12 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { useSystemStore } from '@/stores/system'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const system = useSystemStore()
 
 const formRef = ref(null)
 const loading = ref(false)

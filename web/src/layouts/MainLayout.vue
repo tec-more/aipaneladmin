@@ -90,7 +90,7 @@
         </div>
 
         <div class="header-right">
-          <MailBell />
+          <MailBell v-if="system.isPluginEnabled('mail')" />
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <el-avatar :size="32" :icon="UserFilled" />
@@ -161,6 +161,7 @@ import { changePassword } from '@/api/auth'
 import ApprovalPrompt from '@/views/approval/ApprovalPrompt.vue'
 import GlobalApproval from '@/components/GlobalApproval.vue'
 import MailBell from '@/components/MailBell.vue'
+import { useSystemStore } from '@/stores/system'
 
 // 图标组件映射
 const iconComponents = {
@@ -219,6 +220,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const menuStore = useMenuStore()
+const system = useSystemStore()
 
 const isCollapse = ref(false)
 const passwordVisible = ref(false)

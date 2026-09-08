@@ -10,6 +10,7 @@ export const useSystemStore = defineStore('system', () => {
   const backend_name = ref('')
   const debug = ref(false)
   const install_redirect = ref('login')
+  const enabled_plugins = ref([])
   const loaded = ref(false)
 
   /**
@@ -28,6 +29,7 @@ export const useSystemStore = defineStore('system', () => {
       if (data.backend_name != null) backend_name.value = data.backend_name
       if (data.install_redirect != null) install_redirect.value = data.install_redirect
       if (typeof data.debug === 'boolean') debug.value = data.debug
+      if (Array.isArray(data.enabled_plugins)) enabled_plugins.value = data.enabled_plugins
       loaded.value = true
     } catch (e) {
       console.warn('[system store] 加载系统配置失败，使用默认值：', e?.message || e)
@@ -37,6 +39,14 @@ export const useSystemStore = defineStore('system', () => {
   const siteTitle = computed(() => backend_name.value || app_name.value)
   const productName = computed(() => frontend_name.value || app_name.value)
 
+  /**
+   * 判断插件是否启用
+   * @param {string} name - 插件名（如 'approval' / 'mail'）
+   */
+  function isPluginEnabled(name) {
+    return enabled_plugins.value.includes(name)
+  }
+
   return {
     app_name,
     app_version,
@@ -45,9 +55,11 @@ export const useSystemStore = defineStore('system', () => {
     backend_name,
     debug,
     install_redirect,
+    enabled_plugins,
     loaded,
     loadConfig,
     siteTitle,
     productName,
+    isPluginEnabled,
   }
 })

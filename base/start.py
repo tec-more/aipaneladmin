@@ -80,6 +80,10 @@ async def lifespan(app: FastAPI):
     try:
         await init_data()
 
+        # 审计事件处理器必须在 Tortoise.init 之后注册
+        # （否则 model 的 default_connection 为 None，写日志时会报错）
+        register_audit_handlers()
+
         # 初始化EventBusAdapter（RabbitMQ事件总线）
         try:
             from base.common.events.event_bus import event_bus
@@ -450,8 +454,8 @@ def init_app() -> FastAPI:
     register_exceptions_with_logging(app)  # 使用带详细日志的异常处理器
     register_middlewares(app)
     
-    # 注册审计事件处理器（在应用创建时调用，确保每个进程都注册）
-    register_audit_handlers()
+    # 审计事件处理器推迟到 lifespan 中 init_data() 之后注册
+    # （Tortoise.init 必须先完成，否则 model 的 default_connection 为 None）
 
     # 使用自动路由注册机制
     register_routers(app)

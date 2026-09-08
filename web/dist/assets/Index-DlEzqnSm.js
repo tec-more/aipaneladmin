@@ -1,1 +1,0 @@
-import{_ as o,ba as t,c,o as n,b as s}from"./index-CJ__AGa3.js";const r={},_={class:"expense-index"};function a(d,i){const e=t("router-view");return n(),c("div",_,[s(e)])}const f=o(r,[["render",a],["__scopeId","data-v-42d44878"]]);export{f as default};

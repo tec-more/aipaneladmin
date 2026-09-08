@@ -1,1 +1,0 @@
-import{_ as o,ba as c,c as t,o as n,b as r}from"./index-CJ__AGa3.js";const s={},a={class:"general-ledger-index"};function _(d,i){const e=c("router-view");return n(),t("div",a,[r(e)])}const f=o(s,[["render",_],["__scopeId","data-v-2bd5c8fd"]]);export{f as default};

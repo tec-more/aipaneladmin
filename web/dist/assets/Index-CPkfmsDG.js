@@ -1,0 +1,1 @@
+import{_ as o,ba as c,c as t,o as a,d as n}from"./index-AuTg3dMG.js";const r={},s={class:"receivable-payable-index"};function _(d,i){const e=c("router-view");return a(),t("div",s,[n(e)])}const p=o(r,[["render",_],["__scopeId","data-v-ec979ac9"]]);export{p as default};

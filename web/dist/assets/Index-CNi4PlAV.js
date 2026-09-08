@@ -1,0 +1,1 @@
+import{_ as o,c as t,d as s,ba as c,o as n}from"./index-AuTg3dMG.js";const r={},_={class:"settings-index"};function a(d,i){const e=c("router-view");return n(),t("div",_,[s(e)])}const p=o(r,[["render",a],["__scopeId","data-v-8ef866df"]]);export{p as default};

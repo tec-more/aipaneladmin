@@ -50,8 +50,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
 import { Bell, Star } from '@element-plus/icons-vue'
 import { getInbox, getUnreadCount, markRead } from '@/api/mail'
+import { useSystemStore } from '@/stores/system'
 
 const router = useRouter()
+const system = useSystemStore()
 
 const unreadCount = ref(0)
 const recentList = ref([])
@@ -190,6 +192,8 @@ const onRefreshEvent = () => {
 }
 
 onMounted(() => {
+  // mail 插件未启用时不轮询/不连 WS，避免 404
+  if (!system.isPluginEnabled('mail')) return
   fetchUnread()
   fetchRecent()
   connectWs()

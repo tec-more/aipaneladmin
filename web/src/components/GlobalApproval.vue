@@ -105,9 +105,11 @@ import {
   getApprovalContextByRoute, submitForApproval,
   approveTask, cancelInstance, transferTask
 } from '@/api/approval'
+import { useSystemStore } from '@/stores/system'
 
 const route = useRoute()
 const router = useRouter()
+const system = useSystemStore()
 
 const loading = ref(false)
 const contextData = ref(null)
@@ -126,8 +128,8 @@ const canCreate = computed(() => contextData.value?.can_create ?? false)
 const canUpdate = computed(() => contextData.value?.can_update ?? false)
 const canDelete = computed(() => contextData.value?.can_delete ?? false)
 
-// 加载中或无流程时不显示条
-const visible = computed(() => !loading.value && hasFlow.value)
+// 加载中或无流程时不显示条；approval 插件未启用时整体禁用
+const visible = computed(() => system.isPluginEnabled('approval') && !loading.value && hasFlow.value)
 
 const flowLabel = computed(() => {
   if (!hasFlow.value) return ''
@@ -157,6 +159,11 @@ function getBusinessId() {
 }
 
 async function loadContext() {
+  // approval 插件未启用时不发请求，避免 404
+  if (!system.isPluginEnabled('approval')) {
+    contextData.value = null
+    return
+  }
   const currentRoute = route.path
   if (!currentRoute) return
   loading.value = true
