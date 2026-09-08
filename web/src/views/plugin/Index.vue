@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="plugin-management">
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-card">
@@ -65,8 +65,18 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="安装时间" width="180" />
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="220" fixed="right" align="center">
           <template #default="{ row }">
+            <el-button
+              v-if="!row.is_installed"
+              type="success"
+              link
+              :icon="Download"
+              :loading="row._installing"
+              @click="handleInstall(row)"
+            >
+              安装
+            </el-button>
             <el-button
               type="primary"
               link
@@ -80,7 +90,7 @@
               type="danger"
               link
               :icon="Delete"
-              :disabled="row.is_enabled"
+              :disabled="!row.is_installed"
               @click="handleUninstall(row)"
             >
               卸载
@@ -194,12 +204,13 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, RefreshRight, Upload, Setting, Delete } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Upload, Setting, Delete, Download } from '@element-plus/icons-vue'
 import {
   getPluginList,
   syncPlugins,
   enablePlugin,
   disablePlugin,
+  installPlugin,
   uninstallPlugin,
   uploadPlugin,
   getPluginSettings,
@@ -243,7 +254,8 @@ const fetchData = async () => {
     })
     tableData.value = (res.data.items || []).map(item => ({
       ...item,
-      _switching: false
+      _switching: false,
+      _installing: false
     }))
     pagination.total = res.data.total || 0
   } catch (e) {
@@ -296,18 +308,55 @@ const handleToggleStatus = async (row, enabled) => {
   }
 }
 
-const handleUninstall = async (row) => {
+const handleInstall = async (row) => {
+  row._installing = true
   try {
     await ElMessageBox.confirm(
-      `确定要卸载插件 "${row.display_name}" 吗？卸载后插件文件将被删除。`,
-      '警告',
-      { type: 'warning' }
+      `确定要安装插件 "${row.display_name}" 吗？安装后需手动启用方可生效。`,
+      '安装确认',
+      { type: 'info', confirmButtonText: '安装', cancelButtonText: '取消' }
     )
-    await uninstallPlugin(row.id)
-    ElMessage.success('插件已卸载')
+  } catch (e) {
+    row._installing = false
+    return
+  }
+  try {
+    const res = await installPlugin(row.id)
+    ElMessage.success(res.msg || '插件安装成功')
     fetchData()
   } catch (e) {
-    // 取消或错误
+    // 错误已处理
+    row._installing = false
+  }
+}
+
+const handleUninstall = async (row) => {
+  // 卸载前置确认 + 登录密码验证
+  let password = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `卸载插件 "${row.display_name}" 后将停止使用，需验证您的登录密码。\n请输入当前管理员登录密码：`,
+      '卸载确认',
+      {
+        confirmButtonText: '确认卸载',
+        cancelButtonText: '取消',
+        type: 'warning',
+        inputType: 'password',
+        inputPlaceholder: '请输入登录密码',
+        inputValidator: (val) => (val && val.trim() ? true : '密码不能为空'),
+      }
+    )
+    password = value
+  } catch (e) {
+    return // 用户取消
+  }
+
+  try {
+    const res = await uninstallPlugin(row.id, password)
+    ElMessage.success(res.msg || '插件已卸载')
+    fetchData()
+  } catch (e) {
+    // 密码错误或权限不足，错误已由拦截器提示
   }
 }
 

@@ -10,8 +10,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, status, Query, UploadFile, File
 
 from base.core.extension.services.plugin_service import PluginService
-from base.core.extension.schemas.plugin import PluginSettingsUpdate, PluginUpdate
-from base.common.security import get_current_user_id
+from base.core.extension.schemas.plugin import PluginSettingsUpdate, PluginUpdate, PluginUninstallRequest
+from base.common.security import get_current_user_id, verify_password
 from base.common.response import SuccessResponse, ErrorResponse
 from base.core.users.services.user_service import UserService
 from base.plugins import plugin_manager
@@ -174,12 +174,12 @@ async def disable_plugin(
     return SuccessResponse(data=await plugin.to_dict(), msg="插件已禁用")
 
 
-@router.delete("/{plugin_id}", summary="卸载插件")
-async def uninstall_plugin(
+@router.post("/{plugin_id}/install", summary="安装插件")
+async def install_plugin(
     plugin_id: int,
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """卸载指定插件"""
+    """安装已同步到插件目录的插件（将安装状态置为已安装，插件文件需已存在）"""
     if not await check_admin(current_user_id):
         return ErrorResponse(msg="无权限执行此操作", status_code=status.HTTP_403_FORBIDDEN)
 
@@ -187,17 +187,63 @@ async def uninstall_plugin(
     if not plugin:
         return ErrorResponse(msg="插件不存在", status_code=status.HTTP_404_NOT_FOUND)
 
+    if plugin.is_installed:
+        return ErrorResponse(msg="插件已安装，无需重复安装", status_code=status.HTTP_400_BAD_REQUEST)
+
+    # 校验插件文件（manifest.json）是否存在
+    manifest = plugin_manager.get_manifest(plugin.name)
+    if not manifest:
+        return ErrorResponse(msg="插件文件缺失，请重新上传插件包", status_code=status.HTTP_400_BAD_REQUEST)
+
+    # 写入 manifest 安装状态（安装后默认不启用，需用户手动启用）
+    plugin_manager.update_plugin_status(plugin.name, is_installed=True, is_enabled=False)
+
+    # 更新数据库记录
+    plugin = await PluginService.set_install_status(plugin_id, True)
+
+    return SuccessResponse(data=await plugin.to_dict(), msg=f"插件 {plugin.display_name} 安装成功")
+
+
+@router.post("/{plugin_id}/uninstall", summary="卸载插件（需验证密码）")
+async def uninstall_plugin(
+    plugin_id: int,
+    body: PluginUninstallRequest,
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """卸载指定插件（需管理员权限且验证登录密码）"""
+    # 1. 权限校验：仅超级管理员可卸载
+    if not await check_admin(current_user_id):
+        return ErrorResponse(msg="无权限执行此操作", status_code=status.HTTP_403_FORBIDDEN)
+
+    plugin = await PluginService.get_by_id(plugin_id)
+    if not plugin:
+        return ErrorResponse(msg="插件不存在", status_code=status.HTTP_404_NOT_FOUND)
+
+    # 2. 仅已安装插件可卸载
+    if not plugin.is_installed:
+        return ErrorResponse(msg="插件未安装，无需卸载", status_code=status.HTTP_400_BAD_REQUEST)
+
+    # 3. 验证当前用户登录密码
+    user = await UserService.get_by_id(current_user_id)
+    if not user or not user.password or not verify_password(body.password, user.password):
+        return ErrorResponse(msg="登录密码验证失败，无法卸载插件", status_code=status.HTTP_400_BAD_REQUEST)
+
     plugin_name = plugin.display_name
 
-    # 调用插件管理器卸载插件
-    success = await plugin_manager.uninstall_plugin(plugin.name)
-    if not success:
-        return ErrorResponse(msg="卸载插件失败", status_code=status.HTTP_400_BAD_REQUEST)
+    # 4. 若插件处于启用状态，先禁用（卸载路由、菜单等）
+    if plugin.is_enabled:
+        try:
+            await plugin_manager.disable_plugin(plugin.name)
+        except Exception:
+            pass  # 禁用失败不阻断卸载流程
 
-    # 删除数据库记录
-    await PluginService.delete_plugin(plugin_id)
+    # 5. 写入 manifest：未安装 + 未启用（保留插件文件，便于再次安装）
+    plugin_manager.update_plugin_status(plugin.name, is_installed=False, is_enabled=False)
 
-    return SuccessResponse(msg=f"插件 {plugin_name} 已卸载")
+    # 6. 更新数据库记录
+    plugin = await PluginService.set_install_status(plugin_id, False)
+
+    return SuccessResponse(data=await plugin.to_dict(), msg=f"插件 {plugin_name} 已卸载")
 
 
 @router.post("/upload", summary="上传并安装插件")

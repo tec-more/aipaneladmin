@@ -71,6 +71,11 @@ class PluginSettingsUpdate(BaseModel):
     settings: Dict[str, Any] = Field(default_factory=dict, description="插件配置")
 
 
+class PluginUninstallRequest(BaseModel):
+    """插件卸载请求（需验证登录密码）"""
+    password: str = Field(..., min_length=1, description="当前管理员登录密码")
+
+
 class PluginDiscoverItem(BaseModel):
     """发现的插件信息"""
     name: str

@@ -1,0 +1,1 @@
+import{bn as s}from"./index-Dx-zCMIj.js";const n="/v1/quality",r=t=>s.get(`${n}/inspections`,{params:t}),a=t=>s.post(`${n}/inspections`,t),o=t=>s.get(`${n}/standards`,{params:t}),c=t=>s.post(`${n}/standards`,t);export{o as a,c as b,a as c,r as g};

@@ -1,1 +1,0 @@
-import{_ as o,c,d as n,ba as t,o as s}from"./index-Dbl4CS-e.js";const a={},r={class:"finance-index"};function _(d,i){const e=t("router-view");return s(),c("div",r,[n(e)])}const p=o(a,[["render",_],["__scopeId","data-v-63228a67"]]);export{p as default};

@@ -173,6 +173,31 @@ class PluginService:
         return plugin
 
     @staticmethod
+    async def set_install_status(plugin_id: int, is_installed: bool) -> Optional[Plugin]:
+        """
+        修改插件安装状态（安装/卸载）
+
+        - 安装：is_installed=True，is_enabled 保持 False（安装后需手动启用）
+        - 卸载：is_installed=False，同时强制 is_enabled=False
+
+        Args:
+            plugin_id: 插件ID
+            is_installed: 是否已安装
+
+        Returns:
+            Optional[Plugin]: 更新后的插件对象
+        """
+        plugin = await Plugin.filter(id=plugin_id).first()
+        if not plugin:
+            return None
+
+        plugin.is_installed = is_installed
+        if not is_installed:
+            plugin.is_enabled = False
+        await plugin.save()
+        return plugin
+
+    @staticmethod
     async def update_settings(plugin_id: int, settings: Dict[str, Any]) -> Optional[Plugin]:
         """
         更新插件设置

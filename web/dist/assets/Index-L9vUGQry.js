@@ -1,1 +1,0 @@
-import{_ as o,ba as t,c,o as s,d as n}from"./index-Dbl4CS-e.js";const a={},r={class:"asset-index"};function _(d,i){const e=t("router-view");return s(),c("div",r,[n(e)])}const p=o(a,[["render",_],["__scopeId","data-v-caf00466"]]);export{p as default};

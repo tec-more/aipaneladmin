@@ -30,9 +30,14 @@ export function disablePlugin(pluginId) {
   return request.post(`/v1/plugins/${pluginId}/disable`)
 }
 
-// 卸载插件
-export function uninstallPlugin(pluginId) {
-  return request.delete(`/v1/plugins/${pluginId}`)
+// 安装插件（将已同步但未安装的插件置为已安装）
+export function installPlugin(pluginId) {
+  return request.post(`/v1/plugins/${pluginId}/install`)
+}
+
+// 卸载插件（需验证登录密码）
+export function uninstallPlugin(pluginId, password) {
+  return request.post(`/v1/plugins/${pluginId}/uninstall`, { password })
 }
 
 // 上传安装插件
