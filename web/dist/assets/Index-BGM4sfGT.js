@@ -1,1 +1,0 @@
-import{_ as o,b8 as t,c,o as n,b as s}from"./index-BEeNZQGc.js";const r={},_={class:"inventory-cost-index"};function a(d,i){const e=t("router-view");return n(),c("div",_,[s(e)])}const p=o(r,[["render",a],["__scopeId","data-v-0bf6bb2e"]]);export{p as default};

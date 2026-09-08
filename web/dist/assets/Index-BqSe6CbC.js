@@ -1,1 +1,0 @@
-import{_ as o,b8 as c,c as t,o as s,b as n}from"./index-BEeNZQGc.js";const r={},_={class:"purchase-index"};function a(d,i){const e=c("router-view");return s(),t("div",_,[n(e)])}const f=o(r,[["render",a],["__scopeId","data-v-c1608ed2"]]);export{f as default};

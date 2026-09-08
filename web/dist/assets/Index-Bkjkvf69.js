@@ -1,1 +1,0 @@
-import{_ as o,c,b as n,b8 as t,o as s}from"./index-BEeNZQGc.js";const r={},a={class:"finance-index"};function _(d,i){const e=t("router-view");return s(),c("div",a,[n(e)])}const p=o(r,[["render",_],["__scopeId","data-v-63228a67"]]);export{p as default};

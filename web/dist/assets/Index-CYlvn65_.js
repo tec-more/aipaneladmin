@@ -1,0 +1,1 @@
+import{_ as o,c,b as t,ba as n,o as s}from"./index-CJ__AGa3.js";const a={},r={class:"picking-index"};function _(d,i){const e=n("router-view");return s(),c("div",r,[t(e)])}const f=o(a,[["render",_],["__scopeId","data-v-52eaa532"]]);export{f as default};

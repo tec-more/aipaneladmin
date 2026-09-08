@@ -1,0 +1,1 @@
+import{_ as o,c,b as t,ba as n,o as r}from"./index-CJ__AGa3.js";const s={},_={class:"inventory-index"};function a(d,i){const e=n("router-view");return r(),c("div",_,[t(e)])}const f=o(s,[["render",a],["__scopeId","data-v-ec7c1c98"]]);export{f as default};

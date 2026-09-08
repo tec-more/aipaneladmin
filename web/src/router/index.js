@@ -1,12 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useMenuStore } from '@/stores/menu'
+import { useSystemStore } from '@/stores/system'
+import { getInstallStatus } from '@/api/install'
 
 const routes = [
   {
     path: '/',
     name: 'LandingPage',
     component: () => import('@/views/LandingPage.vue'),
-    meta: { title: '笑话面对面', public: true }
+    meta: { title: 'AIPanelAdmin', public: true }
   },
   {
     path: '/panel/login',
@@ -329,7 +331,19 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  document.title = `${to.meta.title || ''} - 笑话面对面`
+  // 初始化系统配置（确保每次路由都有 config.conf 中的名称可用）
+  const systemStore = useSystemStore()
+  if (!systemStore.loaded) {
+    try {
+      await systemStore.loadConfig()
+    } catch (_) {}
+  }
+  // 动态拼接浏览器标题：页面标题 - 系统名称
+  // /panel 和 /install 等后台路径用 backend_name，其他用 frontend_name
+  const siteName = (to.path.startsWith('/panel') || to.path.startsWith('/install'))
+    ? (systemStore.backend_name || systemStore.app_name)
+    : (systemStore.frontend_name || systemStore.app_name)
+  document.title = to.meta.title ? `${to.meta.title} - ${siteName}` : siteName
 
   // ---- 安装检查：未安装时强制进入安装向导（每次导航都向后端核实真实状态） ----
   const cacheInstalled = localStorage.getItem('system_installed') === 'true'
