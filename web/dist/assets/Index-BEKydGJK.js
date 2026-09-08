@@ -1,1 +1,0 @@
-import{_ as o,aC as c,c as t,o as s,b as n}from"./index-Y-HAgN76.js";const a={},r={class:"cash-bill-index"};function _(d,i){const e=c("router-view");return s(),t("div",r,[n(e)])}const p=o(a,[["render",_],["__scopeId","data-v-a5133e41"]]);export{p as default};

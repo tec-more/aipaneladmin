@@ -45,6 +45,13 @@ export function createRequestWithTimeout(timeout) {
           localStorage.removeItem('userInfo')
           ElMessage.error('登录已过期，请重新登录')
           router.push('/panel/login')
+        } else if (status === 503) {
+          // 503 系统未安装 - 静默处理，清除缓存并跳转安装页
+          localStorage.removeItem('system_installed')
+          if (data?.redirect === '/install') {
+            window.location.href = '/install'
+          }
+          return Promise.reject(new Error('SYSTEM_NOT_INSTALLED'))
         } else {
           ElMessage.error(data?.msg || data?.message || error.message || `请求失败 (${status})`)
         }
@@ -123,6 +130,14 @@ request.interceptors.response.use(
         router.push('/panel/login')
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
+      } else if (status === 503) {
+        // 503 系统未安装 - 静默处理，清除缓存并跳转安装页
+        localStorage.removeItem('system_installed')
+        if (data?.redirect === '/install') {
+          router.push('/install')
+        }
+        // 静默拒绝，不弹错误提示
+        return Promise.reject(new Error('SYSTEM_NOT_INSTALLED'))
       } else if (status === 400 && data?.code === 40001 && data?.require_approval) {
         // 审批拦截：触发全局审批提示事件，不显示错误提示
         window.dispatchEvent(new CustomEvent('approval-required', { detail: data }))

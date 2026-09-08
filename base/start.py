@@ -66,6 +66,14 @@ async def lifespan(app: FastAPI):
     # 启动逻辑
     print("Application starting up...")
 
+    # 安装检查：未安装时只启动最小化 HTTP 服务，跳过数据库和插件初始化
+    from base.core.install.services.install_service import InstallService
+    if not InstallService.is_installed():
+        print("[安装检查] 系统未安装，跳过数据库和插件初始化（仅提供安装向导服务）")
+        print("[安装检查] 请访问前端安装向导或 POST /api/v1/install/execute 完成安装")
+        yield
+        return
+
     # 存储后台任务引用，便于清理
     background_tasks = []
 

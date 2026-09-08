@@ -1,1 +1,0 @@
-import{_ as o,aK as t,c,o as n,b as s}from"./index-Bu1iRavU.js";const a={},r={class:"quality-index"};function _(d,i){const e=t("router-view");return n(),c("div",r,[s(e)])}const p=o(a,[["render",_],["__scopeId","data-v-aed5281e"]]);export{p as default};

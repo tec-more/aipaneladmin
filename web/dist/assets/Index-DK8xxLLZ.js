@@ -1,1 +1,0 @@
-import{_ as o,aK as c,c as t,o as a,b as n}from"./index-DCsUa8PH.js";const r={},s={class:"receivable-payable-index"};function _(d,i){const e=c("router-view");return a(),t("div",s,[n(e)])}const p=o(r,[["render",_],["__scopeId","data-v-930a1848"]]);export{p as default};

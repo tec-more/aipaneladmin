@@ -1,1 +1,0 @@
-import{_ as o,c,b as n,an as t,o as s}from"./index-DvQLNIr9.js";const r={},_={class:"picking-index"};function a(d,i){const e=t("router-view");return s(),c("div",_,[n(e)])}const f=o(r,[["render",a],["__scopeId","data-v-c75c2135"]]);export{f as default};

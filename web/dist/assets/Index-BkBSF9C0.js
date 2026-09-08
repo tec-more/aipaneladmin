@@ -1,1 +1,0 @@
-import{_ as o,aK as t,c,o as n,b as s}from"./index-Q_PMvp3D.js";const r={},_={class:"equipment-index"};function a(d,i){const e=t("router-view");return n(),c("div",_,[s(e)])}const m=o(r,[["render",a],["__scopeId","data-v-e2193e5d"]]);export{m as default};

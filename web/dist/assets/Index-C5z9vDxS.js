@@ -1,1 +1,0 @@
-import{_ as o,c as t,b as c,an as n,o as s}from"./index-DvQLNIr9.js";const r={},_={class:"settings-index"};function a(d,i){const e=n("router-view");return s(),t("div",_,[c(e)])}const p=o(r,[["render",a],["__scopeId","data-v-f8f75c43"]]);export{p as default};

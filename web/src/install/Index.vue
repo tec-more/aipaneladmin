@@ -92,7 +92,7 @@
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="数据库名" prop="db_name">
-                  <el-input v-model="dbForm.db_name" placeholder="jingxipanel" />
+                  <el-input v-model="dbForm.db_name" placeholder="aipaneladmin" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -400,11 +400,11 @@ const installReady = ref(false)
 // 环境检测加载中
 const envChecking = ref(true)
 
-// 步骤状态
+// 步骤状态：让已完成步骤显示 success，当前步骤显示 process
 const stepStatus = computed(() => {
   if (installing.value) return 'process'
   if (installStatus.value === 'success') return 'success'
-  return 'wait'
+  return 'process'
 })
 
 // 环境检测（动态获取）
@@ -420,7 +420,7 @@ const dbForm = reactive({
   db_type: 'postgresql',
   db_host: '127.0.0.1',
   db_port: 15432,
-  db_name: 'jingxipanel',
+  db_name: 'aipaneladmin',
   db_user: 'admin',
   db_password: '',
   charset: 'UTF8',
@@ -501,6 +501,28 @@ let installTimer = null
 // 安装完成页 - 用户确认已重启应用
 const restartConfirmed = ref(false)
 
+// 监听步骤变化，实现"进入步骤即激活"
+watch(currentStep, async (newStep, oldStep) => {
+  if (newStep === 0 && oldStep !== undefined) {
+    // 从其他步骤退回环境检测时，重新执行检测
+    await doEnvCheck()
+  } else if (newStep === 1) {
+    // 进入数据库配置步骤：重置连接状态（防止"上一次连接通过"残留）
+    dbConnectionOk.value = false
+    databaseNotEmptyWarning.value = false
+    testResult.value = null
+  } else if (newStep === 2) {
+    // 进入管理员设置步骤：触发表单初始验证（让"开始安装"按钮即时可判断）
+    nextTick(() => {
+      if (adminFormRef.value) {
+        adminFormRef.value.validate((valid) => {
+          adminFormValid.value = valid
+        })
+      }
+    })
+  }
+})
+
 // 下一步
 const nextStep = async () => {
   if (currentStep.value === 0) {
@@ -512,14 +534,6 @@ const nextStep = async () => {
       return
     }
     currentStep.value = 2
-    // 进入管理员步骤后，等待 DOM 渲染完成再触发验证
-    nextTick(() => {
-      if (adminFormRef.value) {
-        adminFormRef.value.validate((valid) => {
-          adminFormValid.value = valid
-        })
-      }
-    })
   }
 }
 

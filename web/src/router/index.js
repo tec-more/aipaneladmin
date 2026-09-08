@@ -15,6 +15,12 @@ const routes = [
     meta: { title: '管理后台登录', public: true }
   },
   {
+    path: '/install',
+    name: 'Install',
+    component: () => import('@/install/Index.vue'),
+    meta: { title: '系统安装向导', public: true }
+  },
+  {
     path: '/panel',
     name: 'panel',
     component: () => import('@/layouts/MainLayout.vue'),
@@ -324,7 +330,34 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   document.title = `${to.meta.title || ''} - 笑话面对面`
-  
+
+  // ---- 安装检查：未安装时强制进入安装向导（每次导航都向后端核实真实状态） ----
+  const cacheInstalled = localStorage.getItem('system_installed') === 'true'
+  if (!cacheInstalled || to.path === '/install') {
+    let installed = cacheInstalled
+    try {
+      const resp = await fetch('/api/v1/install/status')
+      const json = await resp.json()
+      const data = json?.data || json
+      installed = !!data.installed
+      if (installed) {
+        localStorage.setItem('system_installed', 'true')
+      } else {
+        localStorage.removeItem('system_installed')
+      }
+    } catch (_) {
+      // 后端不可达时依赖本地缓存判断，避免把用户锁死在安装页
+    }
+    if (!installed && to.path !== '/install') {
+      next({ path: '/install' })
+      return
+    }
+    if (installed && to.path === '/install') {
+      next({ path: '/panel/login' })
+      return
+    }
+  }
+
   const token = localStorage.getItem('token')
   const isLoggedIn = !!token
 

@@ -1,1 +1,0 @@
-import{_ as o,aC as s,c as t,o as c,b as n}from"./index-Y-HAgN76.js";const a={},r={class:"sales-index"};function _(d,i){const e=s("router-view");return c(),t("div",r,[n(e)])}const p=o(a,[["render",_],["__scopeId","data-v-22b7db6a"]]);export{p as default};

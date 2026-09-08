@@ -1,1 +1,0 @@
-import{_ as o,an as t,c,o as n,b as s}from"./index-DvQLNIr9.js";const r={},_={class:"mes-index"};function a(d,i){const e=t("router-view");return n(),c("div",_,[s(e)])}const p=o(r,[["render",a],["__scopeId","data-v-590d26d3"]]);export{p as default};

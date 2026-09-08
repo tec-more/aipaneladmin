@@ -5,7 +5,7 @@ class DatabaseConfig(BaseModel):
     """数据库配置"""
     db_host: str = Field(default="127.0.0.1", description="数据库主机地址")
     db_port: int = Field(default=15432, description="数据库端口")
-    db_name: str = Field(default="jingxipanel", description="数据库名称")
+    db_name: str = Field(default="aipaneladmin", description="数据库名称")
     db_user: str = Field(default="admin", description="数据库用户名")
     db_password: str = Field(default="", description="数据库密码")
     charset: str = Field(default="UTF8", description="数据库字符集")

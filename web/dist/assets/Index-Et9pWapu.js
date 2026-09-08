@@ -1,0 +1,1 @@
+import{_ as o,b8 as c,c as t,o as s,b as n}from"./index-BEeNZQGc.js";const r={},_={class:"cash-bill-index"};function a(d,i){const e=c("router-view");return s(),t("div",_,[n(e)])}const l=o(r,[["render",a],["__scopeId","data-v-1e102f5f"]]);export{l as default};

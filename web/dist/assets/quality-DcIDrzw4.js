@@ -1,1 +1,0 @@
-import{aR as s}from"./index-Y-HAgN76.js";const n="/v1/quality",a=t=>s.get(`${n}/inspections`,{params:t}),r=t=>s.post(`${n}/inspections`,t),o=t=>s.get(`${n}/standards`,{params:t}),c=t=>s.post(`${n}/standards`,t);export{o as a,c as b,r as c,a as g};

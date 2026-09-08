@@ -1,1 +1,0 @@
-import{_ as o,aK as c,c as t,o as n,b as s}from"./index-DCsUa8PH.js";const r={},_={class:"expense-index"};function a(d,f){const e=c("router-view");return n(),t("div",_,[s(e)])}const p=o(r,[["render",a],["__scopeId","data-v-f42595cf"]]);export{p as default};

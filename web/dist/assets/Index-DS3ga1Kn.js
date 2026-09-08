@@ -1,1 +1,0 @@
-import{_ as o,c,b as t,aK as n,o as s}from"./index-DCsUa8PH.js";const r={},_={class:"picking-index"};function a(d,i){const e=n("router-view");return s(),c("div",_,[t(e)])}const f=o(r,[["render",a],["__scopeId","data-v-c75c2135"]]);export{f as default};

@@ -1,1 +1,0 @@
-import{_ as o,an as c,c as n,o as t,b as r}from"./index-DvQLNIr9.js";const s={},a={class:"general-ledger-index"};function _(d,i){const e=c("router-view");return t(),n("div",a,[r(e)])}const f=o(s,[["render",_],["__scopeId","data-v-c52f8895"]]);export{f as default};

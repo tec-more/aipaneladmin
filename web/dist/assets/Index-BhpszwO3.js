@@ -1,0 +1,1 @@
+import{_ as o,b8 as c,c as t,o as a,b as n}from"./index-BEeNZQGc.js";const r={},s={class:"receivable-payable-index"};function _(d,i){const e=c("router-view");return a(),t("div",s,[n(e)])}const p=o(r,[["render",_],["__scopeId","data-v-ec979ac9"]]);export{p as default};

@@ -482,8 +482,12 @@ class InstallService:
         settings.timeout = timeout
         settings.command_timeout = command_timeout
         settings.debug = app_debug
-        settings.frontend_name = frontend_name
-        settings.backend_name = backend_name
+        # aipaneladmin 的 Settings 未定义 frontend_name/backend_name 字段，
+        # Pydantic v2 对未定义字段赋值会抛 ValueError，这里防御式处理
+        if hasattr(settings, "frontend_name"):
+            settings.frontend_name = frontend_name
+        if hasattr(settings, "backend_name"):
+            settings.backend_name = backend_name
         
         # 更新 setting 模块级变量（TORTOISE_ORM 初始化时使用的是模块级变量）
         import base.common.setting as setting_module

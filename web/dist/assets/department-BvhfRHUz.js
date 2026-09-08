@@ -1,1 +1,0 @@
-import{aY as e}from"./index-Bu1iRavU.js";function a(t){return e.get("/v1/departments/list",{params:t})}function p(){return e.get("/v1/departments/tree")}function s(t){return e.post("/v1/departments",t)}function u(t,r){return e.put(`/v1/departments/${t}`,r)}function m(t){return e.delete(`/v1/departments/${t}`)}export{a,s as c,m as d,p as g,u};

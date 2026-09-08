@@ -1,1 +1,0 @@
-import{_ as o,c as n,b as c,an as t,o as s}from"./index-DvQLNIr9.js";const a={},r={class:"finance-index"};function _(d,i){const e=t("router-view");return s(),n("div",r,[c(e)])}const p=o(a,[["render",_],["__scopeId","data-v-b872e6a5"]]);export{p as default};

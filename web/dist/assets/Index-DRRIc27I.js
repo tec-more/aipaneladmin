@@ -1,0 +1,1 @@
+import{_ as o,b8 as t,c,o as s,b as n}from"./index-BEeNZQGc.js";const r={},_={class:"mes-index"};function a(d,i){const e=t("router-view");return s(),c("div",_,[n(e)])}const p=o(r,[["render",a],["__scopeId","data-v-78de4b64"]]);export{p as default};

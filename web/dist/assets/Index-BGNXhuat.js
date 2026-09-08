@@ -1,1 +1,0 @@
-import{_ as o,aC as t,c,o as n,b as s}from"./index-Y-HAgN76.js";const r={},_={class:"inventory-cost-index"};function a(d,i){const e=t("router-view");return n(),c("div",_,[s(e)])}const f=o(r,[["render",a],["__scopeId","data-v-5ed03301"]]);export{f as default};

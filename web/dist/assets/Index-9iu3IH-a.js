@@ -1,1 +1,0 @@
-import{_ as o,aK as t,c,o as n,b as s}from"./index-bX5ONf0Y.js";const a={},r={class:"tax-index"};function _(d,i){const e=t("router-view");return n(),c("div",r,[s(e)])}const p=o(a,[["render",_],["__scopeId","data-v-19fa6044"]]);export{p as default};
