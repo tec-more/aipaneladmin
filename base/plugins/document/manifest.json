@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "description": "通用文档管理模块，提供文档上传、版本控制、分类目录、在线预览、业务关联等功能",
     "author": "hepan",
-    "is_installed": true,
-    "is_enabled": true,
+    "is_installed": false,
+    "is_enabled": false,
     "route_prefix": "/v1/document",
     "routes": [
         "api/v1"

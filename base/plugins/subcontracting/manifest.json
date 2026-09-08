@@ -26,8 +26,8 @@
         "mrp2",
         "finance"
     ],
-    "is_installed": true,
-    "is_enabled": true,
+    "is_installed": false,
+    "is_enabled": false,
     "menus": [
         {
             "name": "委外管理",

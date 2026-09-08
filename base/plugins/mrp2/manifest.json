@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "description": "MRPII制造资源计划模块，包含销售预测、主生产计划、物料需求计划、能力需求计划和计划执行监控",
     "author": "hepan",
-    "is_installed": true,
-    "is_enabled": true,
+    "is_installed": false,
+    "is_enabled": false,
     "route_prefix": "/v1/mrp2",
     "routes": [
         "api/v1"

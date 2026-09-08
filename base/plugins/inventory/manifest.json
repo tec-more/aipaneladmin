@@ -4,8 +4,8 @@
     "version": "2.0.0",
     "description": "库存管理系统模块（Odoo风格），包含仓库管理、库位管理、调拨类型管理、调拨单管理、移动明细管理、库存数量管理、库存预留管理、批次管理、包裹管理",
     "author": "hepan",
-    "is_installed": true,
-    "is_enabled": true,
+    "is_installed": false,
+    "is_enabled": false,
     "route_prefix": "/v1/inventory",
     "routes": [
         "api/v1"

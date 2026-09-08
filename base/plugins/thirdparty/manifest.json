@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "description": "对接第三方平台（如Dify、Coze等）的配置管理和API转发服务",
     "author": "system",
-    "is_installed": true,
-    "is_enabled": true,
+    "is_installed": false,
+    "is_enabled": false,
     "route_prefix": "/v1/thirdparty",
     "routes": [
         "api/v1"

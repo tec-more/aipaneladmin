@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "description": "设备管理模块，包含设备台账、维护保养、故障管理等功能",
     "author": "hepan",
-    "is_installed": true,
-    "is_enabled": true,
+    "is_installed": false,
+    "is_enabled": false,
     "route_prefix": "/v1/equipment",
     "routes": [
         "api/v1"

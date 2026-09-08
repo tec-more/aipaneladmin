@@ -237,7 +237,7 @@ base/plugins/qixiang_pay/
   "route_prefix": "/v1/qixiang",
   "routes": ["api/v1"],
   "dependencies": ["customer", "order"],
-  "is_installed": true,
+  "is_installed": false,
   "is_enabled": true
 }
 ```

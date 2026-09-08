@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "description": "消息模块，仿 Odoo mail 机制，提供记录消息（Chatter）、关注者、通知功能，支持与现有业务模块集成",
     "author": "hepan",
-    "is_installed": true,
-    "is_enabled": true,
+    "is_installed": false,
+    "is_enabled": false,
     "route_prefix": "/v1/mail",
     "routes": [
         "api/v1"
