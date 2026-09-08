@@ -118,15 +118,21 @@ async def lifespan(app: FastAPI):
         await plugin_manager.startup()
         print("插件系统初始化完成")
 
-        # 启动订单过期检查定时任务
-        task1 = asyncio.create_task(cancel_expired_orders_task())
-        background_tasks.append(task1)
-        print("订单过期检查定时任务已启动")
+        # 启动订单过期检查定时任务（仅当 sales 插件启用时）
+        if plugin_manager.get_plugin("sales"):
+            task1 = asyncio.create_task(cancel_expired_orders_task())
+            background_tasks.append(task1)
+            print("订单过期检查定时任务已启动")
+        else:
+            print("订单过期检查定时任务跳过（sales 插件未启用）")
 
-        # 启动会员数据更新定时任务
-        task2 = asyncio.create_task(update_membership_data_task())
-        background_tasks.append(task2)
-        print("会员数据更新定时任务已启动（每10分钟）")
+        # 启动会员数据更新定时任务（仅当 customer 和 llm 插件启用时）
+        if plugin_manager.get_plugin("customer") and plugin_manager.get_plugin("llm"):
+            task2 = asyncio.create_task(update_membership_data_task())
+            background_tasks.append(task2)
+            print("会员数据更新定时任务已启动（每10分钟）")
+        else:
+            print("会员数据更新定时任务跳过（customer 或 llm 插件未启用）")
 
         # 启动 Prometheus 推送工作器
         if getattr(settings, 'PROMETHEUS_PUSH_ENABLED', False):
