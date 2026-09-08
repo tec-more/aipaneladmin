@@ -188,6 +188,11 @@ class Settings(BaseSettings):
 	db_user: str = db_user
 	db_password: str = db_password
 	db_port: int = db_port
+	# 数据库连接池配置
+	minsize: int = minsize
+	maxsize: int = maxsize
+	timeout: int = timeout
+	command_timeout: int = command_timeout
 	# Redis配置
 	REDIS_ENABLED: bool = config.config.getboolean("redis", "enabled", fallback=False)
 	REDIS_HOST: str = config.config.get("redis", "host", fallback="127.0.0.1")
