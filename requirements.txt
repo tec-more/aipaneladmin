@@ -66,6 +66,7 @@ langgraph>=1.2.0
 langgraph-checkpoint-postgres>=3.1.0
 psycopg>=3.3.4
 aio-pika >= 10.0.1
+psutil >= 7.2.2
 volcengine-python-sdk[ark]
 pgvector
 numpy

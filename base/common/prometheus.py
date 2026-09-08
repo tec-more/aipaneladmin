@@ -6,8 +6,12 @@ from starlette.types import ASGIApp
 import time
 import os
 import asyncio
-import psutil
 from typing import Dict, Callable
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 
 # 全局注册表和指标
@@ -84,6 +88,8 @@ _system_process = None
 
 def get_process():
     global _system_process
+    if psutil is None:
+        raise ImportError("psutil not installed")
     if _system_process is None:
         _system_process = psutil.Process()
     return _system_process
