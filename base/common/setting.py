@@ -6,10 +6,27 @@ from typing import Any, List, Optional, Literal
 from pathlib import Path
 
 
+def get_discovered_plugins() -> List[str]:
+	"""
+	发现插件目录中所有带 manifest.json 的插件（不论安装/启用状态）
+	"""
+	plugins_dir = Path(__file__).parent.parent / "plugins"
+	exclude_dirs = {"__pycache__", ".git", "_temp_install"}
+
+	discovered = []
+	if plugins_dir.exists() and plugins_dir.is_dir():
+		for plugin in plugins_dir.iterdir():
+			if plugin.is_dir() and not plugin.name.startswith("_") and plugin.name not in exclude_dirs:
+				if (plugin / "manifest.json").exists():
+					discovered.append(plugin.name)
+
+	return discovered
+
+
 def get_enabled_plugins() -> List[str]:
 	"""
 	从各插件的 manifest.json 读取已安装且激活的插件列表
-	用于在 ORM 配置阶段确定要加载哪些插件模型
+	（供路由/功能门控使用；ORM 模型加载请用 get_model_list）
 	"""
 	import json
 	plugins_dir = Path(__file__).parent.parent / "plugins"
@@ -60,7 +77,10 @@ def get_model_list() -> List[str]:
 	"""
 	获取所有需要加载的模型列表
 	- 核心模块的模型总是加载
-	- 插件模型只有在已安装且激活时才加载（从 manifest.json 读取模型声明）
+	- 所有已发现插件（含未安装/未激活）的模型全部加载
+	  加载模型只意味着表结构被注册/创建；
+	  路由、菜单、事件处理器、定时任务等仍由 is_enabled 状态门控。
+	  这样运行时安装/启用插件无需重启即可查询数据。
 	"""
 	plugin_models = []
 	core_models = []
@@ -76,9 +96,9 @@ def get_model_list() -> List[str]:
 						relative_model = f"base.core.{core_module.name}.models.{model_file.stem}"
 						core_models.append(relative_model)
 
-	# 只加载已安装且激活的插件模型
-	enabled_plugins = get_enabled_plugins()
-	for plugin_name in enabled_plugins:
+	# 加载所有已发现插件的模型（不论安装/激活状态）
+	discovered_plugins = get_discovered_plugins()
+	for plugin_name in discovered_plugins:
 		models = get_plugin_models_from_manifest(plugin_name)
 		plugin_models.extend(models)
 
