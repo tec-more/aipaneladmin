@@ -1,1 +1,0 @@
-import{_ as o,ba as t,c,o as n,d as s}from"./index-AuTg3dMG.js";const a={},r={class:"tax-index"};function _(d,i){const e=t("router-view");return n(),c("div",r,[s(e)])}const p=o(a,[["render",_],["__scopeId","data-v-6efc3da1"]]);export{p as default};

@@ -42,3 +42,20 @@ html, body, #app {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+// 统一搜索卡片表单项间距（覆盖 Element Plus inline form 默认 18px 下边距）
+.search-card {
+  margin-bottom: 16px;
+
+  .el-form--inline .el-form-item,
+  .search-form .el-form-item {
+    margin-right: 16px !important;
+    margin-bottom: 10px !important;
+  }
+
+  // 最后一行不需要下边距
+  .el-form--inline .el-form-item:last-child,
+  .search-form .el-form-item:last-child {
+    margin-right: 0 !important;
+  }
+}
