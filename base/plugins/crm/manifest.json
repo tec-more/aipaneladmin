@@ -5,7 +5,7 @@
     "description": "CRM模块，提供线索管理、商机管理、活动管理、联系人管理、跟进任务管理、统计分析等功能",
     "author": "hepan",
     "is_installed": true,
-    "is_enabled": false,
+    "is_enabled": true,
     "route_prefix": "/v1/crm",
     "routes": [
         "api/v1"

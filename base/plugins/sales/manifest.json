@@ -20,8 +20,8 @@
         "customer",
         "product"
     ],
-    "is_installed": false,
-    "is_enabled": false,
+    "is_installed": true,
+    "is_enabled": true,
     "menus": [
         {
             "name": "销售管理",

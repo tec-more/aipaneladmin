@@ -1,0 +1,1 @@
+import{_ as o,ba as s,c as t,o as c,d as n}from"./index-CgifvBoy.js";const a={},r={class:"sales-index"};function _(d,i){const e=s("router-view");return c(),t("div",r,[n(e)])}const l=o(a,[["render",_],["__scopeId","data-v-fd83ae2d"]]);export{l as default};

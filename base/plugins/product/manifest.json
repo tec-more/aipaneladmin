@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "description": "产品模块，提供产品的管理功能",
     "author": "hepan",
-    "is_installed": false,
-    "is_enabled": false,
+    "is_installed": true,
+    "is_enabled": true,
     "route_prefix": "/v1/product",
     "routes": [
         "api/v1"
