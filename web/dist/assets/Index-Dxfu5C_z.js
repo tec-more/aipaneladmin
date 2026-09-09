@@ -1,0 +1,1 @@
+import{_ as o,c as t,d as c,aK as n,o as a}from"./index-dgOYldqo.js";const s={},r={class:"quant-index"};function _(d,f){const e=n("router-view");return a(),t("div",r,[c(e)])}const p=o(s,[["render",_],["__scopeId","data-v-5ef39faa"]]);export{p as default};

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="menu-management">
     <!-- 操作栏 -->
     <el-card shadow="never" class="action-card">
@@ -25,7 +25,7 @@
         <el-table-column prop="icon" label="图标" width="80" align="center">
           <template #default="{ row }">
             <el-icon v-if="row.icon" :size="18">
-              <component :is="row.icon" />
+              <component :is="normalizeIcon(row.icon)" />
             </el-icon>
             <span v-else>-</span>
           </template>
@@ -195,6 +195,11 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Sort, Top, Bottom } from '@element-plus/icons-vue'
 import { getMenuTree, createMenu, updateMenu, deleteMenu } from '@/api/rbac'
+import { useMenuStore } from '@/stores/menu'
+
+const menuStore = useMenuStore()
+// 规范化图标名（兼容历史 Lucide 风格名称），用于表格渲染
+const normalizeIcon = (name) => menuStore.getIconName(name)
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -208,15 +213,25 @@ const tableData = ref([])
 const flatMenuList = ref([]) // 扁平化的菜单列表，用于排序
 const menuTreeOptions = ref([])
 
-// 常用图标列表
+// 常用图标列表（均为 @element-plus/icons-vue 官方图标名，按业务分组）
 const iconOptions = [
-  'Odometer', 'Setting', 'User', 'UserFilled', 'OfficeBuilding',
-  'Menu', 'Key', 'Lock', 'Document', 'Folder', 'FolderOpened',
-  'Files', 'List', 'Grid', 'Operation', 'Tools', 'Management',
-  'DataAnalysis', 'PieChart', 'TrendCharts', 'Monitor', 'Platform',
-  'HomeFilled', 'House', 'Message', 'Bell', 'Calendar', 'Clock',
-  'Search', 'Edit', 'Delete', 'Plus', 'Minus', 'Check', 'Close',
-  'Upload', 'Download', 'Link', 'Picture', 'Camera', 'VideoCamera'
+  // 通用 / 系统
+  'Odometer', 'Setting', 'Menu', 'HomeFilled', 'House', 'Operation', 'Management', 'Platform',
+  'User', 'UserFilled', 'Avatar', 'OfficeBuilding', 'Key', 'Lock', 'Tools',
+  'Document', 'DocumentChecked', 'Folder', 'FolderOpened', 'Files', 'Notebook', 'Reading', 'Tickets', 'Stamp',
+  'List', 'Grid', 'Collection',
+  // 数据 / 图表
+  'DataAnalysis', 'DataLine', 'DataBoard', 'PieChart', 'TrendCharts', 'Histogram', 'Rank',
+  // 商品 / 销售 / 客户 / CRM
+  'Goods', 'Box', 'ShoppingCart', 'ShoppingBag', 'Sell', 'Shop', 'Suitcase', 'Briefcase',
+  'Money', 'Wallet', 'Coin', 'CreditCard', 'PriceTag', 'Discount', 'Present',
+  // 消息 / 沟通
+  'Message', 'Bell', 'BellFilled', 'Notification', 'ChatDotRound', 'ChatLineRound', 'ChatRound', 'Promotion', 'Headset', 'Service',
+  // AI / 智能体
+  'Cpu', 'Monitor', 'Guide', 'Compass',
+  // 基础操作
+  'Calendar', 'Clock', 'Search', 'Edit', 'EditPen', 'Delete', 'Plus', 'Minus', 'Check', 'Close',
+  'Refresh', 'Sort', 'Upload', 'Download', 'Link', 'Share', 'Picture', 'Camera', 'VideoCamera', 'Location', 'Phone'
 ]
 
 const form = ref({

@@ -148,13 +148,9 @@ import { ref, computed, onMounted, markRaw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  UserFilled, Odometer, Setting, User, OfficeBuilding, Key, Menu,
-  Connection, Document, Folder, Files, Grid, List, Search, Edit,
-  Delete, Plus, Minus, Check, Close, Warning, InfoFilled, QuestionFilled,
-  Star, Message, Bell, Calendar, Clock, Location, Phone, Picture,
-  VideoCamera, Upload, Download, Link, Share, Lock, Unlock, Tools,
-  Monitor, DataLine, PieChart, TrendCharts, Histogram, ArrowLeft
+  UserFilled, ArrowLeft, ArrowDown, Fold, Expand
 } from '@element-plus/icons-vue'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useMenuStore } from '@/stores/menu'
 import { changePassword } from '@/api/auth'
@@ -163,57 +159,16 @@ import GlobalApproval from '@/components/GlobalApproval.vue'
 import MailBell from '@/components/MailBell.vue'
 import { useSystemStore } from '@/stores/system'
 
-// 图标组件映射
-const iconComponents = {
-  Odometer: markRaw(Odometer),
-  Setting: markRaw(Setting),
-  User: markRaw(User),
-  OfficeBuilding: markRaw(OfficeBuilding),
-  UserFilled: markRaw(UserFilled),
-  Key: markRaw(Key),
-  Menu: markRaw(Menu),
-  Connection: markRaw(Connection),
-  Document: markRaw(Document),
-  Folder: markRaw(Folder),
-  Files: markRaw(Files),
-  Grid: markRaw(Grid),
-  List: markRaw(List),
-  Search: markRaw(Search),
-  Edit: markRaw(Edit),
-  Delete: markRaw(Delete),
-  Plus: markRaw(Plus),
-  Minus: markRaw(Minus),
-  Check: markRaw(Check),
-  Close: markRaw(Close),
-  Warning: markRaw(Warning),
-  InfoFilled: markRaw(InfoFilled),
-  QuestionFilled: markRaw(QuestionFilled),
-  Star: markRaw(Star),
-  Message: markRaw(Message),
-  Bell: markRaw(Bell),
-  Calendar: markRaw(Calendar),
-  Clock: markRaw(Clock),
-  Location: markRaw(Location),
-  Phone: markRaw(Phone),
-  Picture: markRaw(Picture),
-  VideoCamera: markRaw(VideoCamera),
-  Upload: markRaw(Upload),
-  Download: markRaw(Download),
-  Link: markRaw(Link),
-  Share: markRaw(Share),
-  Lock: markRaw(Lock),
-  Unlock: markRaw(Unlock),
-  Tools: markRaw(Tools),
-  Monitor: markRaw(Monitor),
-  DataLine: markRaw(DataLine),
-  PieChart: markRaw(PieChart),
-  TrendCharts: markRaw(TrendCharts),
-  Histogram: markRaw(Histogram)
+// 全量注册 Element Plus 图标（293 个），菜单图标名可直接使用
+const iconComponents = {}
+for (const [name, comp] of Object.entries(ElementPlusIconsVue)) {
+  iconComponents[name] = markRaw(comp)
 }
 
-// 根据图标名称获取组件
+// 根据图标名称获取组件：经 menuStore 的图标映射规范化（兼容 Lucide 等命名），再查官方图标，最后回退 Document
 const getIconComponent = (iconName) => {
-  return iconComponents[iconName] || iconComponents.Document
+  const resolved = menuStore.getIconName(iconName)
+  return iconComponents[resolved] || iconComponents.Document
 }
 
 const route = useRoute()
