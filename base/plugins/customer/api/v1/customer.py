@@ -591,7 +591,7 @@ async def get_payment_transactions_alias(
             if 'amount' in trans_dict and trans_dict['amount'] is not None:
                 trans_dict['amount'] = float(trans_dict['amount'])
 
-            # 添加七相订单号（更清晰的字段名）
+            # 添加订单号（更清晰的字段名）
             if 'transaction_id' in trans_dict:
                 trans_dict['qixiang_trade_no'] = trans_dict['transaction_id']
 

@@ -77,7 +77,7 @@ async def create_order(request: Request):
     - **param**: 业务扩展参数（可选）
 
     返回:
-    - **trade_no**: 七相订单号
+    - **trade_no**: 订单号
     - **payurl**: 支付跳转URL（PC端扫码/手机端H5）
     - **qrcode**: 二维码链接（如有）
     """
@@ -163,7 +163,7 @@ async def query_order(order_no: str):
 
     返回:
     - **status**: 支付状态（success/pending/failed）
-    - **trade_no**: 七相订单号
+    - **trade_no**: 订单号
     - **amount**: 订单金额
     """
     try:
@@ -177,7 +177,7 @@ async def query_order(order_no: str):
 
         logger.info(f"查询结果:")
         logger.info(f"  订单号: {result.get('order_no')}")
-        logger.info(f"  七相订单号: {result.get('trade_no')}")
+        logger.info(f"  订单号: {result.get('trade_no')}")
         logger.info(f"  支付状态: {result.get('status')}")
         logger.info(f"  支付类型: {result.get('pay_type')}")
         logger.info(f"  订单金额: {result.get('amount')}")
@@ -241,7 +241,7 @@ async def payment_notify(request: Request):
 
         logger.info(f"关键字段:")
         logger.info(f"  商户订单号: {out_trade_no}")
-        logger.info(f"  七相订单号: {trade_no}")
+        logger.info(f"  订单号: {trade_no}")
         logger.info(f"  支付状态: {trade_status}")
         logger.info(f"  支付金额: {money}")
         logger.info(f"  签名: {sign}")

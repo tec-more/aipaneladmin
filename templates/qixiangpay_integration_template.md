@@ -71,7 +71,7 @@
 {
   "code": 1,           // 1为成功，其它为失败
   "msg": "",
-  "trade_no": "20160806151343349021",  // 七相订单号
+  "trade_no": "20160806151343349021",  // 订单号
   "payurl": "https://api.payqixiang.cn/pay/submit/xxx/",  // 支付跳转URL
   "qrcode": "weixin://wxpay/bizpayurl?pr=xxx"  // 二维码链接（可选）
 }
@@ -93,7 +93,7 @@
 | 字段名 | 变量名 | 类型 | 说明 |
 |--------|--------|------|------|
 | 商户ID | pid | Int | |
-| 七相订单号 | trade_no | String | |
+| 订单号 | trade_no | String | |
 | 商户订单号 | out_trade_no | String | |
 | 支付方式 | type | String | alipay/wxpay |
 | 商品名称 | name | String | |
@@ -182,7 +182,7 @@ sign = md5("money=1.00&name=VIP会员&out_trade_no=20160806151343349&...YOUR_KEY
 - **输出**:
   - payurl: 支付跳转URL
   - qrcode: 二维码链接（如有）
-  - trade_no: 七相订单号
+  - trade_no: 订单号
 
 #### 2. 查询支付状态
 - **路径**: `GET /v1/qixiang/query/{order_no}`
@@ -190,7 +190,7 @@ sign = md5("money=1.00&name=VIP会员&out_trade_no=20160806151343349&...YOUR_KEY
 - **输入**: order_no
 - **输出**:
   - status: pending/success/failed
-  - trade_no: 七相订单号
+  - trade_no: 订单号
   - amount: 金额
 
 #### 3. 支付异步回调
@@ -378,7 +378,7 @@ class CreateOrderIn(BaseModel):
 
 class CreateOrderOut(BaseModel):
     """创建支付订单响应"""
-    trade_no: str  # 七相订单号
+    trade_no: str  # 订单号
     payurl: str    # 支付跳转URL
     qrcode: Optional[str]  # 二维码链接
 

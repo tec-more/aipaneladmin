@@ -42,7 +42,7 @@
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="qixiang_trade_no" label="七相订单号" min-width="180">
+        <el-table-column prop="qixiang_trade_no" label="订单号" min-width="180">
           <template #default="{ row }">
             <span v-if="row.qixiang_trade_no" class="trade-no">{{ row.qixiang_trade_no }}</span>
             <span v-else-if="row.transaction_id" class="trade-no">{{ row.transaction_id }}</span>

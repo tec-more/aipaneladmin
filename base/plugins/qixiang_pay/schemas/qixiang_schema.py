@@ -50,7 +50,7 @@ class CreateOrderIn(BaseModel):
 class CreateOrderOut(BaseModel):
     """创建支付订单响应"""
     order_no: str = Field(..., description="商户订单号")
-    trade_no: str = Field(..., description="七相订单号")
+    trade_no: str = Field(..., description="订单号")
     payurl: str = Field(..., description="支付跳转URL")
     qrcode: Optional[str] = Field(None, description="二维码链接（如有）")
     pay_type: str = Field(..., description="支付类型")
@@ -59,7 +59,7 @@ class CreateOrderOut(BaseModel):
 class QueryOrderOut(BaseModel):
     """查询订单响应"""
     order_no: str = Field(..., description="商户订单号")
-    trade_no: str = Field(..., description="七相订单号")
+    trade_no: str = Field(..., description="订单号")
     status: str = Field(..., description="支付状态: success/pending/failed")
     pay_type: str = Field(..., description="支付类型")
     amount: float = Field(..., description="订单金额")
@@ -69,7 +69,7 @@ class QueryOrderOut(BaseModel):
 class NotifyData(BaseModel):
     """支付回调数据"""
     pid: str = Field(..., description="商户ID")
-    trade_no: str = Field(..., description="七相订单号")
+    trade_no: str = Field(..., description="订单号")
     out_trade_no: str = Field(..., description="商户订单号")
     type: str = Field(..., description="支付方式")
     name: Optional[str] = Field(None, description="商品名称")

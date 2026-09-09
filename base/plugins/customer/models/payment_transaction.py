@@ -73,7 +73,7 @@ class PaymentTransaction(BaseModel, TimestampMixin):
             "id": self.id,
             "order_id": self.order_id,
             "transaction_id": self.transaction_id,
-            "qixiang_trade_no": self.transaction_id,  # 七相订单号（别名）
+            "qixiang_trade_no": self.transaction_id,  # 订单号（别名）
             "transaction_type": self.transaction_type,
             "payment_method_display": payment_display,  # 中文显示
             "payment_method_tag": payment_tag,  # 前端标签颜色
