@@ -307,6 +307,8 @@ class Settings(BaseSettings):
 	RABBITMQ_VIRTUAL_HOST: str = config.config.get("rabbitmq", "virtual_host", fallback="/")
 	RABBITMQ_USERNAME: str = config.config.get("rabbitmq", "username", fallback="guest")
 	RABBITMQ_PASSWORD: str = config.config.get("rabbitmq", "password", fallback="guest")
+	# 心跳间隔（秒），0 表示禁用心跳，避免空闲连接被判定为 stuck
+	RABBITMQ_HEARTBEAT: int = config.config.getint("rabbitmq", "heartbeat", fallback=0)
 	RABBITMQ_EXCHANGE: str = config.config.get("rabbitmq", "exchange", fallback="event_bus.exchange")
 	RABBITMQ_QUEUE_PREFIX: str = config.config.get("rabbitmq", "queue_prefix", fallback="event_bus")
 	RABBITMQ_DLQ_NAME: str = config.config.get("rabbitmq", "dlq_name", fallback="event_bus.dlq")

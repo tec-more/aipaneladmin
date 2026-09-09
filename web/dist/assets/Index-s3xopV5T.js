@@ -1,1 +1,0 @@
-import{_ as o,aK as t,c,o as s,d as n}from"./index-dgOYldqo.js";const r={},_={class:"mes-index"};function a(d,i){const e=t("router-view");return s(),c("div",_,[n(e)])}const p=o(r,[["render",a],["__scopeId","data-v-78de4b64"]]);export{p as default};

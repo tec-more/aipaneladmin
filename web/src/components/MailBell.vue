@@ -82,12 +82,28 @@ const typeLabel = (t) => {
   return t || '-'
 }
 
+const stopPolling = () => {
+  shouldReconnect = false
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+  if (ws) {
+    try { ws.close() } catch (e) {}
+    ws = null
+  }
+}
+
 const fetchUnread = async () => {
   try {
     const res = await getUnreadCount()
     unreadCount.value = res.data?.unread_count || 0
   } catch (e) {
-    // 静默失败
+    // 401 表示登录态已失效，停止轮询与 WS 重连，避免持续打无效请求
+    if (e?.response?.status === 401) {
+      stopPolling()
+    }
+    // 其他错误静默处理
   }
 }
 
@@ -202,15 +218,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  shouldReconnect = false
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-  if (ws) {
-    try { ws.close() } catch (e) {}
-    ws = null
-  }
+  stopPolling()
   window.removeEventListener('mail:refresh', onRefreshEvent)
 })
 </script>

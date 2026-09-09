@@ -48,6 +48,7 @@ class RabbitMQConnectionManager:
                 virtualhost=settings.RABBITMQ_VIRTUAL_HOST,
                 login=settings.RABBITMQ_USERNAME,
                 password=settings.RABBITMQ_PASSWORD,
+                heartbeat=settings.RABBITMQ_HEARTBEAT,
             )
 
             self._channel = await self._connection.channel()

@@ -73,11 +73,6 @@ request.interceptors.request.use(
     const token = localStorage.getItem('token')
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
-      console.log('Authorization header set:', `Bearer ${token.substring(0, 20)}...`)
-      console.log('Request URL:', config.url)
-    } else {
-      console.log('No token found in localStorage')
-      console.log('Request URL:', config.url)
     }
     return config
   },

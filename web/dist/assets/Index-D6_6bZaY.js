@@ -1,1 +1,0 @@
-import{_ as o,aK as c,c as t,o as s,d as n}from"./index-dgOYldqo.js";const r={},a={class:"purchase-index"};function _(d,i){const e=c("router-view");return s(),t("div",a,[n(e)])}const f=o(r,[["render",_],["__scopeId","data-v-c1608ed2"]]);export{f as default};

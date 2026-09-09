@@ -52,10 +52,14 @@ async def IntegrityHandle(req: Request, exc: Exception) -> JSONResponse:
 
 async def HttpExcHandle(req: Request, exc: Exception) -> JSONResponse:
     """处理HTTP异常"""
-    # HTTPException 通常不需要完整堆栈，只记录基本信息
-    print(f"\n[WARNING] HTTP异常: {exc.status_code} - {exc.detail}")
-    if req:
-        print(f"   请求: {req.method} {req.url}")
+    # 401/403/404 属于正常的客户端行为（鉴权失败、无权限、资源不存在），
+    # 不应以 WARNING 级别输出，避免日志噪音（如轮询接口 token 过期时的反复 401）
+    if exc.status_code in (401, 403, 404):
+        logger.debug("HTTP异常: %s - %s | 请求: %s %s", exc.status_code, exc.detail, req.method, req.url)
+    else:
+        print(f"\n[WARNING] HTTP异常: {exc.status_code} - {exc.detail}")
+        if req:
+            print(f"   请求: {req.method} {req.url}")
 
     content = dict(code=exc.status_code, msg=exc.detail, data=None)
     return JSONResponse(content=content, status_code=exc.status_code)
