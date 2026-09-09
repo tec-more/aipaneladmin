@@ -198,7 +198,7 @@ class SystemSettingService:
                 icon="Setting",
                 component="",
                 parent_id=None,
-                sort=90,
+                sort=9999,
                 is_visible=True,
                 is_cached=True,
                 is_active=True,
