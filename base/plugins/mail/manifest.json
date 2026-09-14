@@ -24,7 +24,7 @@
             "icon": "Bell",
             "component": "",
             "redirect": "/mail/inbox",
-            "sort": 15,
+            "sort": 890,
             "children": [
                 {
                     "name": "收件箱",

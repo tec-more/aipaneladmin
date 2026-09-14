@@ -23,7 +23,7 @@
             "icon": "Document",
             "component": "",
             "redirect": "/audit/logs",
-            "sort": 5,
+            "sort": 895,
             "children": [
                 {
                     "name": "全链路追踪",
