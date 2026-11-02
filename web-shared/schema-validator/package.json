@@ -1,0 +1,11 @@
+{
+  "name": "@aipanel/schema-validator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Schema v2 图校验器（纯函数，零运行时依赖，前后台共享）",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}

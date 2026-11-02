@@ -105,6 +105,11 @@ def get_model_list() -> List[str]:
 	model_list = core_models + plugin_models + [
 		"base.common.events.models.event_record",
 		"base.common.events.models.replay_audit_log",
+		# T1 新增公共层模型（Q1/Q2：base/common 非插件，显式注册，与插件启用态解耦 R-07）
+		"base.common.quota.models.quota",
+		# T4 套餐绑定关系（Q-D 映射，服务层维护）
+		"base.common.quota.models.binding",
+		"base.common.authz.models.resource_grant",
 	] + ['aerich.models']
 	return model_list
 

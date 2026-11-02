@@ -203,5 +203,5 @@ def auto_discover_middleware(app: FastAPI, base_package: List[str] = ["base.core
     return discoverer.auto_discover_all_modules(base_package)
 
 def register_middlewares(app: FastAPI):
-	"""注册中间件"""
-	auto_discover_middleware(app, base_package=["base.core", "base.plugins"])
+	"""注册中间件（含 base.common 公共层中间件：M8 权限与归属 L1 上下文）"""
+	auto_discover_middleware(app, base_package=["base.common", "base.core", "base.plugins"])

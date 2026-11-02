@@ -243,11 +243,22 @@ async def get_usage_logs_alias(
             query = query.filter(customer_id=customer_id)
         else:
             # 没有指定 customer_id，查询当前用户对应的客户
-            print(f"[UsageLogs] 查询当前客户: system_user_id={current_user_id}")
-            customer = await Customer.get_or_none(system_user_id=current_user_id)
-            if customer:
-                print(f"[UsageLogs] 找到客户: {customer.id}，只返回该客户的记录")
-                query = query.filter(customer_id=customer.id)
+            # T4/M11 改造：identity_link（status=linked）优先，旧列 system_user_id 只读兜底
+            print(f"[UsageLogs] 查询当前客户: user_id={current_user_id}")
+            from base.plugins.customer.models.identity_link import IdentityLink
+            linked_customer_id = None
+            link = await IdentityLink.get_or_none(user_id=current_user_id, status="linked")
+            if link:
+                linked_customer_id = link.customer_id
+                print(f"[UsageLogs] identity_link 命中: customer_id={linked_customer_id}")
+            else:
+                customer = await Customer.get_or_none(system_user_id=current_user_id)
+                if customer:
+                    linked_customer_id = customer.id
+                    print(f"[UsageLogs] 旧列兜底命中: customer_id={linked_customer_id}")
+            if linked_customer_id:
+                print(f"[UsageLogs] 找到客户: {linked_customer_id}，只返回该客户的记录")
+                query = query.filter(customer_id=linked_customer_id)
             else:
                 # 当前用户不是客户，可能是管理员，返回所有记录
                 print(f"[UsageLogs] 当前用户不是客户，返回所有使用记录")

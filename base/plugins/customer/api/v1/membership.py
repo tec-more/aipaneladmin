@@ -38,39 +38,36 @@ class CalculatePriceOut(BaseModel):
 
 
 async def get_or_create_customer(user: User) -> "Customer":
-    """获取或创建客户记录"""
+    """
+    获取或创建客户记录
+
+    RK-14/R-14：已移除按 system_user_id 自动关联的写入路径（旧列只读废弃，
+    身份关联迁移至 identity_link，仅可经 /identity 提示→确认→验证流程建立）。
+    此处仅按邮箱定位/创建客户主体本身，不建立任何跨主体映射。
+    """
     from base.plugins.customer.models.customer import Customer
     from base.plugins.customer.services.membership_service import MembershipService
 
-    # 首先通过system_user关联查找
-    customer = await Customer.get_or_none(system_user_id=user.id)
+    # 仅通过 email 查找（不再读写 system_user_id）
+    customer = await Customer.get_or_none(email=user.email)
 
     if not customer:
-        # 如果没找到，尝试通过email查找
-        customer = await Customer.get_or_none(email=user.email)
+        # 创建新的客户记录（不携带任何跨主体关联字段）
+        customer = await Customer.create(
+            username=user.username,
+            email=user.email,
+            nickname=getattr(user, "nickname", None),
+            avatar=getattr(user, "avatar", None),
+            is_active=True
+        )
 
-        if not customer:
-            # 如果还是没找到，创建新的客户记录
-            customer = await Customer.create(
-                system_user_id=user.id,
-                username=user.username,
-                email=user.email,
-                nickname=getattr(user, "nickname", None),
-                avatar=getattr(user, "avatar", None),
-                is_active=True
-            )
-
-            # 🎁 新用户注册时自动赠送普通会员
-            try:
-                await MembershipService.initialize_regular_member(customer.id)
-                print(f"[Membership] ✅ 新用户 {customer.username} 已自动初始化为普通会员")
-            except Exception as e:
-                print(f"[Membership] ⚠️  初始化普通会员失败: {e}")
-                # 不影响用户注册流程
-        else:
-            # 如果通过email找到了，更新关联
-            customer.system_user_id = user.id
-            await customer.save()
+        # 🎁 新用户注册时自动赠送普通会员
+        try:
+            await MembershipService.initialize_regular_member(customer.id)
+            print(f"[Membership] ✅ 新用户 {customer.username} 已自动初始化为普通会员")
+        except Exception as e:
+            print(f"[Membership] ⚠️  初始化普通会员失败: {e}")
+            # 不影响用户注册流程
     else:
         # 检查是否已经有会员记录，如果没有则创建
         from base.plugins.customer.models.customer_membership import CustomerMembership

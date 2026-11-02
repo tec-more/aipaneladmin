@@ -134,6 +134,16 @@ async def lifespan(app: FastAPI):
         else:
             print("会员数据更新定时任务跳过（customer 或 llm 插件未启用）")
 
+        # 启动 M9 配额定时任务（公共层能力，不依赖插件启用态；注册在 Tortoise.init 之后）
+        try:
+            task_q1 = asyncio.create_task(quota_reconcile_task())
+            background_tasks.append(task_q1)
+            task_q2 = asyncio.create_task(quota_hold_cleanup_task())
+            background_tasks.append(task_q2)
+            print("配额对账/悬挂预占清理定时任务已启动（每分钟）")
+        except Exception as e:
+            print(f"配额定时任务启动失败: {e}")
+
         # 启动 Prometheus 推送工作器
         if getattr(settings, 'PROMETHEUS_PUSH_ENABLED', False):
             try:
@@ -205,6 +215,48 @@ async def lifespan(app: FastAPI):
             print(f"清理WebSocket连接时出错: {e}")
 
         print("所有资源已清理完成，端口9998已释放")
+
+
+async def quota_reconcile_task():
+    """
+    定时任务：每分钟活跃账户配额对账落盘（Redis → PG used）+ 周期滚动
+    溯源：docs/arch/03 §3.6 事实源/对账；§5 usage 对账落盘（每分钟）
+    """
+    while True:
+        try:
+            await asyncio.sleep(60)
+            from base.common.quota.services.quota_service import QuotaService
+            count = await QuotaService.reconcile_active_accounts()
+            if count > 0:
+                print(f"[定时任务] 配额对账落盘完成，账户数: {count}")
+        except asyncio.CancelledError:
+            print("[定时任务] 配额对账任务已取消")
+            break
+        except Exception as e:
+            print(f"[定时任务] 配额对账失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+
+async def quota_hold_cleanup_task():
+    """
+    定时任务：每分钟清理悬挂预占（超 TTL 未结算的 hold 释放）
+    溯源：docs/arch/06 AR-08 quota_hold TTL + 对账任务释放悬挂预占
+    """
+    while True:
+        try:
+            await asyncio.sleep(60)
+            from base.common.quota.services.quota_service import QuotaService
+            released = await QuotaService.cleanup_stale_holds()
+            if released > 0:
+                print(f"[定时任务] 释放悬挂预占 {released} 个")
+        except asyncio.CancelledError:
+            print("[定时任务] 悬挂预占清理任务已取消")
+            break
+        except Exception as e:
+            print(f"[定时任务] 悬挂预占清理失败: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 async def cancel_expired_orders_task():
@@ -489,7 +541,19 @@ def init_app() -> FastAPI:
         print("[手动注册] 事件系统API路由已注册: /v1/events/")
     except ImportError as e:
         print(f"[警告] 无法导入事件系统API路由: {e}")
-    
+
+    # 注册 M9 配额管理侧路由（base/common 非插件，手动注册）
+    try:
+        from base.common.quota.api.admin import quota_plan_admin_router
+        from base.common.quota.api.usage import usage_record_router
+        from base.common.quota.api.board import quota_board_router
+        app.include_router(quota_plan_admin_router)
+        app.include_router(usage_record_router)
+        app.include_router(quota_board_router)
+        print("[手动注册] 配额路由已注册: /v1/quota-plans, /v1/usage-records, /v1/quota")
+    except ImportError as e:
+        print(f"[警告] 无法导入配额路由: {e}")
+
     return app
 
 

@@ -7,7 +7,8 @@ class Customer(BaseModel, TimestampMixin):
     """Customer model"""
 
     # 系统关联
-    system_user_id = fields.BigIntField(unique=True, null=True, description="关联的系统用户ID")
+    # T1：本列语义已废弃（Q-C），身份关联迁移至 identity_link 表；保留列只读，禁止新代码写入
+    system_user_id = fields.BigIntField(unique=True, null=True, description="关联的系统用户ID（已废弃只读，见 identity_link）")
 
     # 基本信息
     openid = fields.CharField(max_length=100, unique=True, description="OpenID for WeChat", null=True)

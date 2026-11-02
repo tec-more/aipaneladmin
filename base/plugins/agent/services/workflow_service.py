@@ -1,15 +1,113 @@
 """
 Workflow service
 """
-from typing import List, Optional, Dict, Any
+import time
+from datetime import datetime
+from typing import List, Optional, Dict, Any, Tuple
+
 from tortoise.exceptions import DoesNotExist
+from tortoise.expressions import Q
+from tortoise.functions import Max
+from tortoise.transactions import in_transaction
+
+from base.common.authz import (
+    OwnerContext,
+    ResourceGrantService,
+    get_owned_or_404,
+    owned_queryset,
+)
+from base.common.authz.filter import is_accessible
 from base.plugins.agent.models.workflow import Workflow, WorkflowNode, WorkflowEdge, WorkflowExecution
+from base.plugins.agent.models.workflow_version import WorkflowVersion
 from base.plugins.agent.models.agent import Agent
 from base.plugins.agent.models.skill import Skill
 from base.plugins.llm.models.model import LLMModel
 from base.plugins.agent.schemas.workflow import (
     WorkflowCreate, WorkflowUpdate, WorkflowExecutionCreate
 )
+from base.plugins.agent.services.graph_validator import (
+    DOMAIN_ADMIN,
+    DOMAIN_USER,
+    collect_resource_refs,
+    has_blocking_errors,
+    validate_graph,
+)
+
+# ============================================================
+# M3 草稿/发布异常（错误码段位 409xx/422xx，docs/arch/04 §2.3）
+# ============================================================
+
+
+class DraftConflictError(Exception):
+    """草稿乐观锁冲突（40901）：draft_version 与服务端不一致"""
+
+    def __init__(self, current_version: int):
+        self.current_version = current_version
+        super().__init__("草稿版本冲突，请刷新后重试")
+
+
+class ValidationBlockedError(Exception):
+    """发布校验阻断（422xx）：携带 E-1xx 结构化错误明细（R-15）"""
+
+    def __init__(self, issues: List[Dict[str, Any]]):
+        self.issues = list(issues)
+        super().__init__("校验未通过，存在阻断级错误")
+
+
+class WorkflowStateError(Exception):
+    """状态冲突（409xx）：如删除存在生效发布态的工作流"""
+
+
+class _IdempotencyStore:
+    """
+    发布幂等键存储（04-§5.2：idempotency_key 24h 去重）
+
+    Redis 可用时落 Redis（quota_ 同款用法）；不可用时进程内字典兜底（单实例私有化部署）。
+    存储值：发布成功响应载荷；重放直接返回原响应（幂等）。
+    """
+
+    _mem: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+    TTL_SECONDS = 86400  # 24h
+
+    @classmethod
+    async def _redis(cls):
+        try:
+            from base.common.cache import RedisCache
+            if not RedisCache.is_enabled():
+                return None
+            cache = await RedisCache.get_instance()
+            return cache._client  # noqa: SLF001（与 quota_service 一致的既有用法）
+        except Exception:
+            return None
+
+    @classmethod
+    async def get(cls, key: str) -> Optional[Dict[str, Any]]:
+        redis = await cls._redis()
+        if redis is not None:
+            try:
+                import json as _json
+                raw = await redis.get(f"idem:{key}")
+                return _json.loads(raw) if raw else None
+            except Exception:
+                pass
+        hit = cls._mem.get(key)
+        if hit and hit[0] > time.time():
+            return hit[1]
+        cls._mem.pop(key, None)
+        return None
+
+    @classmethod
+    async def set(cls, key: str, payload: Dict[str, Any]) -> None:
+        redis = await cls._redis()
+        if redis is not None:
+            try:
+                import json as _json
+                await redis.set(f"idem:{key}", _json.dumps(payload, ensure_ascii=False),
+                                ex=cls.TTL_SECONDS)
+                return
+            except Exception:
+                pass
+        cls._mem[key] = (time.time() + cls.TTL_SECONDS, payload)
 
 # Try to import LangGraph and LangChain
 try:
@@ -40,20 +138,28 @@ class WorkflowService:
     """Workflow service class"""
 
     @staticmethod
-    async def create_workflow(workflow_data: WorkflowCreate) -> Workflow:
-        """Create workflow"""
+    async def create_workflow(workflow_data: WorkflowCreate, owner: Optional[OwnerContext] = None) -> Workflow:
+        """Create workflow（携带归属；v2 图自动识别 schema_version）"""
+        definition = workflow_data.definition or {}
+        schema_version = "v2" if (
+            isinstance(definition, dict) and definition.get("schema_version") in (2, "2", "v2")
+        ) else "v1"
         workflow = await Workflow.create(
             name=workflow_data.name,
             description=workflow_data.description,
             status=workflow_data.status,
-            definition=workflow_data.definition
+            definition=definition,
+            schema_version=schema_version,
+            owner_type=owner.owner_type if owner is not None else "usr",
+            owner_id=owner.owner_id if owner is not None else None,
         )
         return workflow
 
     @staticmethod
-    async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status: str = "") -> List[Workflow]:
-        """Get workflow list"""
-        query = Workflow.all()
+    async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status: str = "",
+                            owner: Optional[OwnerContext] = None) -> List[Workflow]:
+        """Get workflow list（R-01：归属过滤后的可见集合）"""
+        query = owned_queryset(Workflow, owner) if owner is not None else Workflow.all()
         if name:
             query = query.filter(name__icontains=name)
         if status:
@@ -62,8 +168,15 @@ class WorkflowService:
         return workflows
 
     @staticmethod
-    async def get_workflow_by_id(workflow_id: int) -> Optional[Workflow]:
-        """Get workflow by ID"""
+    async def get_workflow_by_id(workflow_id: int, owner: Optional[OwnerContext] = None,
+                                 *, include_public: bool = False,
+                                 for_write: bool = False) -> Optional[Workflow]:
+        """Get workflow by ID（携带 owner 时走强归属校验，越权 404）"""
+        if owner is not None:
+            return await get_owned_or_404(
+                Workflow, workflow_id, owner,
+                include_public=include_public, for_write=for_write,
+            )
         try:
             workflow = await Workflow.get(id=workflow_id).prefetch_related('nodes', 'edges')
             return workflow
@@ -71,30 +184,34 @@ class WorkflowService:
             return None
 
     @staticmethod
-    async def update_workflow(workflow_id: int, workflow_data: WorkflowUpdate) -> Optional[Workflow]:
-        """Update workflow"""
-        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
+    async def update_workflow(workflow_id: int, workflow_data: WorkflowUpdate,
+                              owner: Optional[OwnerContext] = None) -> Optional[Workflow]:
+        """Update workflow（写操作强归属）"""
+        workflow = await WorkflowService.get_workflow_by_id(workflow_id, owner, for_write=True)
         if not workflow:
             return None
 
         update_data = workflow_data.model_dump(exclude_unset=True)
-        
+
         await workflow.update_from_dict(update_data)
         await workflow.save()
-        
+
         return workflow
 
     @staticmethod
-    async def delete_workflow(workflow_id: int) -> bool:
-        """Delete workflow"""
-        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
+    async def delete_workflow(workflow_id: int, owner: Optional[OwnerContext] = None) -> bool:
+        """Delete workflow（有生效发布态需先停用，PRD §6.4-B5/04-§2.1）"""
+        workflow = await WorkflowService.get_workflow_by_id(workflow_id, owner, for_write=True)
         if not workflow:
             return False
+
+        if workflow.current_version_id is not None and workflow.status == "active":
+            raise WorkflowStateError("工作流存在生效发布态，需先停用后再删除")
 
         # Delete associated nodes and edges
         await WorkflowNode.filter(workflow=workflow).delete()
         await WorkflowEdge.filter(workflow=workflow).delete()
-        
+
         await workflow.delete()
         return True
 
@@ -923,3 +1040,323 @@ class WorkflowService:
         except Exception as e:
             import traceback
             return {"success": False, "message": str(e), "traceback": traceback.format_exc()}
+
+    # ==================== M3 工作流定义与版本（T5，Schema v2） ====================
+
+    @staticmethod
+    def empty_v2_graph(name: str = "") -> Dict[str, Any]:
+        """空白 Schema v2 图（最小可发布骨架：start → end）"""
+        return {
+            "schema_version": 2,
+            "meta": {"name": name},
+            "variables": [
+                {"name": "query", "type": "string", "required": True, "source": "user_input"},
+            ],
+            "nodes": [
+                {"id": "n_start", "type": "start", "position": {"x": 80, "y": 200},
+                 "data": {"label": "开始", "config": {},
+                          "outputs": [{"name": "query", "type": "string"}]}},
+                {"id": "n_end", "type": "end", "position": {"x": 480, "y": 200},
+                 "data": {"label": "结束", "config": {"output_mode": "last"},
+                          "inputs": [{"name": "answer", "type": "any", "from": "n_start.query"}],
+                          "outputs": []}},
+            ],
+            "edges": [
+                {"id": "e1", "source": "n_start", "sourceHandle": "out",
+                 "target": "n_end", "targetHandle": "in"},
+            ],
+            "settings": {"timeout_s": 300, "retry": {"max": 3, "backoff": "1,2,4"},
+                         "trace_level": "standard", "memory_mode": "private"},
+        }
+
+    @staticmethod
+    async def _resource_checker_for(owner: OwnerContext, domain: str):
+        """资源授权批量判定注入（仅用户域；后台域保持既有行为不做授权拦截）"""
+        if domain != DOMAIN_USER:
+            return None
+
+        async def _check(resource_type: str, ids: List[str]):
+            return await ResourceGrantService.check_many(
+                (owner.owner_type, owner.owner_id), resource_type, ids
+            )
+
+        return _check
+
+    @staticmethod
+    async def _subworkflow_checker_for(owner: OwnerContext):
+        """子工作流引用有效性判定注入（E-108）：存在、可见、已发布、锁定版本有效"""
+
+        async def _check(wf_ref: str, pinned: Optional[int]) -> Optional[str]:
+            try:
+                wid = int(wf_ref)
+            except (TypeError, ValueError):
+                return f"子工作流标识非法: {wf_ref}"
+            sub = await Workflow.filter(id=wid).first()
+            if sub is None:
+                return f"子工作流 {wf_ref} 不存在或已删除"
+            if not is_accessible(sub, owner, include_public=True):
+                return f"子工作流 {wf_ref} 不可见"
+            if sub.current_version_id is None:
+                return f"子工作流 {wf_ref} 未发布"
+            if pinned is not None:
+                try:
+                    pv = int(pinned)
+                except (TypeError, ValueError):
+                    return f"子工作流 {wf_ref} 锁定版本号非法"
+                exists = await WorkflowVersion.filter(
+                    workflow_id=wid, version_no=pv, status="published"
+                ).exists()
+                if not exists:
+                    return f"子工作流 {wf_ref} 版本 v{pv} 失效或已删除"
+            return None
+
+        return _check
+
+    @classmethod
+    async def validate_graph_for(cls, owner: OwnerContext, graph_json: Dict[str, Any],
+                                 domain: str = DOMAIN_USER) -> List[Dict[str, Any]]:
+        """全量校验入口（R-03）：结构 + 资源授权（用户域）+ 子工作流引用"""
+        return await validate_graph(
+            graph_json,
+            domain=domain,
+            resource_checker=await cls._resource_checker_for(owner, domain),
+            subworkflow_checker=await cls._subworkflow_checker_for(owner),
+        )
+
+    @classmethod
+    async def create_user_workflow(cls, owner: OwnerContext, name: str,
+                                   description: str = "",
+                                   graph_json: Optional[Dict[str, Any]] = None,
+                                   template_id: Optional[int] = None):
+        """
+        用户侧新建（空白/模板，04-§2.1 POST /v1/u/workflows）
+        模板复制：归属当前主体，模板本身只读（PRD §6.4-B6）
+        """
+        graph = graph_json
+        if graph is None and template_id is not None:
+            tpl = await Workflow.filter(id=template_id).first()
+            if tpl is None or tpl.visibility not in ("template", "public"):
+                from base.common.authz import OwnedResourceNotFound
+                raise OwnedResourceNotFound("模板不存在")
+            if tpl.current_version_id is not None:
+                ver = await WorkflowVersion.filter(id=tpl.current_version_id).first()
+                graph = ver.graph_json if ver is not None else None
+            if graph is None:
+                graph = tpl.definition
+        if graph is None:
+            graph = cls.empty_v2_graph(name)
+        issues = await cls.validate_graph_for(owner, graph, DOMAIN_USER)
+        workflow = await Workflow.create(
+            name=name, description=description or "", status="draft",
+            definition=graph, owner_type=owner.owner_type, owner_id=owner.owner_id,
+            visibility="private", schema_version="v2",
+        )
+        return workflow, issues
+
+    @classmethod
+    async def save_draft(cls, workflow_id: int, graph_json: Dict[str, Any],
+                         draft_version: int, owner: OwnerContext,
+                         domain: str = DOMAIN_USER):
+        """
+        保存草稿（04-F1）：
+        - 乐观锁 draft_version：条件更新 0 行即 409 冲突
+        - 保存时服务端全量校验（错误不阻断保存，随响应返回校验结果）
+        Returns: (workflow, issues)
+        """
+        wf = await get_owned_or_404(Workflow, workflow_id, owner, for_write=True)
+        issues = await cls.validate_graph_for(owner, graph_json, domain)
+        rows = await Workflow.filter(
+            id=wf.id, draft_version=int(draft_version)
+        ).update(
+            definition=graph_json,
+            schema_version="v2",
+            draft_version=int(draft_version) + 1,
+        )
+        if rows == 0:
+            current = await Workflow.filter(id=wf.id).values_list("draft_version", flat=True)
+            raise DraftConflictError(current[0] if current else 0)
+        fresh = await Workflow.get(id=wf.id)
+        return fresh, issues
+
+    @classmethod
+    async def publish_workflow(cls, workflow_id: int, owner: OwnerContext,
+                               idempotency_key: Optional[str] = None,
+                               domain: str = DOMAIN_USER) -> Dict[str, Any]:
+        """
+        发布（04-F1）：
+        Idempotency-Key 24h 去重（重放返回原响应）→ 全量校验（错误阻断）→
+        生成不可变 workflow_version（version_no 自增 + 资源快照 ID 清单）→ 更新 current_version_id
+        """
+        idem_key = (
+            f"publish:{owner.owner_type}:{owner.owner_id}:{workflow_id}:{idempotency_key}"
+            if idempotency_key else None
+        )
+        if idem_key:
+            hit = await _IdempotencyStore.get(idem_key)
+            if hit is not None:
+                return {**hit, "idempotent_replay": True}
+
+        wf = await get_owned_or_404(Workflow, workflow_id, owner, for_write=True)
+        graph = wf.definition or {}
+        issues = await cls.validate_graph_for(owner, graph, domain)
+        if has_blocking_errors(issues):
+            raise ValidationBlockedError(issues)
+
+        async with in_transaction():
+            agg = await WorkflowVersion.filter(workflow_id=wf.id).annotate(
+                m=Max("version_no")
+            ).values("m")
+            next_no = ((agg[0]["m"] or 0) + 1) if agg else 1
+            version = await WorkflowVersion.create(
+                workflow_id=wf.id,
+                version_no=next_no,
+                graph_json=graph,
+                schema_version="v2",
+                resource_refs=collect_resource_refs(graph),
+                published_by_type=owner.owner_type,
+                published_by_id=owner.owner_id,
+                published_at=datetime.now(),
+                status="published",
+            )
+            await Workflow.filter(id=wf.id).update(
+                current_version_id=version.id, status="active", schema_version="v2"
+            )
+
+        payload = {
+            "version_id": version.id,
+            "version_no": version.version_no,
+            "published_at": version.published_at.isoformat() if version.published_at else None,
+        }
+        if idem_key:
+            await _IdempotencyStore.set(idem_key, payload)
+        return payload
+
+    @classmethod
+    async def list_versions(cls, workflow_id: int, owner: OwnerContext) -> List[WorkflowVersion]:
+        """版本列表（只读；公开/模板可见性可读）"""
+        wf = await get_owned_or_404(Workflow, workflow_id, owner, include_public=True)
+        return await WorkflowVersion.filter(workflow_id=wf.id).order_by("-version_no")
+
+    @staticmethod
+    def validation_summary(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """校验结果摘要包装（错误不阻断保存时随响应返回，04-F1）"""
+        errors = [i for i in issues if i.get("level") == "error"]
+        warnings = [i for i in issues if i.get("level") == "warning"]
+        return {
+            "valid": len(errors) == 0,
+            "error_count": len(errors),
+            "warning_count": len(warnings),
+            "issues": issues,
+        }
+
+    @classmethod
+    async def get_version_snapshot(cls, workflow_id: int, version_no: int,
+                                   owner: OwnerContext) -> WorkflowVersion:
+        """版本快照（只读，按 version_no 定位）"""
+        from base.common.authz import OwnedResourceNotFound
+        wf = await get_owned_or_404(Workflow, workflow_id, owner, include_public=True)
+        version = await WorkflowVersion.filter(
+            workflow_id=wf.id, version_no=int(version_no)
+        ).first()
+        if version is None:
+            raise OwnedResourceNotFound("版本不存在")
+        return version
+
+    @classmethod
+    async def rollback_workflow(cls, workflow_id: int, version_no: int,
+                                owner: OwnerContext, domain: str = DOMAIN_USER) -> Dict[str, Any]:
+        """
+        回滚（04-§2.1）：以旧版本 graph_json 生成新版本（旧版本本身不可变不动）
+        新图需过全量校验（旧版本引用资源可能已失效，失效即 E-108/E-110 阻断）
+        """
+        from base.common.authz import OwnedResourceNotFound
+        wf = await get_owned_or_404(Workflow, workflow_id, owner, for_write=True)
+        src = await WorkflowVersion.filter(
+            workflow_id=wf.id, version_no=int(version_no)
+        ).first()
+        if src is None:
+            raise OwnedResourceNotFound("目标版本不存在")
+
+        issues = await cls.validate_graph_for(owner, src.graph_json, domain)
+        if has_blocking_errors(issues):
+            raise ValidationBlockedError(issues)
+
+        async with in_transaction():
+            agg = await WorkflowVersion.filter(workflow_id=wf.id).annotate(
+                m=Max("version_no")
+            ).values("m")
+            next_no = ((agg[0]["m"] or 0) + 1) if agg else 1
+            version = await WorkflowVersion.create(
+                workflow_id=wf.id,
+                version_no=next_no,
+                graph_json=src.graph_json,
+                schema_version=src.schema_version or "v2",
+                resource_refs=src.resource_refs,
+                published_by_type=owner.owner_type,
+                published_by_id=owner.owner_id,
+                published_at=datetime.now(),
+                status="published",
+            )
+            await Workflow.filter(id=wf.id).update(
+                current_version_id=version.id,
+                status="active",
+                schema_version=version.schema_version,
+            )
+        return {
+            "version_id": version.id,
+            "version_no": version.version_no,
+            "rolled_back_from": src.version_no,
+            "published_at": version.published_at.isoformat() if version.published_at else None,
+        }
+
+    @classmethod
+    async def disable_workflow(cls, workflow_id: int, owner: OwnerContext) -> Workflow:
+        """停用（publish_status 流转 active → inactive，PRD §6.4-B5）"""
+        wf = await get_owned_or_404(Workflow, workflow_id, owner, for_write=True)
+        await Workflow.filter(id=wf.id).update(status="inactive")
+        return await Workflow.get(id=wf.id)
+
+    @classmethod
+    async def validate_user_workflow(
+        cls,
+        workflow_id: int,
+        graph_json: Dict[str, Any],
+        *,
+        owner: OwnerContext,
+    ) -> Dict[str, Any]:
+        """用户侧校验端点：归属校验 + user 域全量校验（返回摘要结构）"""
+        await get_owned_or_404(Workflow, workflow_id, owner, include_public=True)
+        issues = await cls.validate_graph_for(owner, graph_json, domain=DOMAIN_USER)
+        return cls.validation_summary(issues)
+
+    @classmethod
+    async def get_user_workflow_detail(
+        cls,
+        workflow_id: int,
+        *,
+        owner: OwnerContext,
+    ) -> Dict[str, Any]:
+        """用户侧详情：归属过滤 + 草稿校验结果（PRD §7.3 问题面板数据源）"""
+        workflow = await get_owned_or_404(
+            Workflow, workflow_id, owner, include_public=True
+        )
+        definition = workflow.definition or {}
+        if definition:
+            validation = cls.validation_summary(
+                await cls.validate_graph_for(owner, definition, domain=DOMAIN_USER)
+            )
+        else:
+            validation = {"valid": True, "error_count": 0, "warning_count": 0, "issues": []}
+        return {
+            "id": workflow.id,
+            "name": workflow.name,
+            "description": workflow.description,
+            "status": workflow.status,
+            "schema_version": workflow.schema_version,
+            "draft_version": workflow.draft_version,
+            "current_version_id": workflow.current_version_id,
+            "definition": definition,
+            "validation": validation,
+            "created_at": workflow.created_at,
+            "updated_at": workflow.updated_at,
+        }

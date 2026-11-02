@@ -88,7 +88,8 @@ class LangGraphExecutor:
         sse_yield_func=None,
         execution_id: Optional[str] = None,
         llm_resources: Optional[Dict] = None,
-        skill_resources: Optional[Dict] = None
+        skill_resources: Optional[Dict] = None,
+        execution_context=None
     ) -> Dict[str, Any]:
         """
         执行智能体
@@ -101,6 +102,8 @@ class LangGraphExecutor:
             execution_id: 执行ID（用于追踪）
             llm_resources: 预加载的LLM资源
             skill_resources: 预加载的技能资源
+            execution_context: （T6/M2 可选注入）ExecutionContext；提供时节点生命周期
+                事件经 TraceService 批量缓冲落库；缺省 None 走原有行为（不接入新链路）
             
         Returns:
             执行结果
@@ -130,7 +133,8 @@ class LangGraphExecutor:
                     sse_yield_func=sse_yield_func,
                     execution_id=execution_id,
                     llm_resources=llm_resources,
-                    skill_resources=skill_resources
+                    skill_resources=skill_resources,
+                    execution_context=execution_context
                 )
                 logger.info("=" * 50)
                 logger.info("[LangGraph] ===== RETURNING =====")
@@ -295,7 +299,8 @@ class LangGraphExecutor:
         sse_yield_func=None,
         execution_id: Optional[str] = None,
         llm_resources: Optional[Dict] = None,
-        skill_resources: Optional[Dict] = None
+        skill_resources: Optional[Dict] = None,
+        execution_context=None
     ) -> Dict[str, Any]:
         """
         使用真正的 LangGraph 执行智能体结构图
@@ -319,6 +324,27 @@ class LangGraphExecutor:
             important_memories = []
             nodes = flow_data.get("nodes", [])
             edges = flow_data.get("edges", [])
+
+            # T6/M2 可选注入：创建 Trace 写入器并发出 run_started（缺省 None 不接入新链路）
+            m2_writer = None
+            if execution_context is not None:
+                try:
+                    from base.plugins.agent.services.trace_service import TraceService
+                    from base.plugins.agent.services.engine import events as m2_events
+                    import time as _time
+                    m2_writer = await TraceService.create_writer(
+                        int(execution_context.execution_id)
+                    )
+                    await m2_writer.emit(
+                        m2_events.EventType.RUN_STARTED, None,
+                        m2_events.run_started(
+                            int(execution_context.execution_id),
+                            getattr(execution_context, "version_id", None), _time.time(),
+                        ),
+                    )
+                except Exception as e:
+                    logger.warning(f"[M2] Trace 写入器创建失败（不影响执行）: {e}")
+                    m2_writer = None
 
             if not nodes:
                 logger.warning("结构图没有节点，回退到简单执行")
@@ -517,7 +543,8 @@ class LangGraphExecutor:
                     "recent_memories": memory_list,
                     "important_memories": [{"content": m.content, "importance": m.importance} for m in important_memories],
                     "_llm_resources": llm_resources,  # 预加载的LLM资源
-                    "_skill_resources": skill_resources  # 预加载的技能资源
+                    "_skill_resources": skill_resources,  # 预加载的技能资源
+                    "_m2_trace_writer": m2_writer  # T6/M2 可选注入的 Trace 写入器（不向前端暴露）
                 },
                 "node_results": {},
                 "execution_trace": [],
@@ -587,6 +614,18 @@ class LangGraphExecutor:
             logger.info("[LangGraph] 记忆保存完成，准备返回结果")
 
             if final_state.get("error"):
+                # T6/M2：run_failed 事件（节点错误已传导至 state.error）
+                if m2_writer is not None:
+                    try:
+                        await m2_writer.emit(
+                            m2_events.EventType.RUN_FAILED, None,
+                            m2_events.run_failed(
+                                int(execution_context.execution_id), "NODE_ERROR",
+                                message=str(final_state.get("error", ""))[:500],
+                            ),
+                        )
+                    except Exception as emit_err:
+                        logger.warning(f"[M2] run_failed 事件写入失败（不影响执行）: {emit_err}")
                 return {
                     "success": False,
                     "message": final_state["error"],
@@ -653,11 +692,22 @@ class LangGraphExecutor:
             
             # 过滤敏感数据，不向前端暴露 API 密钥等敏感信息
             safe_variables = variables.copy()
-            sensitive_keys = ["_llm_resources", "_skill_resources"]
+            sensitive_keys = ["_llm_resources", "_skill_resources", "_m2_trace_writer"]
             for key in sensitive_keys:
                 if key in safe_variables:
                     del safe_variables[key]
             
+            # T6/M2：run_completed 事件
+            if m2_writer is not None:
+                try:
+                    await m2_writer.emit(
+                        m2_events.EventType.RUN_COMPLETED, None,
+                        m2_events.run_completed(
+                            int(execution_context.execution_id), {}, int(elapsed * 1000),
+                        ),
+                    )
+                except Exception as emit_err:
+                    logger.warning(f"[M2] run_completed 事件写入失败（不影响执行）: {emit_err}")
             result = {
                 "success": True,
                 "message": "执行成功",
@@ -671,6 +721,15 @@ class LangGraphExecutor:
 
         except GraphInterrupt as e:
             logger.info(f"[LangGraph] 执行暂停，等待用户输入: {e}")
+            # T6/M2：run_paused 事件（HITL 等待用户输入）
+            if m2_writer is not None:
+                try:
+                    await m2_writer.emit(
+                        m2_events.EventType.RUN_PAUSED, None,
+                        m2_events.run_paused("", {"type": "user"}, None),
+                    )
+                except Exception as emit_err:
+                    logger.warning(f"[M2] run_paused 事件写入失败（不影响执行）: {emit_err}")
             return {
                 "success": True,
                 "status": "waiting_for_user",
@@ -679,12 +738,33 @@ class LangGraphExecutor:
             }
         except Exception as e:
             logger.exception(f"LangGraph 执行失败: {e}")
+            # T6/M2：run_failed 事件
+            if m2_writer is not None:
+                try:
+                    await m2_writer.emit(
+                        m2_events.EventType.RUN_FAILED, None,
+                        m2_events.run_failed(
+                            int(execution_context.execution_id), "ENGINE_ERROR",
+                            message=str(e)[:500],
+                        ),
+                    )
+                except Exception as emit_err:
+                    logger.warning(f"[M2] run_failed 事件写入失败（不影响执行）: {emit_err}")
             import traceback
             return {
                 "success": False,
                 "message": str(e),
                 "traceback": traceback.format_exc()
             }
+        finally:
+            # T6/M2：关闭 Trace 写入器（终 flush，R-11）
+            if m2_writer is not None:
+                try:
+                    from base.plugins.agent.services.trace_service import TraceService
+                    await TraceService.close_writer(m2_writer.execution_id)
+                except Exception as close_err:
+                    logger.warning(f"[M2] Trace 写入器关闭失败: {close_err}")
+
     @staticmethod
     async def _execute_node_with_logging(current_node, state, sse_yield_func=None):
         """执行节点，带日志记录和 SSE 推送"""
@@ -699,6 +779,19 @@ class LangGraphExecutor:
         original_flow_data = state.get("flow_data")
 
         state["current_node"] = node_label
+
+        # T6/M2：node_started 事件（可选注入，缺省 None 不接入新链路）
+        m2_writer = (state.get("variables") or {}).get("_m2_trace_writer")
+        m2_node_start = time.time()
+        if m2_writer is not None:
+            try:
+                from base.plugins.agent.services.engine import events as m2_events
+                await m2_writer.emit(
+                    m2_events.EventType.NODE_STARTED, node_id,
+                    m2_events.node_started(node_id, node_label),
+                )
+            except Exception as emit_err:
+                logger.warning(f"[M2] node_started 事件写入失败（不影响执行）: {emit_err}")
 
         if "execution_trace" not in state:
             state["execution_trace"] = []
@@ -800,6 +893,17 @@ class LangGraphExecutor:
                 "timestamp": datetime.now().isoformat()
             })
 
+            # T6/M2：node_completed 事件
+            if m2_writer is not None:
+                try:
+                    ms = int((time.time() - m2_node_start) * 1000)
+                    await m2_writer.emit(
+                        m2_events.EventType.NODE_COMPLETED, node_id,
+                        m2_events.node_completed(node_id, None, ms),
+                    )
+                except Exception as emit_err:
+                    logger.warning(f"[M2] node_completed 事件写入失败（不影响执行）: {emit_err}")
+
             if sse_yield_func:
                 try:
                     await sse_yield_func({
@@ -816,6 +920,15 @@ class LangGraphExecutor:
         except Exception as e:
             logger.exception(f"节点执行失败: {e}")
             state["error"] = str(e)
+            # T6/M2：node_failed 事件
+            if m2_writer is not None:
+                try:
+                    await m2_writer.emit(
+                        m2_events.EventType.NODE_FAILED, node_id,
+                        m2_events.node_failed(node_id, "NODE_ERROR", False, str(e)[:500]),
+                    )
+                except Exception as emit_err:
+                    logger.warning(f"[M2] node_failed 事件写入失败（不影响执行）: {emit_err}")
             if sse_yield_func:
                 await sse_yield_func({'type': 'error', 'node_id': node_id, 'message': str(e)})
 

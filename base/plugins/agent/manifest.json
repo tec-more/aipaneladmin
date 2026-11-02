@@ -17,6 +17,8 @@
         "tool_tag",
         "memory",
         "workflow",
+        "workflow_version",
+        "trace_event",
         "dialog_flow",
         "rag"
     ],

@@ -15,7 +15,6 @@ from base.common.security import (
     get_current_user_id,
 )
 from base.common.response import success_response, fail_response
-from base.core.users.models.users import User
 from base.core.users.services.email_service import EmailService
 
 auth_router = APIRouter(prefix="/auth", tags=["客户认证"])
@@ -53,38 +52,14 @@ class CustomerUpdatePasswordSchema(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=128, description="新密码")
 
 
-async def get_or_create_customer_by_email(email: str, user: User = None) -> "Customer":
-    """通过邮箱获取或创建客户记录"""
-    from base.plugins.customer.models.customer import Customer
+async def _build_link_hint(customer) -> bool:
+    """
+    RK-14 改造：登录响应仅附带 link_hint 供前端提示，
+    是否关联由用户经 /identity 流程主动确认并验证（R-14），系统不再自动建立映射。
+    """
+    from base.plugins.customer.services.identity_service import IdentityService
 
-    if user:
-        # 如果有User对象，通过system_user关联查找
-        customer = await Customer.get_or_none(system_user_id=user.id)
-
-        if not customer:
-            # 如果没找到，尝试通过email查找
-            customer = await Customer.get_or_none(email=email)
-
-            if not customer:
-                # 创建新的客户记录
-                customer = await Customer.create(
-                    system_user_id=user.id,
-                    username=user.username,
-                    email=user.email,
-                    nickname=getattr(user, "nickname", None),
-                    avatar=getattr(user, "avatar", None),
-                    is_active=True
-                )
-            else:
-                # 如果通过email找到了，更新关联
-                customer.system_user_id = user.id
-                await customer.save()
-
-        return customer
-    else:
-        # 没有User对象，通过email查找
-        customer = await Customer.get_or_none(email=email)
-        return customer
+    return await IdentityService.has_link_hint("cus", customer.id, customer.email)
 
 
 @auth_router.post("/register", summary="客户注册")
@@ -145,7 +120,7 @@ async def customer_register(register_data: CustomerRegisterSchema):
     # 创建访问令牌
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(customer.id), "email": customer.email},
+        data={"sub": str(customer.id), "typ": "cus", "email": customer.email},
         expires_delta=access_token_expires
     )
 
@@ -195,11 +170,10 @@ async def customer_login_with_password(login_data: CustomerPasswordLoginSchema):
     if not pwd_context.verify(login_data.password, customer.password):
         return fail_response(msg="邮箱或密码错误")
 
-    # 创建访问令牌
-    user_id = customer.system_user_id if customer.system_user_id else customer.id
+    # 创建访问令牌（RK-13: typ/sub 必须同源，sub 始终使用 customer.id）
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(user_id), "typ": "cus", "email": customer.email},
+        data={"sub": str(customer.id), "typ": "cus", "email": customer.email},
         expires_delta=access_token_expires
     )
 
@@ -217,7 +191,8 @@ async def customer_login_with_password(login_data: CustomerPasswordLoginSchema):
         "access_token": access_token,
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "customer": customer_dict
+        "customer": customer_dict,
+        "link_hint": await _build_link_hint(customer),
     }
 
     return success_response(data=token_data, msg="登录成功")
@@ -283,33 +258,18 @@ async def customer_login_with_code(login_data: VerifyCodeSchema):
     # 查找客户
     customer = await Customer.get_or_none(email=login_data.email)
 
-    # 如果Customer表中没有，尝试从User表查找并创建Customer记录
+    # RK-14/R-14：不再按邮箱自动创建客户主体或自动写入 system_user_id 关联；
+    # 客户须先注册。同邮箱另一主体仅通过 link_hint 提示，由用户主动确认并验证后关联
     if not customer:
-        from base.core.users.services.user_service import UserService
-        user = await UserService.get_by_email(login_data.email)
-
-        if not user:
-            return fail_response(msg="用户不存在")
-
-        customer = await get_or_create_customer_by_email(login_data.email, user)
-    else:
-        # 如果Customer记录存在但没有关联User，尝试关联
-        if not customer.system_user_id:
-            from base.core.users.services.user_service import UserService
-            user = await UserService.get_by_email(login_data.email)
-
-            if user:
-                customer.system_user_id = user.id
-                await customer.save()
+        return fail_response(msg="该邮箱未注册")
 
     if not customer.is_active:
         return fail_response(msg="账号已被禁用，请联系管理员")
 
-    # 创建访问令牌 - 使用User ID如果有关联，否则使用Customer ID
-    user_id = customer.system_user_id if customer.system_user_id else customer.id
+    # 创建访问令牌（RK-13: typ/sub 必须同源，sub 始终使用 customer.id）
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(user_id), "email": customer.email},
+        data={"sub": str(customer.id), "typ": "cus", "email": customer.email},
         expires_delta=access_token_expires
     )
 
@@ -327,7 +287,8 @@ async def customer_login_with_code(login_data: VerifyCodeSchema):
         "access_token": access_token,
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "customer": customer_dict
+        "customer": customer_dict,
+        "link_hint": await _build_link_hint(customer),
     }
 
     return success_response(data=token_data, msg="登录成功")

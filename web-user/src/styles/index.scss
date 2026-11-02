@@ -1,0 +1,32 @@
+// 用户侧全局样式（T7）：CSS 变量 + 基础重置，风格对齐 web/ 工程
+:root {
+  --u-primary: #409eff;
+  --u-bg-page: #f5f7fa;
+  --u-bg-header: #ffffff;
+  --u-border: #e4e7ed;
+  --u-text-main: #303133;
+  --u-text-sub: #909399;
+  --u-header-height: 56px;
+  --u-aside-width: 208px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', Arial, sans-serif;
+  color: var(--u-text-main);
+  background-color: var(--u-bg-page);
+}
+
+a {
+  color: var(--u-primary);
+  text-decoration: none;
+}

@@ -14,7 +14,9 @@
         "customer",
         "membership",
         "customer_membership",
-        "payment_transaction"
+        "payment_transaction",
+        "identity_link",
+        "customer_organization"
     ],
     "schemas": [
         "customer_schema",

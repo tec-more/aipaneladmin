@@ -1,465 +1,410 @@
 """
-Workflow API routes
+工作流 API 路由（管理侧）
+
+M3/T5 改造：
+1. 全部端点接入 M8 归属过滤（RK-01 修复：require_owner + owned_queryset/get_owned_or_404）。
+   usr 超管 data_scope=all 时保持既有全量可见行为，既有响应结构不变（只增不删）。
+2. 新增 M3 端点：校验 / 草稿保存（乐观锁 409）/ 发布（Idempotency-Key 去重）/
+   版本列表与快照 / 回滚 / 停用。
+
+管理侧校验域为 admin：不做用户域节点类型/资源授权限制（保持后台画布兼容），
+结构、图与类型错误照常报告；发布仍被阻断性错误拦截。
 """
-from typing import List, Dict, Any, Optional, AsyncGenerator
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from fastapi.responses import StreamingResponse
-from base.plugins.agent.schemas.workflow import (
-    WorkflowCreate, WorkflowUpdate, WorkflowResponse,
-    WorkflowNodeCreate, WorkflowNodeUpdate, WorkflowNodeResponse,
-    WorkflowEdgeCreate, WorkflowEdgeUpdate, WorkflowEdgeResponse,
-    WorkflowExecutionCreate, WorkflowExecutionResponse
+from typing import Optional, List, Dict, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from pydantic import BaseModel, Field
+
+from base.common.authz import (
+    OwnerContext,
+    OwnedResourceNotFound,
+    get_owned_or_404,
+    owned_queryset,
+    require_owner,
 )
-from base.plugins.agent.services.workflow_service import WorkflowService
-from base.plugins.agent.services.langgraph_executor import LangGraphExecutor
-from base.plugins.agent.services.checkpoint_service import CheckpointService
-from base.common.security import get_current_actor
-from base.common.response import success_response, fail_response
-import uuid
-import asyncio
-import logging
+from base.common.response import fail_response, success_response
 
-logger = logging.getLogger(__name__)
+from ...models.workflow import Workflow, WorkflowExecution
+from ...models.workflow_version import WorkflowVersion
+from ...services.workflow_service import (
+    DraftConflictError,
+    ValidationBlockedError,
+    WorkflowService,
+    WorkflowStateError,
+)
+from ...services.graph_validator import DOMAIN_ADMIN
 
-workflow_execution_manager = {
-}
-
-workflow_router = APIRouter(prefix="/workflows", tags=["workflows"])
-workflow_execution_router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
+workflow_router = APIRouter(prefix="/workflows", tags=["工作流管理"])
+workflow_execution_router = APIRouter(prefix="/workflow-executions", tags=["工作流执行记录"])
 
 
-@workflow_router.post("/")
-async def create_workflow(workflow: WorkflowCreate):
-    """Create a new workflow"""
-    try:
-        created_workflow = await WorkflowService.create_workflow(workflow)
-        
-        data = {
-            "id": created_workflow.id,
-            "name": created_workflow.name,
-            "description": created_workflow.description,
-            "status": created_workflow.status,
-            "definition": created_workflow.definition,
-            "agent_ids": [],
-            "created_at": created_workflow.created_at.isoformat() if created_workflow.created_at else None,
-            "updated_at": created_workflow.updated_at.isoformat() if created_workflow.updated_at else None,
-            "node_count": 0,
-            "edge_count": 0
-        }
-        return success_response(data=data, msg="工作流创建成功")
-    except Exception as e:
-        return fail_response(msg=str(e))
+# ============================================================
+# 请求模型
+# ============================================================
+class WorkflowSaveDraftRequest(BaseModel):
+    graph_json: Dict[str, Any] = Field(..., description="Schema v2 图定义")
+    draft_version: int = Field(..., description="草稿乐观锁版本号（读取时获得）")
 
 
-@workflow_router.post("/import")
-async def import_workflow(import_data: dict):
-    """Import workflow from template"""
-    try:
-        imported_workflow = await WorkflowService.import_workflow(import_data)
-        
-        definition = imported_workflow.definition or {}
-        node_count = len(definition.get('nodes', []))
-        edge_count = len(definition.get('edges', []))
-        
-        data = {
-            "id": imported_workflow.id,
-            "name": imported_workflow.name,
-            "description": imported_workflow.description,
-            "status": imported_workflow.status,
-            "definition": imported_workflow.definition,
-            "created_at": imported_workflow.created_at.isoformat() if imported_workflow.created_at else None,
-            "updated_at": imported_workflow.updated_at.isoformat() if imported_workflow.updated_at else None,
-            "node_count": node_count,
-            "edge_count": edge_count
-        }
-        
-        return success_response(data=data, msg="工作流导入成功")
-    except Exception as e:
-        import traceback
-        return fail_response(msg=f"导入失败: {str(e)}", data={"traceback": traceback.format_exc()})
+class WorkflowValidateRequest(BaseModel):
+    graph_json: Dict[str, Any] = Field(..., description="待校验的 Schema v2 图定义")
 
 
-@workflow_router.get("/")
-async def get_workflows(skip: int = 0, limit: int = 100, name: str = "", status: str = ""):
-    """Get all workflows"""
-    from base.plugins.agent.models.workflow import Workflow
-    
-    # 构建查询条件
-    query = Workflow.all()
-    
-    if name:
-        query = query.filter(name__icontains=name)
-    
-    if status:
-        query = query.filter(status=status)
-    
-    # 获取总数
-    total = await query.count()
-    
-    # 获取分页数据
-    workflows = await query.offset(skip).limit(limit).order_by("-created_at").all()
-    
-    response = []
-    for workflow in workflows:
-        response.append({
-            "id": workflow.id,
-            "name": workflow.name,
-            "description": workflow.description,
-            "status": workflow.status,
-            "definition": workflow.definition,
-            "agent_ids": [],
-            "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
-            "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
-            "node_count": 0,
-            "edge_count": 0
-        })
-    return success_response(data={"items": response, "total": total})
+class WorkflowRollbackRequest(BaseModel):
+    version_no: int = Field(..., description="回滚目标版本号")
 
 
-@workflow_router.get("/{workflow_id}")
-async def get_workflow(workflow_id: int):
-    """Get workflow by ID"""
-    workflow = await WorkflowService.get_workflow_by_id(workflow_id)
-    if not workflow:
-        return fail_response(msg="工作流不存在", code=404)
-    
-    data = {
-        "id": workflow.id,
-        "name": workflow.name,
-        "description": workflow.description,
-        "status": workflow.status,
-        "definition": workflow.definition,
-        "agent_ids": [],
-        "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
-        "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
-        "node_count": 0,
-        "edge_count": 0
+# ============================================================
+# 异常 → HTTP 映射
+# ============================================================
+def _raise_http(exc: Exception):
+    if isinstance(exc, DraftConflictError):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": 40901,
+                "msg": "草稿已被他人（或另一会话）修改，请刷新后重试",
+                "current_draft_version": exc.current_version,
+            },
+        )
+    if isinstance(exc, ValidationBlockedError):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42200, "msg": "校验未通过，操作被阻断", "issues": exc.issues},
+        )
+    if isinstance(exc, WorkflowStateError):
+        raise HTTPException(status_code=409, detail={"code": 40900, "msg": str(exc)})
+    if isinstance(exc, OwnedResourceNotFound):
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    raise exc
+
+
+def _wf_payload(wf: Workflow) -> Dict[str, Any]:
+    """既有响应结构（保持后台前端兼容），附加 M3 字段"""
+    return {
+        "id": wf.id,
+        "name": wf.name,
+        "description": wf.description,
+        "status": wf.status,
+        "definition": wf.definition,
+        "agent_ids": wf.agent_ids,
+        "created_at": wf.created_at,
+        "updated_at": wf.updated_at,
+        "node_count": len(wf.definition.get("nodes", [])) if wf.definition else 0,
+        "edge_count": len(wf.definition.get("edges", [])) if wf.definition else 0,
+        # M3 附加字段（不破坏既有结构）
+        "schema_version": wf.schema_version,
+        "draft_version": wf.draft_version,
+        "current_version_id": wf.current_version_id,
+        "owner_type": wf.owner_type,
+        "owner_id": wf.owner_id,
+        "visibility": wf.visibility,
     }
+
+
+def _version_payload(v: WorkflowVersion) -> Dict[str, Any]:
+    return {
+        "id": v.id,
+        "workflow_id": v.workflow_id,
+        "version_no": v.version_no,
+        "status": v.status,
+        "description": v.description,
+        "resource_refs": v.resource_refs,
+        "published_by_type": v.published_by_type,
+        "published_by_id": v.published_by_id,
+        "published_at": v.published_at,
+        "created_at": v.created_at,
+        "updated_at": v.updated_at,
+    }
+
+
+# ============================================================
+# 既有端点（接入归属过滤，响应结构不变）
+# ============================================================
+@workflow_router.post("", response_model=dict, summary="创建工作流")
+async def create_workflow(
+    name: str,
+    description: Optional[str] = None,
+    definition: Optional[Dict[str, Any]] = None,
+    agent_ids: Optional[List[int]] = None,
+    owner: OwnerContext = Depends(require_owner),
+):
+    workflow = await WorkflowService.create_workflow(
+        name=name,
+        description=description,
+        definition=definition,
+        agent_ids=agent_ids,
+        owner=owner,
+    )
+    return success_response(
+        data={"id": workflow.id, "name": workflow.name}, msg="工作流创建成功"
+    )
+
+
+@workflow_router.get("", response_model=dict, summary="获取工作流列表")
+async def get_workflows(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    status: Optional[str] = None,
+    owner: OwnerContext = Depends(require_owner),
+):
+    workflows = await WorkflowService.get_workflows(
+        skip=skip, limit=limit, status=status, owner=owner
+    )
+    return success_response(data=[_wf_payload(w) for w in workflows])
+
+
+@workflow_router.get("/{workflow_id}", response_model=dict, summary="获取工作流详情")
+async def get_workflow(
+    workflow_id: int,
+    owner: OwnerContext = Depends(require_owner),
+):
+    try:
+        workflow = await WorkflowService.get_workflow_by_id(
+            workflow_id, owner=owner, include_public=True
+        )
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    return success_response(data=_wf_payload(workflow))
+
+
+@workflow_router.put("/{workflow_id}", response_model=dict, summary="更新工作流")
+async def update_workflow(
+    workflow_id: int,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    definition: Optional[Dict[str, Any]] = None,
+    status: Optional[str] = None,
+    agent_ids: Optional[List[int]] = None,
+    owner: OwnerContext = Depends(require_owner),
+):
+    try:
+        workflow = await WorkflowService.update_workflow(
+            workflow_id=workflow_id,
+            name=name,
+            description=description,
+            definition=definition,
+            status=status,
+            agent_ids=agent_ids,
+            owner=owner,
+        )
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    return success_response(
+        data={"id": workflow.id, "name": workflow.name}, msg="工作流更新成功"
+    )
+
+
+@workflow_router.delete("/{workflow_id}", response_model=dict, summary="删除工作流")
+async def delete_workflow(
+    workflow_id: int,
+    owner: OwnerContext = Depends(require_owner),
+):
+    try:
+        success = await WorkflowService.delete_workflow(workflow_id, owner=owner)
+    except (OwnedResourceNotFound, WorkflowStateError) as e:
+        _raise_http(e)
+    if success:
+        return success_response(msg="工作流删除成功")
+    return fail_response(msg="工作流删除失败", code=500)
+
+
+# ============================================================
+# M3 新增端点：校验 / 草稿 / 发布 / 版本 / 回滚 / 停用
+# ============================================================
+@workflow_router.post("/{workflow_id}/validate", response_model=dict, summary="校验工作流图")
+async def validate_workflow_graph(
+    workflow_id: int,
+    body: WorkflowValidateRequest,
+    owner: OwnerContext = Depends(require_owner),
+):
+    """管理侧全量校验（admin 域：不拦截节点类型/资源授权，仅报告结构与图错误）"""
+    try:
+        await get_owned_or_404(Workflow, workflow_id, owner, include_public=True)
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    issues = await WorkflowService.validate_graph_for(
+        owner, body.graph_json, domain=DOMAIN_ADMIN
+    )
+    return success_response(data=WorkflowService.validation_summary(issues))
+
+
+@workflow_router.put("/{workflow_id}/draft", response_model=dict, summary="保存工作流草稿")
+async def save_workflow_draft(
+    workflow_id: int,
+    body: WorkflowSaveDraftRequest,
+    owner: OwnerContext = Depends(require_owner),
+):
+    """保存草稿（乐观锁）：冲突 40901；校验错误不阻断保存但随响应返回"""
+    try:
+        fresh, issues = await WorkflowService.save_draft(
+            workflow_id, body.graph_json, body.draft_version,
+            owner=owner, domain=DOMAIN_ADMIN,
+        )
+    except (OwnedResourceNotFound, DraftConflictError) as e:
+        _raise_http(e)
+    return success_response(data={
+        "id": fresh.id,
+        "draft_version": fresh.draft_version,
+        "updated_at": fresh.updated_at,
+        "validation": WorkflowService.validation_summary(issues),
+    }, msg="草稿已保存")
+
+
+@workflow_router.post("/{workflow_id}/publish", response_model=dict, summary="发布工作流")
+async def publish_workflow(
+    workflow_id: int,
+    owner: OwnerContext = Depends(require_owner),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+):
+    """发布：Idempotency-Key 24h 去重；阻断性校验错误（E-1xx）→ 422 拒绝"""
+    try:
+        result = await WorkflowService.publish_workflow(
+            workflow_id, owner=owner,
+            idempotency_key=idempotency_key, domain=DOMAIN_ADMIN,
+        )
+    except (OwnedResourceNotFound, DraftConflictError, ValidationBlockedError, WorkflowStateError) as e:
+        _raise_http(e)
+    return success_response(data=result, msg="发布成功")
+
+
+@workflow_router.get("/{workflow_id}/versions", response_model=dict, summary="版本列表")
+async def list_workflow_versions(
+    workflow_id: int,
+    owner: OwnerContext = Depends(require_owner),
+):
+    try:
+        versions = await WorkflowService.list_versions(workflow_id, owner=owner)
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    return success_response(data=[_version_payload(v) for v in versions])
+
+
+@workflow_router.get(
+    "/{workflow_id}/versions/{version_no}",
+    response_model=dict,
+    summary="版本快照（只读）",
+)
+async def get_workflow_version(
+    workflow_id: int,
+    version_no: int,
+    owner: OwnerContext = Depends(require_owner),
+):
+    try:
+        v = await WorkflowService.get_version_snapshot(workflow_id, version_no, owner=owner)
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    data = _version_payload(v)
+    data["graph_json"] = v.graph_json  # 快照完整图（只读）
     return success_response(data=data)
 
 
-@workflow_router.put("/{workflow_id}")
-async def update_workflow(workflow_id: int, workflow: WorkflowUpdate):
-    """Update workflow"""
-    updated_workflow = await WorkflowService.update_workflow(workflow_id, workflow)
-    if not updated_workflow:
-        return fail_response(msg="工作流不存在", code=404)
-    
-    data = {
-        "id": updated_workflow.id,
-        "name": updated_workflow.name,
-        "description": updated_workflow.description,
-        "status": updated_workflow.status,
-        "definition": updated_workflow.definition,
-        "agent_ids": [],
-        "created_at": updated_workflow.created_at.isoformat() if updated_workflow.created_at else None,
-        "updated_at": updated_workflow.updated_at.isoformat() if updated_workflow.updated_at else None,
-        "node_count": 0,
-        "edge_count": 0
-    }
-    return success_response(data=data, msg="工作流更新成功")
-
-
-@workflow_router.delete("/{workflow_id}")
-async def delete_workflow(workflow_id: int):
-    """Delete workflow"""
-    success = await WorkflowService.delete_workflow(workflow_id)
-    if not success:
-        return fail_response(msg="工作流不存在", code=404)
-    return success_response(msg="工作流删除成功")
-
-
-@workflow_router.post("/{workflow_id}/nodes")
-async def create_workflow_node(workflow_id: int, node: WorkflowNodeCreate):
-    """Create workflow node"""
-    try:
-        node_data = node.model_dump()
-        created_node = await WorkflowService.create_workflow_node(workflow_id, node_data)
-        data = {
-            "id": created_node.id,
-            "workflow_id": workflow_id,
-            "name": created_node.name,
-            "type": created_node.type,
-            "config": created_node.config,
-            "position": created_node.position,
-            "agent_id": created_node.agent_id,
-            "skill_id": created_node.skill_id,
-            "created_at": created_node.created_at.isoformat() if created_node.created_at else None,
-            "updated_at": created_node.updated_at.isoformat() if created_node.updated_at else None
-        }
-        return success_response(data=data, msg="节点创建成功")
-    except ValueError as e:
-        return fail_response(msg=str(e), code=404)
-    except Exception as e:
-        return fail_response(msg=str(e))
-
-
-@workflow_router.post("/{workflow_id}/edges")
-async def create_workflow_edge(workflow_id: int, edge: WorkflowEdgeCreate):
-    """Create workflow edge"""
-    try:
-        edge_data = edge.model_dump()
-        created_edge = await WorkflowService.create_workflow_edge(workflow_id, edge_data)
-        data = {
-            "id": created_edge.id,
-            "workflow_id": workflow_id,
-            "source_node_id": created_edge.source_node_id,
-            "target_node_id": created_edge.target_node_id,
-            "condition": created_edge.condition,
-            "label": created_edge.label,
-            "created_at": created_edge.created_at.isoformat() if created_edge.created_at else None,
-            "updated_at": created_edge.updated_at.isoformat() if created_edge.updated_at else None
-        }
-        return success_response(data=data, msg="边创建成功")
-    except ValueError as e:
-        return fail_response(msg=str(e), code=404)
-    except Exception as e:
-        return fail_response(msg=str(e))
-
-
-@workflow_router.get("/{workflow_id}/graph")
-async def get_workflow_graph(workflow_id: int):
-    """Get workflow graph definition"""
-    try:
-        logger.info(f"=== 获取工作流结构图: workflow_id={workflow_id} ===")
-        
-        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
-        if not workflow:
-            logger.error(f"工作流不存在: workflow_id={workflow_id}")
-            return fail_response(msg="工作流不存在", code=404)
-        
-        logger.info(f"workflow.definition: {workflow.definition}")
-        
-        return success_response(data={"graph_definition": workflow.definition})
-    except Exception as e:
-        logger.exception(f"获取工作流结构图失败: {e}")
-        return fail_response(msg=str(e))
-
-
-@workflow_router.put("/{workflow_id}/graph")
-async def update_workflow_graph(workflow_id: int, graph_data: dict):
-    """Update workflow graph definition"""
-    try:
-        logger.info(f"=== 保存工作流结构图: workflow_id={workflow_id} ===")
-        logger.info(f"接收到的 graph_data: {graph_data}")
-        
-        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
-        if not workflow:
-            logger.error(f"工作流不存在: workflow_id={workflow_id}")
-            return fail_response(msg="工作流不存在", code=404)
-        
-        logger.info(f"保存前 workflow.definition: {workflow.definition}")
-        
-        workflow.definition = graph_data
-        await workflow.save()
-        
-        logger.info(f"保存后 workflow.definition: {workflow.definition}")
-        
-        return success_response(data={"graph_definition": workflow.definition}, msg="工作流结构图保存成功")
-    except Exception as e:
-        logger.exception(f"保存工作流结构图失败: {e}")
-        return fail_response(msg=str(e))
-
-
-@workflow_router.post("/{workflow_id}/execute")
-async def execute_workflow_unified(
+@workflow_router.post("/{workflow_id}/rollback", response_model=dict, summary="回滚到历史版本")
+async def rollback_workflow(
     workflow_id: int,
-    input_data: dict,
-    stream: Optional[bool] = Query(None, description="是否强制使用流式返回"),
-    actor: dict = Depends(get_current_actor)
+    body: WorkflowRollbackRequest,
+    owner: OwnerContext = Depends(require_owner),
 ):
-    """
-    统一工作流执行接口
-    根据工作流图结构自动判断使用普通模式还是SSE模式
-    
-    Args:
-        workflow_id: 工作流ID
-        input_data: 输入数据
-        stream: 是否强制使用流式返回（可选）
-        actor: 当前用户（从依赖注入获取）
-    
-    Returns:
-        普通响应或SSE流式响应
-    """
+    """回滚＝以旧版本图生成新版本（历史版本不可变）"""
     try:
-        workflow = await WorkflowService.get_workflow_by_id(workflow_id)
-        if not workflow:
-            return fail_response(msg="工作流不存在", code=404)
-        
-        if workflow.status != "active":
-            return fail_response(msg="工作流未激活", code=400)
-        
-        checkpoint_service = CheckpointService.get_instance()
-        use_sse = stream if stream is not None else WorkflowService.should_use_sse(workflow)
-        
-        if use_sse:
-            for exec_id, info in workflow_execution_manager.items():
-                if info.get('workflow_id') == workflow_id:
-                    return fail_response(msg="工作流正在执行中，请稍后再试", code=409)
-            
-            flow_data = workflow.definition or {}
-            nodes = flow_data.get("nodes", [])
-            
-            print(f"[Workflow API] 开始预加载资源...")
-            try:
-                llm_resources = await LangGraphExecutor._preload_llm_resources(nodes)
-                skill_resources = await LangGraphExecutor._preload_skill_resources(nodes)
-                print(f"[Workflow API] 预加载成功，LLM资源: {len(llm_resources)}, 技能资源: {len(skill_resources)}")
-            except ValueError as e:
-                print(f"[Workflow API] 预加载失败: {e}")
-                return fail_response(msg=str(e), code=400)
-            except Exception as e:
-                print(f"[Workflow API] 预加载异常: {e}")
-                import traceback
-                traceback.print_exc()
-                return fail_response(msg=f"资源预加载失败: {str(e)}", code=500)
-            
-            logger.info(f"[Workflow API] input_data: {input_data.get('text', '')}")
-            execution_id = input_data.get('execution_id', '')
-            execution_id = execution_id or checkpoint_service.create_thread_id(actor, execution_id)
-            
-            workflow_execution_manager[execution_id] = {
-                'workflow_id': workflow_id,
-                'is_cancelled': False,
-                '_llm_resources': llm_resources,
-                '_skill_resources': skill_resources
-            }
-            
-            class MockAgent:
-                def __init__(self, definition, wid, wname):
-                    self.graph_definition = definition
-                    self.id = wid
-                    self.name = wname
-            
-            mock_agent = MockAgent(flow_data, workflow_id, workflow.name)
-            
-            async def sse_generator():
-                try:
-                    async for data in WorkflowService.sse_execution_generator(
-                        mock_agent, input_data, execution_id, workflow_execution_manager, actor
-                    ):
-                        yield data
-                finally:
-                    if execution_id in workflow_execution_manager:
-                        del workflow_execution_manager[execution_id]
-            
-            return StreamingResponse(
-                sse_generator(),
-                media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "Access-Control-Allow-Origin": "*",
-                    "X-Accel-Buffering": "no"
-                }
-            )
-        else:
-            execution_id = input_data.get('execution_id', '') or checkpoint_service.create_thread_id(actor, '')
-            result = await WorkflowService.execute_workflow_direct(workflow_id, input_data, actor, execution_id)
-            if result.get("success"):
-                return success_response(data=result, msg="工作流执行成功")
-            else:
-                return fail_response(msg=result.get("message", "执行失败"))
-    
-    except Exception as e:
-        import traceback
-        return fail_response(msg=str(e), data={"traceback": traceback.format_exc()}, code=500)
+        result = await WorkflowService.rollback_workflow(
+            workflow_id, body.version_no, owner=owner, domain=DOMAIN_ADMIN
+        )
+    except (OwnedResourceNotFound, ValidationBlockedError, WorkflowStateError) as e:
+        _raise_http(e)
+    return success_response(data=result, msg="回滚成功")
 
 
-@workflow_execution_router.post("/{execution_id}/cancel")
-async def cancel_workflow_execution(execution_id: str):
-    """取消执行中的工作流任务"""
+@workflow_router.post("/{workflow_id}/disable", response_model=dict, summary="停用工作流")
+async def disable_workflow(
+    workflow_id: int,
+    owner: OwnerContext = Depends(require_owner),
+):
     try:
-        print(f"[Workflow API] 收到取消请求，execution_id: {execution_id}")
-        
-        exec_info = workflow_execution_manager.get(execution_id)
-        if not exec_info:
-            return fail_response(msg="执行任务不存在或已结束", code=404)
-        
-        exec_info['is_cancelled'] = True
-        print(f"[Workflow API] 已标记任务为取消状态，execution_id: {execution_id}")
-        
-        return success_response(msg="取消请求已发送，执行将在安全点停止")
-    except Exception as e:
-        import traceback
-        print(f"[Workflow API] 取消执行错误: {e}")
-        print(traceback.format_exc())
-        return fail_response(msg=str(e), code=500)
+        wf = await WorkflowService.disable_workflow(workflow_id, owner=owner)
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    return success_response(data={"id": wf.id, "status": wf.status}, msg="已停用")
 
 
-@workflow_execution_router.get("/running")
-async def list_running_workflow_executions():
-    """列出所有正在执行的工作流任务"""
+# ============================================================
+# 执行相关（归属过滤；引擎执行为 T6 范围，此处仅保留既有直接执行入口）
+# ============================================================
+@workflow_router.post("/{workflow_id}/execute", response_model=dict, summary="执行工作流")
+async def execute_workflow(
+    workflow_id: int,
+    input_data: Dict[str, Any],
+    owner: OwnerContext = Depends(require_owner),
+):
     try:
-        executions_list = []
-        for exec_id, exec_info in workflow_execution_manager.items():
-            executions_list.append({
-                'execution_id': exec_id,
-                'workflow_id': exec_info.get('workflow_id'),
-                'is_cancelled': exec_info.get('is_cancelled', False)
-            })
-        
-        return success_response(data={"executions": executions_list, "count": len(executions_list)})
-    except Exception as e:
-        import traceback
-        print(f"[Workflow API] 列执行错误: {e}")
-        print(traceback.format_exc())
-        return fail_response(msg=str(e), code=500)
-
-
-@workflow_execution_router.get("/")
-async def get_all_workflow_executions(skip: int = 0, limit: int = 100, status: str = ""):
-    """Get all workflow executions"""
-    try:
-        from base.plugins.agent.models.workflow import WorkflowExecution
-        
-        # 先获取总数
-        query = WorkflowExecution.all()
-        if status:
-            query = query.filter(status=status)
-        total = await query.count()
-        
-        # 获取分页数据
-        executions = await WorkflowService.get_all_workflow_executions(skip=skip, limit=limit, status=status)
-        response = []
-        for execution in executions:
-            response.append({
-                "id": execution.id,
-                "workflow_id": execution.workflow_id,
-                "input_data": execution.input_data,
-                "status": execution.status,
-                "output_data": execution.output_data,
-                "error_message": execution.error_message,
-                "started_at": execution.started_at.isoformat() if execution.started_at else None,
-                "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
-                "created_at": execution.created_at.isoformat() if execution.created_at else None,
-                "updated_at": execution.updated_at.isoformat() if execution.updated_at else None
-            })
-        return success_response(data={"items": response, "total": total})
-    except Exception as e:
-        return fail_response(msg=str(e))
-
-
-@workflow_execution_router.get("/{execution_id}")
-async def get_workflow_execution(execution_id: int):
-    """Get workflow execution by ID"""
-    try:
-        execution = await WorkflowService.get_workflow_execution_by_id(execution_id)
-        if not execution:
-            return fail_response(msg="执行记录不存在", code=404)
-        
-        data = {
-            "id": execution.id,
-            "workflow_id": execution.workflow_id,
-            "input_data": execution.input_data,
+        await get_owned_or_404(Workflow, workflow_id, owner)
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    execution = await WorkflowService.execute_workflow_direct(workflow_id, input_data)
+    return success_response(
+        data={
+            "execution_id": execution.id,
             "status": execution.status,
             "output_data": execution.output_data,
-            "error_message": execution.error_message,
-            "started_at": execution.started_at.isoformat() if execution.started_at else None,
-            "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
-            "created_at": execution.created_at.isoformat() if execution.created_at else None,
-            "updated_at": execution.updated_at.isoformat() if execution.updated_at else None
+        },
+        msg="工作流执行完成",
+    )
+
+
+@workflow_execution_router.get("", response_model=dict, summary="获取工作流执行列表")
+async def get_workflow_executions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    workflow_id: Optional[int] = None,
+    status: Optional[str] = None,
+    owner: OwnerContext = Depends(require_owner),
+):
+    query = owned_queryset(WorkflowExecution, owner, include_public=False)
+    if workflow_id:
+        query = query.filter(workflow_id=workflow_id)
+    if status:
+        query = query.filter(status=status)
+
+    executions = await query.offset(skip).limit(limit).order_by("-created_at")
+    return success_response(data=[
+        {
+            "id": e.id,
+            "workflow_id": e.workflow_id,
+            "status": e.status,
+            "input_data": e.input_data,
+            "output_data": e.output_data,
+            "error_message": e.error_message,
+            "started_at": e.started_at,
+            "completed_at": e.completed_at,
+            "created_at": e.created_at,
         }
-        return success_response(data=data)
-    except Exception as e:
-        return fail_response(msg=str(e))
+        for e in executions
+    ])
+
+
+@workflow_execution_router.get(
+    "/{execution_id}",
+    response_model=dict,
+    summary="获取工作流执行详情",
+)
+async def get_workflow_execution(
+    execution_id: int,
+    owner: OwnerContext = Depends(require_owner),
+):
+    try:
+        execution = await get_owned_or_404(
+            WorkflowExecution, execution_id, owner, include_public=False
+        )
+    except OwnedResourceNotFound:
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
+    return success_response(data={
+        "id": execution.id,
+        "workflow_id": execution.workflow_id,
+        "status": execution.status,
+        "input_data": execution.input_data,
+        "output_data": execution.output_data,
+        "error_message": execution.error_message,
+        "started_at": execution.started_at,
+        "completed_at": execution.completed_at,
+        "created_at": execution.created_at,
+    })

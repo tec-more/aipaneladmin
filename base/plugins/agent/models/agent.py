@@ -19,7 +19,13 @@ class Agent(BaseModel, TimestampMixin):
     default_memory_mode = fields.CharField(max_length=20, default="public", description="Default memory mode: public/private")
     
     config = fields.JSONField(null=True, description="Agent configuration (tools, etc.)")
-    
+
+    # ===== T1 双主体归属与发布态扩展（溯源 02-§4.3 / Q-C）=====
+    owner_type = fields.CharField(max_length=3, default="usr", description="归属主体类型: cus/usr")
+    owner_id = fields.BigIntField(null=True, description="归属主体 ID")
+    # 发布状态（M12）：unpublished 未发布 / published 已发布 / suspended 已停用
+    publish_status = fields.CharField(max_length=20, default="unpublished", description="发布状态: unpublished/published/suspended")
+
     # 多对多关系 - Agent拥有的Skills
     skills = fields.ManyToManyField(
         "models.Skill",

@@ -42,10 +42,21 @@ class RAGKnowledgeBase(BaseModel, TimestampMixin):
         description="可见的部门列表"
     )
     is_public = fields.BooleanField(default=False, description="是否为公有文档库")
-    access_level = fields.CharField(max_length=20, default="private", description="访问级别: private, dept, public")
+    # T1：access_level 收敛为 private/public；存量 dept 已迁移为 ResourceGrant（Q-A/Q3）
+    access_level = fields.CharField(max_length=20, default="private", description="访问级别: private, public（dept 已废弃）")
+
+    # ===== T1 多态归属扩展（溯源 02-§4.3 / Q-A / C-15）=====
+    # owner_* 为归属唯一事实源；created_by 语义废弃，保留列只读
+    owner_type = fields.CharField(max_length=3, default="usr", description="归属主体类型: cus/usr")
+    owner_id = fields.BigIntField(null=True, description="归属主体 ID")
 
     class Meta:
         table = "rag_knowledge_base"
+        # 索引策略溯源 §03-4：(owner_type, owner_id) 我的库 / (is_public) 公共库
+        indexes = [
+            ("owner_type", "owner_id"),
+            ("is_public",),
+        ]
 
     def __str__(self):
         return self.name
