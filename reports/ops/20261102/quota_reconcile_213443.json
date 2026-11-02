@@ -1,0 +1,14 @@
+{
+  "script": "quota_reconcile",
+  "generated_at": "2026-11-02T21:34:42",
+  "worst_level": "P1",
+  "exit_code": 1,
+  "items": [
+    {
+      "name": "M-9 配额对账",
+      "ok": false,
+      "level": "P1",
+      "detail": "Redis 未启用/不可达，对账跳过（进程内降级模式无 TTL 兜底，H-2 硬约束违规信号）"
+    }
+  ]
+}

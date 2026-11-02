@@ -1,0 +1,1 @@
+import{_ as t,c as o,e as c,j as s,a4 as a}from"./index-BqZ1Tkv4.js";/* empty css             *//* empty css                 */const _={class:"page-placeholder"},p={__name:"Index",setup(n){return(r,d)=>{const e=a;return s(),o("div",_,[c(e,{description:"知识库管理（T11 资源选择器任务交付）"})])}}},f=t(p,[["__scopeId","data-v-edf10830"]]);export{f as default};

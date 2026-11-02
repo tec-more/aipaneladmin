@@ -121,7 +121,8 @@ async def handle_llm(node, resolved_inputs, runtime) -> Dict[str, Any]:
     config = data.get("config") or {}
     node_id = node["id"]
 
-    model_ref = config.get("model_id") or config.get("modelId")
+    # BUG-T15-008：契约字段 model_ref 优先，兼容旧字段 model_id/modelId
+    model_ref = config.get("model_ref") or config.get("model_id") or config.get("modelId")
     if model_ref is None:
         raise NodeExecutionError("MODEL_UNAVAILABLE", "LLM 节点未配置模型", retryable=False)
     # 运行时资源复核（E-110 双保险）
@@ -129,7 +130,8 @@ async def handle_llm(node, resolved_inputs, runtime) -> Dict[str, Any]:
         raise NodeExecutionError("MODEL_UNAVAILABLE", "模型未授权或不可用", retryable=False)
 
     flat = _flat_vars(runtime)
-    prompt_template = config.get("prompt_template") or config.get("prompt") or ""
+    # BUG-T15-008：契约字段 user_prompt 优先，兼容旧字段 prompt_template/prompt
+    prompt_template = config.get("user_prompt") or config.get("prompt_template") or config.get("prompt") or ""
     user_prompt = render_template(prompt_template, flat)
     messages: List[Dict[str, str]] = []
     if config.get("system_prompt"):
@@ -172,7 +174,8 @@ async def handle_rag_retrieval(node, resolved_inputs, runtime) -> Dict[str, Any]
 
     ctx = runtime["ctx"]
     config = (node.get("data") or {}).get("config") or {}
-    kb_ids = config.get("kb_ids") or []
+    # BUG-T15-008：契约字段 knowledge_base_refs 优先，兼容旧字段 kb_ids
+    kb_ids = config.get("knowledge_base_refs") or config.get("kb_ids") or []
     query = resolved_inputs.get("query") or runtime["state"]["vars"].get("query") or ""
     if isinstance(query, (list, dict)):
         query = json.dumps(query, ensure_ascii=False)
@@ -280,8 +283,20 @@ async def handle_hitl(node, resolved_inputs, runtime) -> Dict[str, Any]:
     node_id = node["id"]
     config = (node.get("data") or {}).get("config") or {}
 
-    timeout_s = min(int(config.get("timeout_s", HITL_DEFAULT_TIMEOUT_S)), HITL_DEFAULT_TIMEOUT_S)
-    timeout_action = config.get("timeout_action", "fail")
+    # BUG-T15-008：契约字段 timeout_minutes（分）优先，×60 转秒；兼容旧字段 timeout_s（秒）
+    if config.get("timeout_minutes") is not None:
+        timeout_s = min(int(config["timeout_minutes"]) * 60, HITL_DEFAULT_TIMEOUT_S)
+    else:
+        timeout_s = min(int(config.get("timeout_s", HITL_DEFAULT_TIMEOUT_S)), HITL_DEFAULT_TIMEOUT_S)
+    # BUG-T15-008：契约字段 on_timeout（reject/approve/escalate）优先，映射到引擎 timeout_action
+    # reject → fail；approve → approve（超时自动通过，新增逻辑于下方异常分支）；escalate → fail（暂降级，升级通知后续完善）
+    on_timeout = config.get("on_timeout")
+    if on_timeout in ("reject", "escalate"):
+        timeout_action = "fail"
+    elif on_timeout == "approve":
+        timeout_action = "approve"
+    else:
+        timeout_action = config.get("timeout_action", "fail")
     deadline = (datetime.now() + timedelta(seconds=timeout_s)).isoformat()
     assignee = {"type": config.get("assignee_mode", "self")}
 
@@ -294,9 +309,15 @@ async def handle_hitl(node, resolved_inputs, runtime) -> Dict[str, Any]:
         if timeout_action == "skip":
             logger.info(f"[engine] HITL 节点 {node_id} 超时跳过")
             return {"status": "success", "outputs": {"approved": None, "comment": "", "skipped": True}}
+        # BUG-T15-008：契约 on_timeout=approve 映射（超时自动通过）
+        if timeout_action == "approve":
+            logger.info(f"[engine] HITL 节点 {node_id} 超时自动通过")
+            return {"status": "success", "outputs": {"approved": True, "comment": "超时自动通过", "auto_approved": True}}
         raise HitlTimeout(node_id)
 
     control.throw_if_cancelled()
+    # BUG-T15-014：resume 唤醒回执（供 resume API 唤醒确认；取消路径由 backend 捕获处回执）
+    control.ack_event.set()
     payload = control.resume_payload or {}
     outputs = {
         "approved": bool(payload.get("approved")),
@@ -340,7 +361,8 @@ async def handle_sub_workflow(node, resolved_inputs, runtime) -> Dict[str, Any]:
     from base.plugins.agent.models.workflow_version import WorkflowVersion
 
     config = (node.get("data") or {}).get("config") or {}
-    workflow_id = config.get("workflow_id")
+    # BUG-T15-008：契约字段 workflow_ref 优先，兼容旧字段 workflow_id
+    workflow_id = config.get("workflow_ref") or config.get("workflow_id")
     version_id = config.get("version_id")
     if not workflow_id:
         raise NodeExecutionError("SUB_WORKFLOW_INVALID", "sub_workflow 未配置 workflow_id",
@@ -364,7 +386,8 @@ async def handle_sub_agent(node, resolved_inputs, runtime) -> Dict[str, Any]:
     from base.plugins.agent.models.agent import Agent
 
     config = (node.get("data") or {}).get("config") or {}
-    agent_id = config.get("agent_id")
+    # BUG-T15-008：契约字段 agent_ref 优先，兼容旧字段 agent_id
+    agent_id = config.get("agent_ref") or config.get("agent_id")
     if not agent_id:
         raise NodeExecutionError("SUB_AGENT_INVALID", "sub_agent 未配置 agent_id", retryable=False)
     if not await runtime["ctx"].require_resource("agent", agent_id):

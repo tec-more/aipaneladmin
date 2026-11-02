@@ -51,6 +51,15 @@ class RunControl:
         self.cancel_requested = asyncio.Event()
         self.resume_event = asyncio.Event()
         self.resume_payload: Optional[Dict[str, Any]] = None
+        # BUG-T15-014：唤醒确认与保底自救（cancel/resume API 置位后等 ack 回执；
+        # 超时说明 runner 卡死/传输层异常，API 侧走保底强制收尾，杜绝槽永久泄漏）
+        self.ack_event = asyncio.Event()              # 引擎观察到 cancel/resume 的回执
+        self.runner_task: Optional[asyncio.Task] = None   # 保底路径强制取消用
+        self.ctx: Any = None                          # 保底路径 _finalize 入参
+        self.writer: Any = None
+        self.heartbeat_task: Optional[asyncio.Task] = None
+        self.finalize_lock = asyncio.Lock()           # 收尾互斥（保底 vs runner done_callback）
+        self.finalized = False
 
     def request_cancel(self) -> None:
         self.cancel_requested.set()
@@ -145,6 +154,8 @@ class InProcessBackend(ExecutorBackend):
                        evt.run_completed(ctx.execution_id, self._tokens(), ms))
             return {"status": "success", "outputs": self._outputs, "tokens": self._tokens()}
         except ExecutionCancelled:
+            # BUG-T15-014：取消被引擎观察到，回执供 cancel API 唤醒确认
+            self._control.ack_event.set()
             logger.info(f"[engine] 执行被取消 execution_id={ctx.execution_id}")
             return {"status": "cancelled", "outputs": self._outputs, "tokens": self._tokens()}
         except NodeExecutionError as e:

@@ -152,9 +152,12 @@ def _is_blank(v: Any) -> bool:
 
 
 def _check_llm(cfg: dict, nid: str, issues: list) -> None:
-    if _is_blank(cfg.get("model_ref")):
+    # O-01：契约字段优先，兼容旧字段 model_id/modelId、prompt_template/prompt（对齐引擎 nodes.py BUG-T15-008）
+    model_ref = cfg.get("model_ref") or cfg.get("model_id") or cfg.get("modelId")
+    if _is_blank(model_ref):
         issues.append(_issue("E-100", f"llm 节点缺少必填配置 model_ref", node_id=nid, field="model_ref"))
-    if _is_blank(cfg.get("user_prompt")):
+    user_prompt = cfg.get("user_prompt") or cfg.get("prompt_template") or cfg.get("prompt")
+    if _is_blank(user_prompt):
         issues.append(_issue("E-100", f"llm 节点缺少必填配置 user_prompt", node_id=nid, field="user_prompt"))
     temp = cfg.get("temperature")
     if temp is not None and not (isinstance(temp, (int, float)) and 0 <= temp <= 2):
@@ -165,7 +168,8 @@ def _check_llm(cfg: dict, nid: str, issues: list) -> None:
 
 
 def _check_rag(cfg: dict, nid: str, issues: list) -> None:
-    refs = cfg.get("knowledge_base_refs", cfg.get("kb_ids"))
+    # O-01：契约字段优先，兼容旧字段 kb_ids；or 语义使 knowledge_base_refs 为 None/空时兜底（对齐引擎）
+    refs = cfg.get("knowledge_base_refs") or cfg.get("kb_ids")
     if _is_blank(refs) or not isinstance(refs, list):
         issues.append(_issue("E-100", "rag_retrieval 节点缺少必填配置 knowledge_base_refs（≥1）",
                              node_id=nid, field="knowledge_base_refs"))
@@ -210,7 +214,9 @@ def _check_loop(cfg: dict, nid: str, issues: list) -> None:
 
 
 def _check_sub_workflow(cfg: dict, nid: str, issues: list) -> None:
-    if _is_blank(cfg.get("workflow_ref")):
+    # O-01-ext：契约字段优先，兼容旧字段 workflow_id（对齐引擎 nodes.py BUG-T15-008）
+    wf_ref = cfg.get("workflow_ref") or cfg.get("workflow_id")
+    if _is_blank(wf_ref):
         issues.append(_issue("E-100", "sub_workflow 节点缺少必填配置 workflow_ref",
                              node_id=nid, field="workflow_ref"))
     policy = cfg.get("version_policy", "pinned")
@@ -236,11 +242,17 @@ def _check_hitl(cfg: dict, nid: str, issues: list) -> None:
     elif mode != "self" and _is_blank(cfg.get("assignee_refs")):
         issues.append(_issue("E-112", "hitl 节点未配置审批人 assignee_refs",
                              node_id=nid, field="assignee_refs"))
+    # O-01：契约字段优先，兼容旧字段 timeout_s（秒→分钟换算）、timeout_action（approve→approve，其余→reject）
     timeout = cfg.get("timeout_minutes")
+    if timeout is None and isinstance(cfg.get("timeout_s"), int):
+        timeout = cfg["timeout_s"] // 60  # 旧字段 timeout_s 秒→分钟（对齐引擎 BUG-T15-008 口径）
     if timeout is None or not isinstance(timeout, int) or not (5 <= timeout <= 10080):
         issues.append(_issue("E-112", "hitl 节点 timeout_minutes 必填且须在 5-10080 之间",
                              node_id=nid, field="timeout_minutes"))
-    on_timeout = cfg.get("on_timeout", "reject")
+    on_timeout = cfg.get("on_timeout")
+    if on_timeout is None:
+        ta = cfg.get("timeout_action", "fail")  # 旧字段映射：approve→approve，fail/其他→reject
+        on_timeout = "approve" if ta == "approve" else "reject"
     if on_timeout not in ("reject", "approve", "escalate"):
         issues.append(_issue("E-112", "hitl 节点 on_timeout 非法", node_id=nid, field="on_timeout"))
     elif on_timeout == "escalate" and _is_blank(cfg.get("escalate_to")):
@@ -249,7 +261,9 @@ def _check_hitl(cfg: dict, nid: str, issues: list) -> None:
 
 
 def _check_sub_agent(cfg: dict, nid: str, issues: list) -> None:
-    if _is_blank(cfg.get("agent_ref")):
+    # O-01-ext：契约字段优先，兼容旧字段 agent_id（对齐引擎 nodes.py BUG-T15-008）
+    agent_ref = cfg.get("agent_ref") or cfg.get("agent_id")
+    if _is_blank(agent_ref):
         issues.append(_issue("E-100", "sub_agent 节点缺少必填配置 agent_ref", node_id=nid, field="agent_ref"))
     steps = cfg.get("max_steps")
     if steps is None or not isinstance(steps, int) or not (1 <= steps <= 30):

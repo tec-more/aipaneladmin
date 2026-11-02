@@ -105,7 +105,8 @@ async function loadDetail() {
   loading.value = true
   try {
     const res = await getWorkflowDetail(route.params.id)
-    canvasStore.loadDetail(res)
+    // BUG-T15-006：统一包络解包（loadDetail 需要解包后的 data 段）
+    canvasStore.loadDetail(res?.data ?? res)
     canvasStore.runLocalValidate()
     // T13：发布状态/当前版本（字段多别名兜底，后端以 current_version 为准）
     const d = res?.data ?? res
@@ -147,7 +148,8 @@ async function doSave() {
       graph_json: canvasStore.collectGraph(),
       draft_version: canvasStore.draftVersion
     })
-    canvasStore.markSaved(res)
+    // BUG-T15-006：统一包络解包（markSaved 需要解包后的 draft_version）
+    canvasStore.markSaved(res?.data ?? res)
   } catch (err) {
     const code = err?.data?.error?.code
     if (code === 40901) {
@@ -190,12 +192,15 @@ async function onServerValidate() {
   validating.value = true
   try {
     const res = await validateWorkflow(canvasStore.workflowId, canvasStore.collectGraph())
-    canvasStore.serverIssues = res?.issues || []
-    canvasStore.serverSummary = res || null
-    if (res?.ok) {
+    // BUG-T15-006：统一包络解包
+    const d = res?.data ?? res
+    canvasStore.serverIssues = d?.issues || []
+    canvasStore.serverSummary = d || null
+    // BUG-T15-007：契约对齐（后端返回 valid/error_count/warning_count，非 ok/summary.error）
+    if (d?.valid) {
       ElMessage.success('校验通过')
     } else {
-      ElMessage.warning(`校验未通过：${res?.summary?.error ?? 0} 个错误`)
+      ElMessage.warning(`校验未通过：${d?.error_count ?? 0} 个错误`)
     }
   } catch {
     // 拦截器已提示

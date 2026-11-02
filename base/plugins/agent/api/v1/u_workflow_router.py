@@ -51,6 +51,10 @@ class UserWorkflowValidateRequest(BaseModel):
     graph_json: Dict[str, Any] = Field(..., description="待校验图")
 
 
+class UserWorkflowPublishRequest(BaseModel):
+    description: str = Field("", max_length=200, description="发布说明（可选）")
+
+
 class UserWorkflowRollbackRequest(BaseModel):
     version_no: int = Field(..., description="回滚目标版本号")
 
@@ -98,15 +102,24 @@ def _list_payload(wf: Workflow) -> Dict[str, Any]:
 # ============================================================
 @router.get("", response_model=dict, summary="我的工作流列表")
 async def list_my_workflows(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    keyword: Optional[str] = None,
     status: Optional[str] = None,
     owner: OwnerContext = Depends(require_owner),
 ):
+    """BUG-T15-005 修复：契约统一为 {items,total,page,page_size}，参数 page/page_size/keyword 对齐前端"""
+    skip = (page - 1) * page_size
     workflows = await WorkflowService.get_workflows(
-        skip=skip, limit=limit, status=status, owner=owner
+        skip=skip, limit=page_size, name=keyword or "", status=status or "", owner=owner
     )
-    return success_response(data=[_list_payload(w) for w in workflows])
+    total = await WorkflowService.count_workflows(name=keyword or "", status=status or "", owner=owner)
+    return success_response(data={
+        "items": [_list_payload(w) for w in workflows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })
 
 
 @router.post("", response_model=dict, summary="新建工作流（可选从模板复制）")
@@ -183,6 +196,7 @@ async def validate_my_workflow(
 @router.post("/{workflow_id}/publish", response_model=dict, summary="发布工作流")
 async def publish_my_workflow(
     workflow_id: int,
+    body: Optional[UserWorkflowPublishRequest] = None,
     owner: OwnerContext = Depends(require_owner),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
@@ -190,6 +204,7 @@ async def publish_my_workflow(
         result = await WorkflowService.publish_workflow(
             workflow_id, owner=owner,
             idempotency_key=idempotency_key, domain=DOMAIN_USER,
+            description=(body.description if body else ""),
         )
     except (OwnedResourceNotFound, DraftConflictError, ValidationBlockedError, WorkflowStateError) as e:
         _raise_http(e)
@@ -213,7 +228,8 @@ async def list_my_versions(
             "id": v.id,
             "version_no": v.version_no,
             "status": v.status,
-            "description": v.description,
+            # BUG-T15-004：openGauss 空串即 NULL，序列化层兜底为空串保持契约
+            "description": v.description or "",
             "resource_refs": v.resource_refs,
             "published_at": v.published_at,
             "created_at": v.created_at,
@@ -240,7 +256,8 @@ async def get_my_version_snapshot(
         "id": v.id,
         "version_no": v.version_no,
         "status": v.status,
-        "description": v.description,
+        # BUG-T15-004：openGauss 空串即 NULL，序列化层兜底为空串保持契约
+        "description": v.description or "",
         "resource_refs": v.resource_refs,
         "graph_json": v.graph_json,
         "published_at": v.published_at,

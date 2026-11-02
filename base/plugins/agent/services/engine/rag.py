@@ -49,7 +49,15 @@ async def accessible_kb_ids(owner: Tuple[str, int], requested_ids: Sequence[int]
         id__in=requested, is_public=True, status="active"
     ).values_list("id", flat=True)
     granted_str = await ResourceGrantService.check_many(owner, "kb", list(requested))
-    granted = {int(k) for k in granted_str}
+    granted_ids = {int(k) for k in granted_str}
+    # BUG-T15-009：granted 路径补 status="active" 过滤（own/public 已过滤，granted 此前未过滤导致 disabled KB 静默空召回）
+    if granted_ids:
+        active_granted = await RAGKnowledgeBase.filter(
+            id__in=granted_ids, status="active"
+        ).values_list("id", flat=True)
+        granted = set(active_granted)
+    else:
+        granted = set()
     return set(own) | set(public) | granted
 
 

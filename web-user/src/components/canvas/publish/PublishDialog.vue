@@ -41,7 +41,7 @@ async function onPublish() {
   if (publishing.value) return
   publishing.value = true
   try {
-    const res = await publishWorkflow(workflowId, idemKey)
+    const res = await publishWorkflow(workflowId, idemKey, description.value)
     const data = res?.data ?? res
     ElMessage.success(`发布成功，版本 v${data?.version_no}`)
     visible.value = false

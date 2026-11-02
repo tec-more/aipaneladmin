@@ -38,6 +38,30 @@ concurrent_runs = _get_or_create(
     Gauge, "concurrent_runs", "Current concurrent runs", []
 )
 
+# 灰度监控（docs/ops/grayscale-monitoring-checklist.md）：
+# M-4 保底强制收尾触发（协作路径失效信号，出现即 P1 告警）
+force_finalize_total = _get_or_create(
+    Counter, "force_finalize_total", "Force finalize (self-rescue fallback) triggers", ["status"]
+)
+# M-7 节点结算超时/失败（DB 间歇性挂起信号，出现即 P2 告警）
+node_settle_failure_total = _get_or_create(
+    Counter, "node_settle_failure_total", "Node usage settle timeout/failure", []
+)
+
+
+def inc_force_finalize(status: str) -> None:
+    try:
+        force_finalize_total.labels(status=status).inc()
+    except Exception:
+        pass
+
+
+def inc_settle_failure() -> None:
+    try:
+        node_settle_failure_total.inc()
+    except Exception:
+        pass
+
 
 def inc_quota_reject(item: str) -> None:
     try:

@@ -97,8 +97,10 @@ async function loadList(page) {
       page_size: query.page_size,
       keyword: query.keyword || undefined
     })
-    list.value = res.items || []
-    total.value = res.total || 0
+    // BUG-T15-006：统一包络解包（res?.data ?? res 兜底，对齐项目既有范式）
+    const d = res?.data ?? res
+    list.value = d?.items || []
+    total.value = d?.total || 0
   } catch {
     // 拦截器已提示
   } finally {
@@ -151,7 +153,9 @@ async function onCreate() {
     createForm.name = ''
     createForm.description = ''
     ElMessage.success('创建成功')
-    router.push({ name: 'WorkflowEditor', params: { id: res.id } })
+    // BUG-T15-006：统一包络解包
+    const d = res?.data ?? res
+    router.push({ name: 'WorkflowEditor', params: { id: d?.id } })
   } catch {
     // 拦截器已提示
   } finally {

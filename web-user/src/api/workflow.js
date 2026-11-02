@@ -54,11 +54,12 @@ export function deleteWorkflow(id) {
  * @param {number} id @param {string} idempotencyKey 前端生成 UUID，同次重试复用同键
  * @returns Promise<{version_id:number, version_no:number, published_at:string}>
  */
-export function publishWorkflow(id, idempotencyKey) {
+export function publishWorkflow(id, idempotencyKey, description = '') {
   return request({
     url: `/v1/agent/u/workflows/${id}/publish`,
     method: 'post',
-    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
+    data: { description: description || '' }
   })
 }
 

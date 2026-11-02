@@ -1,0 +1,14 @@
+{
+  "script": "trace_check",
+  "generated_at": "2026-11-02T21:34:59",
+  "worst_level": "OK",
+  "exit_code": 0,
+  "items": [
+    {
+      "name": "M-10 Trace seq 单调性",
+      "ok": true,
+      "level": "OK",
+      "detail": "抽检 10/10 个执行实例，seq 全部严格递增"
+    }
+  ]
+}

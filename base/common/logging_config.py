@@ -61,7 +61,19 @@ async def HttpExcHandle(req: Request, exc: Exception) -> JSONResponse:
         if req:
             print(f"   请求: {req.method} {req.url}")
 
-    content = dict(code=exc.status_code, msg=exc.detail, data=None)
+    # BUG-T15-011：detail 为含业务码 code 的 dict 时业务码提顶层，对齐契约 04-§2.3
+    # {code: 业务码, msg: 字符串, data}；存量字符串 detail 行为不变（前端 ElMessage 不再收到嵌套对象）
+    detail = exc.detail
+    if isinstance(detail, dict) and "code" in detail:
+        code = detail["code"]
+        msg = detail.get("msg") or detail.get("msg") or ""
+        # data：优先 detail.data；否则收拢除 code/msg 外的额外字段（如乐观锁 current_draft_version）
+        data = detail["data"] if "data" in detail else (
+            {k: v for k, v in detail.items() if k not in ("code", "msg", "msg")} or None
+        )
+        content = dict(code=code, msg=msg, data=data)
+    else:
+        content = dict(code=exc.status_code, msg=detail, data=None)
     return JSONResponse(content=content, status_code=exc.status_code)
 
 

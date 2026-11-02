@@ -1,0 +1,14 @@
+{
+  "script": "zombie_scan",
+  "generated_at": "2026-11-02T21:34:40",
+  "worst_level": "OK",
+  "exit_code": 0,
+  "items": [
+    {
+      "name": "M-1 僵尸执行实例",
+      "ok": true,
+      "level": "OK",
+      "detail": "无异常"
+    }
+  ]
+}

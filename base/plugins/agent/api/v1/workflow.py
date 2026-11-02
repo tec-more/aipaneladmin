@@ -50,6 +50,10 @@ class WorkflowValidateRequest(BaseModel):
     graph_json: Dict[str, Any] = Field(..., description="待校验的 Schema v2 图定义")
 
 
+class WorkflowPublishRequest(BaseModel):
+    description: str = Field("", max_length=200, description="发布说明（可选）")
+
+
 class WorkflowRollbackRequest(BaseModel):
     version_no: int = Field(..., description="回滚目标版本号")
 
@@ -108,7 +112,8 @@ def _version_payload(v: WorkflowVersion) -> Dict[str, Any]:
         "workflow_id": v.workflow_id,
         "version_no": v.version_no,
         "status": v.status,
-        "description": v.description,
+        # BUG-T15-004：openGauss 空串即 NULL，序列化层兜底为空串保持契约
+        "description": v.description or "",
         "resource_refs": v.resource_refs,
         "published_by_type": v.published_by_type,
         "published_by_id": v.published_by_id,
@@ -254,6 +259,7 @@ async def save_workflow_draft(
 @workflow_router.post("/{workflow_id}/publish", response_model=dict, summary="发布工作流")
 async def publish_workflow(
     workflow_id: int,
+    body: Optional[WorkflowPublishRequest] = None,
     owner: OwnerContext = Depends(require_owner),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
@@ -262,6 +268,7 @@ async def publish_workflow(
         result = await WorkflowService.publish_workflow(
             workflow_id, owner=owner,
             idempotency_key=idempotency_key, domain=DOMAIN_ADMIN,
+            description=(body.description if body else ""),
         )
     except (OwnedResourceNotFound, DraftConflictError, ValidationBlockedError, WorkflowStateError) as e:
         _raise_http(e)

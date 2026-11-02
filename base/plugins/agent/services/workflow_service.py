@@ -168,6 +168,17 @@ class WorkflowService:
         return workflows
 
     @staticmethod
+    async def count_workflows(name: str = "", status: str = "",
+                              owner: Optional[OwnerContext] = None) -> int:
+        """统计归属过滤后的工作流总数（BUG-T15-005：列表契约 items+total）"""
+        query = owned_queryset(Workflow, owner) if owner is not None else Workflow.all()
+        if name:
+            query = query.filter(name__icontains=name)
+        if status:
+            query = query.filter(status=status)
+        return await query.count()
+
+    @staticmethod
     async def get_workflow_by_id(workflow_id: int, owner: Optional[OwnerContext] = None,
                                  *, include_public: bool = False,
                                  for_write: bool = False) -> Optional[Workflow]:
@@ -1181,7 +1192,8 @@ class WorkflowService:
     @classmethod
     async def publish_workflow(cls, workflow_id: int, owner: OwnerContext,
                                idempotency_key: Optional[str] = None,
-                               domain: str = DOMAIN_USER) -> Dict[str, Any]:
+                               domain: str = DOMAIN_USER,
+                               description: str = "") -> Dict[str, Any]:
         """
         发布（04-F1）：
         Idempotency-Key 24h 去重（重放返回原响应）→ 全量校验（错误阻断）→
@@ -1217,6 +1229,8 @@ class WorkflowService:
                 published_by_id=owner.owner_id,
                 published_at=datetime.now(),
                 status="published",
+                # BUG-T15-004：openGauss 空串即 NULL，写库前归一化（空→None 而非 ""）
+                description=description if description else None,
             )
             await Workflow.filter(id=wf.id).update(
                 current_version_id=version.id, status="active", schema_version="v2"

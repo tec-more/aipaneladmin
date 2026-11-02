@@ -1,0 +1,14 @@
+{
+  "script": "audit_report",
+  "generated_at": "2026-11-02T21:34:58",
+  "worst_level": "OK",
+  "exit_code": 0,
+  "items": [
+    {
+      "name": "M-5 取消审计占比（tokens=NULL 强杀路径）",
+      "ok": true,
+      "level": "OK",
+      "detail": "近 24h cancelled=0 例，强杀路径 0 例，占比 0.0%"
+    }
+  ]
+}

@@ -26,6 +26,8 @@ class WorkflowVersion(BaseModel, TimestampMixin):
     schema_version = fields.CharField(max_length=10, default="v2", description="图 Schema 版本: v1/v2")
     # 发布时资源快照 ID 清单（04-F1）：{model: [...], kb: [...], tool: [...], agent: [...]}
     resource_refs = fields.JSONField(null=True, description="发布时引用的资源 ID 快照清单")
+    # 发布说明（T15 BUG-T15-002 补字段；BUG-T15-004 openGauss 空串即 NULL，改 nullable + 序列化层 or "" 兜底）
+    description = fields.TextField(null=True, description="发布说明（可选，用户填写）")
 
     # 发布主体（多态归属，cus=客户 / usr=后台用户）
     published_by_type = fields.CharField(max_length=3, description="发布主体类型: cus/usr")

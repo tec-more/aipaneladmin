@@ -1,0 +1,66 @@
+# aipaneladmin 一体化编排：app + redis + nginx（docker-compose 部署形态）
+#
+# 前置：
+#   1. cp deploy/app/.env.example deploy/app/.env 并填写密码（DB/Redis/密钥）
+#   2. cp deploy/app/config.docker.conf deploy/app/config.conf 并按实际填写（严禁提交真实密钥到仓库）
+#   3. 数据库（openGauss）与 qdrant 等基础设施另行就绪（见 deploy/openguass、qdrant/）
+# 启动：
+#   cd deploy/app && docker compose --env-file .env up -d --build
+# 硬约束落实：
+#   H-1 app 服务 UVICORN_WORKERS=1（单 worker，cancel/resume 进程内注册表约束）
+#   H-2 redis 服务随编排启动，config.conf 中 redis.enabled=true 且 host=redis
+#   H-3 nginx 站点配置 proxy_buffering off + proxy_read_timeout 3600s（见 deploy/nginx）
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: aipanel-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD required}"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # 不暴露宿主机端口：仅编排内网可达
+
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/app/Dockerfile
+    image: aipanel-app:latest
+    container_name: aipanel-app
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      DEPLOY_ENV: docker
+      STRICT_STARTUP: "true"
+      UVICORN_WORKERS: "1"     # H-1 硬约束：禁止调大
+      UVICORN_PORT: "9998"
+    volumes:
+      # 生产配置以卷挂载下发（仓库内仅存模板，真实配置不入库）
+      - ./config.conf:/app/config.conf
+      - app_storage:/app/storage
+      - app_logs:/app/logs
+    expose:
+      - "9998"                 # 仅编排内网暴露，外部统一走 nginx
+
+  nginx:
+    image: nginx:alpine
+    container_name: aipanel-nginx
+    restart: always
+    depends_on:
+      - app
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "8080:80"              # 对外端口按实际调整
+
+volumes:
+  redis_data:
+  app_storage:
+  app_logs:

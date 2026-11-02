@@ -224,6 +224,11 @@ class Settings(BaseSettings):
 	REDIS_PORT: int = config.config.getint("redis", "port", fallback=6379)
 	REDIS_PASSWORD: str = config.config.get("redis", "password", fallback="")
 	REDIS_DB: int = config.config.getint("redis", "db", fallback=0)
+	# 部署环境与启动自检（上线硬约束 H-1/H-2；环境变量优先于 ini 配置）
+	DEPLOY_ENV: str = os.environ.get("DEPLOY_ENV", config.config.get("deploy", "env", fallback="dev"))
+	STRICT_STARTUP: bool = os.environ.get(
+		"STRICT_STARTUP", config.config.get("deploy", "strict_startup", fallback="true")
+	).lower() == "true"
 	# 项目根目录
 	base_path: Path = Path(__file__).parent.parent.parent
 	LOG_DIR: str = config.config.get("log", "path", fallback=str(base_path / "logs"))
