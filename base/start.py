@@ -80,6 +80,11 @@ async def lifespan(app: FastAPI):
     try:
         await init_data()
 
+        # Redis 预热（BUG-OPS-001 根修）：启动时建立连接，使所有 is_enabled() 判断点生效；
+        # 否则惰性连接下首次调用方见 _instance=None 恒走降级，Redis 启用配置形同虚设
+        from base.common.cache import RedisCache
+        await RedisCache.get_instance()
+
         # 审计事件处理器必须在 Tortoise.init 之后注册
         # （否则 model 的 default_connection 为 None，写日志时会报错）
         register_audit_handlers()

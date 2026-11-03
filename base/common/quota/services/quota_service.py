@@ -114,12 +114,16 @@ class QuotaService:
     # ---------------- 基础设施 ----------------
     @staticmethod
     async def _redis():
-        """获取可用 redis 客户端；不可用/异常返回 None（降级）"""
+        """获取可用 redis 客户端；不可用/异常返回 None（降级）
+
+        必须先 get_instance() 触发惰性连接初始化（失败可重试），再判 is_enabled()；
+        若先判 is_enabled() 则实例未创建时恒为 False，连接永远无法建立（BUG-OPS-001）。
+        """
         try:
-            if not RedisCache.is_enabled():
-                return None
             cache = await RedisCache.get_instance()
-            return cache._client  # noqa: SLF001（项目现有用法，见 authz/audit.py）
+            if RedisCache.is_enabled():
+                return cache._client  # noqa: SLF001（项目现有用法，见 authz/audit.py）
+            return None
         except Exception as e:
             logger.warning(f"[quota] Redis 不可用，进入降级路径: {e}")
             return None
