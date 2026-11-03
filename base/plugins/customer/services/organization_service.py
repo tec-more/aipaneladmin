@@ -67,6 +67,9 @@ class CustomerOrganizationService:
         await CustomerOrganizationMember.create(
             org_id=org.id, customer_id=owner_customer_id, role=ROLE_OWNER
         )
+        # §6.1：组织授权缓存失效（新组织 owner 获得成员关系）
+        from base.common.authz.service import invalidate_customer_org_cache
+        await invalidate_customer_org_cache(owner_customer_id)
         return org
 
     @classmethod
@@ -155,17 +158,22 @@ class CustomerOrganizationService:
         existing = await CustomerOrganizationMember.get_or_none(
             org_id=org_id, customer_id=member_customer_id
         )
+        # §6.1：成员关系变化 → 失效该 customer 的组织授权缓存
+        from base.common.authz.service import invalidate_customer_org_cache
         if existing:
             if existing.status == "active":
                 raise OrganizationError("already_member", "该客户已是组织成员")
             existing.status = "active"
             existing.role = role
             await existing.save()
+            await invalidate_customer_org_cache(member_customer_id)
             return existing
 
-        return await CustomerOrganizationMember.create(
+        membership = await CustomerOrganizationMember.create(
             org_id=org_id, customer_id=member_customer_id, role=role
         )
+        await invalidate_customer_org_cache(member_customer_id)
+        return membership
 
     @classmethod
     async def remove_member(
@@ -180,6 +188,9 @@ class CustomerOrganizationService:
             raise OrganizationError("cannot_remove_owner", "不可移除组织所有者")
         membership.status = "removed"
         await membership.save()
+        # §6.1：成员被移除 → 失效组织授权缓存（自动失去组织资源权限）
+        from base.common.authz.service import invalidate_customer_org_cache
+        await invalidate_customer_org_cache(member_customer_id)
 
     @classmethod
     async def update_member_role(

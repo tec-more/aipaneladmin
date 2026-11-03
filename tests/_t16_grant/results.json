@@ -1,0 +1,470 @@
+[
+  {
+    "group": "SEC",
+    "id": "SEC-01",
+    "desc": "无token访问/list",
+    "expected": "401",
+    "actual": "401",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-02",
+    "desc": "非superuser访问/list",
+    "expected": "403/404(D7裁定)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-03",
+    "desc": "非superuser POST /grants",
+    "expected": "403/404(D7)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-04",
+    "desc": "非superuser POST /batch",
+    "expected": "403/404(D7)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-05",
+    "desc": "非superuser DELETE /grants",
+    "expected": "403/404(D7)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-06-subjects",
+    "desc": "非superuser GET subjects",
+    "expected": "403/404(D7)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-06-resource-options",
+    "desc": "非superuser GET resource-options",
+    "expected": "403/404(D7)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-06-by-subject",
+    "desc": "非superuser GET by-subject",
+    "expected": "403/404(D7)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-06-by-resource GET''",
+    "desc": "非superuser GET by-resource GET''",
+    "expected": "403/404(D7)",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-07",
+    "desc": "customer token访问/list",
+    "expected": "401/404",
+    "actual": "403",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "SEC",
+    "id": "SEC-08",
+    "desc": "superuser访问/list",
+    "expected": "200 success",
+    "actual": "200/True",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-01",
+    "desc": "列表默认查询(分页/倒序/enrich字段)",
+    "expected": "200+items含enrich",
+    "actual": "total=4, keys=['created_at', 'expires_at', 'granted_by', 'id', 'owner_id', 'owner_label', 'owner_type', 'owner_type_label', 'resource_deleted', 'resource_id', 'resource_inactive', 'resource_label', 'resource_type', 'resource_type_label', 'status']",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-02",
+    "desc": "新建授权(长期有效)",
+    "expected": "success+expires_at=null",
+    "actual": "200/True/exp=None",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-03",
+    "desc": "重复授权幂等(无重复记录)",
+    "expected": "200 success, DB count=1",
+    "actual": "200, count=1",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-04",
+    "desc": "Q4:重复授权不传expires→保持原过期时间",
+    "expected": "expires_at保持2030-01-01+08同一时刻",
+    "actual": "2029-12-31 16:00:00+00:00",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-05",
+    "desc": "重复授权带expires→刷新过期时间",
+    "expected": "expires_at=2031",
+    "actual": "2031-05-31 16:00:00+00:00",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-06",
+    "desc": "batch逐条独立(2成功2失败)",
+    "expected": "succeeded=2 failed=2",
+    "actual": "s=2 f=2 reasons=['主体不存在或已禁用', '非法主体类型: bad']",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-07",
+    "desc": "batch幂等created=false",
+    "expected": "created=false",
+    "actual": "False",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-08",
+    "desc": "撤销幂等(deleted 1→0)",
+    "expected": "1→0",
+    "actual": "1→0",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-09",
+    "desc": "筛选(owner_type/status/keyword/无命中)",
+    "expected": "各自正确过滤",
+    "actual": "org=1,expired=0,kw=5,kw0=0",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-10",
+    "desc": "by-subject合并org授权",
+    "expected": "含org tool记录",
+    "actual": "{('tool', '1', 'org')}",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-11",
+    "desc": "按资源反查被授权主体",
+    "expected": "含(org,1)",
+    "actual": "{('org', 1)}",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-12",
+    "desc": "subjects选择器(禁用排除/搜索)",
+    "expected": "cus不含禁用5,org不含停用3,usr含1/2,搜索命中1",
+    "actual": "cus=[1, 2, 3, 4],org=[1, 2],usr=[1, 2],kw=1",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-13",
+    "desc": "resource-options五类(停用排除/OB-3)",
+    "expected": "停用资源均不出现",
+    "actual": "{\"model\": [\"16\"], \"kb\": [\"22\"], \"tool\": [\"1\"], \"agent\": [\"10\"], \"node_type\": [\"hitl\", \"sub_agent\", \"tool\"]}",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-14",
+    "desc": "向禁用customer授权→拒绝",
+    "expected": "success=false",
+    "actual": "False/主体不存在或已禁用，无法授权",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-15",
+    "desc": "OB-1:停用/不存在/ghost资源→拒绝",
+    "expected": "均success=false",
+    "actual": "停用:False,不存在:False,ghost:False",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-16",
+    "desc": "过期时间:过去/非法格式→拒绝",
+    "expected": "均success=false",
+    "actual": "past:False/过期时间必须晚于当前时间, invalid:False/过期时间格式非法，需为 ISO 8601",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "FUNC",
+    "id": "FUNC-17",
+    "desc": "§6.2 已删除/已停用/正常三态标注(D4)",
+    "expected": "ghost=(T,F) 停用kb=(F,T) 正常kb=(F,F)",
+    "actual": "ghost=(True,False) off=(False, True) on=(False, False)",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "CACHE",
+    "id": "CACHE-01",
+    "desc": "org_ids读穿写Redis",
+    "expected": "键存在,值含org1",
+    "actual": "keys=authz:org_ids:2,val=\"1\"",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "CACHE",
+    "id": "CACHE-02",
+    "desc": "TTL=300s兜底",
+    "expected": "0<TTL<=300",
+    "actual": "299",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "CACHE",
+    "id": "CACHE-03",
+    "desc": "remove_member→缓存失效",
+    "expected": "键被删除",
+    "actual": "前:authz:org_ids:1 后:",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "CACHE",
+    "id": "CACHE-04",
+    "desc": "add_member→缓存失效",
+    "expected": "键被删除",
+    "actual": "前:authz:org_ids:4 后:",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "CACHE",
+    "id": "CACHE-05",
+    "desc": "Redis宕机降级(判定不受影响)",
+    "expected": "200 success",
+    "actual": "200/True",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "E2E",
+    "id": "E2E-01",
+    "desc": "授权→选择器可见→撤销→消失",
+    "expected": "∅→含22→∅",
+    "actual": "前:[] 中:['22'] 后:[]",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "E2E",
+    "id": "E2E-02",
+    "desc": "org授权→orgB成员(C)可见/A非成员不可见",
+    "expected": "C含16,A不含16",
+    "actual": "C:['16'] A:[]",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "E2E",
+    "id": "E2E-03",
+    "desc": "成员加入orgB→即时获得org授权(Q8)",
+    "expected": "加入后立即可见16",
+    "actual": "前:[] 后:['16']",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "E2E",
+    "id": "E2E-04",
+    "desc": "成员移出orgB→即时失去授权(Q8)",
+    "expected": "移除后不可见16",
+    "actual": "[]",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "E2E",
+    "id": "E2E-05",
+    "desc": "§6.3禁用不放行/恢复自动恢复",
+    "expected": "禁用∅→恢复含22",
+    "actual": "禁用:[] 恢复:['22']",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "E2E",
+    "id": "E2E-06",
+    "desc": "过期授权不放行(§5.2)",
+    "expected": "不含22",
+    "actual": "[]",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "EXC",
+    "id": "EXC-01",
+    "desc": "非法owner/resource类型全端点拒绝",
+    "expected": "均success=false",
+    "actual": "grant-owner:False,grant-res:False,list:False,subj:False,opt:False",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "BND",
+    "id": "BND-01",
+    "desc": "resource_id 65字符→422(schema max64)",
+    "expected": "422",
+    "actual": "422",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "BND",
+    "id": "BND-02",
+    "desc": "resource_id空→422",
+    "expected": "422",
+    "actual": "422",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "BND",
+    "id": "BND-03",
+    "desc": "subjects空/超100→422",
+    "expected": "422/422",
+    "actual": "422/422",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "BND",
+    "id": "BND-04",
+    "desc": "owner_id=0/负数→422",
+    "expected": "422/422",
+    "actual": "422/422",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "BND",
+    "id": "BND-05",
+    "desc": "page=0/page_size=101→422",
+    "expected": "422/422",
+    "actual": "422/422",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "BND",
+    "id": "BND-06",
+    "desc": "关键词特殊字符不报错",
+    "expected": "200",
+    "actual": "200",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "EXC",
+    "id": "EXC-02",
+    "desc": "batch同主体重复→幂等",
+    "expected": "2成功(1创1刷),DB=1",
+    "actual": "s=2,created=[True, False],db=1",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "EXC",
+    "id": "EXC-03",
+    "desc": "撤销不存在记录→幂等deleted=0",
+    "expected": "success,deleted=0",
+    "actual": "True/0",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "NFR",
+    "id": "NFR-01",
+    "desc": "10并发同组合授权→DB唯一/幂等",
+    "expected": "count=1",
+    "actual": "codes=[200, 200, 200, 200, 200, 200, 200, 200, 200, 200],created_true=10,db=1",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "NFR",
+    "id": "NFR-02a",
+    "desc": "审计:grant发放留痕(PRD§5.4)",
+    "expected": "CREATE被捕获",
+    "actual": "before=44,after_create=46,rows=[{'change_type': 'CREATE', 'record_id': '127'}, {'change_type': 'CREATE', 'record_id': '127'}, {'change_type': 'DELETE', 'record_id': '117'}, {'change_type': 'DELETE', 'record_id': '117'}, {'change_type': 'CREATE', 'record_id': '117'}]",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "NFR",
+    "id": "NFR-02b",
+    "desc": "Q6实测:revoke撤销留痕",
+    "expected": "DELETE被捕获(若否则缺陷)",
+    "actual": "after_delete=48,rows=[{'change_type': 'DELETE', 'record_id': '127'}, {'change_type': 'DELETE', 'record_id': '127'}, {'change_type': 'CREATE', 'record_id': '127'}, {'change_type': 'CREATE', 'record_id': '127'}, {'change_type': 'DELETE', 'record_id': '117'}]",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "group": "NFR",
+    "id": "NFR-03",
+    "desc": "list接口耗时(10次)",
+    "expected": "P50<500ms",
+    "actual": "P50=305ms P95=323ms max=344ms",
+    "verdict": "PASS",
+    "note": ""
+  }
+]

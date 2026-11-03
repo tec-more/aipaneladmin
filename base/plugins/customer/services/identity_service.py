@@ -77,14 +77,12 @@ async def _verify_fail_incr(identity: str) -> int:
     """失败计数 +1（窗口 = 锁定时长）"""
     key = _verify_count_key(identity)
     if RedisCache.is_enabled():
-        try:
-            cache = await RedisCache.get_instance()
-            count = await cache._client.incr(key)
-            if count == 1:
-                await cache._client.expire(key, VERIFY_LOCK_SECONDS)
-            return int(count)
-        except Exception as e:
-            logger.warning(f"[identity] Redis 计数失败，退化进程内计数: {e}")
+        cache = await RedisCache.get_instance()
+        # D2 修复：走封装方法（硬超时+熔断），失败返回 None 退化进程内计数
+        count = await cache.incr(key, expire=VERIFY_LOCK_SECONDS)
+        if count is not None:
+            return count
+        logger.warning("[identity] Redis 计数失败，退化进程内计数")
     now = time.monotonic()
     count, expire_ts = _verify_fail_counters.get(key, (0, 0.0))
     if now > expire_ts:
@@ -97,12 +95,11 @@ async def _verify_fail_incr(identity: str) -> int:
 async def _set_verify_lock(identity: str) -> None:
     key = _verify_lock_key(identity)
     if RedisCache.is_enabled():
-        try:
-            cache = await RedisCache.get_instance()
-            await cache._client.set(key, "1", ex=VERIFY_LOCK_SECONDS)
+        cache = await RedisCache.get_instance()
+        # D2 修复：走封装方法（硬超时+熔断）
+        if await cache.set(key, "1", VERIFY_LOCK_SECONDS):
             return
-        except Exception as e:
-            logger.warning(f"[identity] Redis 锁定标记写入失败: {e}")
+        logger.warning("[identity] Redis 锁定标记写入失败")
     _verify_locks[key] = time.monotonic() + VERIFY_LOCK_SECONDS
 
 
@@ -110,12 +107,11 @@ async def _verify_lock_remaining(identity: str) -> int:
     """剩余锁定秒数，0 表示未锁定"""
     key = _verify_lock_key(identity)
     if RedisCache.is_enabled():
-        try:
-            cache = await RedisCache.get_instance()
-            ttl = await cache._client.ttl(key)
-            return max(0, int(ttl)) if ttl and ttl > 0 else 0
-        except Exception:
-            pass
+        cache = await RedisCache.get_instance()
+        # D2 修复：走封装方法（硬超时+熔断）
+        ttl = await cache.ttl(key)
+        if ttl is not None:
+            return max(0, ttl) if ttl > 0 else 0
     expire_ts = _verify_locks.get(key, 0.0)
     remaining = int(expire_ts - time.monotonic())
     if remaining > 0:
@@ -127,12 +123,10 @@ async def _verify_lock_remaining(identity: str) -> int:
 async def _clear_verify_counter(identity: str) -> None:
     key = _verify_count_key(identity)
     if RedisCache.is_enabled():
-        try:
-            cache = await RedisCache.get_instance()
-            await cache._client.delete(key)
+        cache = await RedisCache.get_instance()
+        # D2 修复：走封装方法（硬超时+熔断）
+        if await cache.delete(key):
             return
-        except Exception:
-            pass
     _verify_fail_counters.pop(key, None)
 
 
@@ -140,12 +134,11 @@ async def _send_code_allowed(identity: str) -> bool:
     """验证码发送限频：同主体 60 秒 1 次（Redis SET NX，退化进程内）"""
     key = f"rl:identity_send_code:{identity}"
     if RedisCache.is_enabled():
-        try:
-            cache = await RedisCache.get_instance()
-            ok = await cache._client.set(key, "1", ex=SEND_CODE_MIN_INTERVAL, nx=True)
-            return bool(ok)
-        except Exception:
-            pass
+        cache = await RedisCache.get_instance()
+        # D2 修复：走封装方法（硬超时+熔断）；None=失败，退化进程内限频
+        ok = await cache.set_nx(key, SEND_CODE_MIN_INTERVAL)
+        if ok is not None:
+            return ok
     now = time.monotonic()
     expire_ts = _verify_locks.get(key, 0.0)
     if now < expire_ts:

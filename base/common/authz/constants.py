@@ -9,9 +9,10 @@ from enum import Enum
 
 
 class OwnerType(str, Enum):
-    """归属主体类型（PRD §7.1 双主体，A1 已确认）"""
+    """归属主体类型（PRD §7.1 双主体 + 资源授权管理 PRD §6.1 组织维度）"""
     CUS = "cus"  # 客户用户（customer 插件主体）
     USR = "usr"  # 后台普通用户（core users 主体，叠加 RBAC data_scope）
+    ORG = "org"  # 客户组织（customer 域组织，成员自动继承组织授权）
 
 
 class DataScope(str, Enum):
@@ -35,6 +36,15 @@ class ResourceType(str, Enum):
     TOOL = "tool"          # 工具
     AGENT = "agent"        # 子 Agent
     NODE_TYPE = "node_type"  # 节点类型
+
+
+# node_type 受限类型的中文名（与 schema-validator nodeRegistry 对齐；
+# 供 agent 插件 u_resource_router / admin_grant_router 两侧复用）
+NODE_TYPE_LABELS = {
+    "hitl": "人工节点",
+    "sub_agent": "子Agent",
+    "tool": "工具",
+}
 
 
 # ===== F8 越权限流配置（docs/arch/04 §F8 / 05 §2.1）=====

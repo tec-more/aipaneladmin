@@ -114,7 +114,7 @@ async function loadDetail() {
     currentVersionNo.value = d?.current_version_no ?? d?.current_version ?? null
   } catch {
     // 404（M8 归属不命中按不存在）→ 回列表
-    router.replace({ name: 'WorkflowList' })
+    router.replace({ name: 'Workflows' })
   } finally {
     loading.value = false
   }
@@ -262,7 +262,7 @@ watch(() => execStore.status, (s) => {
 // ---- 离开保护（4.7）----
 function onBack() {
   if (!canvasStore.dirty) {
-    router.push({ name: 'WorkflowList' })
+    router.push({ name: 'Workflows' })
     return
   }
   ElMessageBox.confirm('存在未保存修改，离开前是否保存？', '提示', {
@@ -273,9 +273,9 @@ function onBack() {
     showClose: false
   }).then(async () => {
     await doSave()
-    router.push({ name: 'WorkflowList' })
+    router.push({ name: 'Workflows' })
   }).catch((action) => {
-    if (action === 'cancel') router.push({ name: 'WorkflowList' })
+    if (action === 'cancel') router.push({ name: 'Workflows' })
   })
 }
 

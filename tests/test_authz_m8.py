@@ -51,6 +51,21 @@ async def _close_db():
     await Tortoise.close_connections()
 
 
+async def _reset_redis_client() -> None:
+    """重连 Redis 单例（消除跨 event loop 死连接），仅测试环境使用"""
+    from base.common.cache import RedisCache
+    inst = await RedisCache.get_instance()
+    if getattr(inst, "_client", None) is not None:
+        try:
+            await inst._client.aclose()
+        except Exception:
+            pass
+        inst._client = None
+    from base.common.setting import settings
+    if getattr(settings, "REDIS_ENABLED", False):
+        await inst.connect()
+
+
 class AuthzTestCase(unittest.IsolatedAsyncioTestCase):
     """共享 sqlite 内存库的测试基类"""
 
@@ -65,6 +80,16 @@ class AuthzTestCase(unittest.IsolatedAsyncioTestCase):
 # 1. ResourceGrantService
 # ============================================================
 class ResourceGrantServiceTest(AuthzTestCase):
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        # §6.3 主体有效性校验落地后，判定要求主体真实存在且有效——补建测试主体
+        from base.plugins.customer.models.customer import Customer
+        from base.core.users.models.users import User
+        for cid in (1001, 1002, 1003, 2001):
+            await Customer.create(id=cid, username=f"cus{cid}", is_active=True)
+        for uid in (7, 8, 9, 21):
+            await User.create(id=uid, username=f"usr{uid}", email=f"u{uid}@t.com", is_active=True)
 
     async def test_grant_and_check(self):
         owner = OwnerContext(owner_type=OwnerType.CUS.value, owner_id=1001)
@@ -387,6 +412,21 @@ class ViolationRateLimitTest(AuthzTestCase):
         audit_mod._memory_counters.clear()
         audit_mod._memory_blocks.clear()
         self.audit_mod = audit_mod
+        # 测试隔离（OB-N4-02）：真实 Redis 启用时清空限流键；先重连消除跨 loop 死连接再清理
+        await _reset_redis_client()
+        await self._clean_rl_keys()
+
+    async def asyncTearDown(self):
+        # 封禁键 TTL 60s，不清理会污染后续用例（如 CrossAccessE2ETest 收到 429 而非 404）
+        await _reset_redis_client()
+        await self._clean_rl_keys()
+        await super().asyncTearDown()
+
+    async def _clean_rl_keys(self):
+        from base.common.cache import RedisCache
+        if RedisCache.is_enabled():
+            cache = await RedisCache.get_instance()
+            await cache.delete_pattern("rl:*")
 
     async def test_violation_warn_audit_and_counter(self):
         with patch.object(self.audit_mod, "_write_audit", new=AsyncMock()) as mock_audit:

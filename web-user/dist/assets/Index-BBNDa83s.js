@@ -1,1 +1,0 @@
-import{_ as t,c as o,e as a,j as c,a4 as s}from"./index-BqZ1Tkv4.js";/* empty css             *//* empty css                 */const _={class:"page-placeholder"},p={__name:"Index",setup(r){return(n,d)=>{const e=s;return c(),o("div",_,[a(e,{description:"运行记录与 Trace 回放（T12 试跑任务交付）"})])}}},x=t(p,[["__scopeId","data-v-8ea541d8"]]);export{x as default};

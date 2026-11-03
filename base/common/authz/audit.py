@@ -35,14 +35,12 @@ _memory_blocks: Dict[str, float] = {}
 async def _incr_counter(key: str, window_seconds: int) -> int:
     """窗口计数 +1（Redis INCR/EXPIRE；Redis 不可用退化进程内计数）"""
     if RedisCache.is_enabled():
-        try:
-            cache = await RedisCache.get_instance()
-            count = await cache._client.incr(key)
-            if count == 1:
-                await cache._client.expire(key, window_seconds)
-            return int(count)
-        except Exception as e:
-            logger.warning(f"[authz] Redis 计数失败，退化进程内计数: {e}")
+        cache = await RedisCache.get_instance()
+        # D2 修复：走封装方法（硬超时+熔断），失败返回 None 退化进程内计数
+        count = await cache.incr(key, expire=window_seconds)
+        if count is not None:
+            return count
+        logger.warning("[authz] Redis 计数失败，退化进程内计数")
 
     now = time.monotonic()
     count, expire_ts = _memory_counters.get(key, (0, 0.0))
@@ -55,12 +53,11 @@ async def _incr_counter(key: str, window_seconds: int) -> int:
 
 async def _set_block(key: str, block_seconds: int) -> None:
     if RedisCache.is_enabled():
-        try:
-            cache = await RedisCache.get_instance()
-            await cache._client.set(key, "1", ex=block_seconds)
+        cache = await RedisCache.get_instance()
+        # D2 修复：走封装方法（硬超时+熔断）
+        if await cache.set(key, "1", block_seconds):
             return
-        except Exception as e:
-            logger.warning(f"[authz] Redis 封禁标记写入失败: {e}")
+        logger.warning("[authz] Redis 封禁标记写入失败，退化进程内标记")
     _memory_blocks[key] = time.monotonic() + block_seconds
 
 
@@ -70,7 +67,8 @@ async def is_rate_limited(identity: str, scene: str = RL_SCENE_AUTHZ_404) -> boo
     if RedisCache.is_enabled():
         try:
             cache = await RedisCache.get_instance()
-            return bool(await cache._client.exists(key))
+            # D2 修复：走封装方法（硬超时+熔断），不直连 _client（死连接写路径会绕过 socket_timeout 挂起）
+            return bool(await cache.exists(key))
         except Exception:
             pass
     expire_ts = _memory_blocks.get(key, 0.0)

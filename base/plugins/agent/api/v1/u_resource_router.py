@@ -13,6 +13,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, Query
 
 from base.common.authz import OwnerContext, require_owner
+from base.common.authz.constants import NODE_TYPE_LABELS
 from base.common.authz.service import ResourceGrantService
 from base.common.response import success_response
 
@@ -21,12 +22,8 @@ router = APIRouter(prefix="/u/resources", tags=["用户侧资源授权"])
 # 资源类型枚举（与 graph_validator._NODE_RESOURCE_REFS 一致）
 RESOURCE_TYPES = ("model", "kb", "tool", "agent", "node_type")
 
-# node_type 受限类型的中文名（与 schema-validator nodeRegistry 对齐）
-_NODE_TYPE_LABELS = {
-    "hitl": "人工节点",
-    "sub_agent": "子Agent",
-    "tool": "工具",
-}
+# node_type 受限类型中文名（常量已上移至 authz.constants，供管理侧授权 API 复用）
+_NODE_TYPE_LABELS = NODE_TYPE_LABELS
 
 
 def _to_int_ids(resource_ids: List[str]) -> List[int]:
