@@ -52,7 +52,12 @@
         <template #header>
           <div class="card-header">
             <span>授权记录</span>
-            <el-button type="primary" :icon="Plus" @click="createDialogVisible = true">新建授权</el-button>
+            <div class="header-actions">
+              <el-tooltip content="变更记录保留 90 天" placement="top">
+                <el-button :icon="Clock" @click="goChangeLog">变更记录</el-button>
+              </el-tooltip>
+              <el-button type="primary" :icon="Plus" @click="createDialogVisible = true">新建授权</el-button>
+            </div>
           </div>
         </template>
 
@@ -129,13 +134,20 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Clock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getGrantList, revokeGrant } from '@/api/grant'
 import GrantCreateDialog from './GrantCreateDialog.vue'
 
 const userStore = useUserStore()
+const router = useRouter()
+
+// B1+：跳转数据变更审计，按 resource_grant 表预筛
+const goChangeLog = () => {
+  router.push({ path: '/panel/audit/data-changes', query: { table_name: 'resource_grant' } })
+}
 
 // 资源类型/主体类型中文映射
 const RESOURCE_TYPE_MAP = {
@@ -278,6 +290,12 @@ onMounted(() => {
       display: flex;
       justify-content: space-between;
       align-items: center;
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
     }
 
     .type-tag {

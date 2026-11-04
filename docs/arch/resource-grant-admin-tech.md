@@ -3,6 +3,7 @@
 > 溯源：[resource-grant-admin-prd.md](../RequirementsAnalysis/resource-grant-admin-prd.md)；核心承接 §6.1「判定侧新增 org 维度」结构性裁定。
 > 本文是技术实现方案（数据模型 / 后端 / 前端 / 风险），与 PRD 的产品行为定义分离。
 > 状态：已落地（状态于 2026-11-03 按实际开发/交付进度回写）。
+> 补充（2026-11-04）：原文「组织列表缺口已补齐」与事实不符——组织列表/详情/最小写能力此前未交付，本次以 A3 裁剪版补齐于 customer 域（`/v1/customer/admin/organizations`，见 §3.4）；`web/src/api/grant.js` 亦未封装 `listOrganizations`，以本次 §4.2 订正后的实际封装为准。
 
 ---
 
@@ -12,7 +13,7 @@
 |---|---|---|
 | 数据模型 | `ResourceGrant.owner_type` 支持 `org` 取值 | **零迁移**（字段 `max_length=3` 恰好容纳 `"org"`） |
 | 后端 · 判定 | `check_resource_access` 扩展组织维度解析 | **核心**（§6.1 唯一触及判定逻辑的改动） |
-| 后端 · API | 补齐组织列表 / 按主体反查 / 批量授权 3 个缺口；`owner_type` 校验放行 `org` | 增量 |
+| 后端 · API | 补齐**按主体反查** / **批量授权** 2 个缺口；`owner_type` 校验放行 `org`；组织列表/详情/最小写由 customer 域 `admin/organizations` 补齐（§3.4，A3 裁剪版） | 增量 |
 | 前端 | 新增「资源授权」菜单 + 列表页 + 新建授权表单 + 撤销确认 | 新页面 |
 
 ---
@@ -91,6 +92,28 @@ async def check_resource_access(owner, resource_type, resource_id):
 
 > 既有债务记录（本期不修）：`/v1/customer/list` 认证依赖被注释（"暂时注释，用于调试"），未认证可调，建议另开任务修复。
 
+### 3.4 组织管理后台（A3 裁剪版，2026-11-04 补齐组织列表缺口）
+
+> 挂载：customer 插件 `route_prefix=/v1/customer` + 文件 `base/plugins/customer/api/v1/organization_admin.py` 的 `prefix=/admin/organizations`
+> → 实际前缀 **`/v1/customer/admin/organizations`**；全部 `require_superuser`，统一 `success_response / fail_response` 封装。
+
+| 方法 | 路径 | 关键字段 / 语义 |
+|---|---|---|
+| `GET` | `/v1/customer/admin/organizations` | query `page` / `page_size` / `keyword`（名称模糊）/ `status`（active\|disabled）；data `{items:[{id,name,status,owner_customer_id,owner_username,member_count,created_at}], total, page, page_size}` |
+| `GET` | `/v1/customer/admin/organizations/{org_id}` | data 含 `owner`、`members`（customer_id/username/role/joined_at）、`grants`（`ResourceGrantService.list_by_subject(("org", id), only_valid=False)` + 资源名与 `resource_status: active\|deleted\|inactive` 标注，语义对齐 `admin_grant_router` 的 enrich） |
+| `POST` | `/v1/customer/admin/organizations` | body `{name, owner_customer_id}`；创建成功返回 `{id,name,status}` |
+| `POST` | `/v1/customer/admin/organizations/{org_id}/members` | body `{customer_id, role}`；返回成员对象 |
+| `DELETE` | `/v1/customer/admin/organizations/{org_id}/members/{customer_id}` | 移除成员 |
+
+**超管旁路与缓存失效**：不改 `_require_role`、不在服务层开后门。超管校验通过后，显式取 `org.owner_customer_id` 作为 operator 调用 `CustomerOrganizationService`
+的公开方法（`create_organization` / `add_member` / `remove_member`），因此 `authz:org_ids:` 失效钩子照常触发（加/删成员后 `check_resource_access`
+对该成员立即放行/立即失效，不必等 300s TTL 兜底）。写操作一律经 service，不直写 ORM。
+
+**错误语义**：组织不存在 404；重复成员 / 该客户已是 owner / 组织已停用 409；非法 role、目标客户不存在或禁用、空白名称 400；框架 schema 校验失败沿用全局 422。
+
+> 范围裁剪：不含组织改名/停用接口与后台 UI（`web/`、`web-user/` 本期不动），组织列表数据源此前缺失的问题由本组接口承接；
+> `/admin/grants/subjects?type=org` 仅用于授权主体选择器，不等于组织管理。
+
 ---
 
 ## 4. 前端改动（web 管理后台，Vue3 + Element Plus）
@@ -112,7 +135,7 @@ web/src/views/grant/
     └── SubjectSelect.vue      # 主体级联选择器（FR-06）：类型单选 → 主体搜索多选
 ```
 
-`web/src/api/grant.js`：封装 `listGrants / createGrantBatch / revokeGrant / listOrganizations` 等。
+`web/src/api/grant.js`：实际封装 `getGrantList / createGrant / createGrantBatch / revokeGrant / getGrantsBySubject / getGrantSubjects / getResourceOptions`（**未封装 `listOrganizations`**；组织数据源改由 §3.4 的 `/v1/customer/admin/organizations` 提供）。
 
 ### 4.3 关键交互落点
 
@@ -145,6 +168,8 @@ web/src/views/grant/
 | 后端常量 | `base/common/authz/constants.py` | `OwnerType` 新增 `ORG = "org"`（纯代码，无迁移） |
 | 后端 API | `base/plugins/agent/api/v1/admin_grant_router.py` | owner_type 校验；新增 list / by-subject / batch / subjects / resource-options |
 | 后端服务 | `base/plugins/customer/services/organization_service.py` | add_member/remove_member/create_organization 三处缓存失效挂钩 |
+| 后端 API（A3 裁剪版，2026-11-04） | `base/plugins/customer/api/v1/organization_admin.py` | 新增组织列表/详情/创建/加成员/删成员（超管旁路复用 service 失效钩子，见 §3.4） |
+| 测试 | `tests/test_org_admin.py` | 覆盖列表筛选、详情 enrich、创建、成员增删与缓存失效 |
 | 前端 | `web/src/views/grant/*` + `web/src/api/grant.js` | 新增页面与封装 |
 | 数据 | 菜单表插入「资源授权」记录 | 一次性数据（组件路径 grant/Index） |
 

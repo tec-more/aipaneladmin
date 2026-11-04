@@ -1,7 +1,7 @@
 <template>
   <el-select
     :model-value="modelValue"
-    multiple
+    :multiple="multiple"
     filterable
     remote
     clearable
@@ -23,15 +23,19 @@
 import { ref, watch } from 'vue'
 import { getGrantSubjects } from '@/api/grant'
 
-// FR-06：主体多选选择器（远程搜索）
+// FR-06：主体选择器（远程搜索；默认多选，multiple=false 时单选，供组织 owner/成员选择复用）
 const props = defineProps({
   modelValue: {
-    type: Array,
+    type: [Array, Number, String],
     default: () => []
   },
   subjectType: {
     type: String,
     default: ''
+  },
+  multiple: {
+    type: Boolean,
+    default: true
   }
 })
 const emit = defineEmits(['update:modelValue'])
@@ -41,11 +45,18 @@ const options = ref([])
 // 缓存已加载过的主体（id -> item），避免搜索切换时已选项显示成裸 id
 const itemCache = new Map()
 
+// 已选值统一为数组（单选模式下兼容标量）
+const selectedValues = () => {
+  const value = props.modelValue
+  if (props.multiple) return Array.isArray(value) ? value : []
+  return value === '' || value === null || value === undefined ? [] : [value]
+}
+
 // 合并选项：搜索结果 + 已选中项（从缓存取 label）
 const mergeOptions = (items) => {
   const merged = [...items]
   const ids = new Set(items.map((i) => i.value))
-  for (const id of props.modelValue) {
+  for (const id of selectedValues()) {
     if (!ids.has(id) && itemCache.has(id)) {
       merged.unshift(itemCache.get(id))
     }
@@ -88,7 +99,7 @@ watch(
   () => {
     itemCache.clear()
     options.value = []
-    emit('update:modelValue', [])
+    emit('update:modelValue', props.multiple ? [] : '')
     loadOptions('')
   },
   { immediate: true }

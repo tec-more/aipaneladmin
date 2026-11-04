@@ -1,4 +1,4 @@
-﻿<template>
+﻿﻿<template>
   <div class="data-changes">
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-card">
@@ -121,8 +121,11 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { useRoute } from 'vue-router'
 import { Search, Refresh, View } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+
+const route = useRoute()
 
 const loading = ref(false)
 const detailDialogVisible = ref(false)
@@ -192,6 +195,13 @@ const handleReset = () => {
 const handleDetail = (row) => {
   currentLog.value = row
   detailDialogVisible.value = true
+}
+
+// B1+：深链预筛（如 /panel/audit/data-changes?table_name=resource_grant），
+// 仅预填表名并自动查询一次，不影响其他入口的默认行为
+const initialTableName = typeof route.query.table_name === 'string' ? route.query.table_name.trim() : ''
+if (initialTableName) {
+  searchForm.table_name = initialTableName
 }
 
 fetchData()

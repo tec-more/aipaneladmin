@@ -51,6 +51,14 @@
                     "icon": "Money",
                     "component": "customer/payments/index",
                     "sort": 3
+                },
+                {
+                    "name": "客户组织",
+                    "path": "/customer/organizations",
+                    "icon": "OfficeBuilding",
+                    "component": "customer/organizations/Index",
+                    "sort": 4,
+                    "permission_code": "grant:manage"
                 }
             ]
         }
