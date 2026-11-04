@@ -153,8 +153,10 @@ async def lifespan(app: FastAPI):
         if plugin_manager.get_plugin("audit"):
             task_a1 = asyncio.create_task(audit_cleanup_task())
             background_tasks.append(task_a1)
-            retain_days = getattr(settings, "AUDIT_RETAIN_DAYS", 90) or 90
-            print(f"审计数据变更日志清理定时任务已启动（每24小时，保留 {retain_days} 天，排除授权类表）")
+            print(
+                "审计数据变更日志清理定时任务已启动（每24小时，"
+                "保留天数每轮按 audit_config > settings.AUDIT_RETAIN_DAYS > 90 解析，排除授权类表）"
+            )
         else:
             print("审计数据变更日志清理定时任务跳过（audit 插件未启用）")
 
@@ -278,16 +280,18 @@ async def audit_cleanup_task():
     定时任务：每日清理一次过期的数据变更日志
     - 首次执行前先 sleep，避免启动瞬间批量删除
     - 默认排除授权类表（resource_grant / customer_organization*），保证授权变更可追溯
-    溯源：审计保留期配置 settings.AUDIT_RETAIN_DAYS（config.conf [audit] retention_days）
+    - 保留天数每轮解析：audit_config.retention_days > settings.AUDIT_RETAIN_DAYS > 90
     """
     while True:
         try:
             await asyncio.sleep(86400)  # 24小时
             from base.plugins.audit.services.data_change_service import (
-                DataChangeService,
                 AUTHZ_AUDIT_TABLES,
+                DataChangeService,
+                resolve_retention_days,
             )
-            retain_days = getattr(settings, "AUDIT_RETAIN_DAYS", 90) or 90
+            # 每轮重新解析，后台改 audit_config 无需重启即生效
+            retain_days = await resolve_retention_days()
             deleted = await DataChangeService.delete_old_logs(
                 days=retain_days,
                 exclude_tables=AUTHZ_AUDIT_TABLES,

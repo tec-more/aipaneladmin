@@ -3,7 +3,10 @@ from typing import Optional
 from datetime import datetime
 
 from base.plugins.audit.schemas.audit_log import DataChangeLogResponse, DataChangeLogQuery
-from base.plugins.audit.services.data_change_service import DataChangeService
+from base.plugins.audit.services.data_change_service import (
+    DataChangeService,
+    MIN_RETENTION_DAYS,
+)
 from base.core.users.services.user_service import UserService
 from base.common.security import get_current_user_id
 from base.common.response import SuccessResponse, ErrorResponse
@@ -93,13 +96,19 @@ async def get_record_changes(
 
 @data_change_log_router.delete("/cleanup")
 async def cleanup_old_logs(
-    days: int = Query(90, ge=1, description="保留天数"),
+    days: int = Query(90, description=f"保留天数，最小 {MIN_RETENTION_DAYS} 天"),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """清理旧数据变更日志"""
+    """清理旧数据变更日志（授权类表不在清理范围内）"""
     current_user = await UserService.get_by_id(current_user_id)
     if not current_user or not current_user.is_superuser:
         return ErrorResponse(msg="无权限执行此操作", status_code=status.HTTP_403_FORBIDDEN)
+
+    if days < MIN_RETENTION_DAYS:
+        return ErrorResponse(
+            msg=f"保留天数最小为 {MIN_RETENTION_DAYS} 天（当前 {days} 天），过小会误删近期审计数据",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
     deleted_count = await DataChangeService.delete_old_logs(days)
     return SuccessResponse(data={"deleted_count": deleted_count}, msg=f"已清理 {deleted_count} 条旧日志")
