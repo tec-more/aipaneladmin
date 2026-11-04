@@ -2,6 +2,18 @@ from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
 from base.plugins.audit.models.audit_log import DataChangeLog
 from base.plugins.audit.schemas.audit_log import DataChangeLogCreate
+
+# 授权类表的变更记录不参与保留期清理：
+# 这些记录承载「谁在何时授予/回收了什么权限、谁在何时被加入/移出组织」，
+# 一旦按保留期删除即无法追溯（授权事实本身仍保留，但操作溯源永久丢失）。
+# 若确需清理，必须由人工单独处理并留存外部归档。
+AUTHZ_AUDIT_TABLES: Tuple[str, ...] = (
+    "resource_grant",
+    "customer_organization",
+    "customer_organization_member",
+)
+
+
 class DataChangeService:
     model = "data_change"
     """数据变更服务"""
@@ -63,8 +75,14 @@ class DataChangeService:
         return logs
 
     @staticmethod
-    async def delete_old_logs(days: int = 90) -> int:
-        """删除旧日志"""
+    async def delete_old_logs(
+        days: int = 90,
+        exclude_tables: Tuple[str, ...] = AUTHZ_AUDIT_TABLES,
+    ) -> int:
+        """删除旧日志（默认排除授权类表，保证授权变更可追溯）"""
         cutoff_date = datetime.now() - timedelta(days=days)
-        deleted_count = await DataChangeLog.filter(created_at__lt=cutoff_date).delete()
+        query = DataChangeLog.filter(created_at__lt=cutoff_date)
+        if exclude_tables:
+            query = query.exclude(table_name__in=list(exclude_tables))
+        deleted_count = await query.delete()
         return deleted_count

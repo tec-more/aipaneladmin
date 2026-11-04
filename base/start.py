@@ -149,6 +149,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"配额定时任务启动失败: {e}")
 
+        # 启动审计数据变更日志清理定时任务（仅当 audit 插件启用时；每日一次）
+        if plugin_manager.get_plugin("audit"):
+            task_a1 = asyncio.create_task(audit_cleanup_task())
+            background_tasks.append(task_a1)
+            retain_days = getattr(settings, "AUDIT_RETAIN_DAYS", 90) or 90
+            print(f"审计数据变更日志清理定时任务已启动（每24小时，保留 {retain_days} 天，排除授权类表）")
+        else:
+            print("审计数据变更日志清理定时任务跳过（audit 插件未启用）")
+
         # 启动 Prometheus 推送工作器
         if getattr(settings, 'PROMETHEUS_PUSH_ENABLED', False):
             try:
@@ -260,6 +269,39 @@ async def quota_hold_cleanup_task():
             break
         except Exception as e:
             print(f"[定时任务] 悬挂预占清理失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+
+async def audit_cleanup_task():
+    """
+    定时任务：每日清理一次过期的数据变更日志
+    - 首次执行前先 sleep，避免启动瞬间批量删除
+    - 默认排除授权类表（resource_grant / customer_organization*），保证授权变更可追溯
+    溯源：审计保留期配置 settings.AUDIT_RETAIN_DAYS（config.conf [audit] retention_days）
+    """
+    while True:
+        try:
+            await asyncio.sleep(86400)  # 24小时
+            from base.plugins.audit.services.data_change_service import (
+                DataChangeService,
+                AUTHZ_AUDIT_TABLES,
+            )
+            retain_days = getattr(settings, "AUDIT_RETAIN_DAYS", 90) or 90
+            deleted = await DataChangeService.delete_old_logs(
+                days=retain_days,
+                exclude_tables=AUTHZ_AUDIT_TABLES,
+            )
+            if deleted > 0:
+                print(
+                    f"[定时任务] 清理过期数据变更日志 {deleted} 条"
+                    f"（保留 {retain_days} 天，已排除授权类表）"
+                )
+        except asyncio.CancelledError:
+            print("[定时任务] 审计日志清理任务已取消")
+            break
+        except Exception as e:
+            print(f"[定时任务] 审计日志清理失败: {e}")
             import traceback
             traceback.print_exc()
 
