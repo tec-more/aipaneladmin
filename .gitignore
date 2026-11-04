@@ -2,6 +2,9 @@
 _build/
 web/node_modules/
 
+# 前端构建产物（镜像构建期生成，不入库）
+web/dist/
+
 # dotfiles
 .*
 !.gitignore

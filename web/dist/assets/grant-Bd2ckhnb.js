@@ -1,1 +1,0 @@
-import{a_ as e}from"./index-BWh2i0iB.js";const a=t=>e.get("/v1/agent/admin/grants/list",{params:t}),r=t=>e.post("/v1/agent/admin/grants/batch",t),s=t=>e.delete("/v1/agent/admin/grants",{data:t}),g=t=>e.get("/v1/agent/admin/grants/subjects",{params:t}),o=t=>e.get("/v1/agent/admin/grants/resource-options",{params:t});export{g as a,a as b,r as c,o as g,s as r};
