@@ -55,15 +55,25 @@ async def get_log_list(
     return SuccessResponse(data=response_data)
 
 
+# 清理保留天数的最小值：低于该值会误删近期操作日志
+MIN_RETENTION_DAYS = 30
+
+
 @router.delete("/cleanup", summary="清理旧日志")
 async def cleanup_old_logs(
-        days: int = Query(30, ge=1, description="保留最近多少天的日志"),
+        days: int = Query(30, description=f"保留最近多少天的日志，最小 {MIN_RETENTION_DAYS} 天"),
         current_user_id: int = Depends(get_current_user_id)
 ):
     """清理指定天数前的日志(管理员功能)"""
     current_user = await UserService.get_by_id(current_user_id)
     if not current_user or not current_user.is_superuser:
         return ErrorResponse(msg="无权限执行此操作", status_code=status.HTTP_403_FORBIDDEN)
+
+    if days < MIN_RETENTION_DAYS:
+        return ErrorResponse(
+            msg=f"保留天数最小为 {MIN_RETENTION_DAYS} 天（当前 {days} 天），过小会误删近期操作日志",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
     deleted_count = await OperationLogService.delete_old_logs(days)
 
