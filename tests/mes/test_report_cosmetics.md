@@ -1,5 +1,7 @@
 # 花妍美妆产品测试报告
 
+> 适用范围：MES/化妆品业务历史测试文档（53 个用例），与用户侧智能体平台主线无关；主线测试基线见 tests/ 根目录的 `_t15_*.py`、`test_authz_m8.py`、`test_quota_m9.py`、`test_grant_admin.py`、`test_engine_m2.py`、`test_identity_m11.py` 等脚本。
+
 ## 测试概述
 - 测试日期: 2026-07-12 23:41:55
 - 测试环境: http://127.0.0.1:9998/api/v1

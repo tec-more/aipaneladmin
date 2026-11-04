@@ -353,7 +353,7 @@ def generate_report():
     else:
         report += f"⚠️ 部分测试用例失败，失败率 {fail_count/total_count*100:.1f}%，请检查相关功能模块。"
     
-    report_path = "tests/test_report.md"
+    report_path = "tests/mes/test_report.md"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)
     

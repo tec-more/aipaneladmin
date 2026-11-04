@@ -599,10 +599,10 @@ def generate_test_report():
 
 """
     
-    with open("tests/test_report_cosmetics.md", "w", encoding="utf-8") as f:
+    with open("tests/mes/test_report_cosmetics.md", "w", encoding="utf-8") as f:
         f.write(report)
     
-    print(f"测试报告已保存至: tests/test_report_cosmetics.md")
+    print(f"测试报告已保存至: tests/mes/test_report_cosmetics.md")
     
     with open("tests/test_results_cosmetics.json", "w", encoding="utf-8") as f:
         json.dump(test_results, f, ensure_ascii=False, indent=2)

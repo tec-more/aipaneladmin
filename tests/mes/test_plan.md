@@ -1,5 +1,7 @@
 # 听音蓝牙耳机MES/MRP2系统测试计划
 
+> 适用范围：MES/化妆品业务历史测试文档（53 个用例），与用户侧智能体平台主线无关；主线测试基线见 tests/ 根目录的 `_t15_*.py`、`test_authz_m8.py`、`test_quota_m9.py`、`test_grant_admin.py`、`test_engine_m2.py`、`test_identity_m11.py` 等脚本。
+
 ## 1. 测试概述
 
 ### 1.1 测试目标
@@ -236,7 +238,7 @@
 - 测试结论
 
 ### 6.2 输出文件
-- `tests/test_report.md` - 测试报告
+- `tests/mes/test_report.md` - 测试报告
 - `tests/test_results.json` - 测试结果JSON格式
 
 ---
