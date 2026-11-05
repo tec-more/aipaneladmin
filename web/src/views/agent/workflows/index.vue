@@ -57,10 +57,6 @@
                 <el-icon><Edit /></el-icon>
                 编辑
               </el-button>
-              <el-button type="success" size="small" @click="handleGraph(row)">
-                <el-icon><Share /></el-icon>
-                结构图
-              </el-button>
               <el-button type="info" size="small" @click="handleCopy(row)">
                 <el-icon><CopyDocument /></el-icon>
                 复制
@@ -125,7 +121,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, VideoPlay, CopyDocument, Upload, Download, Share } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, VideoPlay, CopyDocument, Upload, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getWorkflows, createWorkflow, deleteWorkflow, executeWorkflow } from '@/api/agent'
 
@@ -247,10 +243,6 @@ const submitCreate = async () => {
 
 const handleEdit = (row) => {
   router.push(`/panel/agent/workflows/edit/${row.id}`)
-}
-
-const handleGraph = (row) => {
-  router.push(`/panel/agent/workflows/graph/${row.id}`)
 }
 
 const handleExecute = (row) => {

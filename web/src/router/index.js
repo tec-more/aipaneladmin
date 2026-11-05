@@ -177,7 +177,6 @@ const routes = [
       { path: 'llm/usage', name: 'LLMUsage', component: () => import('@/views/llm/usage/index.vue'), meta: { title: '使用记录', icon: 'DataAnalysis' } },
       // 智能体管理
       { path: 'agent/list', name: 'AgentList', component: () => import('@/views/agent/agents/index.vue'), meta: { title: '智能体' } },
-      { path: 'agent/graph/:id', name: 'AgentGraph', component: () => import('@/views/agent/agents/graph.vue'), meta: { title: '智能体结构图' } },
       { path: 'agent/create', name: 'AgentCreate', component: () => import('@/views/agent/agents/edit.vue'), meta: { title: '创建智能体' } },
       { path: 'agent/edit/:id', name: 'AgentEdit', component: () => import('@/views/agent/agents/edit.vue'), meta: { title: '编辑智能体' } },
       { path: 'agent/skills', name: 'AgentSkills', component: () => import('@/views/agent/skills/index.vue'), meta: { title: '技能管理' } },
@@ -190,7 +189,6 @@ const routes = [
       { path: 'agent/tool-tags', name: 'ToolTags', component: () => import('@/views/agent/tool_tags/index.vue'), meta: { title: '工具标签' } },
       { path: 'agent/workflows', name: 'AgentWorkflows', component: () => import('@/views/agent/workflows/index.vue'), meta: { title: '工作流' } },
       { path: 'agent/workflows/edit/:id', name: 'WorkflowEdit', component: () => import('@/views/agent/workflows/edit.vue'), meta: { title: '编辑工作流' } },
-      { path: 'agent/workflows/graph/:id', name: 'WorkflowGraph', component: () => import('@/views/agent/workflows/LangGraphEdit.vue'), meta: { title: '工作流结构图' } },
       { path: 'agent/executions', name: 'Executions', component: () => import('@/views/agent/executions.vue'), meta: { title: '执行记录' } },
       { path: 'agent/memory', name: 'AgentMemory', component: () => import('@/views/agent/memory/index.vue'), meta: { title: '记忆管理' } },
       { path: 'agent/dialog-flows', name: 'DialogFlows', component: () => import('@/views/agent/dialog-flows/index.vue'), meta: { title: '对话流' } },

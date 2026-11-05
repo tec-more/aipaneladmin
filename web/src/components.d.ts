@@ -71,7 +71,6 @@ declare module 'vue' {
     ElUpload: typeof import('element-plus/es')['ElUpload']
     FlowNodePanel: typeof import('./components/approval/FlowNodePanel.vue')['default']
     GlobalApproval: typeof import('./components/GlobalApproval.vue')['default']
-    LangGraphEditor: typeof import('./components/LangGraphEditor.vue')['default']
     MailBell: typeof import('./components/MailBell.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

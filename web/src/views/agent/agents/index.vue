@@ -64,10 +64,6 @@
                 <el-icon><Edit /></el-icon>
                 编辑
               </el-button>
-              <el-button type="success" size="small" @click="handleGraph(row)">
-                <el-icon><Share /></el-icon>
-                结构图
-              </el-button>
               <el-button type="warning" size="small" @click="handleMemory(row)">
                 <el-icon><Memo /></el-icon>
                 记忆
@@ -134,7 +130,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Refresh, Edit, Delete, Memo, Share, Upload } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Edit, Delete, Memo, Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAgents, createAgent, updateAgent, deleteAgent, importAgent } from '@/api/agent'
 
@@ -274,10 +270,6 @@ const handleDelete = async (id) => {
 
 const handleMemory = (row) => {
   window.location.href = `/panel/agent/memory?agent_id=${row.id}`
-}
-
-const handleGraph = (row) => {
-  router.push(`/panel/agent/graph/${row.id}`)
 }
 
 const handleImport = () => {
