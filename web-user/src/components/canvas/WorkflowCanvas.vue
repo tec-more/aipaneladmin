@@ -54,6 +54,7 @@ import { MiniMap } from '@vue-flow/minimap'
 import { ElMessage } from 'element-plus'
 import { RefreshLeft, RefreshRight, Grid, FullScreen } from '@element-plus/icons-vue'
 import { validateConnection } from '@validator'
+import dagre from '@dagrejs/dagre'
 import { useCanvasStore } from '@/stores/canvas'
 import { createNodeByType, makeEdgeId } from '@/utils/graphSerializer'
 import { nodeTypes } from './nodes/nodeTypes'
@@ -110,33 +111,31 @@ function onDrop(event) {
   }
 }
 
-/** 简单分层布局：按 BFS 深度分列（T8 范围；复杂布局库经评审后再引入） */
+/** dagre 分层自动布局：LR 主轴、自动压缩连线交叉、按子树分配行距 */
 function autoLayout() {
   const nodes = canvasStore.nodes
   if (!nodes.length) return
-  const start = nodes.find((n) => n.data?.nodeType === 'start')
-  const depth = new Map()
-  const adj = new Map()
+  const g = new dagre.graphlib.Graph()
+  g.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 140, marginx: 40, marginy: 40 })
+  g.setDefaultEdgeLabel(() => ({}))
+  // 优先用 VueFlow 已测量的实际节点尺寸（含端口行高），缺省 180x56 兜底
+  for (const n of nodes) {
+    const w = n.dimensions?.width || n.width || 180
+    const h = n.dimensions?.height || n.height || 56
+    g.setNode(n.id, { width: w, height: h })
+  }
   for (const e of canvasStore.edges) {
-    if (!adj.has(e.source)) adj.set(e.source, [])
-    adj.get(e.source).push(e.target)
+    if (g.hasNode(e.source) && g.hasNode(e.target)) g.setEdge(e.source, e.target)
   }
-  const queue = start ? [[start.id, 0]] : []
-  while (queue.length) {
-    const [id, d] = queue.shift()
-    if (depth.has(id)) continue
-    depth.set(id, d)
-    for (const nxt of adj.get(id) || []) queue.push([nxt, d + 1])
-  }
+  dagre.layout(g)
   canvasStore.snapshot()
-  const colGap = 260
-  const rowGap = 110
-  const rowCount = new Map()
+  // dagre 返回中心点坐标，VueFlow 需要左上角
   nodes.forEach((n) => {
-    const d = depth.get(n.id) ?? 0
-    const row = rowCount.get(d) || 0
-    rowCount.set(d, row + 1)
-    n.position = { x: 80 + d * colGap, y: 60 + row * rowGap }
+    const pos = g.node(n.id)
+    if (!pos) return
+    const w = n.dimensions?.width || n.width || 180
+    const h = n.dimensions?.height || n.height || 56
+    n.position = { x: Math.round(pos.x - w / 2), y: Math.round(pos.y - h / 2) }
   })
   canvasStore._afterChange()
   fitView()

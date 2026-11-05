@@ -34,6 +34,8 @@ export function toVueFlow(graph) {
     sourceHandle: e.sourceHandle,
     target: e.target,
     targetHandle: e.targetHandle,
+    // 渲染态字段：直角圆角折线（不写入 Schema v2，toGraph 不回传）
+    type: 'smoothstep',
     ...(e.condition ? { condition: e.condition, label: e.condition } : {})
   }))
   return { nodes, edges }

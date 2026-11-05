@@ -173,7 +173,8 @@ export const useCanvasStore = defineStore('canvas', {
         source: conn.source,
         sourceHandle: conn.sourceHandle,
         target: conn.target,
-        targetHandle: conn.targetHandle
+        targetHandle: conn.targetHandle,
+        type: 'smoothstep'
       })
       this._afterChange()
     },
