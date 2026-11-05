@@ -26,6 +26,7 @@ from base.common.response import fail_response, success_response
 
 from ...models.workflow import Workflow, WorkflowExecution
 from ...models.workflow_version import WorkflowVersion
+from ...schemas.workflow import WorkflowCreate, WorkflowUpdate
 from ...services.workflow_service import (
     DraftConflictError,
     ValidationBlockedError,
@@ -91,7 +92,6 @@ def _wf_payload(wf: Workflow) -> Dict[str, Any]:
         "description": wf.description,
         "status": wf.status,
         "definition": wf.definition,
-        "agent_ids": wf.agent_ids,
         "created_at": wf.created_at,
         "updated_at": wf.updated_at,
         "node_count": len(wf.definition.get("nodes", [])) if wf.definition else 0,
@@ -126,27 +126,18 @@ def _version_payload(v: WorkflowVersion) -> Dict[str, Any]:
 # ============================================================
 # 既有端点（接入归属过滤，响应结构不变）
 # ============================================================
-@workflow_router.post("", response_model=dict, summary="创建工作流")
+@workflow_router.post("/", response_model=dict, summary="创建工作流")
 async def create_workflow(
-    name: str,
-    description: Optional[str] = None,
-    definition: Optional[Dict[str, Any]] = None,
-    agent_ids: Optional[List[int]] = None,
+    body: WorkflowCreate,
     owner: OwnerContext = Depends(require_owner),
 ):
-    workflow = await WorkflowService.create_workflow(
-        name=name,
-        description=description,
-        definition=definition,
-        agent_ids=agent_ids,
-        owner=owner,
-    )
+    workflow = await WorkflowService.create_workflow(body, owner=owner)
     return success_response(
         data={"id": workflow.id, "name": workflow.name}, msg="工作流创建成功"
     )
 
 
-@workflow_router.get("", response_model=dict, summary="获取工作流列表")
+@workflow_router.get("/", response_model=dict, summary="获取工作流列表")
 async def get_workflows(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -176,23 +167,11 @@ async def get_workflow(
 @workflow_router.put("/{workflow_id}", response_model=dict, summary="更新工作流")
 async def update_workflow(
     workflow_id: int,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-    definition: Optional[Dict[str, Any]] = None,
-    status: Optional[str] = None,
-    agent_ids: Optional[List[int]] = None,
+    body: WorkflowUpdate,
     owner: OwnerContext = Depends(require_owner),
 ):
     try:
-        workflow = await WorkflowService.update_workflow(
-            workflow_id=workflow_id,
-            name=name,
-            description=description,
-            definition=definition,
-            status=status,
-            agent_ids=agent_ids,
-            owner=owner,
-        )
+        workflow = await WorkflowService.update_workflow(workflow_id, body, owner=owner)
     except OwnedResourceNotFound:
         raise HTTPException(status_code=404, detail="资源不存在或无权访问")
     return success_response(
@@ -358,7 +337,7 @@ async def execute_workflow(
     )
 
 
-@workflow_execution_router.get("", response_model=dict, summary="获取工作流执行列表")
+@workflow_execution_router.get("/", response_model=dict, summary="获取工作流执行列表")
 async def get_workflow_executions(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

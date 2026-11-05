@@ -17,7 +17,7 @@ services:
     restart: always
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD required}"]
     volumes:
-      - redis_data:/data
+      - F:/redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
@@ -43,8 +43,8 @@ services:
     volumes:
       # 生产配置以卷挂载下发（仓库内仅存模板，真实配置不入库）
       - ./config.conf:/app/config.conf
-      - app_storage:/app/storage
-      - app_logs:/app/logs
+      - ../../storage:/app/storage
+      - ../../logs:/app/logs
     expose:
       - "9998"                 # 仅编排内网暴露，外部统一走 nginx
 
@@ -64,8 +64,3 @@ services:
     ports:
       - "8080:80"              # 管理后台（/panel → web/dist，经后端 app_wrapper）
       - "8081:8081"            # web-user 用户端（/workflows 等，nginx 直接托管）
-
-volumes:
-  redis_data:
-  app_storage:
-  app_logs:
