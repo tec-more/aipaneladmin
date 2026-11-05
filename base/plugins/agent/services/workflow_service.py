@@ -1073,8 +1073,8 @@ class WorkflowService:
                           "outputs": []}},
             ],
             "edges": [
-                {"id": "e1", "source": "n_start", "sourceHandle": "out",
-                 "target": "n_end", "targetHandle": "in"},
+                {"id": "e1", "source": "n_start", "sourceHandle": "query",
+                 "target": "n_end", "targetHandle": "answer"},
             ],
             "settings": {"timeout_s": 300, "retry": {"max": 3, "backoff": "1,2,4"},
                          "trace_level": "standard", "memory_mode": "private"},

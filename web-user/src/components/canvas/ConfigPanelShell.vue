@@ -6,6 +6,7 @@
     :modal="false"
     :size="360"
     direction="rtl"
+    modal-class="config-panel-overlay"
     class="config-panel"
     @close="canvasStore.clearSelection()"
   >
@@ -172,5 +173,18 @@ function onLabelChange(val) {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
+}
+</style>
+
+<style lang="scss">
+/* el-drawer modal=false 时 ElOverlay 仍渲染全屏透明 div，会拦截画布点击且自身无 click
+   处理（点击关不掉、选不了其它节点）。让遮罩穿透、面板自身保留交互；关闭走
+   pane-click -> clearSelection -> model-value 变 false 的链路。 */
+.config-panel-overlay {
+  pointer-events: none;
+
+  .el-drawer {
+    pointer-events: auto;
+  }
 }
 </style>

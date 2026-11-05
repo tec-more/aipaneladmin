@@ -169,6 +169,13 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
+/* VueFlow 的 paneClick 仅当 event.target === pane 本身时触发（wrapHandler 丢弃其它 target）。
+   Background 的 svg 铺满画布且 z-index 高于 pane，不放开的话空白处点击永远到不了 pane，
+   pane-click -> clearSelection（关闭右侧配置面板）失效。 */
+.workflow-canvas :deep(.vue-flow__background) {
+  pointer-events: none;
+}
+
 .canvas-toolbar {
   position: absolute;
   top: 12px;

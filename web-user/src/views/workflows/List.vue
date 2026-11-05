@@ -36,10 +36,12 @@
       <el-table-column prop="updated_at" label="更新时间" width="180">
         <template #default="{ row }">{{ formatTime(row.updated_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button text type="primary" @click="goEditor(row)">编辑</el-button>
-          <el-button text type="danger" @click="onDelete(row)">删除</el-button>
+          <div class="row-actions">
+            <el-button text type="primary" @click="goEditor(row)">编辑</el-button>
+            <el-button text type="danger" @click="onDelete(row)">删除</el-button>
+          </div>
         </template>
       </el-table-column>
       <template #empty>
@@ -189,5 +191,17 @@ onMounted(() => loadList())
 .page-pagination {
   margin-top: 16px;
   justify-content: flex-end;
+}
+
+/* 操作列按钮保持单行排列 */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.row-actions .el-button + .el-button {
+  margin-left: 0;
 }
 </style>
